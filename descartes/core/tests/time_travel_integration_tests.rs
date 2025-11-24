@@ -57,6 +57,13 @@ fn create_test_git_repo() -> (TempDir, std::path::PathBuf) {
         .output()
         .unwrap();
 
+    // Disable commit signing for tests
+    Command::new("git")
+        .args(["config", "commit.gpgsign", "false"])
+        .current_dir(&repo_path)
+        .output()
+        .unwrap();
+
     // Create initial commit
     std::fs::write(repo_path.join("test.txt"), "initial content").unwrap();
     Command::new("git")

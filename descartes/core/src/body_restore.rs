@@ -735,6 +735,13 @@ mod tests {
             .output()
             .expect("Failed to configure git user.email");
 
+        // Disable commit signing for tests
+        Command::new("git")
+            .args(["config", "commit.gpgsign", "false"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("Failed to disable commit signing");
+
         // Create initial commit
         std::fs::write(repo_path.join("test.txt"), "initial content").unwrap();
         Command::new("git")
