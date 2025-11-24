@@ -16,6 +16,7 @@ use tokio::sync::RwLock;
 use tracing::{error, info};
 
 /// RPC Server
+#[derive(Clone)]
 pub struct RpcServer {
     config: DaemonConfig,
     handlers: Arc<RpcHandlers>,
@@ -128,15 +129,17 @@ impl RpcServer {
     /// Run the server
     pub async fn run(&self) -> DaemonResult<()> {
         // Start HTTP server
-        let http_handle = tokio::spawn(async {
-            if let Err(e) = self.start_http().await {
+        let server = self.clone();
+        let http_handle = tokio::spawn(async move {
+            if let Err(e) = server.start_http().await {
                 error!("HTTP server error: {:?}", e);
             }
         });
 
         // Start metrics endpoint
-        let metrics_handle = tokio::spawn(async {
-            if let Err(e) = self.start_metrics().await {
+        let server = self.clone();
+        let metrics_handle = tokio::spawn(async move {
+            if let Err(e) = server.start_metrics().await {
                 error!("Metrics server error: {:?}", e);
             }
         });
@@ -161,7 +164,7 @@ async fn handle_http_request(
 ) -> Result<Response<Body>, hyper::Error> {
     metrics.record_connection();
 
-    match req.method() {
+    match *req.method() {
         hyper::Method::POST => {
             let body_bytes = hyper::body::to_bytes(req.into_body()).await?;
 
@@ -175,7 +178,7 @@ async fn handle_http_request(
                                 "code": -32603,
                                 "message": "Internal server error"
                             },
-                            "id": None
+                            "id": serde_json::Value::Null
                         })
                         .to_string()
                     })
@@ -187,7 +190,7 @@ async fn handle_http_request(
                             "code": -32700,
                             "message": format!("Parse error: {}", e)
                         },
-                        "id": None
+                        "id": serde_json::Value::Null
                     })
                     .to_string()
                 }

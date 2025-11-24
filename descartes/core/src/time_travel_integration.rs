@@ -1116,7 +1116,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_rewind_manager() {
-        let store = Arc::new(create_test_store().await);
+        let store = create_test_store().await;
         let (_temp, repo_path) = create_test_repo();
 
         let manager = DefaultRewindManager::new(store, repo_path, 10);
@@ -1152,7 +1152,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_rewind_points() {
-        let store = Arc::new(create_test_store().await);
+        let store = create_test_store().await;
         let (_temp, repo_path) = create_test_repo();
 
         // Create some test events
@@ -1174,7 +1174,7 @@ mod tests {
             store.record_event(event).await.unwrap();
         }
 
-        let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path, 10).unwrap();
+        let manager = DefaultRewindManager::new(store, repo_path, 10).unwrap();
         let points = manager.get_rewind_points("agent-1").await.unwrap();
 
         assert!(!points.is_empty());

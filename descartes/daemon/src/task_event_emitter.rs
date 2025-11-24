@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 /// Configuration for task event emitter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TaskEventEmitterConfig {
     /// Enable debouncing to prevent event flooding
     pub enable_debouncing: bool,

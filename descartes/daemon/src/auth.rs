@@ -27,11 +27,12 @@ pub struct AuthManager {
 impl AuthManager {
     /// Create a new authentication manager
     pub fn new(config: AuthConfig) -> DaemonResult<Self> {
-        let secret = config.jwt_secret.as_bytes();
+        let encoding_key = EncodingKey::from_secret(config.jwt_secret.as_bytes());
+        let decoding_key = DecodingKey::from_secret(config.jwt_secret.as_bytes());
         Ok(AuthManager {
             config,
-            encoding_key: EncodingKey::from_secret(secret),
-            decoding_key: DecodingKey::from_secret(secret),
+            encoding_key,
+            decoding_key,
         })
     }
 

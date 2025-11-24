@@ -181,7 +181,7 @@ impl RpcHandlers {
         }
 
         // TODO: Fetch actual state from state store
-        let state = serde_json::json!({});
+        let state = std::collections::HashMap::new();
 
         let response = StateQueryResponse {
             state: state,

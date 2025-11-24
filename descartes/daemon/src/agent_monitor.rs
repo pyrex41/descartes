@@ -241,7 +241,7 @@ impl AgentMonitor {
     /// Process a JSON line from an agent
     pub async fn process_message(&self, line: &str) -> StreamResult<()> {
         let mut parser = self.parser.write().await;
-        parser.process_lines(&[line])?;
+        parser.process_lines(vec![line])?;
 
         // Update stats
         let mut stats = self.stats.write().await;

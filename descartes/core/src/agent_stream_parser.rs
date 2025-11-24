@@ -138,8 +138,10 @@ pub trait StreamHandler: Send + Sync {
 // PARSER CONFIGURATION
 // ============================================================================
 
+use serde::{Deserialize, Serialize};
+
 /// Configuration for the stream parser
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParserConfig {
     /// Maximum line length in bytes (prevents buffer overflow)
     pub max_line_length: usize,
@@ -297,16 +299,18 @@ impl AgentStreamParser {
     /// Process a synchronous iterator of JSON lines
     ///
     /// This is useful for testing or when working with buffered data.
-    pub fn process_lines<'a, I>(&mut self, lines: I) -> StreamResult<()>
+    pub fn process_lines<I, S>(&mut self, lines: I) -> StreamResult<()>
     where
-        I: IntoIterator<Item = &'a str>,
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
     {
         for line in lines {
-            if line.trim().is_empty() {
+            let line_ref = line.as_ref();
+            if line_ref.trim().is_empty() {
                 continue;
             }
 
-            match self.parse_line(line) {
+            match self.parse_line(line_ref) {
                 Ok(()) => {
                     self.messages_processed += 1;
                 }

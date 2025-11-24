@@ -311,7 +311,7 @@ impl GitBodyRestoreManager {
                     commit_hash, e
                 ))
             })
-            .map(|obj| obj.id)
+            .map(|obj| obj.detach())
     }
 
     /// Convert a commit object to CommitInfo
@@ -337,10 +337,9 @@ impl GitBodyRestoreManager {
 
         let timestamp = author.time.seconds;
 
-        let parents: Vec<String> = commit.parents()
-            .map(|p| p.map(|c| c.id.to_string()))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read parents: {}", e)))?;
+        let parents: Vec<String> = commit.parent_ids()
+            .map(|id| id.to_string())
+            .collect();
 
         Ok(CommitInfo::new(hash, message, author_name, author_email, timestamp)
             .with_parents(parents))
@@ -352,11 +351,12 @@ impl BodyRestoreManager for GitBodyRestoreManager {
     async fn get_current_commit(&self) -> StateStoreResult<String> {
         let repo = self.open_repo()?;
 
-        let head = repo.head()
+        let mut head = repo.head()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read HEAD: {}", e)))?;
 
-        let commit_id = head.peel_to_id_in_place()
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD commit: {}", e)))?;
+        let commit_id = head.try_peel_to_id_in_place()
+            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD commit: {}", e)))?
+            .ok_or_else(|| StateStoreError::DatabaseError("Could not peel HEAD to ID".to_string()))?;
 
         Ok(commit_id.to_string())
     }
@@ -374,16 +374,14 @@ impl BodyRestoreManager for GitBodyRestoreManager {
     }
 
     async fn verify_commit_exists(&self, commit_hash: &str) -> StateStoreResult<bool> {
-        match self.parse_commit_hash(commit_hash) {
-            Ok(oid) => {
-                let repo = self.open_repo()?;
-                match repo.find_object(oid) {
-                    Ok(obj) => Ok(obj.kind == Kind::Commit),
-                    Err(_) => Ok(false),
-                }
-            }
-            Err(_) => Ok(false),
-        }
+        let oid = match self.parse_commit_hash(commit_hash) {
+            Ok(oid) => oid,
+            Err(_) => return Ok(false),
+        };
+
+        let repo = self.open_repo()?;
+        let exists = repo.find_object(oid).map(|obj| obj.kind == Kind::Commit).unwrap_or(false);
+        Ok(exists)
     }
 
     async fn has_uncommitted_changes(&self) -> StateStoreResult<bool> {
@@ -395,11 +393,13 @@ impl BodyRestoreManager for GitBodyRestoreManager {
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read index: {}", e)))?;
 
         // Get the HEAD tree
-        let head = repo.head()
+        let mut head = repo.head()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read HEAD: {}", e)))?;
 
-        let head_commit_id = head.peel_to_id_in_place()
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD: {}", e)))?;
+        let head_commit_id = head.try_peel_to_id_in_place()
+            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD: {}", e)))?
+            .ok_or_else(|| StateStoreError::DatabaseError("Could not peel HEAD to ID".to_string()))?
+            .detach();
 
         let head_commit = repo.find_object(head_commit_id)
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to find HEAD commit: {}", e)))?
@@ -517,12 +517,15 @@ impl BodyRestoreManager for GitBodyRestoreManager {
         let target_oid = self.parse_commit_hash(commit_hash)?;
 
         // Update HEAD to point to the target commit (detached HEAD state)
-        let mut head_ref = repo.head_ref()
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e)))?;
+        {
+            let mut head_ref = repo.head_ref()
+                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e)))?
+                .ok_or_else(|| StateStoreError::DatabaseError("HEAD reference not found".to_string()))?;
 
-        // Detach HEAD and point it to the target commit
-        head_ref.set_target_id(target_oid, "restore body")
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to update HEAD: {}", e)))?;
+            // Detach HEAD and point it to the target commit
+            head_ref.set_target_id(target_oid, "restore body")
+                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to update HEAD: {}", e)))?;
+        }
 
         info!("Successfully checked out commit: {}", commit_hash);
 
@@ -553,11 +556,14 @@ impl BodyRestoreManager for GitBodyRestoreManager {
         let target_oid = self.parse_commit_hash(&backup.head_commit)?;
 
         // Update HEAD back to the backup commit
-        let mut head_ref = repo.head_ref()
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e)))?;
+        {
+            let mut head_ref = repo.head_ref()
+                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e)))?
+                .ok_or_else(|| StateStoreError::DatabaseError("HEAD reference not found".to_string()))?;
 
-        head_ref.set_target_id(target_oid, "rollback restore")
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to rollback HEAD: {}", e)))?;
+            head_ref.set_target_id(target_oid, "rollback restore")
+                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to rollback HEAD: {}", e)))?;
+        }
 
         // Restore stash if it exists
         if let Some(ref stash_ref) = backup.stash_ref {
@@ -574,11 +580,13 @@ impl BodyRestoreManager for GitBodyRestoreManager {
     async fn get_recent_commits(&self, limit: usize) -> StateStoreResult<Vec<CommitInfo>> {
         let repo = self.open_repo()?;
 
-        let head = repo.head()
+        let mut head = repo.head()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read HEAD: {}", e)))?;
 
-        let head_id = head.peel_to_id_in_place()
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD: {}", e)))?;
+        let head_id = head.try_peel_to_id_in_place()
+            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD: {}", e)))?
+            .ok_or_else(|| StateStoreError::DatabaseError("Could not peel HEAD to ID".to_string()))?
+            .detach();
 
         let mut commits = Vec::new();
         let mut current_id = Some(head_id);
@@ -596,10 +604,9 @@ impl BodyRestoreManager for GitBodyRestoreManager {
             let commit_info = self.commit_to_info(commit.clone())?;
 
             // Get first parent for linear history traversal
-            current_id = commit.parents()
+            current_id = commit.parent_ids()
                 .next()
-                .and_then(|r| r.ok())
-                .map(|c| c.id);
+                .map(|id| id.detach());
 
             commits.push(commit_info);
         }

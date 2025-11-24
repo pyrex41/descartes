@@ -3,7 +3,7 @@
 use crate::errors::{DaemonError, DaemonResult};
 use crate::types::{MetricsAgents, MetricsResponse, MetricsSystem};
 use chrono::Utc;
-use prometheus::{Counter, Histogram, IntGauge, Registry};
+use prometheus::{Counter, Encoder, Histogram, HistogramOpts, IntGauge, Registry};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -41,7 +41,8 @@ impl MetricsCollector {
             .register(Box::new(request_total.clone()))
             .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
 
-        let request_duration = Histogram::new("request_duration_seconds", "Request duration")
+        let opts = HistogramOpts::new("request_duration_seconds", "Request duration");
+        let request_duration = Histogram::with_opts(opts)
             .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
         registry
             .register(Box::new(request_duration.clone()))
@@ -135,10 +136,11 @@ impl MetricsCollector {
     /// Get all metrics in Prometheus format
     pub fn gather_metrics(&self) -> DaemonResult<String> {
         let metrics = self.registry.gather();
-        prometheus::TextEncoder::new()
-            .encode(&metrics, &mut Vec::new())
-            .map(|bytes| String::from_utf8(bytes).unwrap_or_default())
-            .map_err(|e| DaemonError::MetricsError(e.to_string()))
+        let mut buffer = Vec::new();
+        let encoder = prometheus::TextEncoder::new();
+        encoder.encode(&metrics, &mut buffer)
+            .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
+        String::from_utf8(buffer).map_err(|e| DaemonError::MetricsError(e.to_string()))
     }
 
     /// Get metrics response

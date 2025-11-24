@@ -28,7 +28,7 @@ jsonrpc-ws-server = "18.0"
 jsonrpc-derive = "18.0"
 
 # jsonrpsee (new implementation for Unix sockets)
-jsonrpsee = { version = "0.21", features = ["server", "macros"] }
+jsonrpsee = { version = "0.21", features = ["server", "macros", "http-client", "ws-client"] }
 
 # HTTP and WebSocket
 hyper = { workspace = true }
@@ -50,6 +50,7 @@ parking_lot = "0.12"
 dashmap = "5.5"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5.0"
+toml = "0.8"
 
 # Authentication
 jsonwebtoken = "9.2"

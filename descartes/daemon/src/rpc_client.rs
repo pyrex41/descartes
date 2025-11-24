@@ -206,7 +206,7 @@ impl UnixSocketRpcClient {
             let code = error.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
             let message = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown error");
             error!("RPC error: {} (code: {})", message, code);
-            return Err(DaemonError::RpcError(code as i32, message.to_string()));
+            return Err(DaemonError::RpcError(code, message.to_string()));
         }
 
         // Extract result

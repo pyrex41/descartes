@@ -10,7 +10,7 @@
 //! - get_state: Query the current state
 
 use crate::errors::{DaemonError, DaemonResult};
-use descartes_core::traits::{AgentConfig, AgentRunner, StateStore, Task, TaskStatus};
+use descartes_core::traits::{AgentConfig, Task, TaskStatus};
 use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::server::{Server, ServerHandle};
