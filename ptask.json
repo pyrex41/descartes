@@ -1,0 +1,910 @@
+{
+  "parallel_execution_plan": [
+    {
+      "wave": 1,
+      "description": "Parallel Batch 1",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "[PARENT] Extend SQLite Schema for AST and File Dependencies",
+          "complexity": 5,
+          "priority": "high"
+        },
+        {
+          "id": "1.1",
+          "title": "Design Schema Extensions",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "10.1",
+          "title": "Parse Swarm.toml Definitions",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "11.1",
+          "title": "Define Lease Model and Schema",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "12.1",
+          "title": "Define Hash Schema and Model",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "13.1",
+          "title": "Define Provider Models",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "14.1",
+          "title": "Define Auto-Deny Policies and Timeout Configurations",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "15.1",
+          "title": "Define Approval API Schemas",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "16",
+          "title": "[PARENT] Implement Global Thoughts Storage",
+          "complexity": 3,
+          "priority": "medium"
+        },
+        {
+          "id": "16.1",
+          "title": "Set up Global Storage Directory",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "17.1",
+          "title": "Define Symlinking Requirements",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "18.1",
+          "title": "Define Thought Schema for Tantivy",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "19.1",
+          "title": "Design and Create Tasks Table Schema",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "2.1",
+          "title": "Set up LanceDB Integration",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "20.1",
+          "title": "Integrate SQLite Schema for Tasks",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "21",
+          "title": "[PARENT] Create .descartes/config.toml Schema",
+          "complexity": 5,
+          "priority": "medium"
+        },
+        {
+          "id": "21.1",
+          "title": "Define Configuration Fields",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "22.1",
+          "title": "Integrate Shared Schema into SCUD",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "23",
+          "title": "[PARENT] Implement Local Encrypted Secrets Storage",
+          "complexity": 5,
+          "priority": "medium"
+        },
+        {
+          "id": "23.1",
+          "title": "Define Secret Data Model",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "24.1",
+          "title": "Identify Secrets to Mask",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "25",
+          "title": "[PARENT] Create NotificationRouter Trait",
+          "complexity": 3,
+          "priority": "low"
+        },
+        {
+          "id": "25.1",
+          "title": "Define NotificationRouter Trait",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "26.1",
+          "title": "Set up TelegramAdapter foundation",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "3.1",
+          "title": "Set up Tantivy Integration and Schema",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "4.1",
+          "title": "Set up Tree-Sitter Library Integration",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "5.1",
+          "title": "Design AST Node Models and Schemas",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "6.1",
+          "title": "Integrate Rayon Dependency",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "7.1",
+          "title": "Evaluate and Select State Machine Library",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "8.1",
+          "title": "Define State Chart Data Models",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "9.1",
+          "title": "Define Deadlock Models and Schemas",
+          "complexity": 0,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "description": "Parallel Batch 2",
+      "tasks": [
+        {
+          "id": "1.2",
+          "title": "Implement Schema Changes",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "10.2",
+          "title": "Implement Mermaid Diagram Generation",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "11.2",
+          "title": "Implement Lease Acquisition Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "12.2",
+          "title": "Implement Hash Generation Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "13.2",
+          "title": "Implement Agent Spawning Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "14.2",
+          "title": "Implement Auto-Deny and Timeout Logic in Approval Manager",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "15.2",
+          "title": "Implement Approval Core Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "16.2",
+          "title": "Implement Storage and Retrieval Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "17",
+          "title": "[PARENT] Add Symlinking Logic for Project Notes",
+          "complexity": 5,
+          "priority": "medium"
+        },
+        {
+          "id": "17.2",
+          "title": "Implement Core Symlinking Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "18.2",
+          "title": "Implement Thought Indexing Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "19",
+          "title": "[PARENT] Finalize Tasks Schema in SQLite",
+          "complexity": 3,
+          "priority": "high"
+        },
+        {
+          "id": "19.2",
+          "title": "Refine and Finalize Schema for Required Fields",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "2",
+          "title": "[PARENT] Implement LanceDB Vector Storage",
+          "complexity": 5,
+          "priority": "high"
+        },
+        {
+          "id": "2.2",
+          "title": "Define Vector Schema",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "20.2",
+          "title": "Implement Create Operation",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "21.2",
+          "title": "Design Schema Structure",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "22.2",
+          "title": "Implement Database Reading Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "23.2",
+          "title": "Implement AES-256 Encryption/Decryption Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "24",
+          "title": "[PARENT] Add Secret Masking in Logs",
+          "complexity": 5,
+          "priority": "low"
+        },
+        {
+          "id": "24.2",
+          "title": "Implement Masking Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "25.2",
+          "title": "Set Up Interfaces for Different Adapters",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "26",
+          "title": "[PARENT] Implement TelegramAdapter",
+          "complexity": 8,
+          "priority": "low"
+        },
+        {
+          "id": "26.2",
+          "title": "Implement message sending logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "3",
+          "title": "[PARENT] Implement Tantivy Full-Text Search Index",
+          "complexity": 5,
+          "priority": "high"
+        },
+        {
+          "id": "3.2",
+          "title": "Implement Document Indexing Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "4.2",
+          "title": "Integrate Rust Grammar",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "5.2",
+          "title": "Implement AST Parsing Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "6.2",
+          "title": "Refactor Indexing Logic for Parallelism",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "7.2",
+          "title": "Integrate Selected Library into Project",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "8.2",
+          "title": "Implement TOML Parsing Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "9.2",
+          "title": "Design Deadlock Detection Algorithm",
+          "complexity": 0,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "description": "Parallel Batch 3",
+      "tasks": [
+        {
+          "id": "1.3",
+          "title": "Create Sample Data and Queries",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "10.3",
+          "title": "Add Diagram Output Functionality",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "11",
+          "title": "[PARENT] Implement TTL-Based File Locking",
+          "complexity": 8,
+          "priority": "high"
+        },
+        {
+          "id": "11.3",
+          "title": "Implement Lease Release Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "12.3",
+          "title": "Integrate Concurrency Check in Write Operations",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "13.3",
+          "title": "Add CLI Command Interface",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "14.3",
+          "title": "Configure Default Behaviors",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "15.3",
+          "title": "Implement API Endpoints",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "16.3",
+          "title": "Test Storing and Reading Thoughts",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "17.3",
+          "title": "Ensure Proper Linking and Access",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "18",
+          "title": "[PARENT] Index Thoughts in Tantivy",
+          "complexity": 5,
+          "priority": "medium"
+        },
+        {
+          "id": "18.3",
+          "title": "Implement Search Functionality",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "19.3",
+          "title": "Populate Database with Sample Tasks",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "2.3",
+          "title": "Implement CRUD Operations",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "20",
+          "title": "[PARENT] Implement CRUD Operations in StateStore",
+          "complexity": 5,
+          "priority": "high"
+        },
+        {
+          "id": "20.3",
+          "title": "Implement Update and Delete Operations",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "21.3",
+          "title": "Implement Schema Parsing",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "22",
+          "title": "[PARENT] Implement Shared Schema Logic for SCUD",
+          "complexity": 5,
+          "priority": "medium"
+        },
+        {
+          "id": "22.3",
+          "title": "Ensure Compatibility and Access",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "23.3",
+          "title": "Build Secure Storage and Retrieval Mechanism",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "24.3",
+          "title": "Integrate Masking into Logging Outputs",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "25.3",
+          "title": "Test Trait Implementation",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "26.3",
+          "title": "Integrate with NotificationRouter",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "26.4",
+          "title": "Unit test TelegramAdapter",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "3.3",
+          "title": "Implement Search Capabilities",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "4",
+          "title": "[PARENT] Integrate Tree-Sitter with Grammars",
+          "complexity": 8,
+          "priority": "high"
+        },
+        {
+          "id": "4.3",
+          "title": "Integrate Python Grammar",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "5.3",
+          "title": "Develop Semantic Chunking Algorithm",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "6.3",
+          "title": "Optimize for Large Repositories",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "7.3",
+          "title": "Implement Basic State Machine Structure and Transitions",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "8.3",
+          "title": "Create Sample TOML Files",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "8.5",
+          "title": "Implement Swarm.toml Export",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "9.3",
+          "title": "Implement Core Verification Logic",
+          "complexity": 0,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "description": "Parallel Batch 4",
+      "tasks": [
+        {
+          "id": "1.4",
+          "title": "Verify and Test Implementation",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "10.4",
+          "title": "Verify Diagram Accuracy",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "11.4",
+          "title": "Integrate Locking Mechanism into ContextSyncer",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "12",
+          "title": "[PARENT] Implement Optimistic Concurrency Checks",
+          "complexity": 8,
+          "priority": "high"
+        },
+        {
+          "id": "12.4",
+          "title": "Implement Rejection Handling",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "13.4",
+          "title": "Test and Document the Spawn Command",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "14.4",
+          "title": "Add Tests for Timeout Simulation and Auto-Deny Verification",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "15.4",
+          "title": "Test API Calls",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "17.4",
+          "title": "Validate Symlinks in Test Projects",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "18.4",
+          "title": "Test Search and Indexing",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "2.4",
+          "title": "Test Vector Storage and Retrieval",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "20.4",
+          "title": "Implement Read Operation and Test CRUD",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "21.4",
+          "title": "Validate Schema Parsing",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "22.4",
+          "title": "Test SCUD Reading Sample Data",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "23.4",
+          "title": "Test Secure Storage and Retrieval",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "24.4",
+          "title": "Verify Masking in Test Logs",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "26.5",
+          "title": "Test end-to-end message sending",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "3.4",
+          "title": "Validate with Sample Documents and Searches",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "4.4",
+          "title": "Integrate Markdown and Git Commit Grammars",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "5",
+          "title": "[PARENT] Implement Semantic Chunking Strategy",
+          "complexity": 13,
+          "priority": "high"
+        },
+        {
+          "id": "5.4",
+          "title": "Integrate Chunking with Ingestion Pipeline",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "6.4",
+          "title": "Implement Benchmarking",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "7.4",
+          "title": "Develop and Run Tests for Simple State Machines",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "8.4",
+          "title": "Validate Parser with Samples",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "9.4",
+          "title": "Integrate Verification with Parser",
+          "complexity": 0,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "description": "Parallel Batch 5",
+      "tasks": [
+        {
+          "id": "11.5",
+          "title": "Test Locking and Unlocking Files",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "12.5",
+          "title": "Test Concurrency Scenarios",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "2.5",
+          "title": "Create Proof of Concept Deployment and Testing",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "4.5",
+          "title": "Test Parsing Accuracy on Sample Files",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "5.5",
+          "title": "Unit Test Chunking Components",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "6",
+          "title": "[PARENT] Add Parallel Indexing with Rayon",
+          "complexity": 8,
+          "priority": "medium"
+        },
+        {
+          "id": "6.5",
+          "title": "Test and Document Changes",
+          "complexity": 0,
+          "priority": "low"
+        },
+        {
+          "id": "7.5",
+          "title": "Integrate Rewind and Resume Logic",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "8.6",
+          "title": "Add Tests and Documentation",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "9.5",
+          "title": "Create Test Cases for State Charts",
+          "complexity": 0,
+          "priority": "medium"
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "description": "Parallel Batch 6",
+      "tasks": [
+        {
+          "id": "5.6",
+          "title": "Verify Chunking Quality on Codebases",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "7",
+          "title": "[PARENT] Integrate State Machine Library",
+          "complexity": 5,
+          "priority": "high"
+        },
+        {
+          "id": "7.6",
+          "title": "Run benchmarks and verify performance gains",
+          "complexity": 0,
+          "priority": "low"
+        },
+        {
+          "id": "9.6",
+          "title": "Test and Validate Implementation",
+          "complexity": 0,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "wave": 7,
+      "description": "Parallel Batch 7",
+      "tasks": [
+        {
+          "id": "8",
+          "title": "[PARENT] Implement Swarm.toml Parser",
+          "complexity": 5,
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "wave": 8,
+      "description": "Parallel Batch 8",
+      "tasks": [
+        {
+          "id": "10",
+          "title": "[PARENT] Implement Mermaid Diagram Generator",
+          "complexity": 5,
+          "priority": "medium"
+        },
+        {
+          "id": "9",
+          "title": "[PARENT] Add Compile-Time Verification for Deadlocks",
+          "complexity": 13,
+          "priority": "medium"
+        }
+      ]
+    },
+    {
+      "wave": 9,
+      "description": "Parallel Batch 9",
+      "tasks": [
+        {
+          "id": "13",
+          "title": "Create ApprovalQueue in SQLite",
+          "complexity": 2,
+          "priority": "medium"
+        }
+      ]
+    },
+    {
+      "wave": 10,
+      "description": "Parallel Batch 10",
+      "tasks": [
+        {
+          "id": "14",
+          "title": "[PARENT] Implement Auto-Deny Policies and Timeouts",
+          "complexity": 5,
+          "priority": "medium"
+        },
+        {
+          "id": "15",
+          "title": "[PARENT] Expose API for External UI Approvals",
+          "complexity": 5,
+          "priority": "medium"
+        }
+      ]
+    }
+  ]
+}
