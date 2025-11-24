@@ -1,0 +1,106 @@
+# Swarm.toml - Generated from DAG 'Parallel Code Review'
+# Generated: 2025-11-24 12:00:00 UTC
+# This file was automatically generated from a visual DAG representation.
+# Edit with caution as manual changes may be lost on regeneration.
+
+[metadata]
+version = "1.0"
+name = "parallel_code_review"
+description = "Multiple agents review code simultaneously"
+author = "Descartes DAG Export"
+created = "2025-11-24"
+
+[agents.architect]
+model = "claude-3-opus"
+max_tokens = 4000
+temperature = 0.7
+tags = ["design", "architecture"]
+
+[agents.maintainability]
+model = "claude-3-sonnet"
+max_tokens = 2000
+temperature = 0.5
+tags = ["maintainability", "code_quality"]
+
+[agents.performance]
+model = "claude-3-sonnet"
+max_tokens = 2000
+temperature = 0.5
+tags = ["performance", "optimization"]
+
+[agents.security]
+model = "claude-3-opus"
+max_tokens = 3000
+temperature = 0.5
+tags = ["security", "vulnerability"]
+
+[resources]
+
+[[workflows]]
+name = "parallel_code_review"
+description = "Multiple agents review code simultaneously"
+
+[workflows.metadata]
+initial_state = "SubmittedForReview"
+completion_timeout_seconds = 1800
+max_retries = 2
+retry_backoff_seconds = 60
+
+[workflows.guards]
+any_critical = "context.critical_issues > 0"
+consensus_approved = "context.approval_votes >= 3"
+
+[workflows.states.Approved]
+description = "Code approved by parallel review consensus"
+agents = []
+entry_actions = ["merge_code", "notify_team"]
+exit_actions = []
+terminal = true
+parallel_execution = false
+handlers = []
+required_resources = []
+
+[workflows.states.ChangesNeeded]
+description = "Changes needed based on parallel reviews"
+agents = []
+entry_actions = ["compile_feedback", "notify_developer"]
+exit_actions = []
+terminal = true
+parallel_execution = false
+handlers = []
+required_resources = []
+
+[workflows.states.ReviewsGathered]
+description = "All parallel reviews collected and analyzed"
+agents = ["architect", "security", "performance", "maintainability"]
+entry_actions = ["aggregate_feedback", "analyze_consensus"]
+exit_actions = []
+terminal = false
+parallel_execution = true
+required_resources = []
+
+[[workflows.states.ReviewsGathered.handlers]]
+event = "consensus_approved"
+target = "Approved"
+guards = ["consensus_approved"]
+
+[[workflows.states.ReviewsGathered.handlers]]
+event = "issues_found"
+target = "ChangesNeeded"
+guards = ["any_critical"]
+
+[workflows.states.SubmittedForReview]
+description = "Code submitted, initiating parallel reviews"
+agents = []
+entry_actions = ["prepare_code_for_review", "assign_reviewers"]
+exit_actions = []
+terminal = false
+parallel_execution = false
+required_resources = []
+
+[[workflows.states.SubmittedForReview.handlers]]
+event = "reviews_complete"
+target = "ReviewsGathered"
+guards = []
+
+[workflows.contracts]

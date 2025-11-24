@@ -165,6 +165,15 @@ pub enum ControlCommandType {
 
     /// Send a custom signal to the agent
     Signal,
+
+    /// Send a custom action to the agent
+    CustomAction,
+
+    /// Query agent output with filtering
+    QueryOutput,
+
+    /// Stream agent logs
+    StreamLogs,
 }
 
 /// Control command to send to an agent.
@@ -379,6 +388,151 @@ pub struct HealthCheckResponse {
     pub metadata: Option<HashMap<String, String>>,
 }
 
+/// Custom action request for sending arbitrary commands to agents
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomActionRequest {
+    /// Unique identifier for this request
+    pub request_id: String,
+
+    /// ID of the agent to send action to
+    pub agent_id: Uuid,
+
+    /// Action name/type
+    pub action: String,
+
+    /// Action parameters
+    #[serde(default)]
+    pub params: Option<serde_json::Value>,
+
+    /// Optional timeout for the action
+    #[serde(default)]
+    pub timeout_secs: Option<u64>,
+}
+
+/// Batch control command for multiple agents
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchControlCommand {
+    /// Unique identifier for this batch request
+    pub request_id: String,
+
+    /// Agent IDs to control
+    pub agent_ids: Vec<Uuid>,
+
+    /// Command to execute on all agents
+    pub command_type: ControlCommandType,
+
+    /// Optional payload for the command
+    #[serde(default)]
+    pub payload: Option<serde_json::Value>,
+
+    /// Whether to fail fast or continue on errors
+    #[serde(default)]
+    pub fail_fast: bool,
+}
+
+/// Batch control response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchControlResponse {
+    /// The request ID this is responding to
+    pub request_id: String,
+
+    /// Overall success (true if all succeeded)
+    pub success: bool,
+
+    /// Individual results per agent
+    pub results: Vec<BatchAgentResult>,
+
+    /// Number of successful operations
+    pub successful: usize,
+
+    /// Number of failed operations
+    pub failed: usize,
+}
+
+/// Result for a single agent in a batch operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchAgentResult {
+    /// Agent ID
+    pub agent_id: Uuid,
+
+    /// Whether this agent's operation succeeded
+    pub success: bool,
+
+    /// Current status (if available)
+    #[serde(default)]
+    pub status: Option<AgentStatus>,
+
+    /// Error message (if failed)
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// Output query request for retrieving agent output with filtering
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutputQueryRequest {
+    /// Unique identifier for this request
+    pub request_id: String,
+
+    /// Agent ID to query
+    pub agent_id: Uuid,
+
+    /// Output stream to query (stdout, stderr, or both)
+    pub stream: ZmqOutputStream,
+
+    /// Optional filter pattern (regex)
+    #[serde(default)]
+    pub filter: Option<String>,
+
+    /// Maximum number of lines to return
+    #[serde(default)]
+    pub limit: Option<usize>,
+
+    /// Offset for pagination
+    #[serde(default)]
+    pub offset: Option<usize>,
+}
+
+/// ZMQ output stream type (for querying agent output)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ZmqOutputStream {
+    /// Standard output
+    Stdout,
+    /// Standard error
+    Stderr,
+    /// Both stdout and stderr
+    Both,
+}
+
+/// Output query response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutputQueryResponse {
+    /// The request ID this is responding to
+    pub request_id: String,
+
+    /// Agent ID
+    pub agent_id: Uuid,
+
+    /// Whether the query was successful
+    pub success: bool,
+
+    /// Output lines
+    #[serde(default)]
+    pub lines: Vec<String>,
+
+    /// Total number of lines available
+    #[serde(default)]
+    pub total_lines: Option<usize>,
+
+    /// Whether there are more lines available
+    #[serde(default)]
+    pub has_more: bool,
+
+    /// Error message (if unsuccessful)
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
 /// Envelope for all ZMQ messages to support multiplexing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -409,6 +563,21 @@ pub enum ZmqMessage {
 
     /// Health check response
     HealthCheckResponse(HealthCheckResponse),
+
+    /// Custom action request
+    CustomActionRequest(CustomActionRequest),
+
+    /// Batch control command
+    BatchControlCommand(BatchControlCommand),
+
+    /// Batch control response
+    BatchControlResponse(BatchControlResponse),
+
+    /// Output query request
+    OutputQueryRequest(OutputQueryRequest),
+
+    /// Output query response
+    OutputQueryResponse(OutputQueryResponse),
 }
 
 // ============================================================================

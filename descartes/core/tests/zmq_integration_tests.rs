@@ -399,3 +399,298 @@ fn test_usage_pattern_documentation() {
     // This test just verifies the pattern compiles
     assert!(true);
 }
+
+// ============================================================================
+// Phase 3:2.4 - Client-Side Agent Control Tests
+// ============================================================================
+
+#[test]
+fn test_custom_action_request_serialization() {
+    use descartes_core::CustomActionRequest;
+
+    let request = CustomActionRequest {
+        request_id: "action-123".to_string(),
+        agent_id: Uuid::new_v4(),
+        action: "process_data".to_string(),
+        params: Some(serde_json::json!({
+            "dataset": "logs",
+            "filter": "ERROR",
+            "limit": 100
+        })),
+        timeout_secs: Some(60),
+    };
+
+    let msg = ZmqMessage::CustomActionRequest(request);
+    let bytes = serialize_zmq_message(&msg).unwrap();
+    let deserialized = deserialize_zmq_message(&bytes).unwrap();
+
+    match deserialized {
+        ZmqMessage::CustomActionRequest(req) => {
+            assert_eq!(req.request_id, "action-123");
+            assert_eq!(req.action, "process_data");
+            assert_eq!(req.timeout_secs, Some(60));
+            assert!(req.params.is_some());
+        }
+        _ => panic!("Wrong message type after deserialization"),
+    }
+}
+
+#[test]
+fn test_batch_control_command_serialization() {
+    use descartes_core::BatchControlCommand;
+
+    let agent_ids = vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+
+    let command = BatchControlCommand {
+        request_id: "batch-456".to_string(),
+        agent_ids: agent_ids.clone(),
+        command_type: ControlCommandType::Pause,
+        payload: None,
+        fail_fast: false,
+    };
+
+    let msg = ZmqMessage::BatchControlCommand(command);
+    let bytes = serialize_zmq_message(&msg).unwrap();
+    let deserialized = deserialize_zmq_message(&bytes).unwrap();
+
+    match deserialized {
+        ZmqMessage::BatchControlCommand(cmd) => {
+            assert_eq!(cmd.request_id, "batch-456");
+            assert_eq!(cmd.agent_ids.len(), 3);
+            assert_eq!(cmd.command_type, ControlCommandType::Pause);
+            assert!(!cmd.fail_fast);
+        }
+        _ => panic!("Wrong message type after deserialization"),
+    }
+}
+
+#[test]
+fn test_batch_control_response_serialization() {
+    use descartes_core::{BatchControlResponse, BatchAgentResult};
+
+    let agent_id_1 = Uuid::new_v4();
+    let agent_id_2 = Uuid::new_v4();
+
+    let response = BatchControlResponse {
+        request_id: "batch-456".to_string(),
+        success: false, // One failed
+        results: vec![
+            BatchAgentResult {
+                agent_id: agent_id_1,
+                success: true,
+                status: Some(AgentStatus::Paused),
+                error: None,
+            },
+            BatchAgentResult {
+                agent_id: agent_id_2,
+                success: false,
+                status: Some(AgentStatus::Running),
+                error: Some("Agent is busy".to_string()),
+            },
+        ],
+        successful: 1,
+        failed: 1,
+    };
+
+    let msg = ZmqMessage::BatchControlResponse(response);
+    let bytes = serialize_zmq_message(&msg).unwrap();
+    let deserialized = deserialize_zmq_message(&bytes).unwrap();
+
+    match deserialized {
+        ZmqMessage::BatchControlResponse(resp) => {
+            assert_eq!(resp.request_id, "batch-456");
+            assert!(!resp.success);
+            assert_eq!(resp.results.len(), 2);
+            assert_eq!(resp.successful, 1);
+            assert_eq!(resp.failed, 1);
+            assert!(resp.results[0].success);
+            assert!(!resp.results[1].success);
+        }
+        _ => panic!("Wrong message type after deserialization"),
+    }
+}
+
+#[test]
+fn test_output_query_request_serialization() {
+    use descartes_core::{OutputQueryRequest, ZmqOutputStream};
+
+    let request = OutputQueryRequest {
+        request_id: "output-789".to_string(),
+        agent_id: Uuid::new_v4(),
+        stream: ZmqOutputStream::Both,
+        filter: Some("ERROR|WARN".to_string()),
+        limit: Some(50),
+        offset: Some(100),
+    };
+
+    let msg = ZmqMessage::OutputQueryRequest(request);
+    let bytes = serialize_zmq_message(&msg).unwrap();
+    let deserialized = deserialize_zmq_message(&bytes).unwrap();
+
+    match deserialized {
+        ZmqMessage::OutputQueryRequest(req) => {
+            assert_eq!(req.request_id, "output-789");
+            assert_eq!(req.stream, ZmqOutputStream::Both);
+            assert_eq!(req.filter, Some("ERROR|WARN".to_string()));
+            assert_eq!(req.limit, Some(50));
+            assert_eq!(req.offset, Some(100));
+        }
+        _ => panic!("Wrong message type after deserialization"),
+    }
+}
+
+#[test]
+fn test_output_query_response_serialization() {
+    use descartes_core::OutputQueryResponse;
+
+    let response = OutputQueryResponse {
+        request_id: "output-789".to_string(),
+        agent_id: Uuid::new_v4(),
+        success: true,
+        lines: vec![
+            "ERROR: Connection failed".to_string(),
+            "WARN: Retrying connection".to_string(),
+            "ERROR: Maximum retries exceeded".to_string(),
+        ],
+        total_lines: Some(150),
+        has_more: true,
+        error: None,
+    };
+
+    let msg = ZmqMessage::OutputQueryResponse(response);
+    let bytes = serialize_zmq_message(&msg).unwrap();
+    let deserialized = deserialize_zmq_message(&bytes).unwrap();
+
+    match deserialized {
+        ZmqMessage::OutputQueryResponse(resp) => {
+            assert_eq!(resp.request_id, "output-789");
+            assert!(resp.success);
+            assert_eq!(resp.lines.len(), 3);
+            assert_eq!(resp.total_lines, Some(150));
+            assert!(resp.has_more);
+        }
+        _ => panic!("Wrong message type after deserialization"),
+    }
+}
+
+#[test]
+fn test_output_stream_types() {
+    use descartes_core::ZmqOutputStream;
+
+    // Verify serialization of enum variants
+    let streams = vec![
+        ZmqOutputStream::Stdout,
+        ZmqOutputStream::Stderr,
+        ZmqOutputStream::Both,
+    ];
+
+    for stream in streams {
+        let json = serde_json::to_string(&stream).unwrap();
+        let deserialized: ZmqOutputStream = serde_json::from_str(&json).unwrap();
+        assert_eq!(stream, deserialized);
+    }
+}
+
+#[tokio::test]
+async fn test_client_queued_command_count() {
+    let config = ZmqRunnerConfig::default();
+    let client = ZmqClient::new(config);
+
+    // Initially should be zero
+    assert_eq!(client.queued_command_count().await, 0);
+}
+
+#[test]
+fn test_control_command_type_extensions() {
+    // Test the new control command types
+    let custom_action = ControlCommandType::CustomAction;
+    let query_output = ControlCommandType::QueryOutput;
+    let stream_logs = ControlCommandType::StreamLogs;
+
+    // Verify they serialize correctly
+    let json1 = serde_json::to_string(&custom_action).unwrap();
+    let json2 = serde_json::to_string(&query_output).unwrap();
+    let json3 = serde_json::to_string(&stream_logs).unwrap();
+
+    assert_eq!(json1, "\"custom_action\"");
+    assert_eq!(json2, "\"query_output\"");
+    assert_eq!(json3, "\"stream_logs\"");
+
+    // Verify deserialization
+    let deser1: ControlCommandType = serde_json::from_str(&json1).unwrap();
+    let deser2: ControlCommandType = serde_json::from_str(&json2).unwrap();
+    let deser3: ControlCommandType = serde_json::from_str(&json3).unwrap();
+
+    assert_eq!(deser1, ControlCommandType::CustomAction);
+    assert_eq!(deser2, ControlCommandType::QueryOutput);
+    assert_eq!(deser3, ControlCommandType::StreamLogs);
+}
+
+#[test]
+fn test_batch_operation_message_size() {
+    use descartes_core::BatchControlCommand;
+
+    // Create a batch command for 100 agents
+    let agent_ids: Vec<Uuid> = (0..100).map(|_| Uuid::new_v4()).collect();
+
+    let command = BatchControlCommand {
+        request_id: "large-batch".to_string(),
+        agent_ids,
+        command_type: ControlCommandType::GetStatus,
+        payload: None,
+        fail_fast: false,
+    };
+
+    let msg = ZmqMessage::BatchControlCommand(command);
+    let bytes = serialize_zmq_message(&msg).unwrap();
+
+    // Verify it's under the max message size
+    assert!(bytes.len() < descartes_core::MAX_MESSAGE_SIZE);
+
+    // Verify it deserializes correctly
+    let deserialized = deserialize_zmq_message(&bytes).unwrap();
+    match deserialized {
+        ZmqMessage::BatchControlCommand(cmd) => {
+            assert_eq!(cmd.agent_ids.len(), 100);
+            assert_eq!(cmd.request_id, "large-batch");
+        }
+        _ => panic!("Wrong message type"),
+    }
+}
+
+#[test]
+fn test_output_query_with_large_results() {
+    use descartes_core::OutputQueryResponse;
+
+    // Create a response with many lines
+    let lines: Vec<String> = (0..1000)
+        .map(|i| format!("Log line {}: Some output data here", i))
+        .collect();
+
+    let response = OutputQueryResponse {
+        request_id: "large-output".to_string(),
+        agent_id: Uuid::new_v4(),
+        success: true,
+        lines: lines.clone(),
+        total_lines: Some(10000),
+        has_more: true,
+        error: None,
+    };
+
+    let msg = ZmqMessage::OutputQueryResponse(response);
+    let bytes = serialize_zmq_message(&msg).unwrap();
+
+    // Verify it's under the max message size
+    assert!(bytes.len() < descartes_core::MAX_MESSAGE_SIZE);
+
+    // Verify deserialization
+    let deserialized = deserialize_zmq_message(&bytes).unwrap();
+    match deserialized {
+        ZmqMessage::OutputQueryResponse(resp) => {
+            assert_eq!(resp.lines.len(), 1000);
+            assert_eq!(resp.total_lines, Some(10000));
+            assert!(resp.has_more);
+        }
+        _ => panic!("Wrong message type"),
+    }
+}

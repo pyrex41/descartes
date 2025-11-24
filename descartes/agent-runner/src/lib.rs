@@ -22,6 +22,7 @@ pub mod db_schema;
 pub mod rag;
 pub mod knowledge_graph;
 pub mod file_tree_builder;
+pub mod knowledge_graph_overlay;
 
 // Re-exports for convenient access
 pub use errors::{ParserError, ParserResult};
@@ -47,6 +48,10 @@ pub use knowledge_graph::{
 pub use file_tree_builder::{
     FileTreeBuilder, FileTreeBuilderConfig, FileTreeUpdater,
     detect_language, is_binary_file, count_lines, find_git_root,
+};
+
+pub use knowledge_graph_overlay::{
+    KnowledgeGraphOverlay, OverlayConfig, CacheStats,
 };
 
 /// Library version

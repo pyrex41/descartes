@@ -28,6 +28,7 @@ sqlx = { workspace = true }
 
 # Git
 gitoxide = { workspace = true }
+gix = { workspace = true }
 
 # UUID
 uuid = { workspace = true }

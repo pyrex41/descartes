@@ -13,6 +13,7 @@ pub mod config_migration;
 pub mod config_watcher;
 pub mod dag;
 pub mod dag_toml;
+pub mod dag_swarm_export;
 pub mod debugger;
 pub mod errors;
 pub mod ipc;
@@ -29,10 +30,12 @@ pub mod state_store;
 pub mod swarm_parser;
 pub mod task_queries;
 pub mod thoughts;
+pub mod time_travel_integration;
 pub mod traits;
 pub mod zmq_agent_runner;
 pub mod zmq_communication;
 pub mod zmq_client;
+pub mod zmq_server;
 
 // Re-export commonly used types
 pub use errors::{
@@ -74,6 +77,9 @@ pub use zmq_agent_runner::{
     StatusUpdate, StatusUpdateType,
     ListAgentsRequest, ListAgentsResponse,
     HealthCheckRequest, HealthCheckResponse,
+    CustomActionRequest,
+    BatchControlCommand, BatchControlResponse, BatchAgentResult,
+    OutputQueryRequest, OutputQueryResponse, ZmqOutputStream,
     serialize_zmq_message, deserialize_zmq_message, validate_message_size,
     ZMQ_PROTOCOL_VERSION, MAX_MESSAGE_SIZE, DEFAULT_TIMEOUT_SECS,
 };
@@ -84,6 +90,10 @@ pub use zmq_communication::{
 
 pub use zmq_client::{
     ZmqClient,
+};
+
+pub use zmq_server::{
+    ZmqAgentServer, ZmqServerConfig, ServerStats,
 };
 
 pub use notifications::{
@@ -188,6 +198,12 @@ pub use brain_restore::{
     create_snapshot_from_state, compare_states,
 };
 
+pub use time_travel_integration::{
+    RewindManager, DefaultRewindManager, RewindConfig, RewindPoint, RewindResult,
+    RewindBackup, ValidationResult, ResumeContext, RewindProgress, RewindConfirmation,
+    slider_to_rewind_point, describe_rewind,
+};
+
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -211,4 +227,9 @@ pub use dag::{
 pub use dag_toml::{
     TomlDAG, TomlDAGNode, TomlDAGEdge, TomlTaskDependency, TomlPosition,
     load_dag_from_toml, save_dag_to_toml,
+};
+
+pub use dag_swarm_export::{
+    SwarmExportConfig, export_dag_to_swarm_toml, import_swarm_toml_to_dag,
+    save_dag_as_swarm_toml, load_dag_from_swarm_toml,
 };

@@ -1,0 +1,72 @@
+# Swarm.toml - Generated from DAG 'Simple Approval'
+# Generated: 2025-11-24 12:00:00 UTC
+# This file was automatically generated from a visual DAG representation.
+# Edit with caution as manual changes may be lost on regeneration.
+
+[metadata]
+version = "1.0"
+name = "simple_approval"
+description = "Simple approval workflow for requests"
+author = "Descartes DAG Export"
+created = "2025-11-24"
+
+[agents.approver]
+model = "claude-3-haiku"
+max_tokens = 1000
+temperature = 0.5
+tags = ["review", "approval"]
+
+[resources]
+
+[[workflows]]
+name = "simple_approval"
+description = "Simple approval workflow for requests"
+
+[workflows.metadata]
+initial_state = "Pending"
+completion_timeout_seconds = 1800
+max_retries = 1
+retry_backoff_seconds = 30
+
+[workflows.guards]
+
+[workflows.states.Approved]
+description = "Request approved and processed"
+agents = []
+entry_actions = ["process_request", "notify_requester"]
+exit_actions = []
+terminal = true
+parallel_execution = false
+handlers = []
+required_resources = []
+
+[workflows.states.Pending]
+description = "Request awaiting approval"
+agents = ["approver"]
+entry_actions = ["log_submission"]
+exit_actions = []
+terminal = false
+parallel_execution = false
+required_resources = []
+
+[[workflows.states.Pending.handlers]]
+event = "approve"
+target = "Approved"
+guards = []
+
+[[workflows.states.Pending.handlers]]
+event = "reject"
+target = "Rejected"
+guards = []
+
+[workflows.states.Rejected]
+description = "Request rejected"
+agents = []
+entry_actions = ["notify_requester"]
+exit_actions = []
+terminal = true
+parallel_execution = false
+handlers = []
+required_resources = []
+
+[workflows.contracts]
