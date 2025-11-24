@@ -19,7 +19,7 @@ sqlx = { workspace = true }
 uuid = { workspace = true }
 futures = "0.3"
 indicatif = "0.17"
-chrono = "0.4"
+chrono = "=0.4.39"
 colored = "2.0"
 atty = "0.2"
 async-trait = { workspace = true }

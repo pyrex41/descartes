@@ -2,7 +2,7 @@
 /// Monitors config file changes and notifies subscribers of updates
 
 use crate::config::{DescaratesConfig, ConfigManager};
-use crate::errors::{AgentError, AgentResult};
+use crate::errors::AgentResult;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};

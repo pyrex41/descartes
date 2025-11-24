@@ -41,7 +41,6 @@ tempfile = "3.8"
 
 # RAG (Retrieval-Augmented Generation) dependencies
 lancedb = "0.5"
-vectordb = "0.4"
 tantivy = "0.21"
 
 # Embedding and ML utilities

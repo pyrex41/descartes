@@ -2,539 +2,281 @@
   "parallel_execution_plan": [
     {
       "wave": 1,
-      "description": "Wave 1",
+      "description": "Phase 3 Execution Wave 1",
       "tasks": [
         {
-          "id": "phase1:13.1",
-          "title": "Define Provider Models",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase1:7.6",
-          "title": "Run benchmarks and verify performance gains",
-          "complexity": 0,
-          "priority": "low"
-        },
-        {
-          "id": "phase2:1",
-          "title": "[PARENT] Extend SQLite Schema for AST and File Dependencies",
+          "id": "1",
+          "title": "[PARENT] Implement JSON-RPC Server",
           "complexity": 5,
           "priority": "high"
         },
         {
-          "id": "phase2:1.1",
-          "title": "Design Schema Extensions",
+          "id": "1.1",
+          "title": "Set up jsonrpsee server infrastructure",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:11",
-          "title": "[PARENT] Implement TTL-Based File Locking",
-          "complexity": 8,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:11.1",
-          "title": "Define Lease Model and Schema",
+          "id": "2.1",
+          "title": "Define ZmqAgentRunner Trait and Schemas",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:16",
-          "title": "[PARENT] Implement Global Thoughts Storage",
-          "complexity": 3,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:16.1",
-          "title": "Set up Global Storage Directory",
+          "id": "3.1",
+          "title": "Initialize Iced Application and Window",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:21",
-          "title": "[PARENT] Create .descartes/config.toml Schema",
+          "id": "3.2",
+          "title": "Establish RPC Connection to Core",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "4.1",
+          "title": "Define Task Data Model and SQLite Schema",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "5.1",
+          "title": "Define Agent Status Models",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "6.1",
+          "title": "Define Debugger State Models",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "7.1",
+          "title": "Define Agent History Data Structures",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "8.1",
+          "title": "Define DAG Data Models",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "9.1",
+          "title": "Define Data Models for File Tree and Knowledge Graph",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "rpc-server-1",
+          "title": "Implement JSON-RPC Server",
           "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:21.1",
-          "title": "Define Configuration Fields",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:23",
-          "title": "[PARENT] Implement Local Encrypted Secrets Storage",
-          "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:23.1",
-          "title": "Define Secret Data Model",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:25",
-          "title": "[PARENT] Create NotificationRouter Trait",
-          "complexity": 3,
-          "priority": "low"
-        },
-        {
-          "id": "phase2:25.1",
-          "title": "Define NotificationRouter Trait",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:4",
-          "title": "[PARENT] Integrate Tree-Sitter with Grammars",
-          "complexity": 8,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:4.1",
-          "title": "Set up Tree-Sitter Library Integration",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:7",
-          "title": "[PARENT] Integrate State Machine Library",
-          "complexity": 5,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:7.1",
-          "title": "Evaluate and Select State Machine Library",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase3:2.5",
-          "title": "Create Proof of Concept Deployment and Testing",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase3:7.5",
-          "title": "Integrate Rewind and Resume Logic",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase3:8.5",
-          "title": "Implement Swarm.toml Export",
-          "complexity": 0,
           "priority": "high"
         }
       ]
     },
     {
       "wave": 2,
-      "description": "Wave 2",
+      "description": "Phase 3 Execution Wave 2",
       "tasks": [
         {
-          "id": "phase1:13.2",
-          "title": "Implement Agent Spawning Logic",
+          "id": "1.2",
+          "title": "Implement RPC methods",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:1.2",
-          "title": "Implement Schema Changes",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:11.2",
-          "title": "Implement Lease Acquisition Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:12",
-          "title": "[PARENT] Implement Optimistic Concurrency Checks",
+          "id": "2",
+          "title": "[PARENT] Implement ZMQ Transport for Remote Agents",
           "complexity": 8,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:12.1",
-          "title": "Define Hash Schema and Model",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:13",
-          "title": "Create ApprovalQueue in SQLite",
-          "complexity": 2,
           "priority": "medium"
         },
         {
-          "id": "phase2:16.2",
-          "title": "Implement Storage and Retrieval Logic",
+          "id": "2.2",
+          "title": "Implement ZMQ Communication Layer",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:17",
-          "title": "[PARENT] Add Symlinking Logic for Project Notes",
-          "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:17.1",
-          "title": "Define Symlinking Requirements",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:19",
-          "title": "[PARENT] Finalize Tasks Schema in SQLite",
-          "complexity": 3,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:19.1",
-          "title": "Design and Create Tasks Table Schema",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:2",
-          "title": "[PARENT] Implement LanceDB Vector Storage",
+          "id": "3",
+          "title": "[PARENT] Set Up Iced Application Shell",
           "complexity": 5,
           "priority": "high"
         },
         {
-          "id": "phase2:2.1",
-          "title": "Set up LanceDB Integration",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:21.2",
-          "title": "Design Schema Structure",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:23.2",
-          "title": "Implement AES-256 Encryption/Decryption Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:24",
-          "title": "[PARENT] Add Secret Masking in Logs",
-          "complexity": 5,
-          "priority": "low"
-        },
-        {
-          "id": "phase2:24.1",
-          "title": "Identify Secrets to Mask",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:25.2",
-          "title": "Set Up Interfaces for Different Adapters",
+          "id": "3.3",
+          "title": "Implement Event Bus Subscription",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:26",
-          "title": "[PARENT] Implement TelegramAdapter",
-          "complexity": 8,
-          "priority": "low"
-        },
-        {
-          "id": "phase2:26.1",
-          "title": "Set up TelegramAdapter foundation",
+          "id": "4.2",
+          "title": "Implement Task Retrieval Logic",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:3",
-          "title": "[PARENT] Implement Tantivy Full-Text Search Index",
-          "complexity": 5,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:3.1",
-          "title": "Set up Tantivy Integration and Schema",
+          "id": "5.2",
+          "title": "Implement JSON Stream Parsing",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:4.2",
-          "title": "Integrate Rust Grammar",
+          "id": "6.2",
+          "title": "Implement Core Debugger Logic",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:4.3",
-          "title": "Integrate Python Grammar",
+          "id": "7.2",
+          "title": "Implement Restore Brain Functionality",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:4.4",
-          "title": "Integrate Markdown and Git Commit Grammars",
+          "id": "7.3",
+          "title": "Implement Restore Body Functionality",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:5",
-          "title": "[PARENT] Implement Semantic Chunking Strategy",
-          "complexity": 13,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:5.1",
-          "title": "Design AST Node Models and Schemas",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:7.2",
-          "title": "Integrate Selected Library into Project",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:8",
-          "title": "[PARENT] Implement Swarm.toml Parser",
-          "complexity": 5,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:8.1",
-          "title": "Define State Chart Data Models",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:8.3",
-          "title": "Create Sample TOML Files",
+          "id": "7.4",
+          "title": "Create Slider UI for Time Travel",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase3:8.6",
-          "title": "Add Tests and Documentation",
+          "id": "8.2",
+          "title": "Implement Core Graph Logic",
           "complexity": 0,
-          "priority": "medium"
+          "priority": "high"
+        },
+        {
+          "id": "9.2",
+          "title": "Implement File Tree Data Structure",
+          "complexity": 0,
+          "priority": "high"
         }
       ]
     },
     {
       "wave": 3,
-      "description": "Wave 3",
+      "description": "Phase 3 Execution Wave 3",
       "tasks": [
         {
-          "id": "phase1:13.3",
-          "title": "Add CLI Command Interface",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:1.3",
-          "title": "Create Sample Data and Queries",
+          "id": "1.3",
+          "title": "Ensure compatibility with scud CLI and descartes GUI",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:10",
-          "title": "[PARENT] Implement Mermaid Diagram Generator",
-          "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:10.1",
-          "title": "Parse Swarm.toml Definitions",
+          "id": "2.3",
+          "title": "Implement Server-Side Agent Spawning",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:11.3",
-          "title": "Implement Lease Release Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:12.2",
-          "title": "Implement Hash Generation Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:14",
-          "title": "[PARENT] Implement Auto-Deny Policies and Timeouts",
-          "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:14.1",
-          "title": "Define Auto-Deny Policies and Timeout Configurations",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:15",
-          "title": "[PARENT] Expose API for External UI Approvals",
-          "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:15.1",
-          "title": "Define Approval API Schemas",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:16.3",
-          "title": "Test Storing and Reading Thoughts",
+          "id": "2.4",
+          "title": "Implement Client-Side Agent Control",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:17.2",
-          "title": "Implement Core Symlinking Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:18",
-          "title": "[PARENT] Index Thoughts in Tantivy",
-          "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:18.1",
-          "title": "Define Thought Schema for Tantivy",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:19.2",
-          "title": "Refine and Finalize Schema for Required Fields",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:2.2",
-          "title": "Define Vector Schema",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:20",
-          "title": "[PARENT] Implement CRUD Operations in StateStore",
-          "complexity": 5,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:20.1",
-          "title": "Integrate SQLite Schema for Tasks",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:21.3",
-          "title": "Implement Schema Parsing",
+          "id": "3.4",
+          "title": "Integrate Basic Layout and Finalize GUI Launch",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:22",
-          "title": "[PARENT] Implement Shared Schema Logic for SCUD",
-          "complexity": 5,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:22.1",
-          "title": "Integrate Shared Schema into SCUD",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:23.3",
-          "title": "Build Secure Storage and Retrieval Mechanism",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:24.2",
-          "title": "Implement Masking Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:25.3",
-          "title": "Test Trait Implementation",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:26.2",
-          "title": "Implement message sending logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:3.2",
-          "title": "Implement Document Indexing Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:4.5",
-          "title": "Test Parsing Accuracy on Sample Files",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:5.2",
-          "title": "Implement AST Parsing Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:6",
-          "title": "[PARENT] Add Parallel Indexing with Rayon",
+          "id": "4",
+          "title": "[PARENT] Implement Task Board View",
           "complexity": 8,
-          "priority": "medium"
+          "priority": "high"
         },
         {
-          "id": "phase2:6.1",
-          "title": "Integrate Rayon Dependency",
+          "id": "4.3",
+          "title": "Set Up Real-Time SQLite Event Listening",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:7.3",
-          "title": "Implement Basic State Machine Structure and Transitions",
+          "id": "4.4",
+          "title": "Create Task Board GUI Component",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:8.2",
-          "title": "Implement TOML Parsing Logic",
+          "id": "5",
+          "title": "[PARENT] Implement Swarm Monitor",
+          "complexity": 8,
+          "priority": "high"
+        },
+        {
+          "id": "5.3",
+          "title": "Integrate with RPC",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "5.4",
+          "title": "Build Swarm Monitor UI View",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "6",
+          "title": "[PARENT] Implement Debugger UI",
+          "complexity": 5,
+          "priority": "high"
+        },
+        {
+          "id": "6.3",
+          "title": "Build Iced UI Components",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:9",
-          "title": "[PARENT] Add Compile-Time Verification for Deadlocks",
+          "id": "7.5",
+          "title": "Integrate Rewind and Resume Logic",
+          "complexity": 0,
+          "priority": "medium"
+        },
+        {
+          "id": "8",
+          "title": "[PARENT] Implement Visual DAG Editor",
           "complexity": 13,
           "priority": "medium"
         },
         {
-          "id": "phase2:9.1",
-          "title": "Define Deadlock Models and Schemas",
+          "id": "8.3",
+          "title": "Build Basic Iced UI Renderer",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "8.5",
+          "title": "Implement Swarm.toml Export",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "9",
+          "title": "[PARENT] Implement Interactive Context Browser",
+          "complexity": 13,
+          "priority": "medium"
+        },
+        {
+          "id": "9.3",
+          "title": "Implement Knowledge Graph Overlay Logic",
+          "complexity": 0,
+          "priority": "high"
+        },
+        {
+          "id": "9.4",
+          "title": "Create GUI Components for Visual File Tree",
           "complexity": 0,
           "priority": "high"
         }
@@ -542,349 +284,73 @@
     },
     {
       "wave": 4,
-      "description": "Wave 4",
+      "description": "Phase 3 Execution Wave 4",
       "tasks": [
         {
-          "id": "phase1:13.4",
-          "title": "Test and Document the Spawn Command",
+          "id": "1.4",
+          "title": "Add comprehensive testing and validation",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:1.4",
-          "title": "Verify and Test Implementation",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:10.2",
-          "title": "Implement Mermaid Diagram Generation",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:11.4",
-          "title": "Integrate Locking Mechanism into ContextSyncer",
+          "id": "2.5",
+          "title": "Create Proof of Concept Deployment and Testing",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:12.3",
-          "title": "Integrate Concurrency Check in Write Operations",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:14.2",
-          "title": "Implement Auto-Deny and Timeout Logic in Approval Manager",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:15.2",
-          "title": "Implement Approval Core Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:17.3",
-          "title": "Ensure Proper Linking and Access",
+          "id": "4.5",
+          "title": "Integrate Real-Time Updates and Test End-to-End",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:18.2",
-          "title": "Implement Thought Indexing Logic",
+          "id": "5.5",
+          "title": "Enable Live Updates and Testing",
           "complexity": 0,
-          "priority": "high"
+          "priority": "low"
         },
         {
-          "id": "phase2:19.3",
-          "title": "Populate Database with Sample Tasks",
+          "id": "6.4",
+          "title": "Add Tests for Debugger Functionality",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:2.3",
-          "title": "Implement CRUD Operations",
+          "id": "7",
+          "title": "[PARENT] Implement Time Travel Rewind",
+          "complexity": 8,
+          "priority": "high"
+        },
+        {
+          "id": "8.4",
+          "title": "Add Drag-and-Drop Functionality",
           "complexity": 0,
           "priority": "high"
         },
         {
-          "id": "phase2:20.2",
-          "title": "Implement Create Operation",
+          "id": "9.5",
+          "title": "Integrate Knowledge Graph Overlays into GUI",
           "complexity": 0,
           "priority": "high"
-        },
-        {
-          "id": "phase2:21.4",
-          "title": "Validate Schema Parsing",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:22.2",
-          "title": "Implement Database Reading Logic",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:23.4",
-          "title": "Test Secure Storage and Retrieval",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:24.3",
-          "title": "Integrate Masking into Logging Outputs",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:26.3",
-          "title": "Integrate with NotificationRouter",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:26.4",
-          "title": "Unit test TelegramAdapter",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:3.3",
-          "title": "Implement Search Capabilities",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:5.3",
-          "title": "Develop Semantic Chunking Algorithm",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:6.2",
-          "title": "Refactor Indexing Logic for Parallelism",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:7.4",
-          "title": "Develop and Run Tests for Simple State Machines",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:8.4",
-          "title": "Validate Parser with Samples",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:9.2",
-          "title": "Design Deadlock Detection Algorithm",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:9.5",
-          "title": "Create Test Cases for State Charts",
-          "complexity": 0,
-          "priority": "medium"
         }
       ]
     },
     {
       "wave": 5,
-      "description": "Wave 5",
+      "description": "Phase 3 Execution Wave 5",
       "tasks": [
         {
-          "id": "phase2:10.3",
-          "title": "Add Diagram Output Functionality",
+          "id": "8.6",
+          "title": "Add Tests and Documentation",
           "complexity": 0,
           "priority": "medium"
         },
         {
-          "id": "phase2:11.5",
-          "title": "Test Locking and Unlocking Files",
+          "id": "9.6",
+          "title": "Add Interactive Exploration Features and Testing",
           "complexity": 0,
           "priority": "medium"
-        },
-        {
-          "id": "phase2:12.4",
-          "title": "Implement Rejection Handling",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:14.3",
-          "title": "Configure Default Behaviors",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:14.4",
-          "title": "Add Tests for Timeout Simulation and Auto-Deny Verification",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:15.3",
-          "title": "Implement API Endpoints",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:17.4",
-          "title": "Validate Symlinks in Test Projects",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:18.3",
-          "title": "Implement Search Functionality",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:2.4",
-          "title": "Test Vector Storage and Retrieval",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:20.3",
-          "title": "Implement Update and Delete Operations",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:22.3",
-          "title": "Ensure Compatibility and Access",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:24.4",
-          "title": "Verify Masking in Test Logs",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:26.5",
-          "title": "Test end-to-end message sending",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:3.4",
-          "title": "Validate with Sample Documents and Searches",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:5.4",
-          "title": "Integrate Chunking with Ingestion Pipeline",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:6.3",
-          "title": "Optimize for Large Repositories",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:9.3",
-          "title": "Implement Core Verification Logic",
-          "complexity": 0,
-          "priority": "high"
-        }
-      ]
-    },
-    {
-      "wave": 6,
-      "description": "Wave 6",
-      "tasks": [
-        {
-          "id": "phase2:10.4",
-          "title": "Verify Diagram Accuracy",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:12.5",
-          "title": "Test Concurrency Scenarios",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:15.4",
-          "title": "Test API Calls",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:18.4",
-          "title": "Test Search and Indexing",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:20.4",
-          "title": "Implement Read Operation and Test CRUD",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:22.4",
-          "title": "Test SCUD Reading Sample Data",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:5.5",
-          "title": "Unit Test Chunking Components",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:6.4",
-          "title": "Implement Benchmarking",
-          "complexity": 0,
-          "priority": "medium"
-        },
-        {
-          "id": "phase2:9.4",
-          "title": "Integrate Verification with Parser",
-          "complexity": 0,
-          "priority": "high"
-        }
-      ]
-    },
-    {
-      "wave": 7,
-      "description": "Wave 7",
-      "tasks": [
-        {
-          "id": "phase2:5.6",
-          "title": "Verify Chunking Quality on Codebases",
-          "complexity": 0,
-          "priority": "high"
-        },
-        {
-          "id": "phase2:6.5",
-          "title": "Test and Document Changes",
-          "complexity": 0,
-          "priority": "low"
-        },
-        {
-          "id": "phase2:9.6",
-          "title": "Test and Validate Implementation",
-          "complexity": 0,
-          "priority": "high"
         }
       ]
     }

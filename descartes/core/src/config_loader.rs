@@ -5,7 +5,7 @@
 use crate::config::{DescaratesConfig, ConfigManager};
 use crate::errors::{AgentError, AgentResult};
 use std::path::{Path, PathBuf};
-use tracing::{debug, info, warn, error};
+use tracing::{debug, info, warn};
 use std::fs;
 use std::env;
 
