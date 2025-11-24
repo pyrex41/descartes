@@ -1,0 +1,16 @@
+[package]
+name = "descartes-gui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+descartes-core = { path = "../core" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }
+
+# GUI will use Iced in Phase 3
+# iced = { version = "0.12", features = ["debug", "tokio"] }
