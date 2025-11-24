@@ -1,0 +1,106 @@
+# Swarm.toml Example: Parallel Processing Workflow
+# Demonstrates multiple agents working in parallel on the same task
+
+[metadata]
+version = "1.0"
+name = "Parallel Code Review Workflow"
+description = "Multiple agents review code simultaneously for faster feedback"
+author = "Descartes Team"
+created = "2025-11-23"
+
+[agents.architect]
+model = "claude-3-opus"
+max_tokens = 4000
+temperature = 0.7
+tags = ["design", "architecture"]
+
+[agents.security]
+model = "claude-3-opus"
+max_tokens = 3000
+temperature = 0.5
+tags = ["security", "vulnerability"]
+
+[agents.performance]
+model = "claude-3-sonnet"
+max_tokens = 2000
+temperature = 0.5
+tags = ["performance", "optimization"]
+
+[agents.maintainability]
+model = "claude-3-sonnet"
+max_tokens = 2000
+temperature = 0.5
+tags = ["maintainability", "code_quality"]
+
+[resources]
+
+[[workflows]]
+name = "parallel_code_review"
+description = "Multiple agents review code simultaneously"
+
+[workflows.metadata]
+initial_state = "SubmittedForReview"
+completion_timeout_seconds = 1800
+max_retries = 2
+retry_backoff_seconds = 60
+
+[workflows.guards]
+consensus_approved = "context.approval_votes >= 3"
+any_critical = "context.critical_issues > 0"
+
+[workflows.states.SubmittedForReview]
+description = "Code submitted, initiating parallel reviews"
+entry_actions = ["prepare_code_for_review", "assign_reviewers"]
+terminal = false
+
+[[workflows.states.SubmittedForReview.handlers]]
+event = "reviews_complete"
+target = "ReviewsGathered"
+guards = []
+
+[workflows.states.ReviewsGathered]
+description = "All parallel reviews collected and analyzed"
+entry_actions = ["aggregate_feedback", "analyze_consensus"]
+agents = ["architect", "security", "performance", "maintainability"]
+parallel_execution = true
+terminal = false
+
+[[workflows.states.ReviewsGathered.handlers]]
+event = "consensus_approved"
+target = "Approved"
+guards = ["consensus_approved"]
+
+[[workflows.states.ReviewsGathered.handlers]]
+event = "issues_found"
+target = "ChangesNeeded"
+guards = ["any_critical"]
+
+[[workflows.states.ReviewsGathered.handlers]]
+event = "consensus_rejected"
+target = "ChangesNeeded"
+guards = []
+
+[workflows.states.Approved]
+description = "Code approved by parallel review consensus"
+entry_actions = ["merge_code", "notify_team"]
+terminal = true
+
+[workflows.states.ChangesNeeded]
+description = "Changes needed based on parallel reviews"
+entry_actions = ["compile_feedback", "notify_developer"]
+terminal = true
+
+[workflows.contracts.parallel_review]
+name = "Parallel Review Results"
+description = "Aggregated results from multiple parallel reviewers"
+
+[workflows.contracts.parallel_review.input]
+source_code = "string"
+context = "string"
+
+[workflows.contracts.parallel_review.output]
+architecture_feedback = "string"
+security_issues = "array<string>"
+performance_suggestions = "array<string>"
+quality_recommendations = "array<string>"
+overall_approval = "boolean"

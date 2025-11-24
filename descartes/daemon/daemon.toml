@@ -1,0 +1,49 @@
+# Descartes RPC Daemon Configuration
+
+[server]
+# HTTP server bind address
+http_addr = "127.0.0.1"
+# HTTP server port
+http_port = 8080
+# WebSocket server bind address
+ws_addr = "127.0.0.1"
+# WebSocket server port
+ws_port = 8081
+# Request timeout in seconds
+request_timeout_secs = 30
+# Maximum concurrent connections
+max_connections = 1000
+# Enable Prometheus metrics endpoint
+enable_metrics = true
+# Metrics endpoint port
+metrics_port = 9090
+
+[auth]
+# Enable authentication (requires JWT secret)
+enabled = false
+# JWT secret for token signing (change in production!)
+jwt_secret = "your-secret-key-change-in-production"
+# Token expiry in seconds (default: 1 hour)
+token_expiry_secs = 3600
+# Optional API key for basic authentication
+# api_key = "your-api-key"
+
+[pool]
+# Minimum connection pool size
+min_size = 10
+# Maximum connection pool size
+max_size = 100
+# Connection timeout in seconds
+connection_timeout_secs = 30
+# Idle connection timeout in seconds
+idle_timeout_secs = 300
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+# Log file path (optional, logs to stdout if not specified)
+# file = "/var/log/descartes/daemon.log"
+# Log to stdout
+stdout = true
+# Log format: json or text
+format = "json"

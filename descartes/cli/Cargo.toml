@@ -13,6 +13,16 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+futures = "0.3"
+indicatif = "0.17"
+chrono = "0.4"
+colored = "2.0"
+atty = "0.2"
+async-trait = { workspace = true }
 
 [[bin]]
 name = "descartes"

@@ -39,7 +39,7 @@ impl SemanticParser {
     /// Parse a single file and extract semantic nodes
     pub fn parse_file(&mut self, file_path: &str) -> ParserResult<ParseResult> {
         let start = Instant::now();
-        let path = Path::new(file_path);
+        let _path = Path::new(file_path);
 
         // Detect language from file extension
         let language = self.detect_language(file_path)?;

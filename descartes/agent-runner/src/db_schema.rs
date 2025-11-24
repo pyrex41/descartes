@@ -103,6 +103,63 @@ CREATE INDEX IF NOT EXISTS idx_node_dependencies_source ON node_dependencies(sou
 CREATE INDEX IF NOT EXISTS idx_node_dependencies_target ON node_dependencies(target_id);
 CREATE INDEX IF NOT EXISTS idx_parse_history_file ON parse_history(file_path);
 CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
+
+-- RAG System Tables
+
+-- Code chunks for RAG
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    language TEXT NOT NULL,
+    line_start INTEGER NOT NULL,
+    line_end INTEGER NOT NULL,
+    node_id TEXT,
+    chunk_type TEXT NOT NULL,
+    metadata TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (node_id) REFERENCES semantic_nodes(id),
+    FOREIGN KEY (file_path) REFERENCES files(file_path)
+);
+
+-- Embedding cache metadata
+CREATE TABLE IF NOT EXISTS rag_embeddings (
+    chunk_id TEXT PRIMARY KEY,
+    embedding_hash TEXT NOT NULL,
+    embedding_model TEXT NOT NULL,
+    dimension INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chunk_id) REFERENCES rag_chunks(id)
+);
+
+-- Search queries and results for analytics
+CREATE TABLE IF NOT EXISTS rag_search_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    query_text TEXT NOT NULL,
+    search_type TEXT NOT NULL,
+    result_count INTEGER,
+    avg_score REAL,
+    query_duration_ms INTEGER,
+    searched_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Chunk retrieval statistics
+CREATE TABLE IF NOT EXISTS rag_chunk_stats (
+    chunk_id TEXT PRIMARY KEY,
+    retrieval_count INTEGER DEFAULT 0,
+    last_retrieved DATETIME,
+    avg_relevance_score REAL,
+    FOREIGN KEY (chunk_id) REFERENCES rag_chunks(id)
+);
+
+-- Indices for RAG tables
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_file ON rag_chunks(file_path);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_type ON rag_chunks(chunk_type);
+CREATE INDEX IF NOT EXISTS idx_rag_chunks_node ON rag_chunks(node_id);
+CREATE INDEX IF NOT EXISTS idx_rag_embeddings_hash ON rag_embeddings(embedding_hash);
+CREATE INDEX IF NOT EXISTS idx_rag_embeddings_model ON rag_embeddings(embedding_model);
+CREATE INDEX IF NOT EXISTS idx_rag_search_type ON rag_search_history(search_type);
+CREATE INDEX IF NOT EXISTS idx_rag_search_date ON rag_search_history(searched_at);
 "#;
 
 /// Database connection pool manager

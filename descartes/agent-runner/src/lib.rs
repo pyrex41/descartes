@@ -19,6 +19,7 @@ pub mod traversal;
 pub mod semantic;
 pub mod parser;
 pub mod db_schema;
+pub mod rag;
 
 // Re-exports for convenient access
 pub use errors::{ParserError, ParserResult};
@@ -28,6 +29,11 @@ pub use traversal::{AstTraversal, TraversalStrategy, QueryHelper};
 pub use semantic::{SemanticExtractor, SemanticAnalysis};
 pub use parser::SemanticParser;
 pub use db_schema::DbPool;
+pub use rag::{
+    RagSystem, RagConfig, RagStats, CodeChunk, SearchResult,
+    EmbeddingProvider, OpenAiEmbeddings, AnthropicEmbeddings,
+    EmbeddingCache, SemanticChunker, VectorStore, FullTextSearch,
+};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -30,7 +30,7 @@ impl SemanticExtractor {
         let mut id_counter = 0;
 
         // Visit all named nodes
-        traversal.visit_matching(|node, metadata| {
+        traversal.visit_matching(|node, _metadata| {
             if node.is_named() {
                 if let Ok(semantic_node) =
                     self.extract_semantic_node(&node, source_code, file_path, &mut id_counter)
@@ -52,14 +52,14 @@ impl SemanticExtractor {
         file_path: &str,
         id_counter: &mut usize,
     ) -> ParserResult<SemanticNode> {
-        let node_id = format!("{}_{}_{}", file_path, node.start_point().row, id_counter);
+        let node_id = format!("{}_{}_{}_{}", file_path, node.start_byte(), node.end_byte(), id_counter);
         *id_counter += 1;
 
         let (node_type, name) = self.classify_node(node, source_code)?;
 
         let source = self.extract_source(node, source_code)?;
-        let line_range = (node.start_point().row, node.end_point().row);
-        let column_range = Some((node.start_point().column, node.end_point().column));
+        let line_range = (node.start_byte() / 80, node.end_byte() / 80); // Approximate line numbers
+        let column_range = Some((0, 80));
 
         let (signature, return_type, parameters) = self.extract_signature(node, source_code)?;
 
@@ -238,11 +238,10 @@ impl SemanticExtractor {
         // Look for preceding comment nodes
         if let Some(parent) = node.parent() {
             for child in parent.children(&mut parent.walk()) {
-                if child.end_point().row + 1 == node.start_point().row {
-                    if child.kind().contains("comment") {
-                        if let Ok(doc) = self.extract_source(&child, source_code) {
-                            return Some(doc);
-                        }
+                // Check if child is a comment immediately before this node
+                if child.end_byte() < node.start_byte() && child.kind().contains("comment") {
+                    if let Ok(doc) = self.extract_source(&child, source_code) {
+                        return Some(doc);
                     }
                 }
             }

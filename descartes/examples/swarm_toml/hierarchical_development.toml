@@ -1,0 +1,199 @@
+# Swarm.toml Example: Hierarchical Workflow with Substates
+# Demonstrates hierarchical state organization for complex workflows
+
+[metadata]
+version = "1.0"
+name = "Hierarchical Development Workflow"
+description = "Multi-phase development process with hierarchical states"
+author = "Descartes Team"
+created = "2025-11-23"
+
+[agents.architect]
+model = "claude-3-opus"
+max_tokens = 6000
+temperature = 0.7
+tags = ["planning", "design"]
+
+[agents.developer]
+model = "claude-3-sonnet"
+max_tokens = 4000
+temperature = 0.5
+tags = ["implementation"]
+
+[agents.tester]
+model = "claude-3-haiku"
+max_tokens = 2000
+temperature = 0.2
+tags = ["testing", "qa"]
+
+[agents.devops]
+model = "claude-3-sonnet"
+max_tokens = 3000
+temperature = 0.5
+tags = ["deployment", "infrastructure"]
+
+[resources.deployment_service]
+type = "http"
+endpoint = "https://deployment.internal"
+auth_required = true
+secret_key = "DEPLOYMENT_API_KEY"
+
+[resources.monitoring]
+type = "http"
+endpoint = "https://monitoring.internal"
+auth_required = true
+secret_key = "MONITORING_API_KEY"
+
+[[workflows]]
+name = "development_workflow"
+description = "Hierarchical development process with multiple phases"
+
+[workflows.metadata]
+initial_state = "Planning"
+completion_timeout_seconds = 86400
+max_retries = 2
+retry_backoff_seconds = 300
+
+[workflows.guards]
+all_substates_complete = "context.planning_complete && context.implementation_complete && context.testing_complete"
+no_blocking_issues = "context.blocking_issues == 0"
+performance_acceptable = "context.performance_score >= 80"
+
+# Phase states (children of InProgress)
+[workflows.states.Planning]
+description = "Planning phase - requirements and design"
+parent = "InProgress"
+agents = ["architect"]
+entry_actions = ["initialize_sprint", "gather_requirements"]
+exit_actions = ["review_plan"]
+terminal = false
+
+[[workflows.states.Planning.handlers]]
+event = "plan_approved"
+target = "Implementation"
+guards = []
+
+[[workflows.states.Planning.handlers]]
+event = "blocked"
+target = "Blocked"
+guards = []
+
+[workflows.states.Implementation]
+description = "Implementation phase - coding and development"
+parent = "InProgress"
+agents = ["developer"]
+entry_actions = ["create_branch", "setup_environment"]
+exit_actions = ["commit_changes"]
+terminal = false
+
+[[workflows.states.Implementation.handlers]]
+event = "implementation_complete"
+target = "Testing"
+guards = []
+
+[[workflows.states.Implementation.handlers]]
+event = "blocked"
+target = "Blocked"
+guards = []
+
+[workflows.states.Testing]
+description = "Testing phase - QA and validation"
+parent = "InProgress"
+agents = ["tester"]
+entry_actions = ["run_tests", "generate_report"]
+exit_actions = ["archive_results"]
+terminal = false
+
+[[workflows.states.Testing.handlers]]
+event = "tests_passed"
+target = "Deployment"
+guards = []
+
+[[workflows.states.Testing.handlers]]
+event = "tests_failed"
+target = "ImplementationRework"
+guards = []
+
+[workflows.states.Deployment]
+description = "Deployment phase - release to production"
+parent = "InProgress"
+agents = ["devops"]
+entry_actions = ["prepare_deployment", "notify_stakeholders"]
+required_resources = ["deployment_service", "monitoring"]
+terminal = false
+
+[[workflows.states.Deployment.handlers]]
+event = "deployment_successful"
+target = "Complete"
+guards = ["no_blocking_issues"]
+
+[[workflows.states.Deployment.handlers]]
+event = "deployment_failed"
+target = "RollBack"
+guards = []
+
+# Parent state
+[workflows.states.InProgress]
+description = "Development work in progress (parent state)"
+entry_actions = ["log_start", "allocate_resources"]
+exit_actions = ["log_end", "release_resources"]
+terminal = false
+
+[[workflows.states.InProgress.handlers]]
+event = "blocked"
+target = "Blocked"
+guards = []
+
+[[workflows.states.InProgress.handlers]]
+event = "complete"
+target = "Complete"
+guards = ["all_substates_complete"]
+
+# Terminal states
+[workflows.states.ImplementationRework]
+description = "Failed tests require rework"
+entry_actions = ["notify_developer"]
+terminal = true
+
+[workflows.states.Blocked]
+description = "Development blocked on dependencies"
+entry_actions = ["log_blocker"]
+terminal = true
+
+[[workflows.states.Blocked.handlers]]
+event = "unblock"
+target = "Planning"
+guards = []
+
+[workflows.states.RollBack]
+description = "Failed deployment, rolling back"
+entry_actions = ["initiate_rollback", "notify_team"]
+required_resources = ["deployment_service"]
+terminal = true
+
+[workflows.states.Complete]
+description = "Development workflow completed successfully"
+entry_actions = ["close_sprint", "generate_summary"]
+terminal = true
+
+[workflows.contracts.planning]
+name = "Planning Phase Output"
+description = "Requirements and design specifications"
+
+[workflows.contracts.planning.output]
+requirements = "string"
+design_doc = "string"
+estimated_effort = "string"
+
+[workflows.contracts.testing]
+name = "Testing Phase Output"
+description = "Test results and quality metrics"
+
+[workflows.contracts.testing.input]
+code = "string"
+test_suite = "string"
+
+[workflows.contracts.testing.output]
+tests_passed = "boolean"
+coverage = "number"
+issues_found = "array<string>"

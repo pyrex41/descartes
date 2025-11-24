@@ -1,0 +1,67 @@
+# Swarm.toml Example: Simple Approval Workflow
+# A minimal example showing basic state machine structure
+
+[metadata]
+version = "1.0"
+name = "Simple Approval Workflow"
+description = "A basic request approval workflow"
+author = "Descartes Team"
+created = "2025-11-23"
+
+[agents.approver]
+model = "claude-3-haiku"
+max_tokens = 1000
+temperature = 0.5
+tags = ["review", "approval"]
+
+[resources]
+
+[[workflows]]
+name = "simple_approval"
+description = "Simple approval workflow for requests"
+
+[workflows.metadata]
+initial_state = "Pending"
+completion_timeout_seconds = 1800
+max_retries = 1
+retry_backoff_seconds = 30
+
+[workflows.guards]
+
+[workflows.states.Pending]
+description = "Request awaiting approval"
+entry_actions = ["log_submission"]
+agents = ["approver"]
+terminal = false
+
+[[workflows.states.Pending.handlers]]
+event = "approve"
+target = "Approved"
+guards = []
+
+[[workflows.states.Pending.handlers]]
+event = "reject"
+target = "Rejected"
+guards = []
+
+[[workflows.states.Pending.handlers]]
+event = "timeout"
+target = "TimedOut"
+guards = []
+
+[workflows.states.Approved]
+description = "Request approved and processed"
+entry_actions = ["process_request", "notify_requester"]
+terminal = true
+
+[workflows.states.Rejected]
+description = "Request rejected"
+entry_actions = ["notify_requester"]
+terminal = true
+
+[workflows.states.TimedOut]
+description = "Request approval timed out"
+entry_actions = ["notify_requester"]
+terminal = true
+
+[workflows.contracts]

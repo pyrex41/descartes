@@ -1,5 +1,13 @@
 /// Descartes CLI - Command-line interface for the orchestration system
 use clap::{Parser, Subcommand};
+use colored::Colorize;
+use descartes_core::{ConfigManager, DescaratesConfig};
+use std::path::{Path, PathBuf};
+
+mod commands;
+mod state;
+
+use commands::{init, kill, logs, ps, spawn};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -8,6 +16,14 @@ use clap::{Parser, Subcommand};
 struct Args {
     #[command(subcommand)]
     command: Commands,
+
+    /// Config file path (defaults to ~/.descartes/config.toml)
+    #[arg(long, global = true)]
+    config: Option<PathBuf>,
+
+    /// Override log level
+    #[arg(long, global = true)]
+    log_level: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -17,6 +33,10 @@ enum Commands {
         /// Project name
         #[arg(short, long)]
         name: Option<String>,
+
+        /// Base directory (defaults to ~/.descartes)
+        #[arg(short, long)]
+        dir: Option<PathBuf>,
     },
 
     /// Spawn an AI agent
@@ -36,15 +56,31 @@ enum Commands {
         /// System prompt/context
         #[arg(short, long)]
         system: Option<String>,
+
+        /// Stream output in real-time
+        #[arg(long, default_value = "true")]
+        stream: bool,
     },
 
     /// List running agents
-    Ps,
+    Ps {
+        /// Output format (table, json)
+        #[arg(short, long, default_value = "table")]
+        format: String,
+
+        /// Show all agents (including completed)
+        #[arg(short, long)]
+        all: bool,
+    },
 
     /// Kill an agent
     Kill {
         /// Agent ID
         id: String,
+
+        /// Force kill (SIGKILL instead of SIGTERM)
+        #[arg(short, long)]
+        force: bool,
     },
 
     /// View agent logs
@@ -55,6 +91,18 @@ enum Commands {
         /// Follow logs
         #[arg(short, long)]
         follow: bool,
+
+        /// Filter by event type
+        #[arg(long)]
+        event_type: Option<String>,
+
+        /// Limit number of entries
+        #[arg(short, long, default_value = "100")]
+        limit: usize,
+
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        format: String,
     },
 
     /// Launch the GUI
@@ -63,18 +111,21 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
-
     let args = Args::parse();
 
+    // Initialize tracing with custom level if provided
+    let log_level = args.log_level.as_deref().unwrap_or("info");
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(log_level)),
+        )
+        .init();
+
+
     match args.command {
-        Commands::Init { name } => {
-            println!(
-                "Initializing Descartes project: {}",
-                name.as_deref().unwrap_or("current")
-            );
-            println!("Feature: Phase 1 - Foundation (Planned)");
+        Commands::Init { name, dir } => {
+            init::execute(name.as_deref(), dir.as_deref()).await?;
         }
 
         Commands::Spawn {
@@ -82,42 +133,46 @@ async fn main() -> anyhow::Result<()> {
             provider,
             model,
             system,
+            stream,
         } => {
-            println!("Spawning agent...");
-            println!("  Task: {}", task);
-            println!("  Provider: {}", provider.as_deref().unwrap_or("anthropic"));
-            println!("  Model: {}", model.as_deref().unwrap_or("default"));
-            if let Some(sys) = system {
-                println!("  System: {}", sys);
-            }
-            println!("Feature: Phase 1 - Agent execution (Planned)");
+            let config = load_config(args.config.as_deref())?;
+
+            spawn::execute(
+                &config,
+                &task,
+                provider.as_deref(),
+                model.as_deref(),
+                system.as_deref(),
+                stream,
+            )
+            .await?;
         }
 
-        Commands::Ps => {
-            println!("Running agents:");
-            println!("Feature: Phase 1 - Agent listing (Planned)");
+        Commands::Ps { format, all } => {
+            let config = load_config(args.config.as_deref())?;
+            ps::execute(&config, &format, all).await?;
         }
 
-        Commands::Kill { id } => {
-            println!("Killing agent: {}", id);
-            println!("Feature: Phase 1 - Agent termination (Planned)");
+        Commands::Kill { id, force } => {
+            let config = load_config(args.config.as_deref())?;
+            kill::execute(&config, &id, force).await?;
         }
 
-        Commands::Logs { id, follow } => {
-            if let Some(agent_id) = id {
-                println!("Showing logs for agent: {}", agent_id);
-            } else {
-                println!("Showing all logs");
-            }
-            if follow {
-                println!("Following logs...");
-            }
-            println!("Feature: Phase 1 - Logging (Planned)");
+        Commands::Logs {
+            id,
+            follow,
+            event_type,
+            limit,
+            format,
+        } => {
+            let config = load_config(args.config.as_deref())?;
+            logs::execute(&config, id.as_deref(), follow, event_type.as_deref(), limit, &format)
+                .await?;
         }
 
         Commands::Gui => {
-            println!("Launching Descartes GUI...");
-            println!("Feature: Phase 3 - Iced UI (Planned)");
+            println!("{}", "Launching Descartes GUI...".cyan());
+            println!("{}", "Feature: Phase 3 - Iced UI (Planned)".yellow());
         }
     }
 

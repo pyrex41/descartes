@@ -1,0 +1,215 @@
+# Swarm.toml Example: Code Review and Merge Workflow
+# This demonstrates a practical workflow for automated code review, testing, and merge orchestration
+
+[metadata]
+version = "1.0"
+name = "Code Review and Merge Workflow"
+description = "Automated code review, testing, and merge orchestration for pull requests"
+author = "Descartes Team"
+created = "2025-11-23"
+
+# Agent definitions - each agent with specific capabilities and token limits
+[agents.architect]
+model = "claude-3-opus"
+max_tokens = 8000
+temperature = 0.7
+tags = ["planning", "design", "analysis"]
+
+[agents.coder]
+model = "claude-3-sonnet"
+max_tokens = 4000
+temperature = 0.5
+tags = ["implementation", "refactoring"]
+
+[agents.tester]
+model = "claude-3-haiku"
+max_tokens = 2000
+temperature = 0.2
+tags = ["testing", "verification", "qa"]
+
+[agents.reviewer]
+model = "claude-3-opus"
+max_tokens = 3000
+temperature = 0.6
+tags = ["review", "feedback", "approval"]
+
+# Resource definitions - external services and APIs
+[resources.github_api]
+type = "http"
+endpoint = "https://api.github.com"
+auth_required = true
+secret_key = "GITHUB_TOKEN"
+
+[resources.slack]
+type = "webhook"
+endpoint = "${SLACK_WEBHOOK_URL}"
+description = "Slack notifications for workflow events"
+
+# Main workflow definition
+[[workflows]]
+name = "code_review"
+description = "Primary code review and merge workflow"
+
+# Workflow metadata
+[workflows.metadata]
+initial_state = "Submitted"
+completion_timeout_seconds = 3600
+max_retries = 3
+retry_backoff_seconds = 60
+
+# Guard condition definitions
+[workflows.guards]
+checks_passed = "context.analysis_results.status == 'passed'"
+all_reviewers_approved = "context.review_count >= 2 && context.approved_count == context.review_count"
+tests_pass = "context.test_results.all_passed == true"
+no_conflicts = "context.merge_conflicts == false"
+
+# State definitions
+[workflows.states.Submitted]
+description = "Code change submitted for review"
+entry_actions = ["log_submission", "assign_reviewers"]
+terminal = false
+
+[[workflows.states.Submitted.handlers]]
+event = "analyze"
+target = "Analyzing"
+guards = []
+
+[[workflows.states.Submitted.handlers]]
+event = "timeout"
+target = "TimedOut"
+guards = []
+
+[workflows.states.Analyzing]
+description = "Automated analysis in progress"
+entry_actions = ["run_static_analysis", "run_security_scan", "check_dependencies"]
+agents = ["architect"]
+terminal = false
+
+[[workflows.states.Analyzing.handlers]]
+event = "analysis_pass"
+target = "ReadyForReview"
+guards = ["checks_passed"]
+
+[[workflows.states.Analyzing.handlers]]
+event = "analysis_fail"
+target = "AnalysisFailed"
+guards = []
+
+[workflows.states.ReadyForReview]
+description = "Automated checks passed, awaiting human review"
+entry_actions = ["notify_reviewers", "prepare_review_summary"]
+agents = ["reviewer"]
+terminal = false
+timeout_seconds = 86400
+timeout_target = "TimedOut"
+
+[[workflows.states.ReadyForReview.handlers]]
+event = "review_approved"
+target = "Approved"
+guards = ["all_reviewers_approved"]
+
+[[workflows.states.ReadyForReview.handlers]]
+event = "review_rejected"
+target = "ChangesRequested"
+guards = []
+
+[[workflows.states.ReadyForReview.handlers]]
+event = "timeout"
+target = "TimedOut"
+guards = []
+
+[workflows.states.ChangesRequested]
+description = "Developer must address feedback"
+entry_actions = ["notify_developer", "log_feedback"]
+terminal = false
+
+[[workflows.states.ChangesRequested.handlers]]
+event = "changes_pushed"
+target = "Submitted"
+guards = []
+
+[[workflows.states.ChangesRequested.handlers]]
+event = "abandoned"
+target = "Abandoned"
+guards = []
+
+[workflows.states.Approved]
+description = "All reviews approved, ready to merge"
+entry_actions = ["run_final_tests", "prepare_merge", "notify_team"]
+agents = ["tester"]
+terminal = false
+parallel_execution = false
+
+[[workflows.states.Approved.handlers]]
+event = "merge_complete"
+target = "Merged"
+guards = ["tests_pass", "no_conflicts"]
+
+[[workflows.states.Approved.handlers]]
+event = "merge_failed"
+target = "MergeFailed"
+guards = []
+
+[workflows.states.Merged]
+description = "Successfully merged to main branch"
+entry_actions = ["create_deployment", "notify_team", "archive_pr"]
+terminal = true
+
+[workflows.states.AnalysisFailed]
+description = "Automated analysis found issues"
+entry_actions = ["notify_developer", "log_issues"]
+terminal = true
+
+[workflows.states.TimedOut]
+description = "Workflow timed out waiting for response"
+entry_actions = ["send_timeout_notification"]
+terminal = true
+
+[workflows.states.Abandoned]
+description = "PR abandoned by developer"
+entry_actions = ["log_abandonment"]
+terminal = true
+
+[workflows.states.MergeFailed]
+description = "Merge conflict or other merge failure"
+entry_actions = ["notify_developer", "log_merge_error"]
+terminal = true
+
+# Contract definitions for state inputs/outputs
+[workflows.contracts.analysis]
+name = "Static Analysis Report"
+description = "Output from code analysis"
+
+[workflows.contracts.analysis.input]
+source_code = "string"
+language = "enum:['rust', 'python', 'js', 'ts']"
+
+[workflows.contracts.analysis.output]
+issues = "array<{severity: enum, line: u32, description: string}>"
+passing = "boolean"
+
+[workflows.contracts.review]
+name = "Code Review Result"
+description = "Result of code review by human reviewers"
+
+[workflows.contracts.review.input]
+code_diff = "string"
+pr_description = "string"
+
+[workflows.contracts.review.output]
+approved = "boolean"
+feedback = "string"
+requested_changes = "array<string>"
+
+[workflows.contracts.merge]
+name = "Merge Result"
+description = "Result of merge operation"
+
+[workflows.contracts.merge.input]
+merge_strategy = "enum:['squash', 'rebase', 'merge_commit']"
+
+[workflows.contracts.merge.output]
+success = "boolean"
+merge_commit_sha = "string"
+error_message = "optional:string"

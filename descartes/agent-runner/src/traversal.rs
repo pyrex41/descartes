@@ -108,7 +108,7 @@ impl<'a> AstTraversal<'a> {
             }
 
             // Add children to queue based on strategy
-            let mut children: Vec<_> = node.children(&mut node.walk()).collect();
+            let children: Vec<_> = node.children(&mut node.walk()).collect();
 
             match self.strategy {
                 TraversalStrategy::BreadthFirst => {
@@ -117,7 +117,7 @@ impl<'a> AstTraversal<'a> {
                     }
                 }
                 TraversalStrategy::DepthFirstPreOrder => {
-                    for (idx, child) in children.iter().enumerate().rev() {
+                    for (idx, _child) in children.iter().enumerate().rev() {
                         queue.push_back((children[idx], depth + 1, idx));
                     }
                 }
@@ -289,9 +289,9 @@ impl QueryHelper {
 }
 
 /// A query match result
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct QueryMatch<'a> {
-    pub capture_names: Vec<&'a str>,
+    pub capture_names: Vec<String>,
     pub captures: Vec<(usize, Node<'a>)>,
 }
 

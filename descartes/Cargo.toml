@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "cli", "gui", "agent-runner"]
+members = ["core", "cli", "gui", "agent-runner", "daemon"]
 resolver = "2"
 
 [workspace.package]
@@ -44,3 +44,6 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 
 # Configuration
 toml = "0.8"
+
+# State machine
+statig = "0.3"
