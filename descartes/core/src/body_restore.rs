@@ -32,6 +32,7 @@ use gix::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 // ============================================================================
@@ -612,6 +613,51 @@ impl BodyRestoreManager for GitBodyRestoreManager {
         }
 
         Ok(commits)
+    }
+}
+
+// Blanket implementation for Arc<T> where T: BodyRestoreManager
+// This allows Arc-wrapped managers to be used directly without dereferencing
+#[async_trait]
+impl<T: BodyRestoreManager> BodyRestoreManager for Arc<T> {
+    async fn get_current_commit(&self) -> StateStoreResult<String> {
+        (**self).get_current_commit().await
+    }
+
+    async fn get_commit_info(&self, commit_hash: &str) -> StateStoreResult<CommitInfo> {
+        (**self).get_commit_info(commit_hash).await
+    }
+
+    async fn verify_commit_exists(&self, commit_hash: &str) -> StateStoreResult<bool> {
+        (**self).verify_commit_exists(commit_hash).await
+    }
+
+    async fn has_uncommitted_changes(&self) -> StateStoreResult<bool> {
+        (**self).has_uncommitted_changes().await
+    }
+
+    async fn create_backup(&self) -> StateStoreResult<RepositoryBackup> {
+        (**self).create_backup().await
+    }
+
+    async fn stash_changes(&self, message: &str) -> StateStoreResult<String> {
+        (**self).stash_changes(message).await
+    }
+
+    async fn restore_stash(&self, stash_ref: &str) -> StateStoreResult<()> {
+        (**self).restore_stash(stash_ref).await
+    }
+
+    async fn checkout_commit(&self, commit_hash: &str, options: RestoreOptions) -> StateStoreResult<RestoreResult> {
+        (**self).checkout_commit(commit_hash, options).await
+    }
+
+    async fn rollback(&self, backup: &RepositoryBackup) -> StateStoreResult<()> {
+        (**self).rollback(backup).await
+    }
+
+    async fn get_recent_commits(&self, limit: usize) -> StateStoreResult<Vec<CommitInfo>> {
+        (**self).get_recent_commits(limit).await
     }
 }
 

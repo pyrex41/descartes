@@ -19,6 +19,7 @@ use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::{ConnectOptions, Row};
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 use uuid::Uuid;
 
 // ============================================================================
@@ -1043,6 +1044,81 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         }
 
         Ok(chain)
+    }
+}
+
+// Blanket implementation for Arc<T> where T: AgentHistoryStore
+// This allows Arc-wrapped stores to be used directly without dereferencing
+#[async_trait]
+impl<T: AgentHistoryStore> AgentHistoryStore for Arc<T> {
+    async fn initialize(&mut self) -> StateStoreResult<()> {
+        // Arc doesn't allow mutable access, so we can't call initialize on Arc<T>
+        // This should be called before wrapping in Arc
+        Err(StateStoreError::DatabaseError(
+            "Cannot initialize through Arc - initialize before wrapping".to_string()
+        ))
+    }
+
+    async fn record_event(&self, event: &AgentHistoryEvent) -> StateStoreResult<()> {
+        (**self).record_event(event).await
+    }
+
+    async fn record_events(&self, events: &[AgentHistoryEvent]) -> StateStoreResult<()> {
+        (**self).record_events(events).await
+    }
+
+    async fn get_events(&self, agent_id: &str, limit: i64) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+        (**self).get_events(agent_id, limit).await
+    }
+
+    async fn query_events(&self, query: &HistoryQuery) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+        (**self).query_events(query).await
+    }
+
+    async fn get_events_by_type(
+        &self,
+        agent_id: &str,
+        event_type: HistoryEventType,
+        limit: i64,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+        (**self).get_events_by_type(agent_id, event_type, limit).await
+    }
+
+    async fn get_events_by_time_range(
+        &self,
+        agent_id: &str,
+        start_time: i64,
+        end_time: i64,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+        (**self).get_events_by_time_range(agent_id, start_time, end_time).await
+    }
+
+    async fn get_events_by_session(&self, session_id: &str) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+        (**self).get_events_by_session(session_id).await
+    }
+
+    async fn create_snapshot(&self, snapshot: &HistorySnapshot) -> StateStoreResult<()> {
+        (**self).create_snapshot(snapshot).await
+    }
+
+    async fn get_snapshot(&self, snapshot_id: &Uuid) -> StateStoreResult<Option<HistorySnapshot>> {
+        (**self).get_snapshot(snapshot_id).await
+    }
+
+    async fn list_snapshots(&self, agent_id: &str) -> StateStoreResult<Vec<HistorySnapshot>> {
+        (**self).list_snapshots(agent_id).await
+    }
+
+    async fn delete_events_before(&self, timestamp: i64) -> StateStoreResult<i64> {
+        (**self).delete_events_before(timestamp).await
+    }
+
+    async fn get_statistics(&self, agent_id: &str) -> StateStoreResult<HistoryStatistics> {
+        (**self).get_statistics(agent_id).await
+    }
+
+    async fn get_event_chain(&self, event_id: &Uuid) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+        (**self).get_event_chain(event_id).await
     }
 }
 
