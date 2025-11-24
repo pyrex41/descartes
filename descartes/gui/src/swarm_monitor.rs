@@ -22,7 +22,54 @@ use descartes_core::{
     AgentRuntimeState, AgentStatus, AgentProgress, AgentError, StatusTransition,
 };
 use std::collections::HashMap;
+use std::time::Instant;
 use uuid::Uuid;
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/// Target frames per second for animations
+pub const TARGET_FPS: f32 = 60.0;
+
+/// Frame time budget in milliseconds (16.67ms for 60 FPS)
+pub const FRAME_TIME_BUDGET_MS: f32 = 16.67;
+
+/// Maximum number of frame times to track for performance monitoring
+pub const MAX_FRAME_TIME_SAMPLES: usize = 100;
+
+// ============================================================================
+// CONNECTION STATUS
+// ============================================================================
+
+/// Connection status for live event streaming
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionStatus {
+    Disconnected,
+    Connecting,
+    Connected,
+    Error,
+}
+
+impl ConnectionStatus {
+    pub fn label(&self) -> &'static str {
+        match self {
+            ConnectionStatus::Disconnected => "Disconnected",
+            ConnectionStatus::Connecting => "Connecting...",
+            ConnectionStatus::Connected => "Connected",
+            ConnectionStatus::Error => "Error",
+        }
+    }
+
+    pub fn color(&self) -> Color {
+        match self {
+            ConnectionStatus::Disconnected => Color::from_rgb(0.5, 0.5, 0.5),
+            ConnectionStatus::Connecting => Color::from_rgb(0.9, 0.7, 0.3),
+            ConnectionStatus::Connected => Color::from_rgb(0.3, 0.8, 0.3),
+            ConnectionStatus::Error => Color::from_rgb(0.9, 0.3, 0.3),
+        }
+    }
+}
 
 // ============================================================================
 // SWARM MONITOR STATE
@@ -46,11 +93,29 @@ pub struct SwarmMonitorState {
     /// Selected agent for detailed view
     pub selected_agent: Option<Uuid>,
 
-    /// Animation state for thinking indicators
+    /// Animation state for thinking indicators (0.0 to 1.0)
     pub animation_phase: f32,
 
     /// Sort mode
     pub sort_mode: SortMode,
+
+    /// Live update settings
+    pub live_updates_enabled: bool,
+
+    /// WebSocket streaming enabled
+    pub websocket_enabled: bool,
+
+    /// Performance tracking
+    pub last_update: Instant,
+    pub update_count: u64,
+    pub fps: f32,
+
+    /// Animation performance tracking
+    pub frame_times: Vec<f32>,
+    pub max_frame_time: f32,
+
+    /// Connection status
+    pub connection_status: ConnectionStatus,
 }
 
 impl Default for SwarmMonitorState {
@@ -63,6 +128,14 @@ impl Default for SwarmMonitorState {
             selected_agent: None,
             animation_phase: 0.0,
             sort_mode: SortMode::ByName,
+            live_updates_enabled: true,
+            websocket_enabled: false,
+            last_update: Instant::now(),
+            update_count: 0,
+            fps: 0.0,
+            frame_times: Vec::with_capacity(MAX_FRAME_TIME_SAMPLES),
+            max_frame_time: 0.0,
+            connection_status: ConnectionStatus::Disconnected,
         }
     }
 }
@@ -198,9 +271,200 @@ impl SwarmMonitorState {
     }
 
     /// Increment animation phase (for thinking indicators)
+    /// Optimized for 60 FPS: increment by 1/60 = 0.0167 per frame
     pub fn tick_animation(&mut self) {
-        self.animation_phase = (self.animation_phase + 0.05) % 1.0;
+        let frame_start = Instant::now();
+
+        // Increment animation phase at 60 FPS
+        self.animation_phase = (self.animation_phase + 0.0167) % 1.0;
+
+        // Track performance
+        self.update_count += 1;
+        let frame_time = frame_start.elapsed().as_secs_f32() * 1000.0; // ms
+
+        // Update frame time tracking
+        if self.frame_times.len() >= MAX_FRAME_TIME_SAMPLES {
+            self.frame_times.remove(0);
+        }
+        self.frame_times.push(frame_time);
+
+        if frame_time > self.max_frame_time {
+            self.max_frame_time = frame_time;
+        }
+
+        // Calculate FPS
+        let elapsed = self.last_update.elapsed().as_secs_f32();
+        if elapsed >= 1.0 {
+            self.fps = self.update_count as f32 / elapsed;
+            self.update_count = 0;
+            self.last_update = Instant::now();
+        }
     }
+
+    /// Get average frame time in milliseconds
+    pub fn avg_frame_time(&self) -> f32 {
+        if self.frame_times.is_empty() {
+            return 0.0;
+        }
+        self.frame_times.iter().sum::<f32>() / self.frame_times.len() as f32
+    }
+
+    /// Check if animation performance is acceptable (< 16.67ms per frame for 60 FPS)
+    pub fn is_performance_acceptable(&self) -> bool {
+        self.avg_frame_time() < FRAME_TIME_BUDGET_MS
+    }
+
+    /// Enable live updates
+    pub fn enable_live_updates(&mut self) {
+        self.live_updates_enabled = true;
+    }
+
+    /// Disable live updates
+    pub fn disable_live_updates(&mut self) {
+        self.live_updates_enabled = false;
+    }
+
+    /// Toggle live updates
+    pub fn toggle_live_updates(&mut self) {
+        self.live_updates_enabled = !self.live_updates_enabled;
+    }
+
+    /// Enable WebSocket streaming
+    pub fn enable_websocket(&mut self) {
+        self.websocket_enabled = true;
+    }
+
+    /// Disable WebSocket streaming
+    pub fn disable_websocket(&mut self) {
+        self.websocket_enabled = false;
+    }
+
+    /// Toggle WebSocket streaming
+    pub fn toggle_websocket(&mut self) {
+        self.websocket_enabled = !self.websocket_enabled;
+    }
+
+    /// Update connection status
+    pub fn set_connection_status(&mut self, status: ConnectionStatus) {
+        self.connection_status = status;
+    }
+
+    /// Batch update multiple agents (more efficient than individual updates)
+    pub fn update_agents_batch(&mut self, agents: HashMap<Uuid, AgentRuntimeState>) {
+        for (agent_id, agent_state) in agents {
+            self.agents.insert(agent_id, agent_state);
+        }
+    }
+
+    /// Update agent from event stream (called on live updates)
+    pub fn handle_agent_event(&mut self, event: AgentEvent) {
+        match event {
+            AgentEvent::AgentSpawned { agent } => {
+                self.update_agent(agent);
+            }
+            AgentEvent::AgentStatusChanged { agent_id, status } => {
+                if let Some(agent) = self.agents.get_mut(&agent_id) {
+                    agent.transition_to(status, Some("Status update from event stream".to_string())).ok();
+                }
+            }
+            AgentEvent::AgentThoughtUpdate { agent_id, thought } => {
+                if let Some(agent) = self.agents.get_mut(&agent_id) {
+                    agent.update_thought(thought);
+                }
+            }
+            AgentEvent::AgentProgressUpdate { agent_id, progress } => {
+                if let Some(agent) = self.agents.get_mut(&agent_id) {
+                    agent.update_progress(progress);
+                }
+            }
+            AgentEvent::AgentCompleted { agent_id } => {
+                if let Some(agent) = self.agents.get_mut(&agent_id) {
+                    agent.transition_to(AgentStatus::Completed, Some("Agent completed".to_string())).ok();
+                }
+            }
+            AgentEvent::AgentFailed { agent_id, error } => {
+                if let Some(agent) = self.agents.get_mut(&agent_id) {
+                    agent.set_error(error);
+                    agent.transition_to(AgentStatus::Failed, Some("Agent failed".to_string())).ok();
+                }
+            }
+            AgentEvent::AgentTerminated { agent_id } => {
+                self.remove_agent(&agent_id);
+            }
+        }
+    }
+
+    /// Get performance statistics
+    pub fn get_performance_stats(&self) -> PerformanceStats {
+        PerformanceStats {
+            fps: self.fps,
+            avg_frame_time_ms: self.avg_frame_time(),
+            max_frame_time_ms: self.max_frame_time,
+            total_agents: self.agents.len(),
+            active_agents: self.agents.values().filter(|a| a.is_active()).count(),
+            is_acceptable: self.is_performance_acceptable(),
+        }
+    }
+}
+
+// ============================================================================
+// AGENT EVENTS
+// ============================================================================
+
+/// Agent events for live updates
+#[derive(Debug, Clone)]
+pub enum AgentEvent {
+    AgentSpawned {
+        agent: AgentRuntimeState,
+    },
+    AgentStatusChanged {
+        agent_id: Uuid,
+        status: AgentStatus,
+    },
+    AgentThoughtUpdate {
+        agent_id: Uuid,
+        thought: String,
+    },
+    AgentProgressUpdate {
+        agent_id: Uuid,
+        progress: AgentProgress,
+    },
+    AgentCompleted {
+        agent_id: Uuid,
+    },
+    AgentFailed {
+        agent_id: Uuid,
+        error: AgentError,
+    },
+    AgentTerminated {
+        agent_id: Uuid,
+    },
+}
+
+// ============================================================================
+// PERFORMANCE STATISTICS
+// ============================================================================
+
+/// Performance statistics for the swarm monitor
+#[derive(Debug, Clone)]
+pub struct PerformanceStats {
+    /// Current frames per second
+    pub fps: f32,
+
+    /// Average frame time in milliseconds
+    pub avg_frame_time_ms: f32,
+
+    /// Maximum frame time in milliseconds
+    pub max_frame_time_ms: f32,
+
+    /// Total number of agents being tracked
+    pub total_agents: usize,
+
+    /// Number of active agents
+    pub active_agents: usize,
+
+    /// Whether performance is acceptable (meeting 60 FPS target)
+    pub is_acceptable: bool,
 }
 
 // ============================================================================
@@ -332,8 +596,23 @@ pub enum SwarmMonitorMessage {
     /// Refresh agent data (triggered by external events)
     RefreshAgents(HashMap<Uuid, AgentRuntimeState>),
 
-    /// Animation tick
+    /// Animation tick (60 FPS)
     AnimationTick,
+
+    /// Toggle live updates
+    ToggleLiveUpdates,
+
+    /// Toggle WebSocket streaming
+    ToggleWebSocket,
+
+    /// Connection status changed
+    ConnectionStatusChanged(ConnectionStatus),
+
+    /// Agent event received (from live stream)
+    AgentEventReceived(AgentEvent),
+
+    /// Batch agent update (more efficient for large updates)
+    BatchAgentUpdate(Vec<AgentRuntimeState>),
 }
 
 // ============================================================================
@@ -367,7 +646,42 @@ pub fn update(state: &mut SwarmMonitorState, message: SwarmMonitorMessage) {
         SwarmMonitorMessage::AnimationTick => {
             state.tick_animation();
         }
+        SwarmMonitorMessage::ToggleLiveUpdates => {
+            state.toggle_live_updates();
+        }
+        SwarmMonitorMessage::ToggleWebSocket => {
+            state.toggle_websocket();
+        }
+        SwarmMonitorMessage::ConnectionStatusChanged(status) => {
+            state.set_connection_status(status);
+        }
+        SwarmMonitorMessage::AgentEventReceived(event) => {
+            if state.live_updates_enabled {
+                state.handle_agent_event(event);
+            }
+        }
+        SwarmMonitorMessage::BatchAgentUpdate(agents) => {
+            let agent_map: HashMap<Uuid, AgentRuntimeState> = agents
+                .into_iter()
+                .map(|agent| (agent.agent_id, agent))
+                .collect();
+            state.update_agents_batch(agent_map);
+        }
     }
+}
+
+// ============================================================================
+// SUBSCRIPTIONS
+// ============================================================================
+
+/// Create a subscription for animations (60 FPS)
+pub fn subscription() -> iced::Subscription<SwarmMonitorMessage> {
+    use iced::time;
+    use std::time::Duration;
+
+    // Target 60 FPS: 1000ms / 60 = ~16.67ms per frame
+    time::every(Duration::from_millis(16))
+        .map(|_| SwarmMonitorMessage::AnimationTick)
 }
 
 // ============================================================================
@@ -382,6 +696,9 @@ pub fn view(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
 
     // Statistics panel
     let stats_panel = view_statistics_panel(state);
+
+    // Live updates and performance panel
+    let live_panel = view_live_control_panel(state);
 
     // Control panel (filters, search, grouping)
     let control_panel = view_control_panel(state);
@@ -401,6 +718,8 @@ pub fn view(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
         title,
         Space::with_height(20),
         stats_panel,
+        Space::with_height(10),
+        live_panel,
         Space::with_height(20),
         control_panel,
         Space::with_height(20),
@@ -412,6 +731,139 @@ pub fn view(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
     container(content)
         .width(Length::Fill)
         .height(Length::Fill)
+        .into()
+}
+
+/// Render the live updates and performance control panel
+fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
+    let perf_stats = state.get_performance_stats();
+
+    // Live updates toggle
+    let live_updates_label = if state.live_updates_enabled {
+        "Live Updates: ON"
+    } else {
+        "Live Updates: OFF"
+    };
+    let live_updates_btn = button(text(live_updates_label).size(12))
+        .padding(8)
+        .on_press(SwarmMonitorMessage::ToggleLiveUpdates);
+
+    let live_updates_box = if state.live_updates_enabled {
+        container(live_updates_btn)
+            .style(|theme: &Theme| {
+                container::Style {
+                    background: Some(Color::from_rgb(0.3, 0.8, 0.3).into()),
+                    border: iced::Border {
+                        width: 1.0,
+                        color: Color::from_rgb(0.5, 1.0, 0.5),
+                        radius: 4.0.into(),
+                    },
+                    ..Default::default()
+                }
+            })
+    } else {
+        container(live_updates_btn)
+    };
+
+    // WebSocket toggle
+    let websocket_label = if state.websocket_enabled {
+        "WebSocket: ON"
+    } else {
+        "WebSocket: OFF"
+    };
+    let websocket_btn = button(text(websocket_label).size(12))
+        .padding(8)
+        .on_press(SwarmMonitorMessage::ToggleWebSocket);
+
+    let websocket_box = if state.websocket_enabled {
+        container(websocket_btn)
+            .style(|theme: &Theme| {
+                container::Style {
+                    background: Some(Color::from_rgb(0.3, 0.7, 0.9).into()),
+                    border: iced::Border {
+                        width: 1.0,
+                        color: Color::from_rgb(0.5, 0.9, 1.0),
+                        radius: 4.0.into(),
+                    },
+                    ..Default::default()
+                }
+            })
+    } else {
+        container(websocket_btn)
+    };
+
+    // Connection status
+    let status_color = state.connection_status.color();
+    let status_badge = container(text(state.connection_status.label()).size(11))
+        .padding(6)
+        .style(move |theme: &Theme| {
+            container::Style {
+                background: Some(status_color.scale_alpha(0.3).into()),
+                border: iced::Border {
+                    width: 1.0,
+                    color: status_color,
+                    radius: 4.0.into(),
+                },
+                text_color: Some(status_color),
+                ..Default::default()
+            }
+        });
+
+    // Performance stats
+    let fps_text = text(format!("FPS: {:.1}", perf_stats.fps))
+        .size(12)
+        .style(if perf_stats.is_acceptable {
+            Color::from_rgb(0.3, 0.8, 0.3)
+        } else {
+            Color::from_rgb(0.9, 0.5, 0.3)
+        });
+
+    let frame_time_text = text(format!(
+        "Frame: {:.2}ms / {:.2}ms",
+        perf_stats.avg_frame_time_ms,
+        perf_stats.max_frame_time_ms
+    ))
+    .size(11)
+    .style(Color::from_rgb(0.7, 0.7, 0.8));
+
+    let agent_count_text = text(format!(
+        "Agents: {} ({} active)",
+        perf_stats.total_agents,
+        perf_stats.active_agents
+    ))
+    .size(11)
+    .style(Color::from_rgb(0.7, 0.7, 0.8));
+
+    let perf_col = column![fps_text, frame_time_text, agent_count_text]
+        .spacing(3)
+        .align_x(alignment::Horizontal::Right);
+
+    let controls_row = row![
+        live_updates_box,
+        Space::with_width(10),
+        websocket_box,
+        Space::with_width(10),
+        status_badge,
+        Space::with_width(Length::Fill),
+        perf_col,
+    ]
+    .spacing(10)
+    .align_y(alignment::Vertical::Center);
+
+    container(controls_row)
+        .padding(12)
+        .width(Length::Fill)
+        .style(|theme: &Theme| {
+            container::Style {
+                background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.6).into()),
+                border: iced::Border {
+                    width: 1.0,
+                    color: Color::from_rgba(0.3, 0.3, 0.4, 0.5),
+                    radius: 6.0.into(),
+                },
+                ..Default::default()
+            }
+        })
         .into()
 }
 

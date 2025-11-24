@@ -1,0 +1,352 @@
+# ZMQ Transport Deployment Configuration
+#
+# This configuration file demonstrates production-ready settings for deploying
+# the Descartes ZMQ transport layer in various environments.
+#
+# Usage:
+#   1. Copy this file and customize for your environment
+#   2. Use environment variables for sensitive data (endpoints, secrets)
+#   3. Test configuration in staging before production deployment
+
+# ==============================================================================
+# Server Configuration
+# ==============================================================================
+
+[server]
+# Server identifier (unique across your deployment)
+server_id = "prod-agent-server-01"
+
+# Endpoint to bind the server to
+# Format: "tcp://<ip>:<port>" or "ipc://<path>"
+#
+# Examples:
+#   - "tcp://0.0.0.0:5555"        # Listen on all interfaces
+#   - "tcp://192.168.1.100:5555"  # Listen on specific interface
+#   - "ipc:///tmp/descartes.sock" # Unix domain socket
+endpoint = "tcp://0.0.0.0:5555"
+
+# Maximum number of concurrent agents the server can manage
+# Adjust based on available system resources (CPU, memory)
+max_agents = 100
+
+# Status update interval in seconds
+# How often the server broadcasts agent status updates
+status_update_interval_secs = 10
+
+# Enable automatic status updates via PUB/SUB
+enable_status_updates = true
+
+# Request timeout in seconds
+# Maximum time to wait for agent operations to complete
+request_timeout_secs = 60
+
+# ==============================================================================
+# Process Runner Configuration
+# ==============================================================================
+
+[server.runner]
+# Enable JSON streaming for agent output
+# Allows structured parsing of agent responses
+enable_json_streaming = true
+
+# Enable periodic health checks for agents
+enable_health_checks = true
+
+# Health check interval in seconds
+health_check_interval_secs = 30
+
+# Maximum concurrent agents (hard limit)
+max_concurrent_agents = 100
+
+# Working directory for spawned agents
+# Set to null to use current directory
+working_dir = "/var/lib/descartes/agents"
+
+# ==============================================================================
+# Client Configuration
+# ==============================================================================
+
+[client]
+# Client identifier
+client_id = "prod-client-01"
+
+# Server endpoint to connect to
+# Should match the server's endpoint
+endpoint = "tcp://localhost:5555"
+
+# Connection timeout in seconds
+connection_timeout_secs = 30
+
+# Request timeout in seconds
+request_timeout_secs = 60
+
+# Enable automatic reconnection on failure
+auto_reconnect = true
+
+# Maximum number of reconnection attempts
+max_reconnect_attempts = 5
+
+# Delay between reconnection attempts (seconds)
+reconnect_delay_secs = 5
+
+# Enable heartbeat/keepalive
+enable_heartbeat = true
+
+# Heartbeat interval in seconds
+heartbeat_interval_secs = 30
+
+# ==============================================================================
+# Network Configuration
+# ==============================================================================
+
+[network]
+# Message size limits (bytes)
+max_message_size = 10485760  # 10 MB
+
+# ZMQ socket options
+send_timeout_ms = 5000
+receive_timeout_ms = 5000
+
+# High water mark (number of messages to buffer)
+# Prevents memory exhaustion under high load
+send_hwm = 1000
+receive_hwm = 1000
+
+# ==============================================================================
+# Security Configuration
+# ==============================================================================
+
+[security]
+# Enable TLS/SSL encryption (requires zeromq with libsodium)
+enable_encryption = false
+
+# Server certificate path (for TLS)
+# server_cert = "/etc/descartes/certs/server.cert"
+
+# Client certificate path (for TLS)
+# client_cert = "/etc/descartes/certs/client.cert"
+
+# Enable authentication
+enable_auth = false
+
+# Authentication type: "plain", "curve", "gssapi"
+# auth_type = "curve"
+
+# ==============================================================================
+# Monitoring Configuration
+# ==============================================================================
+
+[monitoring]
+# Enable Prometheus metrics export
+enable_metrics = true
+
+# Metrics endpoint
+metrics_endpoint = "0.0.0.0:9090"
+
+# Enable detailed logging
+enable_detailed_logging = true
+
+# Log level: "trace", "debug", "info", "warn", "error"
+log_level = "info"
+
+# Log format: "json", "pretty"
+log_format = "json"
+
+# ==============================================================================
+# Resource Limits
+# ==============================================================================
+
+[limits]
+# Maximum memory per agent (MB)
+max_agent_memory_mb = 512
+
+# Maximum CPU percentage per agent
+max_agent_cpu_percent = 50.0
+
+# Agent execution timeout (seconds)
+# Agents exceeding this time will be terminated
+agent_execution_timeout_secs = 3600
+
+# Maximum output buffer size per agent (bytes)
+max_output_buffer_bytes = 10485760  # 10 MB
+
+# ==============================================================================
+# High Availability Configuration
+# ==============================================================================
+
+[ha]
+# Enable high availability mode
+enable_ha = false
+
+# HA mode: "active-passive", "active-active"
+# ha_mode = "active-passive"
+
+# Cluster endpoints (comma-separated)
+# cluster_endpoints = "tcp://server1:5555,tcp://server2:5555,tcp://server3:5555"
+
+# Leader election timeout (seconds)
+# election_timeout_secs = 10
+
+# ==============================================================================
+# Load Balancing Configuration
+# ==============================================================================
+
+[load_balancing]
+# Enable load balancing across multiple servers
+enable_load_balancing = false
+
+# Load balancing strategy: "round-robin", "least-loaded", "random"
+# strategy = "least-loaded"
+
+# Server health check interval (seconds)
+# health_check_interval_secs = 5
+
+# ==============================================================================
+# Persistence Configuration
+# ==============================================================================
+
+[persistence]
+# Enable agent state persistence
+enable_persistence = false
+
+# Persistence backend: "file", "redis", "postgres"
+# backend = "file"
+
+# Persistence path (for file backend)
+# persistence_path = "/var/lib/descartes/persistence"
+
+# Persistence interval (seconds)
+# persistence_interval_secs = 60
+
+# ==============================================================================
+# Development/Testing Configuration
+# ==============================================================================
+
+[development]
+# Enable debug mode (more verbose logging)
+debug_mode = false
+
+# Enable mock mode (simulates agents without spawning)
+mock_mode = false
+
+# Enable testing endpoints
+enable_test_endpoints = false
+
+# ==============================================================================
+# Environment-Specific Overrides
+# ==============================================================================
+
+# Production Environment
+[environments.production]
+log_level = "warn"
+enable_detailed_logging = false
+max_agents = 200
+request_timeout_secs = 120
+
+# Staging Environment
+[environments.staging]
+log_level = "info"
+enable_detailed_logging = true
+max_agents = 50
+enable_test_endpoints = true
+
+# Development Environment
+[environments.development]
+log_level = "debug"
+debug_mode = true
+max_agents = 10
+enable_test_endpoints = true
+mock_mode = false
+
+# ==============================================================================
+# Example Multi-Server Deployment
+# ==============================================================================
+
+# Server 1 Configuration
+[multi_server.server1]
+server_id = "server-01"
+endpoint = "tcp://192.168.1.101:5555"
+max_agents = 100
+
+# Server 2 Configuration
+[multi_server.server2]
+server_id = "server-02"
+endpoint = "tcp://192.168.1.102:5555"
+max_agents = 100
+
+# Server 3 Configuration
+[multi_server.server3]
+server_id = "server-03"
+endpoint = "tcp://192.168.1.103:5555"
+max_agents = 100
+
+# ==============================================================================
+# Docker/Kubernetes Deployment
+# ==============================================================================
+
+[docker]
+# Container network mode
+# network_mode = "bridge"
+
+# Exposed ports
+# expose_ports = [5555, 9090]
+
+# Volume mounts
+# volumes = ["/var/lib/descartes:/data"]
+
+# Environment variables
+[docker.env]
+RUST_LOG = "descartes=info"
+RUST_BACKTRACE = "1"
+# ZMQ_SERVER_ENDPOINT = "tcp://0.0.0.0:5555"
+
+[kubernetes]
+# Service type: "ClusterIP", "NodePort", "LoadBalancer"
+# service_type = "ClusterIP"
+
+# Number of replicas
+# replicas = 3
+
+# Resource requests
+[kubernetes.resources.requests]
+cpu = "500m"
+memory = "512Mi"
+
+# Resource limits
+[kubernetes.resources.limits]
+cpu = "2000m"
+memory = "2Gi"
+
+# ==============================================================================
+# Best Practices Notes
+# ==============================================================================
+
+# 1. **Security**
+#    - Always enable encryption in production
+#    - Use authentication for multi-tenant deployments
+#    - Keep certificates in secure storage (e.g., Vault)
+#
+# 2. **Performance**
+#    - Tune max_agents based on server capacity
+#    - Monitor memory usage and adjust limits
+#    - Use appropriate timeouts for your workload
+#
+# 3. **Reliability**
+#    - Enable auto-reconnect for clients
+#    - Set up health checks and monitoring
+#    - Configure appropriate retry policies
+#
+# 4. **Scalability**
+#    - Use load balancing for high traffic
+#    - Deploy multiple servers for redundancy
+#    - Monitor queue depths and adjust HWM
+#
+# 5. **Monitoring**
+#    - Enable metrics export for observability
+#    - Set up alerts for failures and capacity
+#    - Track agent lifecycle events
+#
+# 6. **Testing**
+#    - Test configuration in staging first
+#    - Run load tests to verify capacity
+#    - Test failure scenarios and recovery

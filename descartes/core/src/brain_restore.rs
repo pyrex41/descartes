@@ -329,6 +329,11 @@ impl<S: AgentHistoryStore> DefaultBrainRestore<S> {
         Self { store }
     }
 
+    /// Get a reference to the history store
+    pub fn store(&self) -> &S {
+        &self.store
+    }
+
     /// Sort events by timestamp and causality
     fn sort_events_by_causality(&self, events: &mut Vec<AgentHistoryEvent>) {
         // Build parent-child map
@@ -641,7 +646,7 @@ impl<S: AgentHistoryStore> BrainRestore for DefaultBrainRestore<S> {
             .get_snapshot(snapshot_id)
             .await?
             .ok_or_else(|| {
-                StateStoreError::NotFoundError(format!("Snapshot {} not found", snapshot_id))
+                StateStoreError::NotFound(format!("Snapshot {} not found", snapshot_id))
             })?;
 
         // Replay events from snapshot

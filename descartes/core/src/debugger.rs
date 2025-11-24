@@ -1065,7 +1065,9 @@ impl Debugger {
 
             // Check for breakpoints
             if let Some(bp) = self.state.check_breakpoints() {
-                self.handle_breakpoint_hit(bp)?;
+                let bp_clone = bp.clone();
+                drop(bp); // Release the borrow
+                self.handle_breakpoint_hit(&bp_clone)?;
                 break;
             }
         }
@@ -1120,7 +1122,9 @@ impl Debugger {
 
             // Check for breakpoints
             if let Some(bp) = self.state.check_breakpoints() {
-                self.handle_breakpoint_hit(bp)?;
+                let bp_clone = bp.clone();
+                drop(bp); // Release the borrow
+                self.handle_breakpoint_hit(&bp_clone)?;
                 break;
             }
         }
@@ -1161,7 +1165,9 @@ impl Debugger {
     pub fn check_and_handle_breakpoints(&mut self) -> DebuggerResult<Option<Uuid>> {
         if let Some(bp) = self.state.check_breakpoints() {
             let bp_id = bp.id;
-            self.handle_breakpoint_hit(bp)?;
+            let bp_clone = bp.clone();
+            drop(bp); // Release the borrow
+            self.handle_breakpoint_hit(&bp_clone)?;
             return Ok(Some(bp_id));
         }
         Ok(None)

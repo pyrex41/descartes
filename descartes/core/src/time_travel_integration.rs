@@ -979,8 +979,8 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         }
 
         // Get snapshots
-        let snapshots = self.history_store
-            .list_snapshots(agent_id, 100)
+        let snapshots = self.brain_restore.store()
+            .list_snapshots(agent_id)
             .await?;
 
         for snapshot in snapshots {
@@ -1019,7 +1019,7 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         let snapshot_id = snapshot.snapshot_id;
 
         // Save snapshot
-        self.history_store.create_snapshot(&snapshot).await?;
+        self.brain_restore.store().create_snapshot(&snapshot).await?;
 
         info!("Snapshot created: {}", snapshot_id);
         Ok(snapshot_id)

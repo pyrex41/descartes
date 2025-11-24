@@ -20,9 +20,15 @@ use iced::{
 use iced::mouse;
 use iced::widget::canvas::{Cache, Canvas, Cursor, Frame, Geometry, Path, Stroke, Style, Text};
 
-use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType, Position, DAGStatistics};
+use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType, Position, DAGStatistics, DAGHistory, DAGOperation};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
+
+use crate::dag_canvas_interactions::{
+    ExtendedInteractionState, EdgeCreation, BoxSelection,
+    handle_mouse_press, handle_mouse_release, handle_mouse_move, handle_mouse_scroll,
+    handle_key_press, handle_key_release, InteractionResult,
+};
 
 // ============================================================================
 // Constants
@@ -58,6 +64,12 @@ pub struct DAGEditorState {
 
     /// Interaction state
     pub interaction: InteractionState,
+
+    /// Extended interaction state (box selection, edge creation, etc.)
+    pub extended_interaction: ExtendedInteractionState,
+
+    /// Undo/redo history
+    pub history: DAGHistory,
 
     /// Selected tool
     pub tool: Tool,
@@ -179,6 +191,14 @@ pub enum DAGEditorMessage {
     CanvasRightClicked(Point),
     CanvasDrag(Point),
     CanvasDragEnd,
+    MousePressed(mouse::Button, Point, keyboard::Modifiers),
+    MouseReleased(mouse::Button, Point),
+    MouseMoved(Point),
+    MouseScrolled(mouse::ScrollDelta, Point),
+
+    /// Keyboard interactions
+    KeyPressed(keyboard::Key, keyboard::Modifiers),
+    KeyReleased(keyboard::Key),
 
     /// Node operations
     SelectNode(Uuid, bool), // ID, add_to_selection
@@ -195,6 +215,7 @@ pub enum DAGEditorMessage {
     ZoomIn,
     ZoomOut,
     ZoomReset,
+    ZoomToPoint(Point, f32), // position, zoom level
     PanTo(Vector),
     FitToView,
 
@@ -212,6 +233,10 @@ pub enum DAGEditorMessage {
     UpdateNode(Uuid, DAGNode),
     RemoveNode(Uuid),
 
+    /// Undo/Redo
+    Undo,
+    Redo,
+
     /// Data operations
     LoadDAG(DAG),
     SaveDAG,
@@ -219,6 +244,9 @@ pub enum DAGEditorMessage {
 
     /// Statistics
     UpdateStatistics,
+
+    /// Internal
+    InteractionResult(InteractionResult),
 }
 
 // ============================================================================
@@ -238,6 +266,8 @@ impl DAGEditorState {
             canvas_state: CanvasState::default(),
             ui_state: UIState::default(),
             interaction: InteractionState::default(),
+            extended_interaction: ExtendedInteractionState::default(),
+            history: DAGHistory::new(),
             tool: Tool::Select,
             show_grid: true,
             snap_to_grid: false,
@@ -309,6 +339,82 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
             state.tool = tool;
             state.interaction.selected_nodes.clear();
             state.interaction.selected_edges.clear();
+            state.clear_cache();
+        }
+
+        // New interaction handlers
+        DAGEditorMessage::MousePressed(button, position, modifiers) => {
+            if let Some(result) = handle_mouse_press(state, &mut state.extended_interaction, button, position, modifiers) {
+                update(state, DAGEditorMessage::InteractionResult(result));
+            }
+        }
+
+        DAGEditorMessage::MouseReleased(button, position) => {
+            if let Some(result) = handle_mouse_release(state, &mut state.extended_interaction, button, position) {
+                update(state, DAGEditorMessage::InteractionResult(result));
+            }
+        }
+
+        DAGEditorMessage::MouseMoved(position) => {
+            if let Some(result) = handle_mouse_move(state, &mut state.extended_interaction, position) {
+                update(state, DAGEditorMessage::InteractionResult(result));
+            }
+        }
+
+        DAGEditorMessage::MouseScrolled(delta, position) => {
+            if let Some(result) = handle_mouse_scroll(state, delta, position) {
+                update(state, DAGEditorMessage::InteractionResult(result));
+            }
+        }
+
+        DAGEditorMessage::KeyPressed(key, modifiers) => {
+            if let Some(result) = handle_key_press(state, &mut state.extended_interaction, key, modifiers) {
+                update(state, DAGEditorMessage::InteractionResult(result));
+            }
+        }
+
+        DAGEditorMessage::KeyReleased(key) => {
+            if let Some(result) = handle_key_release(state, &mut state.extended_interaction, key) {
+                update(state, DAGEditorMessage::InteractionResult(result));
+            }
+        }
+
+        DAGEditorMessage::InteractionResult(result) => {
+            handle_interaction_result(state, result);
+        }
+
+        DAGEditorMessage::Undo => {
+            if let Some(operation) = state.history.undo() {
+                apply_undo_operation(state, operation);
+                state.update_statistics();
+                state.clear_cache();
+            }
+        }
+
+        DAGEditorMessage::Redo => {
+            if let Some(operation) = state.history.redo() {
+                apply_redo_operation(state, operation);
+                state.update_statistics();
+                state.clear_cache();
+            }
+        }
+
+        DAGEditorMessage::ZoomToPoint(position, zoom) => {
+            let world_pos_before = screen_to_world(position, &state.canvas_state);
+            state.canvas_state.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
+            let world_pos_after = screen_to_world(position, &state.canvas_state);
+
+            let world_delta = Vector::new(
+                (world_pos_after.x - world_pos_before.x) * state.canvas_state.zoom,
+                (world_pos_after.y - world_pos_before.y) * state.canvas_state.zoom,
+            );
+
+            state.canvas_state.offset = Vector::new(
+                state.canvas_state.offset.x + world_delta.x,
+                state.canvas_state.offset.y + world_delta.y,
+            );
+
+            state.clear_cache();
         }
 
         DAGEditorMessage::SelectNode(node_id, add_to_selection) => {
@@ -353,33 +459,43 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
         DAGEditorMessage::AddNode(position) => {
             let node_count = state.dag.nodes.len();
             let node = DAGNode::new_auto(format!("Task {}", node_count + 1))
-                .with_position(position.x, position.y);
+                .with_position(position.x as f64, position.y as f64);
 
+            let node_data = node.clone();
             if state.dag.add_node(node).is_ok() {
+                state.history.record(DAGOperation::AddNode(node_data));
                 state.update_statistics();
                 state.clear_cache();
             }
         }
 
         DAGEditorMessage::RemoveNode(node_id) => {
-            if state.dag.remove_node(node_id).is_ok() {
-                state.update_statistics();
-                state.clear_cache();
+            if let Some(node) = state.dag.get_node(node_id).cloned() {
+                if state.dag.remove_node(node_id).is_ok() {
+                    state.history.record(DAGOperation::RemoveNode(node_id, node));
+                    state.update_statistics();
+                    state.clear_cache();
+                }
             }
         }
 
         DAGEditorMessage::CreateEdge(from_id, to_id, edge_type) => {
             let edge = DAGEdge::new(from_id, to_id, edge_type);
+            let edge_data = edge.clone();
             if state.dag.add_edge(edge).is_ok() {
+                state.history.record(DAGOperation::AddEdge(edge_data));
                 state.update_statistics();
                 state.clear_cache();
             }
         }
 
         DAGEditorMessage::DeleteEdge(edge_id) => {
-            if state.dag.remove_edge(edge_id).is_ok() {
-                state.update_statistics();
-                state.clear_cache();
+            if let Some(edge) = state.dag.get_edge(edge_id).cloned() {
+                if state.dag.remove_edge(edge_id).is_ok() {
+                    state.history.record(DAGOperation::RemoveEdge(edge_id, edge));
+                    state.update_statistics();
+                    state.clear_cache();
+                }
             }
         }
 
@@ -1022,4 +1138,122 @@ pub fn snap_to_grid(position: Point) -> Point {
         (position.x / GRID_SIZE).round() * GRID_SIZE,
         (position.y / GRID_SIZE).round() * GRID_SIZE,
     )
+}
+
+// ============================================================================
+// Interaction Result Handlers
+// ============================================================================
+
+/// Handle interaction results from the interaction handlers
+fn handle_interaction_result(state: &mut DAGEditorState, result: InteractionResult) {
+    match result {
+        InteractionResult::NodeDragStarted => {
+            // Already handled in interaction handler
+        }
+
+        InteractionResult::NodeDragging => {
+            // Positions already updated in interaction handler
+        }
+
+        InteractionResult::NodeDragEnded(new_positions) => {
+            // Record the move operation for undo
+            // Note: For simplicity, we record individual node updates
+            // In a production system, you might want a compound operation
+            state.clear_cache();
+        }
+
+        InteractionResult::NodeAdded(node_id) => {
+            // Already handled in message handler
+            state.interaction.selected_nodes.clear();
+            state.interaction.selected_nodes.insert(node_id);
+        }
+
+        InteractionResult::NodeDeleted(_node_id) => {
+            // Already handled
+        }
+
+        InteractionResult::NodesDeleted(_node_ids) => {
+            // Already handled
+        }
+
+        InteractionResult::EdgeCreated(_edge_id) => {
+            // Already handled
+        }
+
+        InteractionResult::EdgeCreationFailed(msg) => {
+            // TODO: Show error message to user
+            eprintln!("Edge creation failed: {}", msg);
+        }
+
+        InteractionResult::Zoomed(_zoom) => {
+            // Already handled
+        }
+
+        InteractionResult::UndoRequested => {
+            update(state, DAGEditorMessage::Undo);
+        }
+
+        InteractionResult::RedoRequested => {
+            update(state, DAGEditorMessage::Redo);
+        }
+
+        _ => {
+            // Other results don't need special handling
+        }
+    }
+}
+
+/// Apply an undo operation
+fn apply_undo_operation(state: &mut DAGEditorState, operation: DAGOperation) {
+    match operation {
+        DAGOperation::AddNode(node) => {
+            // Undo add by removing
+            let _ = state.dag.remove_node(node.node_id);
+        }
+
+        DAGOperation::RemoveNode(node_id, node) => {
+            // Undo remove by adding back
+            let _ = state.dag.add_node(node);
+        }
+
+        DAGOperation::UpdateNode(node_id, old_node, _new_node) => {
+            // Undo update by restoring old node
+            let _ = state.dag.update_node(node_id, old_node);
+        }
+
+        DAGOperation::AddEdge(edge) => {
+            // Undo add by removing
+            let _ = state.dag.remove_edge(edge.edge_id);
+        }
+
+        DAGOperation::RemoveEdge(edge_id, edge) => {
+            // Undo remove by adding back
+            let _ = state.dag.add_edge(edge);
+        }
+    }
+}
+
+/// Apply a redo operation
+fn apply_redo_operation(state: &mut DAGEditorState, operation: DAGOperation) {
+    match operation {
+        DAGOperation::AddNode(node) => {
+            let _ = state.dag.add_node(node);
+        }
+
+        DAGOperation::RemoveNode(node_id, _node) => {
+            let _ = state.dag.remove_node(node_id);
+        }
+
+        DAGOperation::UpdateNode(node_id, _old_node, new_node) => {
+            let _ = state.dag.update_node(node_id, new_node);
+        }
+
+        DAGOperation::AddEdge(edge) => {
+            let _ = state.dag.add_edge(edge);
+        }
+
+        DAGOperation::RemoveEdge(edge_id, _edge) => {
+            let _ = state.dag.remove_edge(edge_id);
+        }
+    }
 }

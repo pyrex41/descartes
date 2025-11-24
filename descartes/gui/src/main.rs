@@ -10,6 +10,7 @@ mod event_handler;
 mod task_board;
 mod dag_editor;
 mod file_tree_view;
+mod knowledge_graph_panel;
 
 use time_travel::{TimeTravelState, TimeTravelMessage};
 use rpc_client::GuiRpcClient;
@@ -17,6 +18,7 @@ use event_handler::EventHandler;
 use task_board::{TaskBoardState, TaskBoardMessage, KanbanBoard};
 use dag_editor::{DAGEditorState, DAGEditorMessage};
 use file_tree_view::{FileTreeState, FileTreeMessage};
+use knowledge_graph_panel::{KnowledgeGraphPanelState, KnowledgeGraphMessage};
 use descartes_daemon::DescartesEvent;
 use descartes_core::{Task, TaskStatus, TaskPriority, TaskComplexity};
 use uuid::Uuid;
@@ -57,6 +59,8 @@ struct DescartesGui {
     dag_editor_state: DAGEditorState,
     /// File tree view state
     file_tree_state: FileTreeState,
+    /// Knowledge graph panel state
+    knowledge_graph_panel_state: KnowledgeGraphPanelState,
     /// RPC client (wrapped in Arc for cloning)
     rpc_client: Option<Arc<GuiRpcClient>>,
     /// Event handler
@@ -77,6 +81,7 @@ enum ViewMode {
     DagEditor,
     ContextBrowser,
     FileBrowser,
+    KnowledgeGraph,
 }
 
 /// Messages that drive the application
@@ -100,6 +105,8 @@ enum Message {
     DAGEditor(DAGEditorMessage),
     /// File tree view message
     FileTree(FileTreeMessage),
+    /// Knowledge graph panel message
+    KnowledgeGraph(KnowledgeGraphMessage),
     /// Load sample history data for demo
     LoadSampleHistory,
     /// Load sample tasks for demo
@@ -108,6 +115,10 @@ enum Message {
     LoadSampleDAG,
     /// Load sample file tree for demo
     LoadSampleFileTree,
+    /// Load sample knowledge graph for demo
+    LoadSampleKnowledgeGraph,
+    /// Generate knowledge graph from file tree
+    GenerateKnowledgeGraph,
     /// Clear status message
     ClearStatus,
     /// Show error message
@@ -125,6 +136,7 @@ impl DescartesGui {
             task_board_state: TaskBoardState::default(),
             dag_editor_state: DAGEditorState::default(),
             file_tree_state: FileTreeState::default(),
+            knowledge_graph_panel_state: KnowledgeGraphPanelState::default(),
             rpc_client: None,
             event_handler: None,
             recent_events: Vec::new(),
@@ -230,6 +242,10 @@ impl DescartesGui {
                 file_tree_view::update(&mut self.file_tree_state, msg);
                 iced::Task::none()
             }
+            Message::KnowledgeGraph(msg) => {
+                knowledge_graph_panel::update(&mut self.knowledge_graph_panel_state, msg);
+                iced::Task::none()
+            }
             Message::LoadSampleHistory => {
                 tracing::info!("Loading sample history data");
                 self.load_sample_history();
@@ -248,6 +264,16 @@ impl DescartesGui {
             Message::LoadSampleFileTree => {
                 tracing::info!("Loading sample file tree data");
                 self.load_sample_file_tree();
+                iced::Task::none()
+            }
+            Message::LoadSampleKnowledgeGraph => {
+                tracing::info!("Loading sample knowledge graph data");
+                self.load_sample_knowledge_graph();
+                iced::Task::none()
+            }
+            Message::GenerateKnowledgeGraph => {
+                tracing::info!("Generating knowledge graph from file tree");
+                self.generate_knowledge_graph_from_file_tree();
                 iced::Task::none()
             }
             Message::ClearStatus => {
@@ -856,6 +882,7 @@ impl DescartesGui {
             (ViewMode::DagEditor, "DAG Editor"),
             (ViewMode::ContextBrowser, "Context Browser"),
             (ViewMode::FileBrowser, "File Browser"),
+            (ViewMode::KnowledgeGraph, "Knowledge Graph"),
         ];
 
         let buttons: Vec<Element<Message>> = nav_items
@@ -918,6 +945,7 @@ impl DescartesGui {
             ViewMode::DagEditor => self.view_dag_editor(),
             ViewMode::ContextBrowser => self.view_context_browser(),
             ViewMode::FileBrowser => self.view_file_browser(),
+            ViewMode::KnowledgeGraph => self.view_knowledge_graph(),
         };
 
         container(content)
@@ -1245,6 +1273,283 @@ impl DescartesGui {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Knowledge Graph view
+    fn view_knowledge_graph(&self) -> Element<Message> {
+        // Check if knowledge graph is loaded
+        if self.knowledge_graph_panel_state.graph.is_none() {
+            let title = text("Knowledge Graph")
+                .size(32)
+                .width(Length::Fill);
+
+            let description = text(
+                "No knowledge graph loaded. Generate one from the file tree or load a sample.\n\n\
+                Steps:\n\
+                1. Go to File Browser and load a file tree\n\
+                2. Come back here and click 'Generate from File Tree'\n\n\
+                Or click 'Load Sample' to see a demo knowledge graph."
+            )
+            .size(16)
+            .width(Length::Fill);
+
+            let load_sample_btn = button(text("Load Sample Knowledge Graph"))
+                .on_press(Message::LoadSampleKnowledgeGraph)
+                .padding(10);
+
+            let generate_btn = button(text("Generate from File Tree"))
+                .on_press(Message::GenerateKnowledgeGraph)
+                .padding(10);
+
+            column![
+                title,
+                Space::with_height(20),
+                description,
+                Space::with_height(20),
+                row![
+                    load_sample_btn,
+                    Space::with_width(10),
+                    generate_btn,
+                ]
+                .spacing(10),
+            ]
+            .spacing(10)
+            .into()
+        } else {
+            // Map knowledge graph messages to main messages
+            knowledge_graph_panel::view(&self.knowledge_graph_panel_state).map(Message::KnowledgeGraph)
+        }
+    }
+
+    /// Load sample knowledge graph for demonstration
+    fn load_sample_knowledge_graph(&mut self) {
+        use descartes_agent_runner::knowledge_graph::{
+            KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, KnowledgeEdge, RelationshipType,
+            FileReference,
+        };
+        use std::path::PathBuf;
+
+        let mut graph = KnowledgeGraph::new();
+
+        // Create sample nodes representing a small codebase
+        // Module: main
+        let mut main_module = KnowledgeNode::new(
+            KnowledgeNodeType::Module,
+            "main".to_string(),
+            "main".to_string(),
+        );
+        main_module.description = Some("Main application module".to_string());
+        main_module.add_file_reference(FileReference {
+            file_node_id: "main-file".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            line_range: (1, 50),
+            column_range: None,
+            is_definition: true,
+        });
+        let main_module_id = graph.add_node(main_module);
+
+        // Function: main
+        let mut main_fn = KnowledgeNode::new(
+            KnowledgeNodeType::Function,
+            "main".to_string(),
+            "main::main".to_string(),
+        );
+        main_fn.description = Some("Application entry point".to_string());
+        main_fn.signature = Some("fn main()".to_string());
+        main_fn.parent_id = Some(main_module_id.clone());
+        main_fn.add_file_reference(FileReference {
+            file_node_id: "main-file".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            line_range: (10, 15),
+            column_range: Some((0, 10)),
+            is_definition: true,
+        });
+        let main_fn_id = graph.add_node(main_fn);
+
+        // Function: initialize
+        let mut init_fn = KnowledgeNode::new(
+            KnowledgeNodeType::Function,
+            "initialize".to_string(),
+            "main::initialize".to_string(),
+        );
+        init_fn.description = Some("Initialize application state".to_string());
+        init_fn.signature = Some("fn initialize() -> AppState".to_string());
+        init_fn.return_type = Some("AppState".to_string());
+        init_fn.parent_id = Some(main_module_id.clone());
+        init_fn.add_file_reference(FileReference {
+            file_node_id: "main-file".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            line_range: (20, 30),
+            column_range: Some((0, 15)),
+            is_definition: true,
+        });
+        let init_fn_id = graph.add_node(init_fn);
+
+        // Class: AppState
+        let mut app_state = KnowledgeNode::new(
+            KnowledgeNodeType::Class,
+            "AppState".to_string(),
+            "app::AppState".to_string(),
+        );
+        app_state.description = Some("Application state container".to_string());
+        app_state.add_file_reference(FileReference {
+            file_node_id: "app-file".to_string(),
+            file_path: PathBuf::from("src/app.rs"),
+            line_range: (5, 20),
+            column_range: None,
+            is_definition: true,
+        });
+        let app_state_id = graph.add_node(app_state);
+
+        // Method: new
+        let mut new_method = KnowledgeNode::new(
+            KnowledgeNodeType::Method,
+            "new".to_string(),
+            "app::AppState::new".to_string(),
+        );
+        new_method.description = Some("Create new AppState instance".to_string());
+        new_method.signature = Some("fn new() -> Self".to_string());
+        new_method.return_type = Some("Self".to_string());
+        new_method.parent_id = Some(app_state_id.clone());
+        new_method.add_file_reference(FileReference {
+            file_node_id: "app-file".to_string(),
+            file_path: PathBuf::from("src/app.rs"),
+            line_range: (22, 27),
+            column_range: Some((4, 15)),
+            is_definition: true,
+        });
+        let new_method_id = graph.add_node(new_method);
+
+        // Module: utils
+        let mut utils_module = KnowledgeNode::new(
+            KnowledgeNodeType::Module,
+            "utils".to_string(),
+            "utils".to_string(),
+        );
+        utils_module.description = Some("Utility functions".to_string());
+        utils_module.add_file_reference(FileReference {
+            file_node_id: "utils-file".to_string(),
+            file_path: PathBuf::from("src/utils.rs"),
+            line_range: (1, 100),
+            column_range: None,
+            is_definition: true,
+        });
+        let utils_module_id = graph.add_node(utils_module);
+
+        // Function: helper
+        let mut helper_fn = KnowledgeNode::new(
+            KnowledgeNodeType::Function,
+            "helper".to_string(),
+            "utils::helper".to_string(),
+        );
+        helper_fn.description = Some("Helper utility function".to_string());
+        helper_fn.signature = Some("fn helper(data: &str) -> String".to_string());
+        helper_fn.parameters = vec!["data: &str".to_string()];
+        helper_fn.return_type = Some("String".to_string());
+        helper_fn.parent_id = Some(utils_module_id.clone());
+        helper_fn.add_file_reference(FileReference {
+            file_node_id: "utils-file".to_string(),
+            file_path: PathBuf::from("src/utils.rs"),
+            line_range: (10, 15),
+            column_range: Some((0, 10)),
+            is_definition: true,
+        });
+        let helper_fn_id = graph.add_node(helper_fn);
+
+        // Create relationships
+        graph.add_edge(KnowledgeEdge::new(
+            main_fn_id.clone(),
+            init_fn_id.clone(),
+            RelationshipType::Calls,
+        ));
+
+        graph.add_edge(KnowledgeEdge::new(
+            init_fn_id.clone(),
+            new_method_id.clone(),
+            RelationshipType::Calls,
+        ));
+
+        graph.add_edge(KnowledgeEdge::new(
+            init_fn_id.clone(),
+            app_state_id.clone(),
+            RelationshipType::Uses,
+        ));
+
+        graph.add_edge(KnowledgeEdge::new(
+            main_fn_id.clone(),
+            helper_fn_id.clone(),
+            RelationshipType::Calls,
+        ));
+
+        graph.add_edge(KnowledgeEdge::new(
+            new_method_id.clone(),
+            app_state_id.clone(),
+            RelationshipType::DefinedIn,
+        ));
+
+        tracing::info!(
+            "Sample knowledge graph loaded: {} nodes, {} edges",
+            graph.nodes.len(),
+            graph.edges.len()
+        );
+
+        // Update the knowledge graph panel state
+        knowledge_graph_panel::update(
+            &mut self.knowledge_graph_panel_state,
+            KnowledgeGraphMessage::GraphLoaded(graph),
+        );
+
+        self.status_message = Some("Sample knowledge graph loaded successfully!".to_string());
+    }
+
+    /// Generate knowledge graph from the current file tree
+    fn generate_knowledge_graph_from_file_tree(&mut self) {
+        if self.file_tree_state.tree.is_none() {
+            self.status_message = Some("No file tree loaded. Load a file tree first.".to_string());
+            return;
+        }
+
+        use descartes_agent_runner::knowledge_graph_overlay::KnowledgeGraphOverlay;
+
+        let mut file_tree = self.file_tree_state.tree.clone().unwrap();
+
+        tracing::info!("Generating knowledge graph from file tree");
+
+        match KnowledgeGraphOverlay::new() {
+            Ok(mut overlay) => {
+                match overlay.generate_and_link(&mut file_tree) {
+                    Ok(knowledge_graph) => {
+                        tracing::info!(
+                            "Knowledge graph generated: {} nodes, {} edges",
+                            knowledge_graph.nodes.len(),
+                            knowledge_graph.edges.len()
+                        );
+
+                        // Update file tree state with links
+                        self.file_tree_state.tree = Some(file_tree);
+
+                        // Update knowledge graph panel
+                        knowledge_graph_panel::update(
+                            &mut self.knowledge_graph_panel_state,
+                            KnowledgeGraphMessage::GraphLoaded(knowledge_graph),
+                        );
+
+                        self.status_message = Some(format!(
+                            "Knowledge graph generated successfully! {} entities extracted.",
+                            self.knowledge_graph_panel_state.graph.as_ref().unwrap().nodes.len()
+                        ));
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to generate knowledge graph: {}", e);
+                        self.status_message = Some(format!("Failed to generate knowledge graph: {}", e));
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to create knowledge graph overlay: {}", e);
+                self.status_message = Some(format!("Failed to create overlay: {}", e));
             }
         }
     }

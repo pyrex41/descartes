@@ -7,8 +7,11 @@
 /// - Real-time updates from daemon
 
 use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
+use descartes_daemon::DescartesEvent;
 use iced::widget::{button, column, container, row, scrollable, text, Column, Row, Space};
 use iced::{alignment, color, Alignment, Color, Element, Length, Theme};
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 /// State for the Task Board view
@@ -26,6 +29,41 @@ pub struct TaskBoardState {
     pub loading: bool,
     /// Error message
     pub error: Option<String>,
+    /// Real-time update state
+    pub realtime_state: RealtimeUpdateState,
+}
+
+/// Real-time update state for debouncing and connection management
+#[derive(Debug, Clone)]
+pub struct RealtimeUpdateState {
+    /// Whether real-time updates are enabled
+    pub enabled: bool,
+    /// Connection status
+    pub connected: bool,
+    /// Last update timestamp for debouncing
+    pub last_update: Option<Instant>,
+    /// Pending updates (task_id -> timestamp)
+    pub pending_updates: HashMap<Uuid, Instant>,
+    /// Debounce interval in milliseconds
+    pub debounce_ms: u64,
+    /// Count of received events
+    pub events_received: u64,
+    /// Count of applied updates
+    pub updates_applied: u64,
+}
+
+impl Default for RealtimeUpdateState {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            connected: false,
+            last_update: None,
+            pending_updates: HashMap::new(),
+            debounce_ms: 100, // 100ms debounce
+            events_received: 0,
+            updates_applied: 0,
+        }
+    }
 }
 
 /// Kanban board structure
@@ -102,6 +140,20 @@ pub enum TaskBoardMessage {
     RefreshTasks,
     /// Toggle show blocked only
     ToggleBlockedOnly,
+    /// Real-time event received from daemon
+    EventReceived(DescartesEvent),
+    /// Task created via real-time update
+    TaskCreated(Task),
+    /// Task updated via real-time update
+    TaskUpdated(Task),
+    /// Task deleted via real-time update
+    TaskDeleted(Uuid),
+    /// Connection status changed
+    ConnectionStatusChanged(bool),
+    /// Enable/disable real-time updates
+    ToggleRealtimeUpdates,
+    /// Flush pending debounced updates
+    FlushPendingUpdates,
 }
 
 impl Default for TaskBoardState {
@@ -113,6 +165,7 @@ impl Default for TaskBoardState {
             selected_task: None,
             loading: false,
             error: None,
+            realtime_state: RealtimeUpdateState::default(),
         }
     }
 }
@@ -193,6 +246,101 @@ impl TaskBoardState {
             }
         }
         tasks
+    }
+
+    /// Add or update a task in the board (for real-time updates)
+    pub fn upsert_task(&mut self, task: Task) {
+        // Remove task from all columns first
+        self.remove_task(&task.id);
+
+        // Add to appropriate column based on status
+        match task.status {
+            TaskStatus::Todo => self.kanban_board.todo.push(task),
+            TaskStatus::InProgress => self.kanban_board.in_progress.push(task),
+            TaskStatus::Done => self.kanban_board.done.push(task),
+            TaskStatus::Blocked => self.kanban_board.blocked.push(task),
+        }
+
+        // Update realtime state
+        self.realtime_state.last_update = Some(Instant::now());
+        self.realtime_state.updates_applied += 1;
+    }
+
+    /// Remove a task from all columns
+    pub fn remove_task(&mut self, task_id: &Uuid) {
+        self.kanban_board.todo.retain(|t| t.id != *task_id);
+        self.kanban_board.in_progress.retain(|t| t.id != *task_id);
+        self.kanban_board.done.retain(|t| t.id != *task_id);
+        self.kanban_board.blocked.retain(|t| t.id != *task_id);
+    }
+
+    /// Check if update should be applied based on debouncing
+    pub fn should_apply_update(&self, task_id: &Uuid) -> bool {
+        if !self.realtime_state.enabled {
+            return false;
+        }
+
+        if let Some(pending_time) = self.realtime_state.pending_updates.get(task_id) {
+            let elapsed = Instant::now().duration_since(*pending_time);
+            elapsed.as_millis() >= self.realtime_state.debounce_ms as u128
+        } else {
+            true
+        }
+    }
+
+    /// Mark task as having a pending update
+    pub fn mark_pending_update(&mut self, task_id: Uuid) {
+        self.realtime_state.pending_updates.insert(task_id, Instant::now());
+    }
+
+    /// Clear pending update for a task
+    pub fn clear_pending_update(&mut self, task_id: &Uuid) {
+        self.realtime_state.pending_updates.remove(task_id);
+    }
+
+    /// Process an event from the daemon
+    pub fn process_event(&mut self, event: DescartesEvent) -> Option<TaskBoardMessage> {
+        use descartes_daemon::{TaskEvent, TaskEventType};
+
+        self.realtime_state.events_received += 1;
+
+        match event {
+            DescartesEvent::TaskEvent(TaskEvent {
+                task_id,
+                event_type,
+                data,
+                ..
+            }) => {
+                let task_uuid = Uuid::parse_str(&task_id).ok()?;
+
+                match event_type {
+                    TaskEventType::Created => {
+                        // Extract task from event data
+                        if let Some(task_value) = data.get("task") {
+                            if let Ok(task) = serde_json::from_value::<Task>(task_value.clone()) {
+                                return Some(TaskBoardMessage::TaskCreated(task));
+                            }
+                        }
+                    }
+                    TaskEventType::Progress => {
+                        // Task was updated
+                        if let Some(task_value) = data.get("task") {
+                            if let Ok(task) = serde_json::from_value::<Task>(task_value.clone()) {
+                                return Some(TaskBoardMessage::TaskUpdated(task));
+                            }
+                        }
+                    }
+                    TaskEventType::Cancelled => {
+                        // Task was deleted
+                        return Some(TaskBoardMessage::TaskDeleted(task_uuid));
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+
+        None
     }
 }
 
@@ -628,6 +776,63 @@ pub fn update(state: &mut TaskBoardState, message: TaskBoardMessage) {
         }
         TaskBoardMessage::ToggleBlockedOnly => {
             state.filters.show_blocked_only = !state.filters.show_blocked_only;
+        }
+        TaskBoardMessage::EventReceived(event) => {
+            // Process the event and potentially generate another message
+            if let Some(msg) = state.process_event(event) {
+                update(state, msg);
+            }
+        }
+        TaskBoardMessage::TaskCreated(task) => {
+            if state.realtime_state.enabled {
+                let task_id = task.id;
+                if state.should_apply_update(&task_id) {
+                    state.upsert_task(task);
+                    state.clear_pending_update(&task_id);
+                } else {
+                    state.mark_pending_update(task_id);
+                }
+            }
+        }
+        TaskBoardMessage::TaskUpdated(task) => {
+            if state.realtime_state.enabled {
+                let task_id = task.id;
+                if state.should_apply_update(&task_id) {
+                    state.upsert_task(task);
+                    state.clear_pending_update(&task_id);
+                } else {
+                    state.mark_pending_update(task_id);
+                }
+            }
+        }
+        TaskBoardMessage::TaskDeleted(task_id) => {
+            if state.realtime_state.enabled {
+                if state.should_apply_update(&task_id) {
+                    state.remove_task(&task_id);
+                    state.clear_pending_update(&task_id);
+                    // Deselect if this was the selected task
+                    if state.selected_task == Some(task_id) {
+                        state.selected_task = None;
+                    }
+                } else {
+                    state.mark_pending_update(task_id);
+                }
+            }
+        }
+        TaskBoardMessage::ConnectionStatusChanged(connected) => {
+            state.realtime_state.connected = connected;
+            if !connected {
+                state.error = Some("Real-time connection lost".to_string());
+            } else {
+                state.error = None;
+            }
+        }
+        TaskBoardMessage::ToggleRealtimeUpdates => {
+            state.realtime_state.enabled = !state.realtime_state.enabled;
+        }
+        TaskBoardMessage::FlushPendingUpdates => {
+            // Clear all pending updates (apply them all)
+            state.realtime_state.pending_updates.clear();
         }
     }
 }

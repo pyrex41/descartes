@@ -22,3 +22,10 @@ iced = { version = "0.13", features = ["debug", "tokio", "advanced"] }
 [[bin]]
 name = "descartes-gui"
 path = "src/main.rs"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "swarm_monitor_bench"
+harness = false

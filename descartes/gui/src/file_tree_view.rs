@@ -45,6 +45,33 @@ pub struct FileTreeState {
 
     /// Sort order
     pub sort_order: SortOrder,
+
+    /// Highlighted file node IDs (for bidirectional navigation)
+    pub highlighted_files: HashSet<String>,
+
+    /// Show knowledge details for file
+    pub show_knowledge_for: Option<String>,
+
+    /// Navigation history (stack of visited node IDs)
+    pub navigation_history: Vec<String>,
+
+    /// Current position in navigation history
+    pub history_position: usize,
+
+    /// Bookmarked node IDs
+    pub bookmarked_nodes: HashSet<String>,
+
+    /// Hovered node (for preview)
+    pub hovered_node: Option<String>,
+
+    /// Regex search enabled
+    pub regex_search: bool,
+
+    /// Recently accessed files (for quick access)
+    pub recent_files: Vec<String>,
+
+    /// Pin important files to top
+    pub pinned_files: HashSet<String>,
 }
 
 impl Default for FileTreeState {
@@ -58,6 +85,15 @@ impl Default for FileTreeState {
             show_hidden: false,
             show_only_linked: false,
             sort_order: SortOrder::NameAsc,
+            highlighted_files: HashSet::new(),
+            show_knowledge_for: None,
+            navigation_history: Vec::new(),
+            history_position: 0,
+            bookmarked_nodes: HashSet::new(),
+            hovered_node: None,
+            regex_search: false,
+            recent_files: Vec::new(),
+            pinned_files: HashSet::new(),
         }
     }
 }
@@ -111,6 +147,66 @@ pub enum FileTreeMessage {
 
     /// Collapse all nodes
     CollapseAll,
+
+    /// Show knowledge nodes for a file
+    ShowKnowledgeNodes(String),
+
+    /// Navigate to knowledge node
+    NavigateToKnowledgeNode(String),
+
+    /// Highlight related files for a knowledge node
+    HighlightRelatedFiles(Vec<String>),
+
+    /// Clear highlights
+    ClearHighlights,
+
+    /// Navigate back in history
+    NavigateBack,
+
+    /// Navigate forward in history
+    NavigateForward,
+
+    /// Add bookmark
+    AddBookmark(String),
+
+    /// Remove bookmark
+    RemoveBookmark(String),
+
+    /// Clear all bookmarks
+    ClearBookmarks,
+
+    /// Jump to bookmarked node
+    JumpToBookmark(String),
+
+    /// Hover over node (for preview)
+    HoverNode(Option<String>),
+
+    /// Toggle regex search
+    ToggleRegexSearch,
+
+    /// Pin file to top
+    PinFile(String),
+
+    /// Unpin file
+    UnpinFile(String),
+
+    /// Find references to symbol in file
+    FindReferences(String),
+
+    /// Go to definition of symbol
+    GoToDefinition(String),
+
+    /// Show file usages
+    ShowUsages(String),
+
+    /// Reveal in system file explorer
+    RevealInExplorer(String),
+
+    /// Copy file path to clipboard
+    CopyPath(String),
+
+    /// Copy relative path to clipboard
+    CopyRelativePath(String),
 }
 
 /// Update the file tree state
@@ -136,7 +232,27 @@ pub fn update(state: &mut FileTreeState, message: FileTreeMessage) {
             }
         }
         FileTreeMessage::SelectNode(node_id) => {
-            state.selected_node = Some(node_id);
+            // Add to navigation history
+            if state.selected_node.is_some() && state.selected_node.as_ref() != Some(&node_id) {
+                // Remove any forward history
+                state.navigation_history.truncate(state.history_position + 1);
+
+                // Add current to history
+                if let Some(current) = &state.selected_node {
+                    state.navigation_history.push(current.clone());
+                }
+
+                state.history_position = state.navigation_history.len();
+            }
+
+            state.selected_node = Some(node_id.clone());
+
+            // Add to recent files
+            if !state.recent_files.contains(&node_id) {
+                state.recent_files.insert(0, node_id.clone());
+                // Keep only last 20 recent files
+                state.recent_files.truncate(20);
+            }
         }
         FileTreeMessage::OpenNode(node_id) => {
             // Select the node and emit an event
@@ -177,6 +293,110 @@ pub fn update(state: &mut FileTreeState, message: FileTreeMessage) {
             if let Some(tree) = &state.tree {
                 if let Some(root_id) = &tree.root_id {
                     state.expanded_nodes.insert(root_id.clone());
+                }
+            }
+        }
+        FileTreeMessage::ShowKnowledgeNodes(node_id) => {
+            state.show_knowledge_for = Some(node_id.clone());
+            state.selected_node = Some(node_id);
+            tracing::info!("Showing knowledge nodes for file: {}", node_id);
+        }
+        FileTreeMessage::NavigateToKnowledgeNode(knowledge_node_id) => {
+            tracing::info!("Navigating to knowledge node: {}", knowledge_node_id);
+            // This would trigger navigation in the main app
+        }
+        FileTreeMessage::HighlightRelatedFiles(file_node_ids) => {
+            state.highlighted_files = file_node_ids.into_iter().collect();
+            tracing::info!("Highlighted {} related files", state.highlighted_files.len());
+        }
+        FileTreeMessage::ClearHighlights => {
+            state.highlighted_files.clear();
+            state.show_knowledge_for = None;
+        }
+        FileTreeMessage::NavigateBack => {
+            if state.history_position > 0 {
+                state.history_position -= 1;
+                if let Some(node_id) = state.navigation_history.get(state.history_position) {
+                    state.selected_node = Some(node_id.clone());
+                    tracing::debug!("Navigated back to: {}", node_id);
+                }
+            }
+        }
+        FileTreeMessage::NavigateForward => {
+            if state.history_position < state.navigation_history.len().saturating_sub(1) {
+                state.history_position += 1;
+                if let Some(node_id) = state.navigation_history.get(state.history_position) {
+                    state.selected_node = Some(node_id.clone());
+                    tracing::debug!("Navigated forward to: {}", node_id);
+                }
+            }
+        }
+        FileTreeMessage::AddBookmark(node_id) => {
+            state.bookmarked_nodes.insert(node_id.clone());
+            tracing::info!("Added bookmark: {}", node_id);
+        }
+        FileTreeMessage::RemoveBookmark(node_id) => {
+            state.bookmarked_nodes.remove(&node_id);
+            tracing::info!("Removed bookmark: {}", node_id);
+        }
+        FileTreeMessage::ClearBookmarks => {
+            state.bookmarked_nodes.clear();
+            tracing::info!("Cleared all bookmarks");
+        }
+        FileTreeMessage::JumpToBookmark(node_id) => {
+            state.selected_node = Some(node_id.clone());
+            tracing::info!("Jumped to bookmark: {}", node_id);
+        }
+        FileTreeMessage::HoverNode(node_id) => {
+            state.hovered_node = node_id;
+        }
+        FileTreeMessage::ToggleRegexSearch => {
+            state.regex_search = !state.regex_search;
+            tracing::info!("Regex search: {}", state.regex_search);
+        }
+        FileTreeMessage::PinFile(node_id) => {
+            state.pinned_files.insert(node_id.clone());
+            tracing::info!("Pinned file: {}", node_id);
+        }
+        FileTreeMessage::UnpinFile(node_id) => {
+            state.pinned_files.remove(&node_id);
+            tracing::info!("Unpinned file: {}", node_id);
+        }
+        FileTreeMessage::FindReferences(node_id) => {
+            tracing::info!("Finding references for: {}", node_id);
+            // This would trigger a reference search in the knowledge graph
+        }
+        FileTreeMessage::GoToDefinition(node_id) => {
+            tracing::info!("Going to definition for: {}", node_id);
+            // This would navigate to the definition in the knowledge graph
+        }
+        FileTreeMessage::ShowUsages(node_id) => {
+            tracing::info!("Showing usages for: {}", node_id);
+            // This would show all usages of entities in this file
+        }
+        FileTreeMessage::RevealInExplorer(node_id) => {
+            if let Some(tree) = &state.tree {
+                if let Some(node) = tree.get_node(&node_id) {
+                    tracing::info!("Revealing in explorer: {:?}", node.path);
+                    // This would open the system file explorer
+                }
+            }
+        }
+        FileTreeMessage::CopyPath(node_id) => {
+            if let Some(tree) = &state.tree {
+                if let Some(node) = tree.get_node(&node_id) {
+                    tracing::info!("Copying path: {:?}", node.path);
+                    // This would copy the absolute path to clipboard
+                }
+            }
+        }
+        FileTreeMessage::CopyRelativePath(node_id) => {
+            if let Some(tree) = &state.tree {
+                if let Some(node) = tree.get_node(&node_id) {
+                    let relative_path = node.path.strip_prefix(&tree.base_path)
+                        .unwrap_or(&node.path);
+                    tracing::info!("Copying relative path: {:?}", relative_path);
+                    // This would copy the relative path to clipboard
                 }
             }
         }
@@ -238,6 +458,19 @@ fn view_header(state: &FileTreeState) -> Element<FileTreeMessage> {
         .padding(8)
         .width(Length::Fill);
 
+    let nav_buttons = row![
+        button(text("◄"))
+            .on_press(FileTreeMessage::NavigateBack)
+            .padding(6),
+        button(text("►"))
+            .on_press(FileTreeMessage::NavigateForward)
+            .padding(6),
+        button(if state.regex_search { text(".*") } else { text("Ab") })
+            .on_press(FileTreeMessage::ToggleRegexSearch)
+            .padding(6),
+    ]
+    .spacing(3);
+
     let filter_buttons = row![
         button(text("Hidden")).on_press(FileTreeMessage::ToggleShowHidden).padding(6),
         button(text("Linked")).on_press(FileTreeMessage::ToggleShowOnlyLinked).padding(6),
@@ -251,12 +484,27 @@ fn view_header(state: &FileTreeState) -> Element<FileTreeMessage> {
     ]
     .spacing(5);
 
+    let bookmark_info = if !state.bookmarked_nodes.is_empty() {
+        text(format!("🔖 {}", state.bookmarked_nodes.len()))
+            .size(12)
+    } else {
+        text("")
+    };
+
     container(
         column![
-            search_input,
+            row![
+                search_input,
+                Space::with_width(10),
+                nav_buttons,
+            ]
+            .spacing(5)
+            .align_y(Vertical::Center),
             Space::with_height(5),
             row![
                 filter_buttons,
+                Space::with_width(10),
+                bookmark_info,
                 Space::with_width(Length::Fill),
                 expand_buttons,
             ]
@@ -335,6 +583,10 @@ fn view_node_recursive<'a>(
 fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a, FileTreeMessage> {
     let is_selected = state.selected_node.as_ref() == Some(&node.node_id);
     let is_expanded = state.expanded_nodes.contains(&node.node_id);
+    let is_highlighted = state.highlighted_files.contains(&node.node_id);
+    let is_bookmarked = state.bookmarked_nodes.contains(&node.node_id);
+    let is_pinned = state.pinned_files.contains(&node.node_id);
+    let is_recent = state.recent_files.contains(&node.node_id);
 
     // Indentation based on depth
     let indent_width = (node.depth * 20) as f32;
@@ -356,13 +608,31 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
     // Node name
     let name_text = text(&node.name).size(14);
 
-    // Knowledge badge
+    // Enhanced knowledge badge with icon and color
     let knowledge_badge = if !node.knowledge_links.is_empty() {
-        text(format!(" [{}]", node.knowledge_links.len()))
-            .size(12)
-            .style(Color::from_rgb8(100, 200, 255))
+        let badge_text = if node.knowledge_links.len() > 9 {
+            format!(" 🔗 {}+", node.knowledge_links.len())
+        } else {
+            format!(" 🔗 {}", node.knowledge_links.len())
+        };
+
+        button(text(badge_text).size(11).style(Color::from_rgb8(120, 200, 255)))
+            .padding(2)
+            .style(|theme: &Theme| {
+                button::Style {
+                    background: Some(Color::from_rgba8(120, 200, 255, 0.2).into()),
+                    border: iced::Border {
+                        width: 1.0,
+                        color: Color::from_rgb8(120, 200, 255),
+                        radius: 3.0.into(),
+                    },
+                    ..button::Style::default()
+                }
+            })
+            .on_press(FileTreeMessage::ShowKnowledgeNodes(node.node_id.clone()))
+            .into()
     } else {
-        text("")
+        Space::with_width(0).into()
     };
 
     // Git status indicator
@@ -374,14 +644,38 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
         text("")
     };
 
+    // Bookmark indicator
+    let bookmark_icon = if is_bookmarked {
+        text(" 🔖").size(12)
+    } else {
+        text("")
+    };
+
+    // Pin indicator
+    let pin_icon = if is_pinned {
+        text(" 📌").size(12)
+    } else {
+        text("")
+    };
+
+    // Recent file indicator
+    let recent_icon = if is_recent && !is_selected {
+        text(" ⏱").size(11).style(Color::from_rgb8(150, 150, 150))
+    } else {
+        text("")
+    };
+
     // Build the row
     let node_content = row![
         Space::with_width(indent_width),
+        pin_icon,
         text(expand_icon).size(14),
         text(node_icon).size(14),
         name_text,
+        bookmark_icon,
         knowledge_badge,
         git_status,
+        recent_icon,
     ]
     .spacing(5)
     .align_y(Vertical::Center);
@@ -396,7 +690,7 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
             FileTreeMessage::SelectNode(node.node_id.clone())
         });
 
-    // Style based on selection
+    // Style based on selection and highlighting
     if is_selected {
         container(node_button)
             .width(Length::Fill)
@@ -406,6 +700,21 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
                     border: iced::Border {
                         width: 0.0,
                         color: Color::TRANSPARENT,
+                        radius: 0.0.into(),
+                    },
+                    ..Default::default()
+                }
+            })
+            .into()
+    } else if is_highlighted {
+        container(node_button)
+            .width(Length::Fill)
+            .style(|_theme: &Theme| {
+                container::Style {
+                    background: Some(Color::from_rgba8(255, 200, 100, 0.2).into()),
+                    border: iced::Border {
+                        width: 1.0,
+                        color: Color::from_rgb8(255, 200, 100),
                         radius: 0.0.into(),
                     },
                     ..Default::default()
