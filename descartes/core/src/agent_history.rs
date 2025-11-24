@@ -9,7 +9,6 @@
 /// - Audit trails for agent actions
 /// - Performance analysis and optimization
 /// - Recovery and restoration from any point in history
-
 use crate::errors::{StateStoreError, StateStoreResult};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -124,11 +123,7 @@ pub struct AgentHistoryEvent {
 
 impl AgentHistoryEvent {
     /// Create a new history event
-    pub fn new(
-        agent_id: String,
-        event_type: HistoryEventType,
-        event_data: Value,
-    ) -> Self {
+    pub fn new(agent_id: String, event_type: HistoryEventType, event_data: Value) -> Self {
         Self {
             event_id: Uuid::new_v4(),
             agent_id,
@@ -315,7 +310,11 @@ pub trait AgentHistoryStore: Send + Sync {
     async fn record_events(&self, events: &[AgentHistoryEvent]) -> StateStoreResult<()>;
 
     /// Get events for a specific agent
-    async fn get_events(&self, agent_id: &str, limit: i64) -> StateStoreResult<Vec<AgentHistoryEvent>>;
+    async fn get_events(
+        &self,
+        agent_id: &str,
+        limit: i64,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>>;
 
     /// Query events with filters
     async fn query_events(&self, query: &HistoryQuery) -> StateStoreResult<Vec<AgentHistoryEvent>>;
@@ -337,7 +336,10 @@ pub trait AgentHistoryStore: Send + Sync {
     ) -> StateStoreResult<Vec<AgentHistoryEvent>>;
 
     /// Get events by session
-    async fn get_events_by_session(&self, session_id: &str) -> StateStoreResult<Vec<AgentHistoryEvent>>;
+    async fn get_events_by_session(
+        &self,
+        session_id: &str,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>>;
 
     /// Create a snapshot of agent history
     async fn create_snapshot(&self, snapshot: &HistorySnapshot) -> StateStoreResult<()>;
@@ -382,14 +384,13 @@ impl SqliteAgentHistoryStore {
         }
 
         // Create connection options
-        let connect_options = sqlx::sqlite::SqliteConnectOptions::from_str(
-            db_path.to_string_lossy().as_ref(),
-        )
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to parse database path: {}", e))
-        })?
-        .create_if_missing(true)
-        .foreign_keys(true);
+        let connect_options =
+            sqlx::sqlite::SqliteConnectOptions::from_str(db_path.to_string_lossy().as_ref())
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to parse database path: {}", e))
+                })?
+                .create_if_missing(true)
+                .foreign_keys(true);
 
         // Create connection pool
         let pool = SqlitePoolOptions::new()
@@ -530,9 +531,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(metadata_json)
         .execute(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to record event: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to record event: {}", e)))?;
 
         Ok(())
     }
@@ -588,7 +587,11 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         Ok(())
     }
 
-    async fn get_events(&self, agent_id: &str, limit: i64) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    async fn get_events(
+        &self,
+        agent_id: &str,
+        limit: i64,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         let rows = sqlx::query(
             r#"
             SELECT event_id, agent_id, timestamp, event_type, event_data, git_commit_hash,
@@ -603,9 +606,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to fetch events: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch events: {}", e)))?;
 
         self.rows_to_events(rows)
     }
@@ -742,7 +743,10 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         self.rows_to_events(rows)
     }
 
-    async fn get_events_by_session(&self, session_id: &str) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    async fn get_events_by_session(
+        &self,
+        session_id: &str,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         let rows = sqlx::query(
             r#"
             SELECT event_id, agent_id, timestamp, event_type, event_data, git_commit_hash,
@@ -787,22 +791,21 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(agent_state_json)
         .execute(&mut *tx)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to create snapshot: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create snapshot: {}", e)))?;
 
         // Link events to snapshot
         for event in &snapshot.events {
-            sqlx::query(
-                "INSERT INTO snapshot_events (snapshot_id, event_id) VALUES (?, ?)",
-            )
-            .bind(snapshot.snapshot_id.to_string())
-            .bind(event.event_id.to_string())
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| {
-                StateStoreError::DatabaseError(format!("Failed to link event to snapshot: {}", e))
-            })?;
+            sqlx::query("INSERT INTO snapshot_events (snapshot_id, event_id) VALUES (?, ?)")
+                .bind(snapshot.snapshot_id.to_string())
+                .bind(event.event_id.to_string())
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!(
+                        "Failed to link event to snapshot: {}",
+                        e
+                    ))
+                })?;
         }
 
         tx.commit().await.map_err(|e| {
@@ -823,9 +826,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(snapshot_id.to_string())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to fetch snapshot: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch snapshot: {}", e)))?;
 
         if let Some(row) = row {
             let snapshot_id_str: String = row.get("snapshot_id");
@@ -886,9 +887,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(agent_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to list snapshots: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to list snapshots: {}", e)))?;
 
         let mut snapshots = Vec::new();
 
@@ -918,15 +917,14 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
 
     async fn get_statistics(&self, agent_id: &str) -> StateStoreResult<HistoryStatistics> {
         // Get total events
-        let total_events: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM agent_history_events WHERE agent_id = ?",
-        )
-        .bind(agent_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to get total events: {}", e))
-        })?;
+        let total_events: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM agent_history_events WHERE agent_id = ?")
+                .bind(agent_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to get total events: {}", e))
+                })?;
 
         // Get events by type
         let type_rows = sqlx::query(
@@ -947,15 +945,14 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         }
 
         // Get total snapshots
-        let total_snapshots: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM history_snapshots WHERE agent_id = ?",
-        )
-        .bind(agent_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to get total snapshots: {}", e))
-        })?;
+        let total_snapshots: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM history_snapshots WHERE agent_id = ?")
+                .bind(agent_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to get total snapshots: {}", e))
+                })?;
 
         // Get time range
         let time_range = sqlx::query(
@@ -1028,9 +1025,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
             .bind(id.to_string())
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| {
-                StateStoreError::DatabaseError(format!("Failed to fetch event: {}", e))
-            })?;
+            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch event: {}", e)))?;
 
             if let Some(row) = row {
                 let parent_id_str: Option<String> = row.get("parent_event_id");
@@ -1048,15 +1043,19 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
 }
 
 // Blanket implementation for Arc<T> where T: AgentHistoryStore
-// This allows Arc-wrapped stores to be used directly without dereferencing
+// This allows Arc-wrapped stores to be used directly without dereferencing,
+// while still enforcing that initialization happens before sharing clones.
 #[async_trait]
 impl<T: AgentHistoryStore> AgentHistoryStore for Arc<T> {
     async fn initialize(&mut self) -> StateStoreResult<()> {
-        // Arc doesn't allow mutable access, so we can't call initialize on Arc<T>
-        // This should be called before wrapping in Arc
-        Err(StateStoreError::DatabaseError(
-            "Cannot initialize through Arc - initialize before wrapping".to_string()
-        ))
+        if let Some(inner) = Arc::get_mut(self) {
+            inner.initialize().await
+        } else {
+            Err(StateStoreError::DatabaseError(
+                "Cannot initialize Arc-cloned AgentHistoryStore; call initialize() before cloning the Arc"
+                    .to_string(),
+            ))
+        }
     }
 
     async fn record_event(&self, event: &AgentHistoryEvent) -> StateStoreResult<()> {
@@ -1067,7 +1066,11 @@ impl<T: AgentHistoryStore> AgentHistoryStore for Arc<T> {
         (**self).record_events(events).await
     }
 
-    async fn get_events(&self, agent_id: &str, limit: i64) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    async fn get_events(
+        &self,
+        agent_id: &str,
+        limit: i64,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         (**self).get_events(agent_id, limit).await
     }
 
@@ -1081,7 +1084,9 @@ impl<T: AgentHistoryStore> AgentHistoryStore for Arc<T> {
         event_type: HistoryEventType,
         limit: i64,
     ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
-        (**self).get_events_by_type(agent_id, event_type, limit).await
+        (**self)
+            .get_events_by_type(agent_id, event_type, limit)
+            .await
     }
 
     async fn get_events_by_time_range(
@@ -1090,10 +1095,15 @@ impl<T: AgentHistoryStore> AgentHistoryStore for Arc<T> {
         start_time: i64,
         end_time: i64,
     ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
-        (**self).get_events_by_time_range(agent_id, start_time, end_time).await
+        (**self)
+            .get_events_by_time_range(agent_id, start_time, end_time)
+            .await
     }
 
-    async fn get_events_by_session(&self, session_id: &str) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    async fn get_events_by_session(
+        &self,
+        session_id: &str,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         (**self).get_events_by_session(session_id).await
     }
 
@@ -1124,7 +1134,10 @@ impl<T: AgentHistoryStore> AgentHistoryStore for Arc<T> {
 
 // Helper methods for SqliteAgentHistoryStore
 impl SqliteAgentHistoryStore {
-    fn rows_to_events(&self, rows: Vec<sqlx::sqlite::SqliteRow>) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    fn rows_to_events(
+        &self,
+        rows: Vec<sqlx::sqlite::SqliteRow>,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         rows.iter().map(|row| self.row_to_event(row)).collect()
     }
 
@@ -1152,11 +1165,9 @@ impl SqliteAgentHistoryStore {
             StateStoreError::SerializationError(format!("Failed to parse tags: {}", e))
         })?;
 
-        let metadata = metadata_str
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let metadata = metadata_str.and_then(|s| serde_json::from_str(&s).ok());
 
-        let parent_event_id = parent_event_id_str
-            .and_then(|s| Uuid::parse_str(&s).ok());
+        let parent_event_id = parent_event_id_str.and_then(|s| Uuid::parse_str(&s).ok());
 
         Ok(AgentHistoryEvent {
             event_id,
@@ -1176,7 +1187,14 @@ impl SqliteAgentHistoryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
+    use tempfile::{NamedTempFile, TempDir};
+
+    async fn create_uninitialized_store() -> (SqliteAgentHistoryStore, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("agent_history.db");
+        let store = SqliteAgentHistoryStore::new(&db_path).await.unwrap();
+        (store, temp_dir)
+    }
 
     async fn create_test_store() -> SqliteAgentHistoryStore {
         let temp_file = NamedTempFile::new().unwrap();
@@ -1382,5 +1400,47 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(early_events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn arc_store_initialize_succeeds_when_unique() {
+        let (store, _temp_dir) = create_uninitialized_store().await;
+        let mut arc_store = Arc::new(store);
+
+        AgentHistoryStore::initialize(&mut arc_store)
+            .await
+            .expect("initialize should succeed for unique Arc");
+
+        let event = AgentHistoryEvent::new(
+            "agent-unique".to_string(),
+            HistoryEventType::Thought,
+            serde_json::json!({"content": "initialized via Arc"}),
+        );
+
+        arc_store.record_event(&event).await.unwrap();
+        let events = arc_store.get_events("agent-unique", 10).await.unwrap();
+        assert_eq!(events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn arc_store_initialize_fails_when_cloned() {
+        let (store, _temp_dir) = create_uninitialized_store().await;
+        let mut arc_store = Arc::new(store);
+        let _clone = Arc::clone(&arc_store);
+
+        let err = AgentHistoryStore::initialize(&mut arc_store)
+            .await
+            .expect_err("initialize should fail when Arc has multiple owners");
+
+        match err {
+            StateStoreError::DatabaseError(msg) => {
+                assert!(
+                    msg.contains("Arc-cloned"),
+                    "unexpected error message: {}",
+                    msg
+                );
+            }
+            other => panic!("expected DatabaseError, got {:?}", other),
+        }
     }
 }
