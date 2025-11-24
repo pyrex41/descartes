@@ -149,7 +149,7 @@ pub trait AgentRunner: Send + Sync {
 }
 
 /// Configuration for spawning an agent.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AgentConfig {
     pub name: String,
     pub model_backend: String, // e.g., "anthropic", "openai", "ollama"
@@ -168,7 +168,7 @@ pub enum AgentSignal {
 }
 
 /// Information about a running agent.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AgentInfo {
     pub id: Uuid,
     pub name: String,
@@ -179,7 +179,7 @@ pub struct AgentInfo {
 }
 
 /// Status of an agent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AgentStatus {
     Idle,
     Running,
@@ -282,7 +282,10 @@ pub struct Task {
     pub title: String,
     pub description: Option<String>,
     pub status: TaskStatus,
+    pub priority: TaskPriority,
+    pub complexity: TaskComplexity,
     pub assigned_to: Option<String>,
+    pub dependencies: Vec<Uuid>, // IDs of tasks this task depends on
     pub created_at: i64,
     pub updated_at: i64,
     pub metadata: Option<Value>,
@@ -296,6 +299,91 @@ pub enum TaskStatus {
     InProgress,
     Done,
     Blocked,
+}
+
+/// Priority level of a task.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskPriority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl Default for TaskPriority {
+    fn default() -> Self {
+        TaskPriority::Medium
+    }
+}
+
+impl std::fmt::Display for TaskPriority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskPriority::Low => write!(f, "low"),
+            TaskPriority::Medium => write!(f, "medium"),
+            TaskPriority::High => write!(f, "high"),
+            TaskPriority::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+impl std::str::FromStr for TaskPriority {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "low" => Ok(TaskPriority::Low),
+            "medium" => Ok(TaskPriority::Medium),
+            "high" => Ok(TaskPriority::High),
+            "critical" => Ok(TaskPriority::Critical),
+            _ => Err(format!("Invalid priority: {}", s)),
+        }
+    }
+}
+
+/// Complexity/effort estimate of a task.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskComplexity {
+    Trivial,   // < 1 hour
+    Simple,    // 1-4 hours
+    Moderate,  // 1-2 days
+    Complex,   // 3-5 days
+    Epic,      // > 1 week
+}
+
+impl Default for TaskComplexity {
+    fn default() -> Self {
+        TaskComplexity::Moderate
+    }
+}
+
+impl std::fmt::Display for TaskComplexity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskComplexity::Trivial => write!(f, "trivial"),
+            TaskComplexity::Simple => write!(f, "simple"),
+            TaskComplexity::Moderate => write!(f, "moderate"),
+            TaskComplexity::Complex => write!(f, "complex"),
+            TaskComplexity::Epic => write!(f, "epic"),
+        }
+    }
+}
+
+impl std::str::FromStr for TaskComplexity {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "trivial" => Ok(TaskComplexity::Trivial),
+            "simple" => Ok(TaskComplexity::Simple),
+            "moderate" => Ok(TaskComplexity::Moderate),
+            "complex" => Ok(TaskComplexity::Complex),
+            "epic" => Ok(TaskComplexity::Epic),
+            _ => Err(format!("Invalid complexity: {}", s)),
+        }
+    }
 }
 
 /// ContextSyncer trait - loads and streams context.

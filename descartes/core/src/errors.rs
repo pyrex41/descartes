@@ -129,6 +129,13 @@ pub enum StateStoreError {
 
     #[error("Expired secret: {0}")]
     ExpiredSecret(String),
+
+    // Git/Body restore errors
+    #[error("Operation not supported: {0}")]
+    NotSupported(String),
+
+    #[error("Conflict: {0}")]
+    Conflict(String),
 }
 
 /// Result type for state store operations.

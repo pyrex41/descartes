@@ -47,3 +47,6 @@ toml = "0.8"
 
 # State machine
 statig = "0.3"
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }

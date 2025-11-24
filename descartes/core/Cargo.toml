@@ -54,6 +54,12 @@ bincode = "1.3"
 # State machine
 statig = { workspace = true }
 
+# ZeroMQ for remote agent communication
+zeromq = "0.4"
+rmp-serde = "1.1"  # MessagePack for efficient serialization
+base64 = "0.22"  # Base64 encoding for binary data
+tokio-stream = "0.1"  # Stream utilities for async
+
 # Unix signal handling (for agent process management)
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["signal"] }

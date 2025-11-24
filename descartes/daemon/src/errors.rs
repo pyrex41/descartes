@@ -70,6 +70,14 @@ pub enum DaemonError {
     #[error("Operation timed out")]
     Timeout,
 
+    /// Connection error
+    #[error("Connection error: {0}")]
+    ConnectionError(String),
+
+    /// RPC error with code and message
+    #[error("RPC error {0}: {1}")]
+    RpcError(i64, String),
+
     /// Other errors
     #[error("{0}")]
     Other(String),
@@ -94,6 +102,8 @@ impl DaemonError {
             DaemonError::MetricsError(msg) => (-32008, format!("Metrics error: {}", msg)),
             DaemonError::IoError(e) => (-32603, format!("IO error: {}", e)),
             DaemonError::Timeout => (-32009, "Operation timed out".to_string()),
+            DaemonError::ConnectionError(msg) => (-32010, format!("Connection error: {}", msg)),
+            DaemonError::RpcError(code, msg) => (*code, msg.clone()),
             DaemonError::Other(msg) => (-32000, msg.clone()),
         };
 
@@ -121,6 +131,8 @@ impl DaemonError {
             DaemonError::MetricsError(_) => -32008,
             DaemonError::IoError(_) => -32603,
             DaemonError::Timeout => -32009,
+            DaemonError::ConnectionError(_) => -32010,
+            DaemonError::RpcError(code, _) => *code,
             DaemonError::Other(_) => -32000,
         }
     }

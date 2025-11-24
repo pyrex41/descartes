@@ -20,6 +20,8 @@ pub mod semantic;
 pub mod parser;
 pub mod db_schema;
 pub mod rag;
+pub mod knowledge_graph;
+pub mod file_tree_builder;
 
 // Re-exports for convenient access
 pub use errors::{ParserError, ParserResult};
@@ -33,6 +35,18 @@ pub use rag::{
     RagSystem, RagConfig, RagStats, CodeChunk, SearchResult,
     EmbeddingProvider, OpenAiEmbeddings, AnthropicEmbeddings,
     EmbeddingCache, SemanticChunker, VectorStore, FullTextSearch,
+};
+
+pub use knowledge_graph::{
+    FileTreeNode, FileNodeType, FileMetadata, FileTree, FileTreeStats,
+    KnowledgeNode, KnowledgeNodeType, KnowledgeEdge, RelationshipType,
+    KnowledgeGraph, KnowledgeGraphStats, FileReference, CodeRepository,
+    RepositoryStats,
+};
+
+pub use file_tree_builder::{
+    FileTreeBuilder, FileTreeBuilderConfig, FileTreeUpdater,
+    detect_language, is_binary_file, count_lines, find_git_root,
 };
 
 /// Library version

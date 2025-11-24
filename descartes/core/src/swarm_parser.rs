@@ -251,8 +251,8 @@ impl SwarmParser {
 
         let validated = config
             .workflows
-            .into_iter()
-            .map(|workflow| self.validate_workflow(&workflow, &config))
+            .iter()
+            .map(|workflow| self.validate_workflow(workflow, &config))
             .collect::<SwarmResult<Vec<_>>>()?;
 
         Ok(validated)

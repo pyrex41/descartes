@@ -1,0 +1,133 @@
+# Example DAG (Directed Acyclic Graph) for Task Dependencies
+# This demonstrates how to define task dependencies in TOML format
+
+[dag]
+name = "Feature Development Workflow"
+description = "DAG representing dependencies for developing a new feature"
+
+# Nodes represent tasks in the workflow
+[[dag.nodes]]
+node_id = "550e8400-e29b-41d4-a716-446655440001"
+task_id = "550e8400-e29b-41d4-a716-446655440011"
+label = "Design Architecture"
+description = "Create architectural design for the new feature"
+position = { x = 100.0, y = 100.0 }
+tags = ["planning", "architecture"]
+
+[dag.nodes.metadata]
+priority = "high"
+estimated_hours = 8
+assignee = "architect-agent"
+
+[[dag.nodes]]
+node_id = "550e8400-e29b-41d4-a716-446655440002"
+task_id = "550e8400-e29b-41d4-a716-446655440012"
+label = "Implement Backend API"
+description = "Build the backend API endpoints"
+position = { x = 300.0, y = 100.0 }
+tags = ["implementation", "backend"]
+
+[dag.nodes.metadata]
+priority = "high"
+estimated_hours = 16
+assignee = "backend-dev-agent"
+
+[[dag.nodes]]
+node_id = "550e8400-e29b-41d4-a716-446655440003"
+task_id = "550e8400-e29b-41d4-a716-446655440013"
+label = "Implement Frontend UI"
+description = "Create the user interface components"
+position = { x = 300.0, y = 300.0 }
+tags = ["implementation", "frontend"]
+
+[dag.nodes.metadata]
+priority = "medium"
+estimated_hours = 12
+assignee = "frontend-dev-agent"
+
+[[dag.nodes]]
+node_id = "550e8400-e29b-41d4-a716-446655440004"
+task_id = "550e8400-e29b-41d4-a716-446655440014"
+label = "Write Unit Tests"
+description = "Create comprehensive unit tests"
+position = { x = 500.0, y = 200.0 }
+tags = ["testing", "quality"]
+
+[dag.nodes.metadata]
+priority = "high"
+estimated_hours = 8
+assignee = "test-agent"
+
+[[dag.nodes]]
+node_id = "550e8400-e29b-41d4-a716-446655440005"
+task_id = "550e8400-e29b-41d4-a716-446655440015"
+label = "Integration Testing"
+description = "Test the complete system integration"
+position = { x = 700.0, y = 200.0 }
+tags = ["testing", "integration"]
+
+[dag.nodes.metadata]
+priority = "high"
+estimated_hours = 6
+assignee = "qa-agent"
+
+[[dag.nodes]]
+node_id = "550e8400-e29b-41d4-a716-446655440006"
+task_id = "550e8400-e29b-41d4-a716-446655440016"
+label = "Deploy to Staging"
+description = "Deploy the feature to staging environment"
+position = { x = 900.0, y = 200.0 }
+tags = ["deployment", "staging"]
+
+[dag.nodes.metadata]
+priority = "medium"
+estimated_hours = 2
+assignee = "devops-agent"
+
+# Edges define dependencies between tasks
+[[dag.edges]]
+edge_id = "650e8400-e29b-41d4-a716-446655440001"
+from = "550e8400-e29b-41d4-a716-446655440001"
+to = "550e8400-e29b-41d4-a716-446655440002"
+edge_type = "dependency"
+label = "requires_design"
+
+[[dag.edges]]
+edge_id = "650e8400-e29b-41d4-a716-446655440002"
+from = "550e8400-e29b-41d4-a716-446655440001"
+to = "550e8400-e29b-41d4-a716-446655440003"
+edge_type = "dependency"
+label = "requires_design"
+
+[[dag.edges]]
+edge_id = "650e8400-e29b-41d4-a716-446655440003"
+from = "550e8400-e29b-41d4-a716-446655440002"
+to = "550e8400-e29b-41d4-a716-446655440004"
+edge_type = "dependency"
+label = "needs_implementation"
+
+[[dag.edges]]
+edge_id = "650e8400-e29b-41d4-a716-446655440004"
+from = "550e8400-e29b-41d4-a716-446655440003"
+to = "550e8400-e29b-41d4-a716-446655440004"
+edge_type = "soft_dependency"
+label = "optional_ui_tests"
+
+[[dag.edges]]
+edge_id = "650e8400-e29b-41d4-a716-446655440005"
+from = "550e8400-e29b-41d4-a716-446655440004"
+to = "550e8400-e29b-41d4-a716-446655440005"
+edge_type = "dependency"
+label = "needs_unit_tests"
+
+[[dag.edges]]
+edge_id = "650e8400-e29b-41d4-a716-446655440006"
+from = "550e8400-e29b-41d4-a716-446655440005"
+to = "550e8400-e29b-41d4-a716-446655440006"
+edge_type = "dependency"
+label = "needs_integration_tests"
+
+[dag.metadata]
+workflow_version = "1.0"
+created_by = "project-manager-agent"
+estimated_total_hours = 52

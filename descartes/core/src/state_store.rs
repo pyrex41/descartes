@@ -224,6 +224,22 @@ impl SqliteStateStore {
                 CREATE INDEX IF NOT EXISTS idx_sessions_agent_id ON sessions(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);"#),
+            (5, "enhance_task_model", "Add priority, complexity, and dependencies to tasks",
+                r#"CREATE TABLE IF NOT EXISTS task_dependencies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    depends_on_task_id TEXT NOT NULL,
+                    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+                    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                    FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                    UNIQUE(task_id, depends_on_task_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+                CREATE INDEX IF NOT EXISTS idx_tasks_complexity ON tasks(complexity);
+                CREATE INDEX IF NOT EXISTS idx_tasks_priority_status ON tasks(priority, status);
+                CREATE INDEX IF NOT EXISTS idx_tasks_complexity_status ON tasks(complexity, status);
+                CREATE INDEX IF NOT EXISTS idx_task_dependencies_task_id ON task_dependencies(task_id);
+                CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies(depends_on_task_id);"#),
         ];
 
         // Apply pending migrations
@@ -288,7 +304,10 @@ impl StateStore for SqliteStateStore {
                 title TEXT NOT NULL,
                 description TEXT,
                 status TEXT NOT NULL,
+                priority TEXT NOT NULL DEFAULT 'medium',
+                complexity TEXT NOT NULL DEFAULT 'moderate',
                 assigned_to TEXT,
+                dependencies TEXT DEFAULT '[]',
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
                 metadata TEXT,
@@ -433,19 +452,24 @@ impl StateStore for SqliteStateStore {
 
     async fn save_task(&self, task: &Task) -> StateStoreResult<()> {
         let metadata = task.metadata.as_ref().map(|m| m.to_string());
+        let dependencies_json = serde_json::to_string(&task.dependencies)
+            .map_err(|e| StateStoreError::SerializationError(format!("Failed to serialize dependencies: {}", e)))?;
 
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO tasks
-            (id, title, description, status, assigned_to, created_at, updated_at, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, title, description, status, priority, complexity, assigned_to, dependencies, created_at, updated_at, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(task.id.to_string())
         .bind(&task.title)
         .bind(&task.description)
         .bind(format!("{:?}", task.status))
+        .bind(task.priority.to_string())
+        .bind(task.complexity.to_string())
         .bind(&task.assigned_to)
+        .bind(&dependencies_json)
         .bind(task.created_at)
         .bind(task.updated_at)
         .bind(metadata)
@@ -453,12 +477,33 @@ impl StateStore for SqliteStateStore {
         .await
         .map_err(|e| StateStoreError::DatabaseError(format!("Failed to save task: {}", e)))?;
 
+        // Update task_dependencies table
+        // First, delete existing dependencies for this task
+        sqlx::query("DELETE FROM task_dependencies WHERE task_id = ?")
+            .bind(task.id.to_string())
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to delete old dependencies: {}", e)))?;
+
+        // Insert new dependencies
+        for dep_id in &task.dependencies {
+            sqlx::query(
+                "INSERT INTO task_dependencies (task_id, depends_on_task_id, created_at) VALUES (?, ?, ?)"
+            )
+            .bind(task.id.to_string())
+            .bind(dep_id.to_string())
+            .bind(chrono::Utc::now().timestamp())
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to insert dependency: {}", e)))?;
+        }
+
         Ok(())
     }
 
     async fn get_task(&self, task_id: &Uuid) -> StateStoreResult<Option<Task>> {
         let row = sqlx::query(
-            "SELECT id, title, description, status, assigned_to, created_at, updated_at, metadata FROM tasks WHERE id = ?"
+            "SELECT id, title, description, status, priority, complexity, assigned_to, dependencies, created_at, updated_at, metadata FROM tasks WHERE id = ?"
         )
         .bind(task_id.to_string())
         .fetch_optional(&self.pool)
@@ -466,6 +511,9 @@ impl StateStore for SqliteStateStore {
         .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch task: {}", e)))?;
 
         Ok(row.map(|r| {
+            use crate::traits::{TaskPriority, TaskComplexity};
+            use std::str::FromStr;
+
             let status_str: String = r.get("status");
             let status = match status_str.as_str() {
                 "Todo" => TaskStatus::Todo,
@@ -475,6 +523,15 @@ impl StateStore for SqliteStateStore {
                 _ => TaskStatus::Todo,
             };
 
+            let priority_str: String = r.get("priority");
+            let priority = TaskPriority::from_str(&priority_str).unwrap_or_default();
+
+            let complexity_str: String = r.get("complexity");
+            let complexity = TaskComplexity::from_str(&complexity_str).unwrap_or_default();
+
+            let dependencies_str: String = r.get("dependencies");
+            let dependencies: Vec<Uuid> = serde_json::from_str(&dependencies_str).unwrap_or_default();
+
             let metadata_str: Option<String> = r.get("metadata");
             let metadata = metadata_str.and_then(|m| serde_json::from_str(&m).ok());
 
@@ -483,7 +540,10 @@ impl StateStore for SqliteStateStore {
                 title: r.get("title"),
                 description: r.get("description"),
                 status,
+                priority,
+                complexity,
                 assigned_to: r.get("assigned_to"),
+                dependencies,
                 created_at: r.get("created_at"),
                 updated_at: r.get("updated_at"),
                 metadata,
@@ -493,7 +553,7 @@ impl StateStore for SqliteStateStore {
 
     async fn get_tasks(&self) -> StateStoreResult<Vec<Task>> {
         let rows = sqlx::query(
-            "SELECT id, title, description, status, assigned_to, created_at, updated_at, metadata FROM tasks ORDER BY updated_at DESC"
+            "SELECT id, title, description, status, priority, complexity, assigned_to, dependencies, created_at, updated_at, metadata FROM tasks ORDER BY updated_at DESC"
         )
         .fetch_all(&self.pool)
         .await
@@ -502,6 +562,9 @@ impl StateStore for SqliteStateStore {
         let tasks = rows
             .iter()
             .map(|r| {
+                use crate::traits::{TaskPriority, TaskComplexity};
+                use std::str::FromStr;
+
                 let status_str: String = r.get("status");
                 let status = match status_str.as_str() {
                     "Todo" => TaskStatus::Todo,
@@ -511,6 +574,15 @@ impl StateStore for SqliteStateStore {
                     _ => TaskStatus::Todo,
                 };
 
+                let priority_str: String = r.get("priority");
+                let priority = TaskPriority::from_str(&priority_str).unwrap_or_default();
+
+                let complexity_str: String = r.get("complexity");
+                let complexity = TaskComplexity::from_str(&complexity_str).unwrap_or_default();
+
+                let dependencies_str: String = r.get("dependencies");
+                let dependencies: Vec<Uuid> = serde_json::from_str(&dependencies_str).unwrap_or_default();
+
                 let metadata_str: Option<String> = r.get("metadata");
                 let metadata = metadata_str.and_then(|m| serde_json::from_str(&m).ok());
 
@@ -519,7 +591,10 @@ impl StateStore for SqliteStateStore {
                     title: r.get("title"),
                     description: r.get("description"),
                     status,
+                    priority,
+                    complexity,
                     assigned_to: r.get("assigned_to"),
+                    dependencies,
                     created_at: r.get("created_at"),
                     updated_at: r.get("updated_at"),
                     metadata,
@@ -896,7 +971,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_state_store_creation() {
-        let store = SqliteStateStore::new("/tmp/test_state.db", false)
+        let mut store = SqliteStateStore::new("/tmp/test_state.db", false)
             .await
             .expect("Failed to create state store");
         store.initialize().await.expect("Failed to initialize store");
@@ -904,7 +979,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_load_event() {
-        let store = SqliteStateStore::new("/tmp/test_events.db", false)
+        let mut store = SqliteStateStore::new("/tmp/test_events.db", false)
             .await
             .expect("Failed to create state store");
         store.initialize().await.expect("Failed to initialize store");
@@ -930,7 +1005,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_load_task() {
-        let store = SqliteStateStore::new("/tmp/test_tasks.db", false)
+        use crate::traits::{TaskPriority, TaskComplexity};
+
+        let mut store = SqliteStateStore::new("/tmp/test_tasks.db", false)
             .await
             .expect("Failed to create state store");
         store.initialize().await.expect("Failed to initialize store");
@@ -940,7 +1017,10 @@ mod tests {
             title: "Test Task".to_string(),
             description: Some("A test task".to_string()),
             status: TaskStatus::InProgress,
+            priority: TaskPriority::High,
+            complexity: TaskComplexity::Moderate,
             assigned_to: Some("agent_1".to_string()),
+            dependencies: vec![],
             created_at: Utc::now().timestamp(),
             updated_at: Utc::now().timestamp(),
             metadata: None,
@@ -950,12 +1030,15 @@ mod tests {
         let fetched = store.get_task(&task.id).await.expect("Failed to get task");
 
         assert!(fetched.is_some());
-        assert_eq!(fetched.unwrap().title, "Test Task");
+        let fetched_task = fetched.unwrap();
+        assert_eq!(fetched_task.title, "Test Task");
+        assert_eq!(fetched_task.priority, TaskPriority::High);
+        assert_eq!(fetched_task.complexity, TaskComplexity::Moderate);
     }
 
     #[tokio::test]
     async fn test_search_events() {
-        let store = SqliteStateStore::new("/tmp/test_search.db", false)
+        let mut store = SqliteStateStore::new("/tmp/test_search.db", false)
             .await
             .expect("Failed to create state store");
         store.initialize().await.expect("Failed to initialize store");

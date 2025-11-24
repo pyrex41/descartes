@@ -21,11 +21,14 @@ sqlx = { workspace = true }
 # Descartes core
 descartes-core = { path = "../core" }
 
-# JSON-RPC
+# JSON-RPC (legacy)
 jsonrpc-core = "18.0"
 jsonrpc-http-server = "18.0"
 jsonrpc-ws-server = "18.0"
 jsonrpc-derive = "18.0"
+
+# jsonrpsee (new implementation for Unix sockets)
+jsonrpsee = { version = "0.21", features = ["server", "macros"] }
 
 # HTTP and WebSocket
 hyper = { workspace = true }

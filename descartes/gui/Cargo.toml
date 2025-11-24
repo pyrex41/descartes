@@ -7,10 +7,18 @@ license.workspace = true
 
 [dependencies]
 descartes-core = { path = "../core" }
+descartes-daemon = { path = "../daemon" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 serde_json = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
 
-# GUI will use Iced in Phase 3
-# iced = { version = "0.12", features = ["debug", "tokio"] }
+# GUI framework
+iced = { version = "0.13", features = ["debug", "tokio", "advanced"] }
+
+[[bin]]
+name = "descartes-gui"
+path = "src/main.rs"

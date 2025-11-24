@@ -1,0 +1,36 @@
+# Simplified DAG format using the dependencies notation
+# This is a more concise way to define task dependencies
+
+[dag]
+name = "Code Review Workflow"
+description = "Simple code review and approval process"
+
+# Using the simplified dependencies format
+# Each task lists what it depends on
+
+[[dag.dependencies]]
+task = "550e8400-e29b-41d4-a716-446655440021"
+depends_on = []
+# No dependencies - this is a start node
+
+[[dag.dependencies]]
+task = "550e8400-e29b-41d4-a716-446655440022"
+depends_on = ["550e8400-e29b-41d4-a716-446655440021"]
+dependency_type = "dependency"
+
+[[dag.dependencies]]
+task = "550e8400-e29b-41d4-a716-446655440023"
+depends_on = ["550e8400-e29b-41d4-a716-446655440021"]
+dependency_type = "dependency"
+
+[[dag.dependencies]]
+task = "550e8400-e29b-41d4-a716-446655440024"
+depends_on = [
+    "550e8400-e29b-41d4-a716-446655440022",
+    "550e8400-e29b-41d4-a716-446655440023"
+]
+dependency_type = "dependency"
+
+[dag.metadata]
+workflow_type = "code_review"
+approvers_required = 2

@@ -641,7 +641,7 @@ impl RequestResponseTracker {
 
     /// Mark a request as responded
     pub fn mark_responded(&self, request_id: &str) -> Option<IpcMessage> {
-        self.pending.remove(request_id).map(|(msg, _)| msg)
+        self.pending.remove(request_id).map(|(_, (msg, _))| msg)
     }
 
     /// Get pending requests

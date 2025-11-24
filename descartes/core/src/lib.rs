@@ -1,11 +1,19 @@
 // Descartes: Composable AI Agent Orchestration System
 // Core library providing traits, providers, and orchestration utilities
 
+pub mod agent_history;
 pub mod agent_runner;
+pub mod agent_state;
+pub mod agent_stream_parser;
+pub mod body_restore;
+pub mod brain_restore;
 pub mod config;
 pub mod config_loader;
 pub mod config_migration;
 pub mod config_watcher;
+pub mod dag;
+pub mod dag_toml;
+pub mod debugger;
 pub mod errors;
 pub mod ipc;
 pub mod lease;
@@ -19,8 +27,12 @@ pub mod state_machine;
 pub mod state_machine_store;
 pub mod state_store;
 pub mod swarm_parser;
+pub mod task_queries;
 pub mod thoughts;
 pub mod traits;
+pub mod zmq_agent_runner;
+pub mod zmq_communication;
+pub mod zmq_client;
 
 // Re-export commonly used types
 pub use errors::{
@@ -42,6 +54,36 @@ pub use providers::{
 
 pub use agent_runner::{
     LocalProcessRunner, ProcessRunnerConfig, GracefulShutdown,
+};
+
+pub use agent_state::{
+    AgentStatus as RuntimeAgentStatus, AgentRuntimeState, AgentProgress, AgentError as RuntimeAgentError,
+    StatusTransition, AgentStreamMessage, OutputStream, LifecycleEvent,
+    AgentStateCollection, AgentStatistics,
+};
+
+pub use agent_stream_parser::{
+    AgentStreamParser, StreamHandler, ParserConfig, StreamParseError, StreamResult,
+    ParserStatistics, LoggingHandler,
+};
+
+pub use zmq_agent_runner::{
+    ZmqAgentRunner, ZmqMessage, ZmqRunnerConfig,
+    SpawnRequest, SpawnResponse,
+    ControlCommand, ControlCommandType, CommandResponse,
+    StatusUpdate, StatusUpdateType,
+    ListAgentsRequest, ListAgentsResponse,
+    HealthCheckRequest, HealthCheckResponse,
+    serialize_zmq_message, deserialize_zmq_message, validate_message_size,
+    ZMQ_PROTOCOL_VERSION, MAX_MESSAGE_SIZE, DEFAULT_TIMEOUT_SECS,
+};
+
+pub use zmq_communication::{
+    ZmqConnection, ZmqMessageRouter, SocketType, ConnectionState, ConnectionStats,
+};
+
+pub use zmq_client::{
+    ZmqClient,
 };
 
 pub use notifications::{
@@ -69,6 +111,11 @@ pub use lease_manager::SqliteLeaseManager;
 
 pub use state_store::{
     SqliteStateStore, AgentState, StateTransition, Migration,
+};
+
+pub use task_queries::{
+    TaskQueries, TaskQueryBuilder, TaskSortField, SortOrder,
+    KanbanBoard, TaskStatistics,
 };
 
 pub use config::{
@@ -113,6 +160,34 @@ pub use thoughts::{
     StorageStatistics,
 };
 
+pub use debugger::{
+    DebuggerState, DebuggerError, DebuggerResult, ExecutionState, ThoughtSnapshot,
+    CallFrame, DebugContext, BreakpointLocation, Breakpoint, DebugCommand,
+    DebugEvent, DebugSnapshot, DebugStatistics, DebuggerStateExt,
+    // Core debugger logic (phase3:6.2)
+    Debugger, CommandResult, DebuggableAgent, run_with_debugging,
+};
+
+pub use agent_history::{
+    AgentHistoryEvent, AgentHistoryStore, HistoryEventType, HistoryQuery, HistorySnapshot,
+    HistoryStatistics, SqliteAgentHistoryStore,
+};
+
+pub use body_restore::{
+    BodyRestoreManager, CommitInfo, CoordinatedRestore, GitBodyRestoreManager,
+    RepositoryBackup,
+    RestoreOptions as BodyRestoreOptions,
+    RestoreResult as BodyRestoreResult,
+};
+
+pub use brain_restore::{
+    BrainRestore, BrainState, DefaultBrainRestore,
+    RestoreOptions as BrainRestoreOptions,
+    RestoreResult as BrainRestoreResult,
+    ThoughtEntry, DecisionNode, ConversationState, MessageEntry,
+    create_snapshot_from_state, compare_states,
+};
+
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -128,3 +203,12 @@ mod tests {
 
 #[cfg(test)]
 mod providers_test;
+
+pub use dag::{
+    DAG, DAGNode, DAGEdge, DAGError, DAGResult, DAGStatistics, EdgeType, Position,
+};
+
+pub use dag_toml::{
+    TomlDAG, TomlDAGNode, TomlDAGEdge, TomlTaskDependency, TomlPosition,
+    load_dag_from_toml, save_dag_to_toml,
+};

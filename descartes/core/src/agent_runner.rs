@@ -301,9 +301,21 @@ impl AgentRunner for LocalProcessRunner {
 
     async fn kill(&self, agent_id: &Uuid) -> AgentResult<()> {
         if let Some(handle) = self.agents.get(agent_id) {
-            let mut handle_guard = handle.write();
-            handle_guard.kill().await?;
-            drop(handle_guard); // Release lock before removing
+            let child = {
+                let handle_guard = handle.read();
+                Arc::clone(&handle_guard.child)
+            };
+
+            let mut child_guard = child.lock().await;
+            child_guard.kill().await?;
+            drop(child_guard);
+
+            // Update the handle's status
+            {
+                let mut handle_guard = handle.write();
+                handle_guard.status = AgentStatus::Terminated;
+            }
+
             self.agents.remove(agent_id);
             Ok(())
         } else {
@@ -316,8 +328,56 @@ impl AgentRunner for LocalProcessRunner {
 
     async fn signal(&self, agent_id: &Uuid, signal: AgentSignal) -> AgentResult<()> {
         if let Some(handle) = self.agents.get(agent_id) {
-            let mut handle_guard = handle.write();
-            handle_guard.send_signal(signal).await
+            let child = {
+                let handle_guard = handle.read();
+                Arc::clone(&handle_guard.child)
+            };
+
+            let mut child_guard = child.lock().await;
+
+            match signal {
+                AgentSignal::Interrupt => {
+                    // Send SIGINT (Ctrl+C)
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child_guard.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGINT)
+                                .map_err(|e| AgentError::ExecutionError(format!("Failed to send SIGINT: {}", e)))?;
+                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        return Err(AgentError::UnsupportedOperation(
+                            "SIGINT not supported on this platform".into()
+                        ));
+                    }
+                }
+                AgentSignal::Terminate => {
+                    // Send SIGTERM
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child_guard.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
+                                .map_err(|e| AgentError::ExecutionError(format!("Failed to send SIGTERM: {}", e)))?;
+                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        child_guard.kill().await?;
+                    }
+                }
+                AgentSignal::Kill => {
+                    child_guard.kill().await?;
+                }
+            }
+
+            Ok(())
         } else {
             Err(AgentError::NotFound(format!(
                 "Agent not found: {}",
@@ -338,10 +398,6 @@ struct LocalAgentHandle {
     child: Arc<Mutex<Child>>,
     /// Stdin writer
     stdin: Arc<Mutex<ChildStdin>>,
-    /// Stdout reader with optional JSON streaming
-    stdout_reader: Arc<Mutex<BufReader<ChildStdout>>>,
-    /// Stderr reader
-    stderr_reader: Arc<Mutex<BufReader<ChildStderr>>>,
     /// Current status
     status: AgentStatus,
     /// Exit code if completed
@@ -383,12 +439,6 @@ impl LocalAgentHandle {
             info,
             child: Arc::new(Mutex::new(child)),
             stdin: Arc::new(Mutex::new(stdin)),
-            stdout_reader: Arc::new(Mutex::new(BufReader::new(
-                tokio::io::empty()
-            ))),
-            stderr_reader: Arc::new(Mutex::new(BufReader::new(
-                tokio::io::empty()
-            ))),
             status: AgentStatus::Running,
             exit_code: None,
             json_streaming,
@@ -584,28 +634,70 @@ impl AgentHandle for AgentHandleWrapper {
     }
 
     async fn write_stdin(&mut self, data: &[u8]) -> AgentResult<()> {
-        let mut handle = self.handle.write();
-        handle.write_stdin(data).await
+        let stdin = {
+            let handle = self.handle.read();
+            Arc::clone(&handle.stdin)
+        };
+        let mut stdin_guard = stdin.lock().await;
+        stdin_guard.write_all(data).await?;
+        stdin_guard.flush().await?;
+        Ok(())
     }
 
     async fn read_stdout(&mut self) -> AgentResult<Option<Vec<u8>>> {
-        let mut handle = self.handle.write();
-        handle.read_stdout().await
+        let stdout_buffer = {
+            let handle = self.handle.read();
+            Arc::clone(&handle.stdout_buffer)
+        };
+        let mut buffer = stdout_buffer.lock().await;
+        Ok(buffer.try_recv().ok())
     }
 
     async fn read_stderr(&mut self) -> AgentResult<Option<Vec<u8>>> {
-        let mut handle = self.handle.write();
-        handle.read_stderr().await
+        let stderr_buffer = {
+            let handle = self.handle.read();
+            Arc::clone(&handle.stderr_buffer)
+        };
+        let mut buffer = stderr_buffer.lock().await;
+        Ok(buffer.try_recv().ok())
     }
 
     async fn wait(&mut self) -> AgentResult<ExitStatus> {
-        let mut handle = self.handle.write();
-        handle.wait().await
+        let child = {
+            let handle = self.handle.read();
+            Arc::clone(&handle.child)
+        };
+        let mut child_guard = child.lock().await;
+        let status = child_guard.wait().await?;
+
+        // Update the handle's status
+        {
+            let mut handle = self.handle.write();
+            handle.status = AgentStatus::Completed;
+            handle.exit_code = status.code();
+        }
+
+        Ok(ExitStatus {
+            code: status.code(),
+            success: status.success(),
+        })
     }
 
     async fn kill(&mut self) -> AgentResult<()> {
-        let mut handle = self.handle.write();
-        handle.kill().await
+        let child = {
+            let handle = self.handle.read();
+            Arc::clone(&handle.child)
+        };
+        let mut child_guard = child.lock().await;
+        child_guard.kill().await?;
+
+        // Update the handle's status
+        {
+            let mut handle = self.handle.write();
+            handle.status = AgentStatus::Terminated;
+        }
+
+        Ok(())
     }
 
     fn exit_code(&self) -> Option<i32> {
