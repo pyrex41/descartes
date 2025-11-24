@@ -101,6 +101,34 @@ pub enum StateStoreError {
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    // Secrets-specific errors
+    #[error("Encryption error: {0}")]
+    EncryptionError(String),
+
+    #[error("Decryption failed: authentication tag mismatch")]
+    DecryptionFailed,
+
+    #[error("Invalid secret: {0}")]
+    InvalidSecret(String),
+
+    #[error("Access denied: {0}")]
+    AccessDenied(String),
+
+    #[error("Authentication failed: {0}")]
+    AuthenticationFailed(String),
+
+    #[error("Master key not initialized")]
+    MasterKeyNotInitialized,
+
+    #[error("Invalid password: {0}")]
+    InvalidPassword(String),
+
+    #[error("Secret rotation failed: {0}")]
+    RotationFailed(String),
+
+    #[error("Expired secret: {0}")]
+    ExpiredSecret(String),
 }
 
 /// Result type for state store operations.

@@ -1,8 +1,16 @@
 // Descartes: Composable AI Agent Orchestration System
 // Core library providing traits, providers, and orchestration utilities
 
+pub mod config;
 pub mod errors;
+pub mod lease;
+pub mod lease_manager;
+pub mod notifications;
+pub mod notification_router_impl;
 pub mod providers;
+pub mod secrets;
+pub mod secrets_crypto;
+pub mod thoughts;
 pub mod traits;
 
 // Re-export commonly used types
@@ -21,6 +29,34 @@ pub use traits::{
 pub use providers::{
     AnthropicProvider, ClaudeCodeAdapter, HeadlessCliAdapter, OllamaProvider, OpenAiProvider,
     ProviderFactory,
+};
+
+pub use notifications::{
+    ChannelStats, NotificationAdapter, NotificationChannel, NotificationError,
+    NotificationEventType, NotificationPayload, NotificationPayloadBuilder, NotificationSendResult,
+    NotificationRouter, NotificationStats, RateLimitConfig, RoutingRule, RetryConfig, Severity,
+    TemplateContext, EventTypeStats,
+};
+
+pub use notification_router_impl::DefaultNotificationRouter;
+
+pub use lease::{
+    Lease, LeaseStatus, LeaseAcquisitionRequest, LeaseAcquisitionResponse,
+    LeaseRenewalRequest, LeaseRenewalResponse, LeaseReleaseRequest, LeaseReleaseResponse,
+    LeaseManager,
+};
+
+pub use lease_manager::SqliteLeaseManager;
+
+pub use config::{
+    ConfigManager, DescaratesConfig, ProvidersConfig, AgentBehaviorConfig, StorageConfig,
+    SecurityConfig, NotificationsConfig, FeaturesConfig, LoggingConfig,
+    OpenAiConfig, AnthropicConfig, OllamaConfig, DeepSeekConfig, GroqConfig,
+};
+
+pub use thoughts::{
+    ThoughtsStorage, ThoughtsConfig, ThoughtMetadata, ThoughtsError, ThoughtsResult,
+    StorageStatistics,
 };
 
 /// Library version

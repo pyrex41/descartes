@@ -37,6 +37,25 @@ bytes = "1.5"
 dashmap = "5.5"
 parking_lot = "0.12"
 futures = "0.3"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5.0"
+toml = { workspace = true }
+
+# Cryptography for secrets management
+aes-gcm = "0.10"
+sha2 = "0.10"
+pbkdf2 = "0.12"
+argon2 = "0.5"
+rand = "0.8"
+zeroize = { version = "1.7", features = ["derive"] }
+generic-array = "0.14"
+bincode = "1.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+tempfile = "3.8"
+
+[[bench]]
+name = "main"
+path = "benches/main.rs"
+harness = false

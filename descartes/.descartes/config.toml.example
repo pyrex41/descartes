@@ -1,0 +1,416 @@
+# Descartes Configuration File
+# Version 1.0.0
+#
+# This is an example configuration file for Descartes AI Agent Orchestration System.
+# Copy this file to ~/.descartes/config.toml and customize for your setup.
+#
+# Environment Variables:
+# - OPENAI_API_KEY: OpenAI API key
+# - ANTHROPIC_API_KEY: Anthropic API key
+# - DEEPSEEK_API_KEY: DeepSeek API key
+# - GROQ_API_KEY: Groq API key
+# - DESCARTES_ENCRYPTION_KEY: Master encryption key
+# - DESCARTES_SECRET_KEY: Session secret key
+
+version = "1.0.0"
+
+# ============================================================================
+# PROVIDER CONFIGURATION
+# ============================================================================
+# Configure LLM providers: OpenAI, Anthropic, Ollama, DeepSeek, Groq, etc.
+
+[providers]
+# Primary provider to use (anthropic, openai, ollama, deepseek, groq)
+primary = "anthropic"
+
+# ============================================================================
+# Anthropic Claude Provider (Recommended)
+# ============================================================================
+[providers.anthropic]
+enabled = true
+# API key can be set here or via ANTHROPIC_API_KEY environment variable
+# api_key = "sk-ant-..."
+endpoint = "https://api.anthropic.com"
+model = "claude-3-5-sonnet-20241022"
+models = [
+    "claude-3-5-sonnet-20241022",
+    "claude-3-opus-20240229",
+    "claude-3-haiku-20240307"
+]
+timeout_secs = 120
+max_retries = 3
+retry_backoff_ms = 1000
+rate_limit_rpm = 60
+temperature = 0.7
+max_tokens = 4096
+
+# ============================================================================
+# OpenAI Provider
+# ============================================================================
+[providers.openai]
+enabled = false
+# api_key = "sk-proj-..."
+endpoint = "https://api.openai.com/v1"
+model = "gpt-4-turbo"
+models = [
+    "gpt-4",
+    "gpt-4-turbo",
+    "gpt-3.5-turbo"
+]
+timeout_secs = 120
+max_retries = 3
+retry_backoff_ms = 1000
+rate_limit_rpm = 60
+temperature = 0.7
+max_tokens = 4096
+
+# ============================================================================
+# Ollama Local Provider (for local inference)
+# ============================================================================
+[providers.ollama]
+enabled = false
+endpoint = "http://localhost:11434"
+model = "llama2"
+timeout_secs = 120
+max_retries = 3
+retry_backoff_ms = 1000
+temperature = 0.7
+max_tokens = 4096
+
+# ============================================================================
+# DeepSeek Provider
+# ============================================================================
+[providers.deepseek]
+enabled = false
+# api_key = "sk-..."
+endpoint = "https://api.deepseek.com/v1"
+model = "deepseek-chat"
+timeout_secs = 120
+max_retries = 3
+retry_backoff_ms = 1000
+temperature = 0.7
+max_tokens = 4096
+
+# ============================================================================
+# Groq Provider
+# ============================================================================
+[providers.groq]
+enabled = false
+# api_key = "gsk_..."
+endpoint = "https://api.groq.com/openai/v1"
+model = "mixtral-8x7b-32768"
+timeout_secs = 120
+max_retries = 3
+retry_backoff_ms = 1000
+temperature = 0.7
+max_tokens = 4096
+
+# ============================================================================
+# AGENT BEHAVIOR CONFIGURATION
+# ============================================================================
+# Configure how agents behave, timeout, concurrency, etc.
+
+[agent]
+# Default agent execution timeout in seconds
+default_timeout_secs = 300
+
+# Maximum concurrent agents running simultaneously
+max_concurrent_agents = 10
+
+# Task queue size (buffered channel)
+task_queue_size = 1000
+
+# Enable streaming responses (Server-Sent Events)
+enable_streaming = true
+
+# Enable tool/function calling
+enable_tools = true
+
+# Max retries when tool execution fails
+max_tool_retries = 2
+
+# Tool execution timeout in seconds
+tool_timeout_secs = 60
+
+# Enable agent memory/context caching
+enable_memory = true
+
+# Memory cache TTL (Time To Live) in seconds
+memory_ttl_secs = 3600
+
+# Maximum context size in tokens (for all messages)
+max_context_tokens = 32000
+
+# Enable background task processing
+enable_background_tasks = true
+
+# Number of worker threads for background tasks
+worker_threads = 4
+
+# ============================================================================
+# STORAGE CONFIGURATION
+# ============================================================================
+# Configure where Descartes stores data, logs, and state
+
+[storage]
+# Base directory for all storage (defaults to ~/.descartes)
+base_path = "~/.descartes"
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+[storage.database]
+# Database type: sqlite, postgres, mysql
+database_type = "sqlite"
+
+# SQLite database path (relative to storage.base_path)
+sqlite_path = "data/descartes.db"
+
+# PostgreSQL connection string (if using postgres)
+# postgres_url = "postgresql://user:password@localhost:5432/descartes"
+
+# Connection pool size
+pool_size = 10
+
+# Run migrations on startup
+auto_migrate = true
+
+# Enable automatic backups
+enable_backups = true
+
+# Backup interval in hours
+backup_interval_hours = 24
+
+# ============================================================================
+# State Store Configuration
+# ============================================================================
+[storage.state_store]
+# Enable state persistence
+enabled = true
+
+# State directory (relative to storage.base_path)
+path = "data/state"
+
+# Serialization format: json, msgpack, bincode
+serialization_format = "json"
+
+# Enable state compression
+enable_compression = false
+
+# ============================================================================
+# Event Store Configuration
+# ============================================================================
+[storage.event_store]
+# Enable event persistence
+enabled = true
+
+# Event directory (relative to storage.base_path)
+path = "data/events"
+
+# Event retention in days (0 = infinite)
+retention_days = 0
+
+# Event batch size for writes
+batch_size = 100
+
+# Enable event indexing for search
+enable_indexing = true
+
+# ============================================================================
+# Cache Configuration
+# ============================================================================
+[storage.cache]
+# Enable caching
+enabled = true
+
+# Cache type: in-memory, redis, disk
+cache_type = "in-memory"
+
+# Disk cache path (if using disk cache)
+disk_path = "data/cache"
+
+# Redis connection URL (if using redis cache)
+# redis_url = "redis://localhost:6379"
+
+# Cache TTL in seconds
+ttl_secs = 3600
+
+# Max cache size in MB
+max_size_mb = 512
+
+# ============================================================================
+# SECURITY CONFIGURATION
+# ============================================================================
+# Configure encryption, authentication, and security settings
+
+[security]
+# Enable encryption for sensitive data
+enable_encryption = true
+
+# Encryption algorithm
+encryption_algorithm = "aes-256-gcm"
+
+# Encryption key (can be read from DESCARTES_ENCRYPTION_KEY env var)
+# encryption_key = "..."
+
+# Encrypt API keys in storage
+encrypt_api_keys = true
+
+# File permissions for sensitive files (octal)
+file_permissions = "0600"
+
+# Enable Role-Based Access Control
+enable_rbac = false
+
+# Secret key for session management (use env var: DESCARTES_SECRET_KEY)
+# secret_key = "..."
+
+# Session timeout in seconds
+session_timeout_secs = 3600
+
+# Enable audit logging
+enable_audit_logging = true
+
+# Audit log path (relative to storage.base_path)
+audit_log_path = "data/audit.log"
+
+# ============================================================================
+# NOTIFICATIONS CONFIGURATION
+# ============================================================================
+# Configure how Descartes notifies you about events
+
+[notifications]
+enabled = false
+
+# Alert thresholds
+[notifications.alerts]
+# Alert when token usage exceeds this percentage (0-100)
+high_token_usage_threshold = 80
+
+# Alert on API errors
+alert_on_api_errors = true
+
+# Alert on agent failures
+alert_on_agent_failures = true
+
+# Alert on timeouts
+alert_on_timeouts = true
+
+# Alert on rate limiting
+alert_on_rate_limit = true
+
+# ============================================================================
+# Telegram Notifications
+# ============================================================================
+# [notifications.channels.telegram]
+# enabled = true
+# bot_token = "YOUR_TELEGRAM_BOT_TOKEN"
+# chat_id = "YOUR_CHAT_ID"
+
+# ============================================================================
+# Webhook Notifications
+# ============================================================================
+# [[notifications.channels.webhooks]]
+# name = "slack"
+# url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+# method = "POST"
+# events = ["agent_failure", "high_token_usage"]
+# enable_retries = true
+# max_retries = 3
+#
+# [notifications.channels.webhooks.headers]
+# X-Custom-Header = "value"
+
+# ============================================================================
+# Email Notifications
+# ============================================================================
+# [notifications.channels.email]
+# enabled = true
+# smtp_server = "smtp.gmail.com"
+# smtp_port = 587
+# smtp_user = "your-email@gmail.com"
+# smtp_password = "your-app-password"
+# from_address = "your-email@gmail.com"
+# recipients = ["admin@example.com"]
+# use_tls = true
+
+# ============================================================================
+# Slack Notifications
+# ============================================================================
+# [notifications.channels.slack]
+# enabled = true
+# webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+# channel = "#alerts"
+# username = "Descartes"
+
+# ============================================================================
+# FEATURE FLAGS AND EXPERIMENTAL OPTIONS
+# ============================================================================
+# Control which features are enabled
+
+[features]
+# Enable experimental/beta features
+enable_experimental = false
+
+# Enable debug mode (more verbose logging)
+enable_debug = false
+
+# Enable distributed tracing
+enable_tracing = true
+
+# Enable profiling
+enable_profiling = false
+
+# Individual feature flags
+[features.flags]
+# Example feature flags
+# streaming_responses = true
+# persistent_context = true
+
+# Beta features to enable
+beta_features = []
+
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+# Configure how Descartes logs information
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+
+# Log format: json, text, pretty
+format = "text"
+
+# Log HTTP requests
+log_requests = true
+
+# Log HTTP responses (including token counts)
+log_responses = true
+
+# Log sensitive data like API keys (NOT RECOMMENDED FOR PRODUCTION)
+log_sensitive_data = false
+
+# ============================================================================
+# Log Output Configuration
+# ============================================================================
+[logging.targets]
+# Log to stdout/stderr
+stdout = true
+
+# Log to file
+[logging.targets.file]
+# Path to log file (relative to storage.base_path)
+path = "data/descartes.log"
+
+# Max log file size in MB (for rotation)
+max_size_mb = 100
+
+# Number of old log files to keep
+max_backups = 10
+
+# Compress rotated logs
+compress = false
+
+# Log to syslog
+# syslog = true

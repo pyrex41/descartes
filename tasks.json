@@ -3,7 +3,7 @@
     "name": "phase1",
     "tasks": [
       {
-        "id": "1",
+        "id": "phase1:1",
         "title": "[PARENT] Initialize Rust Workspace",
         "description": "Create a Cargo.toml file with workspace members for core, cli, gui, and agent-runner. Set up dependencies including tokio, sqlx (sqlite), clap, tracing, serde, mimalloc, rkyv, and ipmpsc. Configure a GitHub Actions CI/CD pipeline for build and test. Success criteria: Workspace builds successfully and CI passes on pushes.\n\n[This task has been expanded into subtasks: 1.1, 1.2, 1.3]",
         "status": "pending",
@@ -15,211 +15,211 @@
         "updated_at": "2025-11-24T02:47:50.108279+00:00"
       },
       {
-        "id": "2",
+        "id": "phase1:2",
         "title": "[PARENT] Define Core Traits",
         "description": "Define the AgentRunner trait for spawning and managing agents. Define the StateStore trait for persistence. Define the ContextSyncer trait for file/context access. Define the new ModelBackend trait for unified LLM providers. Success criteria: Traits are documented and compile without errors.\n\n[This task has been expanded into subtasks: 2.1, 2.2, 2.3, 2.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "1"
+          "phase1:1"
         ],
         "complexity_analysis": "The task involves defining four distinct traits (AgentRunner, StateStore, ContextSyncer, ModelBackend) in a Rust-like environment, each with specific functionalities that require consideration of async operations, persistence mechanisms, file I/O, and LLM integrations. While defining traits themselves is straightforward, ensuring proper design for integration, error handling, and documentation adds technical difficulty. It affects multiple components (likely 4+ files/modules), requires compilation verification, and may involve some research for unified LLM interfaces. No major unknowns or heavy testing, but edge cases like async error propagation and persistence failures need handling. Estimated 2-4 hours total.",
         "created_at": "2025-11-24T02:46:13.004076+00:00",
         "updated_at": "2025-11-24T02:47:56.801287+00:00"
       },
       {
-        "id": "3",
+        "id": "phase1:3",
         "title": "[PARENT] Design SQLite Schema",
         "description": "Create schema for events table (Hot Path), tasks table (Global Task Manager), and sessions table. Set up sqlx migrations for the schema. Success criteria: Migrations run successfully and tables are created in a test database.\n\n[This task has been expanded into subtasks: 3.1, 3.2, 3.3]",
         "status": "pending",
         "complexity": 3,
         "priority": "high",
         "dependencies": [
-          "1"
+          "phase1:1"
         ],
         "complexity_analysis": "The task involves designing schemas for three tables with standard SQL, setting up sqlx migrations (assuming familiarity with sqlx), and basic testing in a test database. It requires moderate effort for schema design considering the 'Hot Path' performance hint, but no significant unknowns, research, or complex integrations are evident.",
         "created_at": "2025-11-24T02:46:13.004077+00:00",
         "updated_at": "2025-11-24T02:48:00.226878+00:00"
       },
       {
-        "id": "4",
+        "id": "phase1:4",
         "title": "[PARENT] Implement SqliteStore",
         "description": "Implement the StateStore trait using sqlx for SQLite interactions. Create the Hot Path logger for events. Success criteria: Can read/write events to the database and logger functions correctly.\n\n[This task has been expanded into subtasks: 4.1, 4.2, 4.3, 4.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "3",
-          "2"
+          "phase1:3",
+          "phase1:2"
         ],
         "complexity_analysis": "The task involves implementing a database-backed StateStore trait using sqlx, which requires handling async operations, database schema, and error management. Additionally, creating a Hot Path logger adds another component with potential integration complexities. It affects multiple files (store implementation, logger, possibly migrations), requires testing for read/write operations and logger functionality, and may need research into sqlx specifics for SQLite. Edge cases like concurrency, connection failures, and data serialization could add moderate difficulty, estimating 2-4 hours for a developer familiar with the stack.",
         "created_at": "2025-11-24T02:46:13.004078+00:00",
         "updated_at": "2025-11-24T02:48:03.868235+00:00"
       },
       {
-        "id": "5",
+        "id": "phase1:5",
         "title": "[PARENT] Implement LocalProcessRunner",
         "description": "Use tokio::process::Command to spawn child processes. Implement stdin writing and stdout/stderr streaming. Add signal handling for SIGINT/SIGTERM graceful shutdown. Success criteria: Can spawn a process, send input, and receive output while handling signals.\n\n[This task has been expanded into subtasks: 5.1, 5.2, 5.3, 5.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "2"
+          "phase1:2"
         ],
         "complexity_analysis": "The task involves async process spawning, stdin writing, and concurrent stdout/stderr streaming in Tokio, plus signal handling for graceful shutdown, which introduces concurrency challenges and edge cases like race conditions. It requires familiarity with Tokio's process and signal APIs, moderate testing for async behavior, and handling of integration dependencies, estimating 2-4 hours for an experienced developer.",
         "created_at": "2025-11-24T02:46:13.004078+00:00",
         "updated_at": "2025-11-24T02:48:08.544423+00:00"
       },
       {
-        "id": "6",
+        "id": "phase1:6",
         "title": "[PARENT] Integrate Git Layer with gitoxide",
         "description": "Integrate the gix crate into the project. Implement a basic GitRepo trait for fast repo traversal using gix. Success criteria: Can perform basic repo checks like detecting if a directory is a git repo.\n\n[This task has been expanded into subtasks: 6.1, 6.2, 6.3, 6.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "medium",
         "dependencies": [
-          "1"
+          "phase1:1"
         ],
         "complexity_analysis": "This task involves integrating a new dependency (gix crate), researching its API for Git repo operations, implementing a trait for basic checks and traversal, and handling edge cases like non-repo directories or permissions. It requires modifying build files, creating or updating modules, and writing tests, estimated at 2-4 hours of work with moderate technical unknowns in API usage.",
         "created_at": "2025-11-24T02:46:13.004079+00:00",
         "updated_at": "2025-11-24T02:48:12.307931+00:00"
       },
       {
-        "id": "7",
+        "id": "phase1:7",
         "title": "[PARENT] Implement IPC Layer with SharedMemoryChannel",
         "description": "Implement SharedMemoryChannel using ipmpsc and rkyv for zero-copy serialization. Benchmark performance against standard pipes. Success criteria: Channel works for inter-process communication and benchmarking shows performance gains.\n\n[This task has been expanded into subtasks: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6]",
         "status": "pending",
         "complexity": 13,
         "priority": "medium",
         "dependencies": [
-          "1"
+          "phase1:1"
         ],
         "complexity_analysis": "The task involves implementing a shared memory channel with zero-copy serialization, which requires deep knowledge of low-level IPC, OS primitives, and integration of specialized crates like ipmpsc and rkyv. It includes research into usage and best practices, handling multiple edge cases like synchronization and process failures, setting up comprehensive IPC testing, and creating performance benchmarks against pipes. This spans multiple components, dependencies, and integration points, making it extremely complex and ideally split into subtasks for implementation, testing, and benchmarking.",
         "created_at": "2025-11-24T02:46:13.004080+00:00",
         "updated_at": "2025-11-24T02:48:17.066385+00:00"
       },
       {
-        "id": "8",
+        "id": "phase1:8",
         "title": "[PARENT] Implement OpenAI API Provider",
         "description": "Implement the ModelBackend trait for OpenAI HTTP client. Handle API requests and responses. Success criteria: Can query OpenAI API and receive valid responses.\n\n[This task has been expanded into subtasks: 8.1, 8.2, 8.3]",
         "status": "pending",
         "complexity": 3,
         "priority": "high",
         "dependencies": [
-          "2"
+          "phase1:2"
         ],
         "complexity_analysis": "The task involves implementing a trait for an HTTP client to interact with the OpenAI API, which requires handling requests, responses, and basic error cases. It's moderately complex due to API integration, dependencies on HTTP libraries, and handling edge cases like rate limits and authentication, but the API is well-documented, affecting likely 1-2 files with straightforward testing using mocks. No major unknowns or research needed beyond quick API review.",
         "created_at": "2025-11-24T02:46:13.004080+00:00",
         "updated_at": "2025-11-24T02:48:20.421164+00:00"
       },
       {
-        "id": "9",
+        "id": "phase1:9",
         "title": "[PARENT] Implement Anthropic API Provider",
         "description": "Implement the ModelBackend trait for Anthropic HTTP client. Handle API requests and responses. Success criteria: Can query Anthropic API and receive valid responses.\n\n[This task has been expanded into subtasks: 9.1, 9.2, 9.3]",
         "status": "pending",
         "complexity": 3,
         "priority": "high",
         "dependencies": [
-          "2"
+          "phase1:2"
         ],
         "complexity_analysis": "The task requires implementing an API client for Anthropic, integrating it with an existing ModelBackend trait. This involves moderate technical difficulty with HTTP requests, JSON parsing, authentication handling, and error management. It may need some research on Anthropic's API documentation, but assumes familiarity with similar integrations. Estimated time is 1-2 hours, affecting a few files, with basic testing for API queries and responses.",
         "created_at": "2025-11-24T02:46:13.004081+00:00",
         "updated_at": "2025-11-24T02:48:24.281392+00:00"
       },
       {
-        "id": "10",
+        "id": "phase1:10",
         "title": "[PARENT] Implement ClaudeCodeAdapter for Headless Mode",
         "description": "Implement the ModelBackend trait by spawning the claude CLI as a child process. Handle input/output interaction. Success criteria: Can spawn claude CLI and exchange messages.\n\n[This task has been expanded into subtasks: 10.1, 10.2, 10.3, 10.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "2",
-          "5"
+          "phase1:2",
+          "phase1:5"
         ],
         "complexity_analysis": "The task involves spawning a child process and managing I/O streams for message exchange, which requires familiarity with process handling in the language (e.g., Rust's std::process). It affects at least one file implementing the trait, with dependencies on the claude CLI that need research for its input/output protocol. Testing includes integration with an external CLI, handling edge cases like process failures, timeouts, and non-interactive mode, and potential async I/O. Estimated 2-4 hours for an experienced developer.",
         "created_at": "2025-11-24T02:46:13.004081+00:00",
         "updated_at": "2025-11-24T02:48:27.994648+00:00"
       },
       {
-        "id": "11",
+        "id": "phase1:11",
         "title": "[PARENT] Implement OllamaAdapter for Local Mode",
         "description": "Implement the ModelBackend trait to connect to localhost:11434 for Ollama. Handle local LLM interactions. Success criteria: Can query local Ollama instance and receive responses.\n\n[This task has been expanded into subtasks: 11.1, 11.2, 11.3, 11.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "2"
+          "phase1:2"
         ],
         "complexity_analysis": "The task involves implementing a trait to make HTTP requests to a local Ollama instance, which requires moderate research on Ollama's API (endpoints, request/response formats), handling async HTTP calls, error cases (e.g., server down, timeouts), and integrating with the existing ModelBackend. It affects 1-2 files, needs testing against a live instance, and accounts for edge cases like malformed responses or network issues. Estimated 2-4 hours total.",
         "created_at": "2025-11-24T02:46:13.004082+00:00",
         "updated_at": "2025-11-24T02:48:31.507795+00:00"
       },
       {
-        "id": "12",
+        "id": "phase1:12",
         "title": "[PARENT] Implement CLI Command: descartes init",
         "description": "Add the init command to create .descartes directory and initialize the DB. Use the SqliteStore for setup. Success criteria: Running the command creates the directory and DB successfully.\n\n[This task has been expanded into subtasks: 12.1, 12.2, 12.3]",
         "status": "pending",
         "complexity": 3,
         "priority": "high",
         "dependencies": [
-          "1",
-          "4"
+          "phase1:1",
+          "phase1:4"
         ],
         "complexity_analysis": "The task involves adding a straightforward CLI command using an existing SqliteStore, with basic file system operations (creating a directory) and database initialization. Assuming the CLI framework and SqliteStore are already in place, it's a moderate task affecting a few files (e.g., CLI entry point and command handler). Testing includes verifying directory creation and DB setup, with edge cases like existing directory or permission errors. No significant research or complex integrations needed, estimable at 1-2 hours.",
         "created_at": "2025-11-24T02:46:13.004082+00:00",
         "updated_at": "2025-11-24T02:48:35.920653+00:00"
       },
       {
-        "id": "13",
+        "id": "phase1:13",
         "title": "[PARENT] Implement CLI Command: descartes spawn",
         "description": "Add the spawn command to launch an agent via a selected ModelBackend provider. Support --provider flag for API, headless, local. Success criteria: Can spawn agents with different providers and get responses.\n\n[This task has been expanded into subtasks: 13.1, 13.2, 13.3, 13.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "2",
-          "8",
-          "9",
-          "10",
-          "11",
-          "5"
+          "phase1:2",
+          "phase1:8",
+          "phase1:9",
+          "phase1:10",
+          "phase1:11",
+          "phase1:5"
         ],
         "complexity_analysis": "The task involves adding a new CLI command with provider selection logic, integrating with existing ModelBackend providers (API, headless, local), and ensuring response handling. This requires modifying CLI code, handling multiple integration points, testing across providers, and addressing edge cases like invalid providers or failures, estimating 2-4 hours for an experienced developer.",
         "created_at": "2025-11-24T02:46:13.004083+00:00",
         "updated_at": "2025-11-24T02:48:40.771658+00:00"
       },
       {
-        "id": "14",
+        "id": "phase1:14",
         "title": "[PARENT] Implement CLI Command: descartes logs",
         "description": "Add the logs command to tail the event stream from the SQLite DB using SqliteStore. Success criteria: Displays events in real-time from the database.\n\n[This task has been expanded into subtasks: 14.1, 14.2, 14.3, 14.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "4"
+          "phase1:4"
         ],
         "complexity_analysis": "The task involves adding a new CLI command that requires integrating real-time tailing of an event stream from SQLite using an existing SqliteStore, which may involve polling or querying logic. It affects CLI parsing and handler code, with moderate testing for real-time display, edge cases like empty streams or interruptions, and potential research on efficient polling mechanisms. Estimated at 2-4 hours due to integration points and unknowns in stream handling.",
         "created_at": "2025-11-24T02:46:13.004084+00:00",
         "updated_at": "2025-11-24T02:48:44.968402+00:00"
       },
       {
-        "id": "15",
+        "id": "phase1:15",
         "title": "[PARENT] Add Pipe Support to CLI",
         "description": "Implement stdin reading in the CLI to support piping input, e.g., cat file | descartes spawn. Integrate with spawn command. Success criteria: Can pipe file content into spawn and process it.\n\n[This task has been expanded into subtasks: 15.1, 15.2, 15.3]",
         "status": "pending",
         "complexity": 3,
         "priority": "high",
         "dependencies": [
-          "13"
+          "phase1:13"
         ],
         "complexity_analysis": "The task involves implementing stdin reading in a CLI tool, which is a common feature with low technical difficulty in most languages. It likely affects 1-2 files (CLI entry and spawn handler), with straightforward integration. Testing includes basic piping scenarios, but edge cases like empty or large inputs are minimal. No significant research or dependencies needed; estimated 1-2 hours.",
         "created_at": "2025-11-24T02:46:13.004084+00:00",
         "updated_at": "2025-11-24T02:48:48.151768+00:00"
       },
       {
-        "id": "1.1",
+        "id": "phase1:1.1",
         "title": "Create Root Cargo.toml with Workspace Configuration",
         "description": "Create a root Cargo.toml file that defines the workspace with members for core, cli, gui, and agent-runner. Include the specified dependencies: tokio, sqlx (with sqlite feature), clap, tracing, serde, mimalloc, rkyv, and ipmpsc. Ensure the file is valid and the workspace can be built.",
         "status": "pending",
@@ -230,34 +230,34 @@
         "updated_at": "2025-11-24T02:47:50.108235+00:00"
       },
       {
-        "id": "1.2",
+        "id": "phase1:1.2",
         "title": "Initialize Workspace Member Crates",
         "description": "Create directories and basic Cargo.toml files for each workspace member (core, cli, gui, agent-runner). Each should have a minimal lib.rs or main.rs file to allow independent building and testing.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "1.1"
+          "phase1:1.1"
         ],
         "created_at": "2025-11-24T02:47:50.108258+00:00",
         "updated_at": "2025-11-24T02:47:50.108258+00:00"
       },
       {
-        "id": "1.3",
+        "id": "phase1:1.3",
         "title": "Configure GitHub Actions CI/CD Pipeline",
         "description": "Set up a .github/workflows directory with a YAML file for CI/CD that runs build and test on pushes. Include steps to check out code, install Rust, build the workspace, and run tests. Ensure the pipeline passes successfully.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "1.1",
-          "1.2"
+          "phase1:1.1",
+          "phase1:1.2"
         ],
         "created_at": "2025-11-24T02:47:50.108269+00:00",
         "updated_at": "2025-11-24T02:47:50.108269+00:00"
       },
       {
-        "id": "2.1",
+        "id": "phase1:2.1",
         "title": "Define AgentRunner Trait",
         "description": "Define the AgentRunner trait for spawning and managing agents, including its methods and behaviors. Ensure it is well-structured and ready for documentation.",
         "status": "pending",
@@ -268,46 +268,46 @@
         "updated_at": "2025-11-24T02:47:56.801246+00:00"
       },
       {
-        "id": "2.2",
+        "id": "phase1:2.2",
         "title": "Define StateStore Trait",
         "description": "Define the StateStore trait for persistence, including its methods and behaviors. Ensure it is well-structured and ready for documentation.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "2.1"
+          "phase1:2.1"
         ],
         "created_at": "2025-11-24T02:47:56.801266+00:00",
         "updated_at": "2025-11-24T02:47:56.801266+00:00"
       },
       {
-        "id": "2.3",
+        "id": "phase1:2.3",
         "title": "Define ContextSyncer Trait",
         "description": "Define the ContextSyncer trait for file/context access, including its methods and behaviors. Ensure it is well-structured and ready for documentation.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "2.2"
+          "phase1:2.2"
         ],
         "created_at": "2025-11-24T02:47:56.801273+00:00",
         "updated_at": "2025-11-24T02:47:56.801273+00:00"
       },
       {
-        "id": "2.4",
+        "id": "phase1:2.4",
         "title": "Define ModelBackend Trait and Verify Compilation",
         "description": "Define the ModelBackend trait for unified LLM providers, including its methods and behaviors. Add documentation to all four traits. Compile the code and verify there are no errors.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "2.3"
+          "phase1:2.3"
         ],
         "created_at": "2025-11-24T02:47:56.801277+00:00",
         "updated_at": "2025-11-24T02:47:56.801277+00:00"
       },
       {
-        "id": "3.1",
+        "id": "phase1:3.1",
         "title": "Design Table Schemas",
         "description": "Define the SQLite schemas for the events table (Hot Path), tasks table (Global Task Manager), and sessions table, including columns, data types, constraints, and indexes. Ensure schemas align with the application's requirements.",
         "status": "pending",
@@ -318,33 +318,33 @@
         "updated_at": "2025-11-24T02:48:00.226855+00:00"
       },
       {
-        "id": "3.2",
+        "id": "phase1:3.2",
         "title": "Set Up sqlx Migrations",
         "description": "Create sqlx migration files with the SQL statements to create the events, tasks, and sessions tables based on the designed schemas. Include any necessary up and down migrations.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "3.1"
+          "phase1:3.1"
         ],
         "created_at": "2025-11-24T02:48:00.226867+00:00",
         "updated_at": "2025-11-24T02:48:00.226867+00:00"
       },
       {
-        "id": "3.3",
+        "id": "phase1:3.3",
         "title": "Test Migrations in Database",
         "description": "Run the migrations against a test SQLite database and verify that the tables are created successfully, meeting the success criteria. Test with sqlx tools and ensure no errors occur.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "3.2"
+          "phase1:3.2"
         ],
         "created_at": "2025-11-24T02:48:00.226872+00:00",
         "updated_at": "2025-11-24T02:48:00.226872+00:00"
       },
       {
-        "id": "4.1",
+        "id": "phase1:4.1",
         "title": "Define SQLite Schema and Models",
         "description": "Create the database schema for storing events in SQLite, including necessary tables and indices. Define Rust structs/models for events and any related data structures to interact with the database using sqlx.",
         "status": "pending",
@@ -355,47 +355,47 @@
         "updated_at": "2025-11-24T02:48:03.868192+00:00"
       },
       {
-        "id": "4.2",
+        "id": "phase1:4.2",
         "title": "Implement StateStore Trait for SQLite",
         "description": "Implement the StateStore trait methods (read/write events) using sqlx to interact with the SQLite database, ensuring proper connection handling and error management.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "4.1"
+          "phase1:4.1"
         ],
         "created_at": "2025-11-24T02:48:03.868213+00:00",
         "updated_at": "2025-11-24T02:48:03.868213+00:00"
       },
       {
-        "id": "4.3",
+        "id": "phase1:4.3",
         "title": "Create Hot Path Logger for Events",
         "description": "Implement the Hot Path logger component to log events efficiently, integrating it with the SqliteStore for event logging functionality.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "4.2"
+          "phase1:4.2"
         ],
         "created_at": "2025-11-24T02:48:03.868219+00:00",
         "updated_at": "2025-11-24T02:48:03.868219+00:00"
       },
       {
-        "id": "4.4",
+        "id": "phase1:4.4",
         "title": "Test SqliteStore and Logger",
         "description": "Write unit and integration tests to verify that events can be read from and written to the database, and that the logger functions correctly. Ensure success criteria are met.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "4.2",
-          "4.3"
+          "phase1:4.2",
+          "phase1:4.3"
         ],
         "created_at": "2025-11-24T02:48:03.868223+00:00",
         "updated_at": "2025-11-24T02:48:03.868223+00:00"
       },
       {
-        "id": "5.1",
+        "id": "phase1:5.1",
         "title": "Set up basic process spawning",
         "description": "Create the LocalProcessRunner struct and implement the core method to spawn a child process using tokio::process::Command, including passing command arguments and starting the process.",
         "status": "pending",
@@ -406,48 +406,48 @@
         "updated_at": "2025-11-24T02:48:08.544389+00:00"
       },
       {
-        "id": "5.2",
+        "id": "phase1:5.2",
         "title": "Implement stdin writing",
         "description": "Add functionality to write input to the spawned process's stdin asynchronously, allowing data to be sent to the process.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "5.1"
+          "phase1:5.1"
         ],
         "created_at": "2025-11-24T02:48:08.544402+00:00",
         "updated_at": "2025-11-24T02:48:08.544402+00:00"
       },
       {
-        "id": "5.3",
+        "id": "phase1:5.3",
         "title": "Implement stdout and stderr streaming",
         "description": "Add asynchronous reading and streaming of output from the process's stdout and stderr, collecting or forwarding the data in real-time.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "5.1"
+          "phase1:5.1"
         ],
         "created_at": "2025-11-24T02:48:08.544407+00:00",
         "updated_at": "2025-11-24T02:48:08.544407+00:00"
       },
       {
-        "id": "5.4",
+        "id": "phase1:5.4",
         "title": "Add signal handling for graceful shutdown",
         "description": "Integrate signal handling for SIGINT and SIGTERM to allow the process to shut down gracefully, ensuring the child process is properly terminated when signals are received.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "5.1",
-          "5.2",
-          "5.3"
+          "phase1:5.1",
+          "phase1:5.2",
+          "phase1:5.3"
         ],
         "created_at": "2025-11-24T02:48:08.544410+00:00",
         "updated_at": "2025-11-24T02:48:08.544410+00:00"
       },
       {
-        "id": "6.1",
+        "id": "phase1:6.1",
         "title": "Add gix crate dependency",
         "description": "Add the gix crate to the project's Cargo.toml file and ensure it compiles successfully.",
         "status": "pending",
@@ -458,46 +458,46 @@
         "updated_at": "2025-11-24T02:48:12.307899+00:00"
       },
       {
-        "id": "6.2",
+        "id": "phase1:6.2",
         "title": "Define GitRepo trait",
         "description": "Create a basic GitRepo trait in the codebase that outlines methods for repo traversal, including a method to check if a directory is a git repo.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "6.1"
+          "phase1:6.1"
         ],
         "created_at": "2025-11-24T02:48:12.307913+00:00",
         "updated_at": "2025-11-24T02:48:12.307913+00:00"
       },
       {
-        "id": "6.3",
+        "id": "phase1:6.3",
         "title": "Implement GitRepo using gix",
         "description": "Implement the GitRepo trait using the gix crate, focusing on fast repo traversal and basic repo checks like detecting git directories.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "6.2"
+          "phase1:6.2"
         ],
         "created_at": "2025-11-24T02:48:12.307920+00:00",
         "updated_at": "2025-11-24T02:48:12.307920+00:00"
       },
       {
-        "id": "6.4",
+        "id": "phase1:6.4",
         "title": "Test basic repo checks",
         "description": "Write and run unit tests to verify that the GitRepo implementation can perform basic repo checks, such as identifying git repositories.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "6.3"
+          "phase1:6.3"
         ],
         "created_at": "2025-11-24T02:48:12.307924+00:00",
         "updated_at": "2025-11-24T02:48:12.307924+00:00"
       },
       {
-        "id": "7.1",
+        "id": "phase1:7.1",
         "title": "Set up project dependencies and structure",
         "description": "Add ipmpsc and rkyv crates to the project dependencies. Create a basic module structure for the SharedMemoryChannel, including placeholders for serialization and channel implementation.",
         "status": "pending",
@@ -508,72 +508,72 @@
         "updated_at": "2025-11-24T02:48:17.066123+00:00"
       },
       {
-        "id": "7.2",
+        "id": "phase1:7.2",
         "title": "Implement zero-copy serialization with rkyv",
         "description": "Define data structures and implement serialization/deserialization using rkyv for zero-copy operations. Ensure the serialization logic is tested for correctness in a unit test.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "7.1"
+          "phase1:7.1"
         ],
         "created_at": "2025-11-24T02:48:17.066152+00:00",
         "updated_at": "2025-11-24T02:48:17.066152+00:00"
       },
       {
-        "id": "7.3",
+        "id": "phase1:7.3",
         "title": "Implement SharedMemoryChannel using ipmpsc",
         "description": "Build the SharedMemoryChannel class that utilizes ipmpsc for shared memory management and integrates the rkyv serialization. Implement basic send and receive methods.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "7.2"
+          "phase1:7.2"
         ],
         "created_at": "2025-11-24T02:48:17.066164+00:00",
         "updated_at": "2025-11-24T02:48:17.066164+00:00"
       },
       {
-        "id": "7.4",
+        "id": "phase1:7.4",
         "title": "Integrate channel into IPC layer",
         "description": "Create an IPC layer that wraps the SharedMemoryChannel for inter-process communication. Ensure it handles process creation, connection establishment, and basic message passing.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "7.3"
+          "phase1:7.3"
         ],
         "created_at": "2025-11-24T02:48:17.066356+00:00",
         "updated_at": "2025-11-24T02:48:17.066356+00:00"
       },
       {
-        "id": "7.5",
+        "id": "phase1:7.5",
         "title": "Develop benchmarking framework",
         "description": "Create a benchmarking tool to test the SharedMemoryChannel against standard pipes. Include metrics for throughput, latency, and memory usage in the framework.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "7.4"
+          "phase1:7.4"
         ],
         "created_at": "2025-11-24T02:48:17.066364+00:00",
         "updated_at": "2025-11-24T02:48:17.066364+00:00"
       },
       {
-        "id": "7.6",
+        "id": "phase1:7.6",
         "title": "Run benchmarks and verify performance gains",
         "description": "Execute the benchmarks comparing SharedMemoryChannel to standard pipes. Analyze results to confirm performance gains and document the findings.",
         "status": "pending",
         "complexity": 0,
         "priority": "low",
         "dependencies": [
-          "7.5"
+          "phase1:7.5"
         ],
         "created_at": "2025-11-24T02:48:17.066372+00:00",
         "updated_at": "2025-11-24T02:48:17.066372+00:00"
       },
       {
-        "id": "8.1",
+        "id": "phase1:8.1",
         "title": "Define OpenAI API Models",
         "description": "Create structs and enums for OpenAI API request and response models, including authentication and data schemas.",
         "status": "pending",
@@ -584,33 +584,33 @@
         "updated_at": "2025-11-24T02:48:20.421126+00:00"
       },
       {
-        "id": "8.2",
+        "id": "phase1:8.2",
         "title": "Implement HTTP Client Logic",
         "description": "Build the HTTP client to construct, send requests to OpenAI API, and parse raw responses.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "8.1"
+          "phase1:8.1"
         ],
         "created_at": "2025-11-24T02:48:20.421139+00:00",
         "updated_at": "2025-11-24T02:48:20.421139+00:00"
       },
       {
-        "id": "8.3",
+        "id": "phase1:8.3",
         "title": "Integrate ModelBackend Trait",
         "description": "Implement the ModelBackend trait using the HTTP client, handle API responses, and ensure successful querying and valid responses.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "8.2"
+          "phase1:8.2"
         ],
         "created_at": "2025-11-24T02:48:20.421145+00:00",
         "updated_at": "2025-11-24T02:48:20.421145+00:00"
       },
       {
-        "id": "9.1",
+        "id": "phase1:9.1",
         "title": "Define Anthropic API Request and Response Models",
         "description": "Create structs and enums for Anthropic API request payloads (e.g., messages, model parameters) and response formats (e.g., completions, errors). Ensure they align with the official Anthropic API documentation.",
         "status": "pending",
@@ -621,33 +621,33 @@
         "updated_at": "2025-11-24T02:48:24.281363+00:00"
       },
       {
-        "id": "9.2",
+        "id": "phase1:9.2",
         "title": "Implement Anthropic HTTP Client Logic",
         "description": "Build the HTTP client functionality to construct API requests, send them to the Anthropic endpoint, and parse responses into the defined models. Handle authentication, headers, and basic error handling.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.1"
+          "phase1:9.1"
         ],
         "created_at": "2025-11-24T02:48:24.281379+00:00",
         "updated_at": "2025-11-24T02:48:24.281379+00:00"
       },
       {
-        "id": "9.3",
+        "id": "phase1:9.3",
         "title": "Integrate ModelBackend Trait and Test API Queries",
         "description": "Implement the ModelBackend trait methods using the HTTP client, ensuring queries can be made to the Anthropic API and valid responses are returned. Add unit tests for request/response handling and integration.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "9.2"
+          "phase1:9.2"
         ],
         "created_at": "2025-11-24T02:48:24.281385+00:00",
         "updated_at": "2025-11-24T02:48:24.281385+00:00"
       },
       {
-        "id": "10.1",
+        "id": "phase1:10.1",
         "title": "Define ClaudeCodeAdapter Structure",
         "description": "Create the basic structure for ClaudeCodeAdapter implementing the ModelBackend trait, including necessary imports and class skeleton without process spawning logic yet.",
         "status": "pending",
@@ -658,46 +658,46 @@
         "updated_at": "2025-11-24T02:48:27.994615+00:00"
       },
       {
-        "id": "10.2",
+        "id": "phase1:10.2",
         "title": "Implement CLI Process Spawning",
         "description": "Add functionality to spawn the claude CLI as a child process within the ClaudeCodeAdapter, handling process creation and basic setup.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "10.1"
+          "phase1:10.1"
         ],
         "created_at": "2025-11-24T02:48:27.994628+00:00",
         "updated_at": "2025-11-24T02:48:27.994628+00:00"
       },
       {
-        "id": "10.3",
+        "id": "phase1:10.3",
         "title": "Handle Input/Output Interaction",
         "description": "Implement message exchange by handling stdin/stdout streams for sending inputs to the spawned claude CLI and reading its outputs.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "10.2"
+          "phase1:10.2"
         ],
         "created_at": "2025-11-24T02:48:27.994635+00:00",
         "updated_at": "2025-11-24T02:48:27.994635+00:00"
       },
       {
-        "id": "10.4",
+        "id": "phase1:10.4",
         "title": "Test Message Exchange",
         "description": "Write and run tests to verify that the adapter can successfully spawn the CLI and exchange messages, meeting the success criteria.",
         "status": "pending",
         "complexity": 0,
         "priority": "low",
         "dependencies": [
-          "10.3"
+          "phase1:10.3"
         ],
         "created_at": "2025-11-24T02:48:27.994640+00:00",
         "updated_at": "2025-11-24T02:48:27.994640+00:00"
       },
       {
-        "id": "11.1",
+        "id": "phase1:11.1",
         "title": "Define OllamaAdapter Structure and Dependencies",
         "description": "Create the OllamaAdapter struct implementing the ModelBackend trait, including necessary imports, configuration fields (e.g., host and port), and any required data structures for requests and responses.",
         "status": "pending",
@@ -708,46 +708,46 @@
         "updated_at": "2025-11-24T02:48:31.507768+00:00"
       },
       {
-        "id": "11.2",
+        "id": "phase1:11.2",
         "title": "Implement Connection Logic to Ollama",
         "description": "Implement the method to establish a connection to localhost:11434, including setting up an HTTP client and handling basic connectivity checks.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "11.1"
+          "phase1:11.1"
         ],
         "created_at": "2025-11-24T02:48:31.507780+00:00",
         "updated_at": "2025-11-24T02:48:31.507780+00:00"
       },
       {
-        "id": "11.3",
+        "id": "phase1:11.3",
         "title": "Implement Query and Response Handling",
         "description": "Implement the core logic for sending queries to the local Ollama instance and parsing responses, ensuring proper error handling for network issues or invalid responses.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "11.2"
+          "phase1:11.2"
         ],
         "created_at": "2025-11-24T02:48:31.507784+00:00",
         "updated_at": "2025-11-24T02:48:31.507784+00:00"
       },
       {
-        "id": "11.4",
+        "id": "phase1:11.4",
         "title": "Add Unit Tests and Documentation",
         "description": "Write unit tests to verify query/response functionality and document the OllamaAdapter implementation, including usage examples and success criteria validation.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "11.3"
+          "phase1:11.3"
         ],
         "created_at": "2025-11-24T02:48:31.507788+00:00",
         "updated_at": "2025-11-24T02:48:31.507788+00:00"
       },
       {
-        "id": "12.1",
+        "id": "phase1:12.1",
         "title": "Setup SqliteStore Initialization",
         "description": "Define and implement the logic to initialize the SQLite database using SqliteStore, including creating necessary tables and schema for the .descartes directory.",
         "status": "pending",
@@ -758,7 +758,7 @@
         "updated_at": "2025-11-24T02:48:35.920642+00:00"
       },
       {
-        "id": "12.2",
+        "id": "phase1:12.2",
         "title": "Implement Directory Creation Logic",
         "description": "Create a function or module to handle the creation of the .descartes directory in the current working directory.",
         "status": "pending",
@@ -769,21 +769,21 @@
         "updated_at": "2025-11-24T02:48:35.920648+00:00"
       },
       {
-        "id": "12.3",
+        "id": "phase1:12.3",
         "title": "Integrate Init Command into CLI",
         "description": "Add the 'descartes init' command to the CLI framework, integrating the directory creation and DB initialization logic, and ensure it runs successfully to meet the success criteria.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "12.1",
-          "12.2"
+          "phase1:12.1",
+          "phase1:12.2"
         ],
         "created_at": "2025-11-24T02:48:35.920650+00:00",
         "updated_at": "2025-11-24T02:48:35.920650+00:00"
       },
       {
-        "id": "13.1",
+        "id": "phase1:13.1",
         "title": "Define Provider Models",
         "description": "Create models or enums for the supported providers (API, headless, local) to ensure type safety and clarity in the codebase.",
         "status": "pending",
@@ -794,46 +794,46 @@
         "updated_at": "2025-11-24T02:48:40.771583+00:00"
       },
       {
-        "id": "13.2",
+        "id": "phase1:13.2",
         "title": "Implement Agent Spawning Logic",
         "description": "Develop the core logic to spawn agents using the selected ModelBackend provider, handling the differences between API, headless, and local providers.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "13.1"
+          "phase1:13.1"
         ],
         "created_at": "2025-11-24T02:48:40.771612+00:00",
         "updated_at": "2025-11-24T02:48:40.771612+00:00"
       },
       {
-        "id": "13.3",
+        "id": "phase1:13.3",
         "title": "Add CLI Command Interface",
         "description": "Integrate the 'spawn' command into the CLI, including support for the --provider flag to select the provider, and ensure it launches the agent and retrieves responses.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "13.2"
+          "phase1:13.2"
         ],
         "created_at": "2025-11-24T02:48:40.771625+00:00",
         "updated_at": "2025-11-24T02:48:40.771625+00:00"
       },
       {
-        "id": "13.4",
+        "id": "phase1:13.4",
         "title": "Test and Document the Spawn Command",
         "description": "Write tests to verify that agents can be spawned with different providers and responses are received, then create documentation for the command usage.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "13.3"
+          "phase1:13.3"
         ],
         "created_at": "2025-11-24T02:48:40.771636+00:00",
         "updated_at": "2025-11-24T02:48:40.771636+00:00"
       },
       {
-        "id": "14.1",
+        "id": "phase1:14.1",
         "title": "Define Event Model and Schema",
         "description": "Ensure the event structure and SQLite schema are defined and accessible via SqliteStore for querying events.",
         "status": "pending",
@@ -844,46 +844,46 @@
         "updated_at": "2025-11-24T02:48:44.968211+00:00"
       },
       {
-        "id": "14.2",
+        "id": "phase1:14.2",
         "title": "Implement Event Tailing Logic",
         "description": "Develop the core logic to continuously query and stream events from the SQLite DB in real-time using SqliteStore.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "14.1"
+          "phase1:14.1"
         ],
         "created_at": "2025-11-24T02:48:44.968374+00:00",
         "updated_at": "2025-11-24T02:48:44.968374+00:00"
       },
       {
-        "id": "14.3",
+        "id": "phase1:14.3",
         "title": "Add CLI Command Structure",
         "description": "Integrate the logs command into the CLI framework, wiring it to invoke the event tailing logic and display output.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "14.2"
+          "phase1:14.2"
         ],
         "created_at": "2025-11-24T02:48:44.968382+00:00",
         "updated_at": "2025-11-24T02:48:44.968382+00:00"
       },
       {
-        "id": "14.4",
+        "id": "phase1:14.4",
         "title": "Test and Document",
         "description": "Write tests to verify real-time log display and add documentation for the new logs command.",
         "status": "pending",
         "complexity": 0,
         "priority": "low",
         "dependencies": [
-          "14.3"
+          "phase1:14.3"
         ],
         "created_at": "2025-11-24T02:48:44.968388+00:00",
         "updated_at": "2025-11-24T02:48:44.968388+00:00"
       },
       {
-        "id": "15.1",
+        "id": "phase1:15.1",
         "title": "Implement stdin reading in CLI",
         "description": "Modify the CLI entry point to read from stdin when no file arguments are provided, storing the input for further processing.",
         "status": "pending",
@@ -894,27 +894,27 @@
         "updated_at": "2025-11-24T02:48:48.151709+00:00"
       },
       {
-        "id": "15.2",
+        "id": "phase1:15.2",
         "title": "Integrate stdin input with spawn command",
         "description": "Update the spawn command logic to accept and process piped input from stdin, allowing it to handle file content piped in (e.g., cat file | descartes spawn).",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "15.1"
+          "phase1:15.1"
         ],
         "created_at": "2025-11-24T02:48:48.151737+00:00",
         "updated_at": "2025-11-24T02:48:48.151737+00:00"
       },
       {
-        "id": "15.3",
+        "id": "phase1:15.3",
         "title": "Test piping functionality",
         "description": "Create and run tests to verify that piping input works correctly, ensuring file content is processed by the spawn command as per success criteria.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "15.2"
+          "phase1:15.2"
         ],
         "created_at": "2025-11-24T02:48:48.151749+00:00",
         "updated_at": "2025-11-24T02:48:48.151749+00:00"
@@ -925,7 +925,7 @@
     "name": "phase3",
     "tasks": [
       {
-        "id": "1",
+        "id": "phase3:1",
         "title": "[PARENT] Implement JSON-RPC Server",
         "description": "Set up a jsonrpsee server over Unix Socket exposing spawn, list_tasks, approve, and get_state methods. Ensure compatibility with scud CLI and descartes GUI. Success when server accepts RPC calls and responds correctly.\n\n[This task has been expanded into subtasks: 1.1, 1.2, 1.3, 1.4]",
         "status": "pending",
@@ -937,119 +937,122 @@
         "updated_at": "2025-11-24T02:58:53.991317+00:00"
       },
       {
-        "id": "2",
+        "id": "phase3:2",
         "title": "[PARENT] Implement ZMQ Transport for Remote Agents",
         "description": "Implement ZmqAgentRunner trait to allow spawning agents on remote machines via ZMQ. Create a proof of concept deployment. Success when an agent can be spawned and controlled remotely.\n\n[This task has been expanded into subtasks: 2.1, 2.2, 2.3, 2.4, 2.5]",
         "status": "pending",
         "complexity": 8,
         "priority": "medium",
         "dependencies": [
-          "1"
+          "phase3:1"
         ],
         "complexity_analysis": "This task involves integrating ZMQ for remote agent spawning and control, which requires understanding ZMQ messaging patterns, networking, and asynchronous handling in Rust. It affects multiple components like the trait implementation, ZMQ setup, and POC deployment. Testing remote spawning introduces edge cases like network failures and timeouts. Moderate research on ZMQ best practices is needed, along with dependencies on external libraries. Overall, it's very complex, estimated at 4-8 hours due to the technical unknowns and integration points.",
         "created_at": "2025-11-24T02:57:32.783124+00:00",
         "updated_at": "2025-11-24T02:58:58.128390+00:00"
       },
       {
-        "id": "3",
+        "id": "phase3:3",
         "title": "[PARENT] Set Up Iced Application Shell",
         "description": "Establish the basic iced application structure with event bus subscription to Core events via RPC. Include window setup and basic layout. Success when the GUI launches and subscribes to events.\n\n[This task has been expanded into subtasks: 3.1, 3.2, 3.3, 3.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "1"
+          "phase3:1"
         ],
         "complexity_analysis": "This task involves setting up a basic Iced application structure, which includes window and layout setup (moderate difficulty), but adds complexity through RPC-based event bus subscription to external Core events. This requires integrating with dependencies like RPC libraries, handling connection and subscription logic, and potentially dealing with unknowns in event handling or network issues. It affects multiple files (e.g., main application file, layout components, RPC handler), needs research on Iced-RPC integration, and testing includes GUI launch plus event subscription verification. Overall, estimated 2-4 hours due to integration points and edge cases like connection failures.",
         "created_at": "2025-11-24T02:57:32.783125+00:00",
         "updated_at": "2025-11-24T02:59:03.053732+00:00"
       },
       {
-        "id": "4",
+        "id": "phase3:4",
         "title": "[PARENT] Implement Task Board View",
         "description": "Create a Kanban or list view for the Global Task Manager with real-time updates from SQLite events. Display tasks visually. Success when tasks appear and update in real-time in the GUI.\n\n[This task has been expanded into subtasks: 4.1, 4.2, 4.3, 4.4, 4.5]",
         "status": "pending",
         "complexity": 8,
         "priority": "high",
         "dependencies": [
-          "3"
+          "phase3:3",
+          "phase2:20",
+          "phase1:4"
         ],
         "complexity_analysis": "The task involves creating a visual Kanban or list view with real-time updates from SQLite events, requiring UI design, event handling, and database integration. It affects multiple components (UI, DB layer, event system), needs research on real-time syncing (e.g., polling or triggers), testing for concurrency and edge cases like rapid updates or errors, and integration with existing task logic, making it very complex (4-8h).",
         "created_at": "2025-11-24T02:57:32.783126+00:00",
         "updated_at": "2025-11-24T02:59:08.103013+00:00"
       },
       {
-        "id": "5",
+        "id": "phase3:5",
         "title": "[PARENT] Implement Swarm Monitor",
         "description": "Build a view to visualize active agents, their status, and 'Thinking' state via JSON Stream parsing. Integrate with RPC. Success when agent statuses are displayed and update live.\n\n[This task has been expanded into subtasks: 5.1, 5.2, 5.3, 5.4, 5.5]",
         "status": "pending",
         "complexity": 8,
         "priority": "high",
         "dependencies": [
-          "3"
+          "phase3:3",
+          "phase1:5"
         ],
         "complexity_analysis": "This task involves real-time JSON stream parsing for live updates, UI visualization of agent statuses including 'Thinking' state, and RPC integration, which introduces technical unknowns like handling streaming data, connection management, and potential edge cases such as malformed streams or network failures. It affects multiple components (UI, parser, RPC client), requires testing for real-time behavior and integration points, and may need research into streaming libraries or RPC specifics, making it very complex (4-8h).",
         "created_at": "2025-11-24T02:57:32.783126+00:00",
         "updated_at": "2025-11-24T02:59:11.217558+00:00"
       },
       {
-        "id": "6",
+        "id": "phase3:6",
         "title": "[PARENT] Implement Debugger UI",
         "description": "Add step-by-step mode in Iced with Pause, Resume, and Step buttons. Include split view for current Thought and Context. Success when an agent can be paused, stepped, and resumed with visible state.\n\n[This task has been expanded into subtasks: 6.1, 6.2, 6.3, 6.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "3"
+          "phase3:3"
         ],
         "complexity_analysis": "The task involves implementing UI components in Iced (buttons for Pause, Resume, Step, and a split view for Thought and Context), which requires moderate technical difficulty in GUI development and event handling. It likely affects a few UI files and integrates with agent execution state, necessitating research into Iced's split view and button interactions. Testing includes UI responsiveness and state visibility during pause/resume/step, with edge cases like boundary stepping or concurrent operations. Estimated at 2-4 hours total.",
         "created_at": "2025-11-24T02:57:32.783127+00:00",
         "updated_at": "2025-11-24T02:59:15.666045+00:00"
       },
       {
-        "id": "7",
+        "id": "phase3:7",
         "title": "[PARENT] Implement Time Travel Rewind",
         "description": "Integrate restore_brain (load events) and restore_body (git checkout) with a slider UI for scrolling through agent history. Allow rewinding to previous states. Success when user can rewind and resume from a past point.\n\n[This task has been expanded into subtasks: 7.1, 7.2, 7.3, 7.4, 7.5]",
         "status": "pending",
         "complexity": 8,
         "priority": "high",
         "dependencies": [
-          "6"
+          "phase3:6"
         ],
         "complexity_analysis": "The task involves integrating UI (slider for history scrolling), state restoration (restore_brain for events, restore_body via git checkout), and logic for rewinding and resuming, affecting multiple components like UI, state management, and external tool integration. Technical unknowns include programmatic git handling, state persistence/loading, and potential edge cases such as state corruption, branching timelines, or resuming behavior. Testing requires verifying UI interaction, state integrity across rewinds, and integration points, likely taking 4-8 hours with possible research on git APIs and agent state management.",
         "created_at": "2025-11-24T02:57:32.783128+00:00",
         "updated_at": "2025-11-24T02:59:18.913973+00:00"
       },
       {
-        "id": "8",
+        "id": "phase3:8",
         "title": "[PARENT] Implement Visual DAG Editor",
         "description": "Create a node-based graph editor in Iced for drag-and-drop task dependencies. Enable auto-generation of Swarm.toml from the visual graph. Success when a DAG can be edited visually and exported to config.\n\n[This task has been expanded into subtasks: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6]",
         "status": "pending",
         "complexity": 13,
         "priority": "medium",
         "dependencies": [
-          "3"
+          "phase3:3"
         ],
         "complexity_analysis": "This task involves implementing a full node-based graph editor with drag-and-drop functionality in Iced, including graph logic, UI interactions, validation for DAGs, and serialization to Swarm.toml. It requires research into Iced (if unfamiliar), Swarm.toml format, handling edge cases like cycles and large graphs, and affects multiple components (UI, graph management, serialization). Testing includes UI, logic, and integration, with potential unknowns in GUI rendering and performance, making it extremely complex and suitable for splitting into subtasks like UI setup, graph logic, and export functionality.",
         "created_at": "2025-11-24T02:57:32.783128+00:00",
         "updated_at": "2025-11-24T02:59:22.941315+00:00"
       },
       {
-        "id": "9",
+        "id": "phase3:9",
         "title": "[PARENT] Implement Interactive Context Browser",
         "description": "Develop a visual file tree with Knowledge Graph overlays for browsing context. Integrate with GUI for interactive exploration. Success when files and knowledge are browsable and linked in the UI.\n\n[This task has been expanded into subtasks: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6]",
         "status": "pending",
         "complexity": 13,
         "priority": "medium",
         "dependencies": [
-          "3"
+          "phase3:3"
         ],
         "complexity_analysis": "This task involves multiple complex components: building a visual file tree, implementing knowledge graph overlays with potential unknowns in graph visualization libraries, integrating with an existing GUI, handling interactivity, and linking files to knowledge nodes. It requires research into graph technologies, affects multiple UI and data components, needs thorough testing for performance and edge cases like large datasets, and has dependencies on GUI frameworks and data sources. Estimated at 1 day; should be split into subtasks like file tree development, graph integration, and UI interactivity.",
         "created_at": "2025-11-24T02:57:32.783129+00:00",
         "updated_at": "2025-11-24T02:59:27.434851+00:00"
       },
       {
-        "id": "1.1",
+        "id": "phase3:1.1",
         "title": "Set up jsonrpsee server infrastructure",
         "description": "Initialize a jsonrpsee server configured to listen over a Unix socket, including basic server setup, error handling for socket connections, and defining the RPC interface structure.",
         "status": "pending",
@@ -1060,48 +1063,48 @@
         "updated_at": "2025-11-24T02:58:53.991246+00:00"
       },
       {
-        "id": "1.2",
+        "id": "phase3:1.2",
         "title": "Implement RPC methods",
         "description": "Add implementations for the spawn, list_tasks, approve, and get_state methods to the server, ensuring they handle requests and return appropriate responses.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "1.1"
+          "phase3:1.1"
         ],
         "created_at": "2025-11-24T02:58:53.991292+00:00",
         "updated_at": "2025-11-24T02:58:53.991292+00:00"
       },
       {
-        "id": "1.3",
+        "id": "phase3:1.3",
         "title": "Ensure compatibility with scud CLI and descartes GUI",
         "description": "Test and adjust the server to ensure it integrates correctly with the scud CLI and descartes GUI, verifying that RPC calls are accepted and responses are compatible.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "1.2"
+          "phase3:1.2"
         ],
         "created_at": "2025-11-24T02:58:53.991302+00:00",
         "updated_at": "2025-11-24T02:58:53.991302+00:00"
       },
       {
-        "id": "1.4",
+        "id": "phase3:1.4",
         "title": "Add comprehensive testing and validation",
         "description": "Create unit tests for the RPC methods, integration tests for the server, and validate that the server fully accepts RPC calls and responds correctly in various scenarios.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "1.1",
-          "1.2",
-          "1.3"
+          "phase3:1.1",
+          "phase3:1.2",
+          "phase3:1.3"
         ],
         "created_at": "2025-11-24T02:58:53.991308+00:00",
         "updated_at": "2025-11-24T02:58:53.991308+00:00"
       },
       {
-        "id": "2.1",
+        "id": "phase3:2.1",
         "title": "Define ZmqAgentRunner Trait and Schemas",
         "description": "Define the ZmqAgentRunner trait interface, including methods for spawning and controlling agents. Create message schemas and data models for ZMQ communication (e.g., spawn requests, control commands, responses).",
         "status": "pending",
@@ -1112,60 +1115,60 @@
         "updated_at": "2025-11-24T02:58:58.128257+00:00"
       },
       {
-        "id": "2.2",
+        "id": "phase3:2.2",
         "title": "Implement ZMQ Communication Layer",
         "description": "Set up the core ZMQ socket connections (e.g., REQ/REP or DEALER/ROUTER patterns) for sending and receiving messages between client and remote server. Implement serialization/deserialization of messages.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "2.1"
+          "phase3:2.1"
         ],
         "created_at": "2025-11-24T02:58:58.128286+00:00",
         "updated_at": "2025-11-24T02:58:58.128286+00:00"
       },
       {
-        "id": "2.3",
+        "id": "phase3:2.3",
         "title": "Implement Server-Side Agent Spawning",
         "description": "On the remote server, implement the logic to handle incoming spawn requests via ZMQ, instantiate agents using the ZmqAgentRunner trait, and manage agent lifecycles (start, stop).",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "2.2"
+          "phase3:2.2"
         ],
         "created_at": "2025-11-24T02:58:58.128298+00:00",
         "updated_at": "2025-11-24T02:58:58.128298+00:00"
       },
       {
-        "id": "2.4",
+        "id": "phase3:2.4",
         "title": "Implement Client-Side Agent Control",
         "description": "On the client side, implement functions to send spawn and control commands (e.g., send actions to agents) via ZMQ and handle responses from the remote server.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "2.2"
+          "phase3:2.2"
         ],
         "created_at": "2025-11-24T02:58:58.128308+00:00",
         "updated_at": "2025-11-24T02:58:58.128308+00:00"
       },
       {
-        "id": "2.5",
+        "id": "phase3:2.5",
         "title": "Create Proof of Concept Deployment and Testing",
         "description": "Set up a simple deployment with a client and remote server, deploy an example agent remotely, and verify that it can be spawned, controlled, and responds correctly. Include basic integration tests.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "2.3",
-          "2.4"
+          "phase3:2.3",
+          "phase3:2.4"
         ],
         "created_at": "2025-11-24T02:58:58.128361+00:00",
         "updated_at": "2025-11-24T02:58:58.128361+00:00"
       },
       {
-        "id": "3.1",
+        "id": "phase3:3.1",
         "title": "Initialize Iced Application and Window",
         "description": "Set up a new Iced application with basic structure, including necessary imports, application initialization, and window configuration (size, title, etc.). Ensure the application can be run and a window appears.",
         "status": "pending",
@@ -1176,7 +1179,7 @@
         "updated_at": "2025-11-24T02:59:03.053594+00:00"
       },
       {
-        "id": "3.2",
+        "id": "phase3:3.2",
         "title": "Establish RPC Connection to Core",
         "description": "Implement the RPC client to connect to the Core service, handling connection setup, authentication if needed, and basic error handling for the connection.",
         "status": "pending",
@@ -1187,34 +1190,34 @@
         "updated_at": "2025-11-24T02:59:03.053620+00:00"
       },
       {
-        "id": "3.3",
+        "id": "phase3:3.3",
         "title": "Implement Event Bus Subscription",
         "description": "Using the established RPC connection, subscribe to Core events via the event bus. Implement the subscription logic to receive and handle incoming events.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "3.2"
+          "phase3:3.2"
         ],
         "created_at": "2025-11-24T02:59:03.053625+00:00",
         "updated_at": "2025-11-24T02:59:03.053625+00:00"
       },
       {
-        "id": "3.4",
+        "id": "phase3:3.4",
         "title": "Integrate Basic Layout and Finalize GUI Launch",
         "description": "Add a basic UI layout to the Iced application window, integrate the event subscription, and ensure the GUI launches successfully with active event listening. Test that events are subscribed upon launch.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "3.1",
-          "3.3"
+          "phase3:3.1",
+          "phase3:3.3"
         ],
         "created_at": "2025-11-24T02:59:03.053631+00:00",
         "updated_at": "2025-11-24T02:59:03.053631+00:00"
       },
       {
-        "id": "4.1",
+        "id": "phase3:4.1",
         "title": "Define Task Data Model and SQLite Schema",
         "description": "Ensure the SQLite database schema includes a tasks table with necessary fields (e.g., id, title, status, description). Define a Task model or structure for handling task data in the application.",
         "status": "pending",
@@ -1225,61 +1228,61 @@
         "updated_at": "2025-11-24T02:59:08.102987+00:00"
       },
       {
-        "id": "4.2",
+        "id": "phase3:4.2",
         "title": "Implement Task Retrieval Logic",
         "description": "Create functions to query and retrieve tasks from the SQLite database, including filtering by status for Kanban columns or list views. Ensure this logic is modular and testable.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "4.1"
+          "phase3:4.1"
         ],
         "created_at": "2025-11-24T02:59:08.102995+00:00",
         "updated_at": "2025-11-24T02:59:08.102995+00:00"
       },
       {
-        "id": "4.3",
+        "id": "phase3:4.3",
         "title": "Set Up Real-Time SQLite Event Listening",
         "description": "Implement event listeners or triggers to detect changes in the SQLite database (e.g., inserts, updates, deletes on tasks) and emit events that can be consumed by the GUI for real-time updates.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "4.1",
-          "4.2"
+          "phase3:4.1",
+          "phase3:4.2"
         ],
         "created_at": "2025-11-24T02:59:08.103+00:00",
         "updated_at": "2025-11-24T02:59:08.103+00:00"
       },
       {
-        "id": "4.4",
+        "id": "phase3:4.4",
         "title": "Create Task Board GUI Component",
         "description": "Build the UI component for the Kanban or list view, displaying tasks visually with columns or lists. Integrate with the task retrieval logic to populate the view initially.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "4.2"
+          "phase3:4.2"
         ],
         "created_at": "2025-11-24T02:59:08.103004+00:00",
         "updated_at": "2025-11-24T02:59:08.103004+00:00"
       },
       {
-        "id": "4.5",
+        "id": "phase3:4.5",
         "title": "Integrate Real-Time Updates and Test End-to-End",
         "description": "Connect the GUI component to the real-time event listeners to update the view dynamically. Add unit tests for components and integration tests to verify tasks appear and update in real-time. Document the implementation.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "4.3",
-          "4.4"
+          "phase3:4.3",
+          "phase3:4.4"
         ],
         "created_at": "2025-11-24T02:59:08.103007+00:00",
         "updated_at": "2025-11-24T02:59:08.103007+00:00"
       },
       {
-        "id": "5.1",
+        "id": "phase3:5.1",
         "title": "Define Agent Status Models",
         "description": "Create data models and schemas to represent active agents, their statuses, and 'Thinking' state, ensuring they align with the expected JSON stream format.",
         "status": "pending",
@@ -1290,62 +1293,62 @@
         "updated_at": "2025-11-24T02:59:11.217492+00:00"
       },
       {
-        "id": "5.2",
+        "id": "phase3:5.2",
         "title": "Implement JSON Stream Parsing",
         "description": "Develop logic to parse incoming JSON streams, extract agent statuses and 'Thinking' states, and handle real-time data updates.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "5.1"
+          "phase3:5.1"
         ],
         "created_at": "2025-11-24T02:59:11.217511+00:00",
         "updated_at": "2025-11-24T02:59:11.217511+00:00"
       },
       {
-        "id": "5.3",
+        "id": "phase3:5.3",
         "title": "Integrate with RPC",
         "description": "Connect the parsing logic to the RPC system to fetch and stream agent data, ensuring seamless data flow from the backend.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "5.2"
+          "phase3:5.2"
         ],
         "created_at": "2025-11-24T02:59:11.217522+00:00",
         "updated_at": "2025-11-24T02:59:11.217522+00:00"
       },
       {
-        "id": "5.4",
+        "id": "phase3:5.4",
         "title": "Build Swarm Monitor UI View",
         "description": "Create a user interface component to visualize active agents, their statuses, and 'Thinking' states, displaying the data in an intuitive layout.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "5.1",
-          "5.2"
+          "phase3:5.1",
+          "phase3:5.2"
         ],
         "created_at": "2025-11-24T02:59:11.217532+00:00",
         "updated_at": "2025-11-24T02:59:11.217532+00:00"
       },
       {
-        "id": "5.5",
+        "id": "phase3:5.5",
         "title": "Enable Live Updates and Testing",
         "description": "Implement live updating mechanisms for the UI based on parsed stream data, and add unit tests to verify statuses display and update correctly.",
         "status": "pending",
         "complexity": 0,
         "priority": "low",
         "dependencies": [
-          "5.2",
-          "5.3",
-          "5.4"
+          "phase3:5.2",
+          "phase3:5.3",
+          "phase3:5.4"
         ],
         "created_at": "2025-11-24T02:59:11.217542+00:00",
         "updated_at": "2025-11-24T02:59:11.217542+00:00"
       },
       {
-        "id": "6.1",
+        "id": "phase3:6.1",
         "title": "Define Debugger State Models",
         "description": "Create data structures and models to represent the debugger's state, including paused/resumed status, current thought, and context. Ensure these models integrate with the agent's existing state.",
         "status": "pending",
@@ -1356,49 +1359,49 @@
         "updated_at": "2025-11-24T02:59:15.665856+00:00"
       },
       {
-        "id": "6.2",
+        "id": "phase3:6.2",
         "title": "Implement Core Debugger Logic",
         "description": "Develop the logic functions for pausing, resuming, and stepping through the agent's execution. This includes updating the debugger state and interacting with the agent's runtime.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "6.1"
+          "phase3:6.1"
         ],
         "created_at": "2025-11-24T02:59:15.665883+00:00",
         "updated_at": "2025-11-24T02:59:15.665883+00:00"
       },
       {
-        "id": "6.3",
+        "id": "phase3:6.3",
         "title": "Build Iced UI Components",
         "description": "Implement the Iced user interface with Pause, Resume, and Step buttons, plus a split view to display the current Thought and Context from the debugger state.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "6.1",
-          "6.2"
+          "phase3:6.1",
+          "phase3:6.2"
         ],
         "created_at": "2025-11-24T02:59:15.665892+00:00",
         "updated_at": "2025-11-24T02:59:15.665892+00:00"
       },
       {
-        "id": "6.4",
+        "id": "phase3:6.4",
         "title": "Add Tests for Debugger Functionality",
         "description": "Write unit and integration tests to verify that the debugger can pause, step, and resume the agent correctly, with state visibility. Include edge cases and UI interactions.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "6.1",
-          "6.2",
-          "6.3"
+          "phase3:6.1",
+          "phase3:6.2",
+          "phase3:6.3"
         ],
         "created_at": "2025-11-24T02:59:15.665898+00:00",
         "updated_at": "2025-11-24T02:59:15.665898+00:00"
       },
       {
-        "id": "7.1",
+        "id": "phase3:7.1",
         "title": "Define Agent History Data Structures",
         "description": "Create models and schemas for storing and retrieving agent history, including event logs (brain) and git commit references (body), ensuring they are serializable and queryable.",
         "status": "pending",
@@ -1409,61 +1412,61 @@
         "updated_at": "2025-11-24T02:59:18.913935+00:00"
       },
       {
-        "id": "7.2",
+        "id": "phase3:7.2",
         "title": "Implement Restore Brain Functionality",
         "description": "Develop the logic to load and replay events from the agent history, allowing the brain to be restored to a specific point in time.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "7.1"
+          "phase3:7.1"
         ],
         "created_at": "2025-11-24T02:59:18.913946+00:00",
         "updated_at": "2025-11-24T02:59:18.913946+00:00"
       },
       {
-        "id": "7.3",
+        "id": "phase3:7.3",
         "title": "Implement Restore Body Functionality",
         "description": "Integrate git checkout operations to restore the agent's body (code/state) to a previous commit, ensuring safe and reversible changes.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "7.1"
+          "phase3:7.1"
         ],
         "created_at": "2025-11-24T02:59:18.913952+00:00",
         "updated_at": "2025-11-24T02:59:18.913952+00:00"
       },
       {
-        "id": "7.4",
+        "id": "phase3:7.4",
         "title": "Create Slider UI for Time Travel",
         "description": "Build a user interface component with a slider that allows scrolling through agent history, displaying timestamps and enabling selection of rewind points.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "7.1"
+          "phase3:7.1"
         ],
         "created_at": "2025-11-24T02:59:18.913958+00:00",
         "updated_at": "2025-11-24T02:59:18.913958+00:00"
       },
       {
-        "id": "7.5",
+        "id": "phase3:7.5",
         "title": "Integrate Rewind and Resume Logic",
         "description": "Connect the slider UI with restore brain and body functions to enable rewinding to selected points and resuming from there, including state synchronization and user feedback.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "7.2",
-          "7.3",
-          "7.4"
+          "phase3:7.2",
+          "phase3:7.3",
+          "phase3:7.4"
         ],
         "created_at": "2025-11-24T02:59:18.913964+00:00",
         "updated_at": "2025-11-24T02:59:18.913964+00:00"
       },
       {
-        "id": "8.1",
+        "id": "phase3:8.1",
         "title": "Define DAG Data Models",
         "description": "Create Rust structs and types for representing nodes, edges, and the overall DAG structure, including task dependencies and metadata.",
         "status": "pending",
@@ -1474,77 +1477,77 @@
         "updated_at": "2025-11-24T02:59:22.941253+00:00"
       },
       {
-        "id": "8.2",
+        "id": "phase3:8.2",
         "title": "Implement Core Graph Logic",
         "description": "Develop functions for adding/removing nodes, creating connections, validating acyclic graphs, and managing the DAG state.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "8.1"
+          "phase3:8.1"
         ],
         "created_at": "2025-11-24T02:59:22.941263+00:00",
         "updated_at": "2025-11-24T02:59:22.941263+00:00"
       },
       {
-        "id": "8.3",
+        "id": "phase3:8.3",
         "title": "Build Basic Iced UI Renderer",
         "description": "Set up the Iced application framework and implement basic rendering of nodes and edges on the canvas.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "8.1",
-          "8.2"
+          "phase3:8.1",
+          "phase3:8.2"
         ],
         "created_at": "2025-11-24T02:59:22.941269+00:00",
         "updated_at": "2025-11-24T02:59:22.941269+00:00"
       },
       {
-        "id": "8.4",
+        "id": "phase3:8.4",
         "title": "Add Drag-and-Drop Functionality",
         "description": "Integrate mouse event handling in Iced to enable dragging nodes and creating connections via drop actions.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "8.3"
+          "phase3:8.3"
         ],
         "created_at": "2025-11-24T02:59:22.941273+00:00",
         "updated_at": "2025-11-24T02:59:22.941273+00:00"
       },
       {
-        "id": "8.5",
+        "id": "phase3:8.5",
         "title": "Implement Swarm.toml Export",
         "description": "Create logic to serialize the visual DAG into a Swarm.toml configuration file format.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "8.2"
+          "phase3:8.2"
         ],
         "created_at": "2025-11-24T02:59:22.941278+00:00",
         "updated_at": "2025-11-24T02:59:22.941278+00:00"
       },
       {
-        "id": "8.6",
+        "id": "phase3:8.6",
         "title": "Add Tests and Documentation",
         "description": "Write unit tests for models and logic, integration tests for UI interactions, and basic user documentation for the editor.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "8.1",
-          "8.2",
-          "8.3",
-          "8.4",
-          "8.5"
+          "phase3:8.1",
+          "phase3:8.2",
+          "phase3:8.3",
+          "phase3:8.4",
+          "phase3:8.5"
         ],
         "created_at": "2025-11-24T02:59:22.941283+00:00",
         "updated_at": "2025-11-24T02:59:22.941283+00:00"
       },
       {
-        "id": "9.1",
+        "id": "phase3:9.1",
         "title": "Define Data Models for File Tree and Knowledge Graph",
         "description": "Create schemas and models for representing the file tree structure and knowledge graph nodes/edges, including their relationships.",
         "status": "pending",
@@ -1555,68 +1558,68 @@
         "updated_at": "2025-11-24T02:59:27.434830+00:00"
       },
       {
-        "id": "9.2",
+        "id": "phase3:9.2",
         "title": "Implement File Tree Data Structure",
         "description": "Build the core logic to load and organize file data into a tree structure, ensuring it can be traversed and queried.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.1"
+          "phase3:9.1"
         ],
         "created_at": "2025-11-24T02:59:27.434837+00:00",
         "updated_at": "2025-11-24T02:59:27.434837+00:00"
       },
       {
-        "id": "9.3",
+        "id": "phase3:9.3",
         "title": "Implement Knowledge Graph Overlay Logic",
         "description": "Develop the logic to generate and overlay knowledge graph elements (nodes, edges) linked to file tree nodes.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.1",
-          "9.2"
+          "phase3:9.1",
+          "phase3:9.2"
         ],
         "created_at": "2025-11-24T02:59:27.434840+00:00",
         "updated_at": "2025-11-24T02:59:27.434840+00:00"
       },
       {
-        "id": "9.4",
+        "id": "phase3:9.4",
         "title": "Create GUI Components for Visual File Tree",
         "description": "Design and implement UI components to render the file tree visually in the GUI, allowing basic browsing.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.2"
+          "phase3:9.2"
         ],
         "created_at": "2025-11-24T02:59:27.434842+00:00",
         "updated_at": "2025-11-24T02:59:27.434842+00:00"
       },
       {
-        "id": "9.5",
+        "id": "phase3:9.5",
         "title": "Integrate Knowledge Graph Overlays into GUI",
         "description": "Add visual overlays for knowledge graph elements to the file tree GUI, ensuring links between files and knowledge are displayed.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.3",
-          "9.4"
+          "phase3:9.3",
+          "phase3:9.4"
         ],
         "created_at": "2025-11-24T02:59:27.434845+00:00",
         "updated_at": "2025-11-24T02:59:27.434845+00:00"
       },
       {
-        "id": "9.6",
+        "id": "phase3:9.6",
         "title": "Add Interactive Exploration Features and Testing",
         "description": "Implement interactive features like clicking, expanding, and linking exploration in the GUI, and conduct tests to verify browsability and linking.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "9.5"
+          "phase3:9.5"
         ],
         "created_at": "2025-11-24T02:59:27.434847+00:00",
         "updated_at": "2025-11-24T02:59:27.434847+00:00"
@@ -1627,7 +1630,7 @@
     "name": "phase2",
     "tasks": [
       {
-        "id": "1",
+        "id": "phase2:1",
         "title": "[PARENT] Extend SQLite Schema for AST and File Dependencies",
         "description": "Extend the SQLite database schema to store AST relationships and file dependencies. Ensure the schema supports querying and updating these elements efficiently. Verify by inserting sample data and querying relationships.\n\n[This task has been expanded into subtasks: 1.1, 1.2, 1.3, 1.4]",
         "status": "pending",
@@ -1639,35 +1642,35 @@
         "updated_at": "2025-11-24T02:54:58.028607+00:00"
       },
       {
-        "id": "2",
+        "id": "phase2:2",
         "title": "[PARENT] Implement LanceDB Vector Storage",
         "description": "Integrate LanceDB to handle vector storage for embeddings in the RAG layer. Implement basic CRUD operations for storing and retrieving vectors. Test by storing and querying sample embeddings.\n\n[This task has been expanded into subtasks: 2.1, 2.2, 2.3, 2.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "1"
+          "phase2:1"
         ],
         "complexity_analysis": "The task involves integrating a new vector database (LanceDB) into the RAG layer, which requires some research on its API if unfamiliar, setting up dependencies and configuration, implementing CRUD operations for vectors, and creating tests with sample embeddings. This affects multiple components like database connection, storage logic, and testing files, with moderate technical unknowns around vector handling and edge cases like varying embedding sizes or query performance. Estimated 2-4 hours for an experienced developer.",
         "created_at": "2025-11-24T02:50:42.066545+00:00",
         "updated_at": "2025-11-24T02:55:00.939768+00:00"
       },
       {
-        "id": "3",
+        "id": "phase2:3",
         "title": "[PARENT] Implement Tantivy Full-Text Search Index",
         "description": "Integrate Tantivy to create a full-text search index for the RAG layer. Set up indexing and searching capabilities. Validate by indexing sample documents and performing searches.\n\n[This task has been expanded into subtasks: 3.1, 3.2, 3.3, 3.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "1"
+          "phase2:1"
         ],
         "complexity_analysis": "This task involves integrating Tantivy, a Rust-based full-text search library, into an existing RAG layer, which requires adding dependencies, setting up index creation and search functions, and validating with sample data. Technical difficulty includes potential unknowns in Tantivy APIs if not familiar, moderate research on integration with RAG workflows, and handling edge cases like indexing large documents or search performance. It affects several components (e.g., dependency management, index setup code, search logic, and possibly RAG retrieval modules), with integration points in the retrieval pipeline. Testing includes unit tests for indexing and searching, but thorough validation for edge cases adds complexity. Estimated time: 2-4 hours for a developer with Rust and search experience.",
         "created_at": "2025-11-24T02:50:42.066546+00:00",
         "updated_at": "2025-11-24T02:55:04.051512+00:00"
       },
       {
-        "id": "4",
+        "id": "phase2:4",
         "title": "[PARENT] Integrate Tree-Sitter with Grammars",
         "description": "Integrate tree-sitter library with grammars for Rust, Python, Markdown, and Git Commit. Ensure proper parsing of these languages. Test parsing accuracy on sample files.\n\n[This task has been expanded into subtasks: 4.1, 4.2, 4.3, 4.4, 4.5]",
         "status": "pending",
@@ -1679,36 +1682,36 @@
         "updated_at": "2025-11-24T02:55:11.059820+00:00"
       },
       {
-        "id": "5",
+        "id": "phase2:5",
         "title": "[PARENT] Implement Semantic Chunking Strategy",
         "description": "Develop the semantic chunking strategy using AST nodes instead of text splitting. Integrate with the ingestion pipeline. Verify chunking quality on various codebases.\n\n[This task has been expanded into subtasks: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6]",
         "status": "pending",
         "complexity": 13,
         "priority": "high",
         "dependencies": [
-          "4",
-          "1"
+          "phase2:4",
+          "phase2:1"
         ],
         "complexity_analysis": "Implementing semantic chunking with AST nodes requires significant research on AST parsing and semantic chunking techniques for code, handling multiple programming languages, and addressing unknowns in AST structures. It affects multiple components in the ingestion pipeline, involves integration dependencies, extensive testing on diverse codebases, and handling edge cases like nested structures, malformed code, and performance issues. This is a full feature development task best split into subtasks like research, implementation, integration, and verification.",
         "created_at": "2025-11-24T02:50:42.066548+00:00",
         "updated_at": "2025-11-24T02:55:15.487953+00:00"
       },
       {
-        "id": "6",
+        "id": "phase2:6",
         "title": "[PARENT] Add Parallel Indexing with Rayon",
         "description": "Use rayon for parallel processing in the ingestion pipeline indexing. Optimize performance for large repositories. Benchmark indexing speed improvements.\n\n[This task has been expanded into subtasks: 6.1, 6.2, 6.3, 6.4, 6.5]",
         "status": "pending",
         "complexity": 8,
         "priority": "medium",
         "dependencies": [
-          "5"
+          "phase2:5"
         ],
         "complexity_analysis": "Integrating Rayon for parallel indexing involves modifying the ingestion pipeline's core logic, potentially affecting multiple files and components. It requires careful handling of thread safety, shared state, and error propagation to avoid race conditions and deadlocks. Testing needs to cover correctness in parallel execution, performance benchmarks across different repository sizes, and edge cases like memory constraints or partial failures. Research on Rayon's best practices and integration with existing dependencies adds to the effort, making it very complex and time-intensive (4-8 hours).",
         "created_at": "2025-11-24T02:50:42.066549+00:00",
         "updated_at": "2025-11-24T02:55:19.231572+00:00"
       },
       {
-        "id": "7",
+        "id": "phase2:7",
         "title": "[PARENT] Integrate State Machine Library",
         "description": "Integrate rust-fsm or GraphFlow for the state machine engine. Set up basic state transitions. Test simple state machines.\n\n[This task has been expanded into subtasks: 7.1, 7.2, 7.3, 7.4]",
         "status": "pending",
@@ -1720,49 +1723,49 @@
         "updated_at": "2025-11-24T02:55:22.645078+00:00"
       },
       {
-        "id": "8",
+        "id": "phase2:8",
         "title": "[PARENT] Implement Swarm.toml Parser",
         "description": "Create a parser for Swarm.toml files to define declarative state charts. Handle parsing of state definitions and transitions. Validate parsing with sample toml files.\n\n[This task has been expanded into subtasks: 8.1, 8.2, 8.3, 8.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "7"
+          "phase2:7"
         ],
         "complexity_analysis": "The task involves designing a TOML schema for declarative state charts, which requires some research into state chart structures and TOML format. Parsing state definitions and transitions adds moderate technical difficulty, especially with edge cases like invalid transitions or malformed files. It affects at least one parser component, needs integration with a library for TOML parsing, and requires testing with sample files. Overall, it's complex but manageable in 2-4 hours without splitting.",
         "created_at": "2025-11-24T02:50:42.066550+00:00",
         "updated_at": "2025-11-24T02:55:28.107184+00:00"
       },
       {
-        "id": "9",
+        "id": "phase2:9",
         "title": "[PARENT] Add Compile-Time Verification for Deadlocks",
         "description": "Implement compile-time checks to detect potential deadlocks in state machines. Integrate with the parser. Test on various state charts.\n\n[This task has been expanded into subtasks: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6]",
         "status": "pending",
         "complexity": 13,
         "priority": "medium",
         "dependencies": [
-          "8"
+          "phase2:8"
         ],
         "complexity_analysis": "Implementing compile-time deadlock detection for state machines requires researching and applying graph algorithms (e.g., cycle detection or reachability analysis) suitable for potentially complex statecharts with hierarchies and concurrency. It involves significant technical difficulty, unknowns in edge cases (e.g., parallel states, guards), multiple components/files (parser integration, analyzer modules), integration points with the compilation pipeline, extensive testing on diverse state charts to avoid false positives/negatives, and handling non-trivial scenarios. This exceeds 8 hours and is complex enough to warrant splitting into subtasks like algorithm implementation, integration, and testing.",
         "created_at": "2025-11-24T02:50:42.066551+00:00",
         "updated_at": "2025-11-24T02:55:33.868504+00:00"
       },
       {
-        "id": "10",
+        "id": "phase2:10",
         "title": "[PARENT] Implement Mermaid Diagram Generator",
         "description": "Build a generator to create Mermaid diagrams from Swarm.toml definitions. Output diagrams for visualization. Verify diagram accuracy against sample inputs.\n\n[This task has been expanded into subtasks: 10.1, 10.2, 10.3, 10.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "medium",
         "dependencies": [
-          "8"
+          "phase2:8"
         ],
         "complexity_analysis": "The task involves parsing a specific TOML format (Swarm.toml, which may require research on its structure), generating Mermaid syntax for diagrams, and verifying accuracy with tests. This includes handling potential edge cases in TOML parsing and diagram output, with moderate technical difficulty, integration of libraries like TOML parsers, and testing against samples, fitting into 2-4 hours.",
         "created_at": "2025-11-24T02:50:42.066552+00:00",
         "updated_at": "2025-11-24T02:55:37.259308+00:00"
       },
       {
-        "id": "11",
+        "id": "phase2:11",
         "title": "[PARENT] Implement TTL-Based File Locking",
         "description": "Add TTL-based file locking mechanism in ContextSyncer with lease management. Implement lease acquisition and release logic. Test locking and unlocking files.\n\n[This task has been expanded into subtasks: 11.1, 11.2, 11.3, 11.4, 11.5]",
         "status": "pending",
@@ -1774,63 +1777,63 @@
         "updated_at": "2025-11-24T02:55:44.941906+00:00"
       },
       {
-        "id": "12",
+        "id": "phase2:12",
         "title": "[PARENT] Implement Optimistic Concurrency Checks",
         "description": "Add hash-based checks for optimistic concurrency on file writes. Reject writes if hashes mismatch. Test concurrency scenarios with multiple agents.\n\n[This task has been expanded into subtasks: 12.1, 12.2, 12.3, 12.4, 12.5]",
         "status": "pending",
         "complexity": 8,
         "priority": "high",
         "dependencies": [
-          "11"
+          "phase2:11"
         ],
         "complexity_analysis": "This task involves implementing hash-based optimistic concurrency checks on file writes, including rejection logic for mismatches, which requires modifying write functions, handling hash computation and storage, and ensuring atomicity. It affects multiple components like file I/O handlers and potentially error handling. Testing concurrency with multiple agents demands setting up scenarios for race conditions, race conditions, and failures, which is non-trivial. Edge cases include hash collisions, partial writes, and simultaneous access. Moderate research on hashing algorithms and concurrency patterns is needed, but no major unknowns. Overall, it's very complex, estimated at 4-8 hours, not warranting splitting.",
         "created_at": "2025-11-24T02:50:42.066554+00:00",
         "updated_at": "2025-11-24T02:55:48.443815+00:00"
       },
       {
-        "id": "13",
+        "id": "phase2:13",
         "title": "Create ApprovalQueue in SQLite",
         "description": "Implement an ApprovalQueue table in SQLite for managing approvals. Include fields for actions, statuses, and timestamps. Test CRUD operations.",
         "status": "pending",
         "complexity": 2,
         "priority": "medium",
         "dependencies": [
-          "1"
+          "phase2:1"
         ],
         "complexity_analysis": "The task involves creating a simple SQLite table with defined fields, which is straightforward with basic SQL knowledge. Testing CRUD operations requires writing and executing a few SQL statements, adding minimal effort. No significant unknowns, dependencies, or edge cases are present, making it a simple task completable in under an hour.",
         "created_at": "2025-11-24T02:50:42.066554+00:00",
         "updated_at": "2025-11-24T02:53:44.635053+00:00"
       },
       {
-        "id": "14",
+        "id": "phase2:14",
         "title": "[PARENT] Implement Auto-Deny Policies and Timeouts",
         "description": "Add logic for auto-deny policies and timeout handling in the Approval Manager. Configure default behaviors. Simulate timeouts in tests.\n\n[This task has been expanded into subtasks: 14.1, 14.2, 14.3, 14.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "medium",
         "dependencies": [
-          "13"
+          "phase2:13"
         ],
         "complexity_analysis": "The task involves adding conditional logic for auto-deny policies and timeout handling in the Approval Manager, which requires understanding existing code and potential integration points. Configuring defaults is straightforward, but simulating timeouts in tests introduces complexity with mocking timed scenarios, edge cases like race conditions or conflicting policies, and ensuring robust testing. Estimated at 2-4 hours due to moderate technical difficulty, affecting a few components/files, and some research/testing effort.",
         "created_at": "2025-11-24T02:50:42.066555+00:00",
         "updated_at": "2025-11-24T02:55:53.160804+00:00"
       },
       {
-        "id": "15",
+        "id": "phase2:15",
         "title": "[PARENT] Expose API for External UI Approvals",
         "description": "Create an API to allow external UIs to approve or deny actions in the ApprovalQueue. Implement endpoints for interaction. Test API calls.\n\n[This task has been expanded into subtasks: 15.1, 15.2, 15.3, 15.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "medium",
         "dependencies": [
-          "13"
+          "phase2:13"
         ],
         "complexity_analysis": "The task involves creating API endpoints for approving/denying actions in an existing ApprovalQueue, which requires integration with likely existing components. Technical difficulty includes handling authentication for external UIs, error handling, and ensuring data consistency. Multiple files may be affected (routes, controllers, possibly models). Testing requires API call validation, including edge cases like invalid inputs or concurrent access. Research on secure API practices may be needed, and dependencies on the ApprovalQueue add integration complexity. Overall, estimated 2-4 hours.",
         "created_at": "2025-11-24T02:50:42.066556+00:00",
         "updated_at": "2025-11-24T02:55:57.340874+00:00"
       },
       {
-        "id": "16",
+        "id": "phase2:16",
         "title": "[PARENT] Implement Global Thoughts Storage",
         "description": "Set up ~/.descartes/thoughts as global storage for the Thoughts system. Handle storage and retrieval of notes. Test storing and reading thoughts.\n\n[This task has been expanded into subtasks: 16.1, 16.2, 16.3]",
         "status": "pending",
@@ -1842,64 +1845,64 @@
         "updated_at": "2025-11-24T02:55:59.612915+00:00"
       },
       {
-        "id": "17",
+        "id": "phase2:17",
         "title": "[PARENT] Add Symlinking Logic for Project Notes",
         "description": "Implement logic to symlink thoughts to project-specific directories. Ensure proper linking and access. Validate symlinks in test projects.\n\n[This task has been expanded into subtasks: 17.1, 17.2, 17.3, 17.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "medium",
         "dependencies": [
-          "16"
+          "phase2:16"
         ],
         "complexity_analysis": "The task requires implementing symlinking logic across project directories, ensuring proper linking and access, and validating in test projects. This involves file system operations, potential cross-platform differences, handling edge cases like permissions and broken links, and setting up tests. While not extremely complex, it includes unknowns in research and integration, estimating 2-4 hours.",
         "created_at": "2025-11-24T02:50:42.066557+00:00",
         "updated_at": "2025-11-24T02:56:08.338750+00:00"
       },
       {
-        "id": "18",
+        "id": "phase2:18",
         "title": "[PARENT] Index Thoughts in Tantivy",
         "description": "Index thoughts in the Tantivy search index for agent retrieval. Enable searching across thoughts. Test search functionality.\n\n[This task has been expanded into subtasks: 18.1, 18.2, 18.3, 18.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "medium",
         "dependencies": [
-          "16",
-          "3"
+          "phase2:16",
+          "phase2:3"
         ],
         "complexity_analysis": "The task involves integrating Tantivy search engine, defining a schema for indexing custom 'thoughts' data structures, implementing search functionality, and thorough testing. It requires moderate technical knowledge of Tantivy (potentially some research), affects multiple components for indexing and search logic, and includes handling edge cases like query variations and performance with varying data sizes. Estimated 2-4 hours for a developer with search experience, but not trivial due to integration and unknowns in thought structures.",
         "created_at": "2025-11-24T02:50:42.066562+00:00",
         "updated_at": "2025-11-24T02:56:11.823284+00:00"
       },
       {
-        "id": "19",
+        "id": "phase2:19",
         "title": "[PARENT] Finalize Tasks Schema in SQLite",
         "description": "Define and finalize the tasks schema in SQLite for the Global Task Manager. Ensure it supports all required fields. Populate with sample tasks.\n\n[This task has been expanded into subtasks: 19.1, 19.2, 19.3]",
         "status": "pending",
         "complexity": 3,
         "priority": "high",
         "dependencies": [
-          "1"
+          "phase2:1"
         ],
         "complexity_analysis": "The task involves defining a SQLite schema with required fields, which may require some clarification on specifics, followed by basic population with sample data. It's moderately complex due to potential unknowns in exact fields needed, simple testing of schema creation and inserts, and minimal dependencies, fitting within 1-2 hours for an experienced developer.",
         "created_at": "2025-11-24T02:50:42.066562+00:00",
         "updated_at": "2025-11-24T02:56:16.417403+00:00"
       },
       {
-        "id": "20",
+        "id": "phase2:20",
         "title": "[PARENT] Implement CRUD Operations in StateStore",
         "description": "Add CRUD operations for tasks in the StateStore module. Integrate with the SQLite schema. Test creating, updating, and deleting tasks.\n\n[This task has been expanded into subtasks: 20.1, 20.2, 20.3, 20.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "high",
         "dependencies": [
-          "19"
+          "phase2:19"
         ],
         "complexity_analysis": "Implementing CRUD operations involves modifying the StateStore module to add methods for creating, reading, updating, and deleting tasks, integrating with an existing SQLite schema. This requires handling database queries, transactions, and error handling. Testing each operation adds complexity, including edge cases like invalid inputs, non-existent tasks, and data validation. Multiple files may be affected (StateStore, schema, and test files), with dependencies on SQLite integration. Assumes some familiarity with the codebase, but unknowns in schema details or existing state management could increase effort to 2-4 hours.",
         "created_at": "2025-11-24T02:50:42.066563+00:00",
         "updated_at": "2025-11-24T02:56:20.140890+00:00"
       },
       {
-        "id": "21",
+        "id": "phase2:21",
         "title": "[PARENT] Create .descartes/config.toml Schema",
         "description": "Design and implement the .descartes/config.toml schema for SCUD integration. Include necessary configuration fields. Validate schema parsing.\n\n[This task has been expanded into subtasks: 21.1, 21.2, 21.3, 21.4]",
         "status": "pending",
@@ -1911,22 +1914,22 @@
         "updated_at": "2025-11-24T02:56:24.861721+00:00"
       },
       {
-        "id": "22",
+        "id": "phase2:22",
         "title": "[PARENT] Implement Shared Schema Logic for SCUD",
         "description": "Add logic allowing scud to read the database using the shared schema. Ensure compatibility and access. Test scud reading sample data.\n\n[This task has been expanded into subtasks: 22.1, 22.2, 22.3, 22.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "medium",
         "dependencies": [
-          "21",
-          "19"
+          "phase2:21",
+          "phase2:19"
         ],
         "complexity_analysis": "The task requires implementing logic for SCUD to read from a shared database schema, which involves code changes across potentially multiple files, ensuring compatibility and access controls, and testing with sample data. This includes moderate integration points, research into schema details, and handling edge cases like data types or permissions, suggesting a complex effort of 2-4 hours.",
         "created_at": "2025-11-24T02:50:42.066565+00:00",
         "updated_at": "2025-11-24T02:56:28.391740+00:00"
       },
       {
-        "id": "23",
+        "id": "phase2:23",
         "title": "[PARENT] Implement Local Encrypted Secrets Storage",
         "description": "Build local encrypted storage for secrets using AES-256. Handle encryption and decryption. Test secure storage and retrieval.\n\n[This task has been expanded into subtasks: 23.1, 23.2, 23.3, 23.4]",
         "status": "pending",
@@ -1938,21 +1941,21 @@
         "updated_at": "2025-11-24T02:56:32.289788+00:00"
       },
       {
-        "id": "24",
+        "id": "phase2:24",
         "title": "[PARENT] Add Secret Masking in Logs",
         "description": "Implement masking of secrets in logs to prevent exposure. Apply to all logging outputs. Verify masking in test logs.\n\n[This task has been expanded into subtasks: 24.1, 24.2, 24.3, 24.4]",
         "status": "pending",
         "complexity": 5,
         "priority": "low",
         "dependencies": [
-          "23"
+          "phase2:23"
         ],
         "complexity_analysis": "The task involves identifying and implementing secret masking across all logging outputs, which requires defining patterns for secrets (e.g., via regex), potentially modifying logging configurations or formatters in multiple components, handling edge cases like structured logs or partial matches, and thorough testing to verify masking without affecting normal logs. This adds technical difficulty, research on best practices, and integration across files, estimating 2-4 hours for a typical codebase.",
         "created_at": "2025-11-24T02:50:42.066566+00:00",
         "updated_at": "2025-11-24T02:56:36.181244+00:00"
       },
       {
-        "id": "25",
+        "id": "phase2:25",
         "title": "[PARENT] Create NotificationRouter Trait",
         "description": "Define the NotificationRouter trait for handling notifications. Set up interfaces for different adapters. Test trait implementation.\n\n[This task has been expanded into subtasks: 25.1, 25.2, 25.3]",
         "status": "pending",
@@ -1964,21 +1967,21 @@
         "updated_at": "2025-11-24T02:56:38.955738+00:00"
       },
       {
-        "id": "26",
+        "id": "phase2:26",
         "title": "[PARENT] Implement TelegramAdapter",
         "description": "Build the TelegramAdapter using the Bot API for sending notifications. Integrate with NotificationRouter. Test sending messages via Telegram.\n\n[This task has been expanded into subtasks: 26.1, 26.2, 26.3, 26.4, 26.5]",
         "status": "pending",
         "complexity": 8,
         "priority": "low",
         "dependencies": [
-          "25"
+          "phase2:25"
         ],
         "complexity_analysis": "The task involves building a new TelegramAdapter using the Bot API, which requires understanding API endpoints, authentication, and message sending mechanics, potentially needing research if unfamiliar. Integration with NotificationRouter adds modification of existing components. Testing includes unit and integration tests, plus manual verification of message sending, handling edge cases like API errors, rate limits, and network issues. Estimated 4-8 hours due to multiple steps and unknowns.",
         "created_at": "2025-11-24T02:50:42.066567+00:00",
         "updated_at": "2025-11-24T02:56:43.420114+00:00"
       },
       {
-        "id": "1.1",
+        "id": "phase2:1.1",
         "title": "Design Schema Extensions",
         "description": "Analyze the requirements for storing AST relationships and file dependencies. Design new tables, columns, and indexes to support efficient querying and updating in the SQLite schema.",
         "status": "pending",
@@ -1989,46 +1992,46 @@
         "updated_at": "2025-11-24T02:54:58.028567+00:00"
       },
       {
-        "id": "1.2",
+        "id": "phase2:1.2",
         "title": "Implement Schema Changes",
         "description": "Write and execute SQL scripts to create the new tables, relationships, and indexes in the SQLite database based on the designed schema.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "1.1"
+          "phase2:1.1"
         ],
         "created_at": "2025-11-24T02:54:58.028586+00:00",
         "updated_at": "2025-11-24T02:54:58.028586+00:00"
       },
       {
-        "id": "1.3",
+        "id": "phase2:1.3",
         "title": "Create Sample Data and Queries",
         "description": "Develop scripts to insert sample data representing AST relationships and file dependencies, and write queries to retrieve and update these elements.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "1.2"
+          "phase2:1.2"
         ],
         "created_at": "2025-11-24T02:54:58.028593+00:00",
         "updated_at": "2025-11-24T02:54:58.028593+00:00"
       },
       {
-        "id": "1.4",
+        "id": "phase2:1.4",
         "title": "Verify and Test Implementation",
         "description": "Execute the sample data insertions, run the queries, and verify that the schema supports efficient querying and updating of AST and file dependency relationships.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "1.3"
+          "phase2:1.3"
         ],
         "created_at": "2025-11-24T02:54:58.028599+00:00",
         "updated_at": "2025-11-24T02:54:58.028599+00:00"
       },
       {
-        "id": "2.1",
+        "id": "phase2:2.1",
         "title": "Set up LanceDB Integration",
         "description": "Install LanceDB dependencies, initialize the LanceDB database connection, and set up basic configuration for vector storage in the RAG layer.",
         "status": "pending",
@@ -2039,46 +2042,46 @@
         "updated_at": "2025-11-24T02:55:00.939717+00:00"
       },
       {
-        "id": "2.2",
+        "id": "phase2:2.2",
         "title": "Define Vector Schema",
         "description": "Create data models or schemas for storing vector embeddings, including fields for vector data, metadata, and unique identifiers.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "2.1"
+          "phase2:2.1"
         ],
         "created_at": "2025-11-24T02:55:00.939741+00:00",
         "updated_at": "2025-11-24T02:55:00.939741+00:00"
       },
       {
-        "id": "2.3",
+        "id": "phase2:2.3",
         "title": "Implement CRUD Operations",
         "description": "Develop functions for Create, Read, Update, and Delete operations on vector embeddings, including batch operations if needed.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "2.2"
+          "phase2:2.2"
         ],
         "created_at": "2025-11-24T02:55:00.939748+00:00",
         "updated_at": "2025-11-24T02:55:00.939748+00:00"
       },
       {
-        "id": "2.4",
+        "id": "phase2:2.4",
         "title": "Test Vector Storage and Retrieval",
         "description": "Create sample embeddings, store them in LanceDB, perform queries to retrieve vectors, and validate CRUD operations work correctly.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "2.3"
+          "phase2:2.3"
         ],
         "created_at": "2025-11-24T02:55:00.939758+00:00",
         "updated_at": "2025-11-24T02:55:00.939758+00:00"
       },
       {
-        "id": "3.1",
+        "id": "phase2:3.1",
         "title": "Set up Tantivy Integration and Schema",
         "description": "Add Tantivy as a dependency, initialize the search index with a defined schema for the RAG layer documents, including fields for text content and metadata.",
         "status": "pending",
@@ -2089,49 +2092,49 @@
         "updated_at": "2025-11-24T02:55:04.051448+00:00"
       },
       {
-        "id": "3.2",
+        "id": "phase2:3.2",
         "title": "Implement Document Indexing Logic",
         "description": "Create functions to add documents to the Tantivy index, handling tokenization, indexing, and committing changes to the index.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "3.1"
+          "phase2:3.1"
         ],
         "created_at": "2025-11-24T02:55:04.051492+00:00",
         "updated_at": "2025-11-24T02:55:04.051492+00:00"
       },
       {
-        "id": "3.3",
+        "id": "phase2:3.3",
         "title": "Implement Search Capabilities",
         "description": "Develop search functions to query the index using Tantivy's query parser, retrieve results, and return them in a structured format for the RAG layer.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "3.1",
-          "3.2"
+          "phase2:3.1",
+          "phase2:3.2"
         ],
         "created_at": "2025-11-24T02:55:04.051499+00:00",
         "updated_at": "2025-11-24T02:55:04.051499+00:00"
       },
       {
-        "id": "3.4",
+        "id": "phase2:3.4",
         "title": "Validate with Sample Documents and Searches",
         "description": "Index a set of sample documents, perform various search queries, and verify that results are accurate and relevant.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "3.1",
-          "3.2",
-          "3.3"
+          "phase2:3.1",
+          "phase2:3.2",
+          "phase2:3.3"
         ],
         "created_at": "2025-11-24T02:55:04.051504+00:00",
         "updated_at": "2025-11-24T02:55:04.051504+00:00"
       },
       {
-        "id": "4.1",
+        "id": "phase2:4.1",
         "title": "Set up Tree-Sitter Library Integration",
         "description": "Install the Tree-Sitter library and set up the basic integration in the project, including any necessary configuration for parsing.",
         "status": "pending",
@@ -2142,62 +2145,62 @@
         "updated_at": "2025-11-24T02:55:11.059714+00:00"
       },
       {
-        "id": "4.2",
+        "id": "phase2:4.2",
         "title": "Integrate Rust Grammar",
         "description": "Add and configure the Tree-Sitter grammar for the Rust programming language to enable parsing of Rust code.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "4.1"
+          "phase2:4.1"
         ],
         "created_at": "2025-11-24T02:55:11.059788+00:00",
         "updated_at": "2025-11-24T02:55:11.059788+00:00"
       },
       {
-        "id": "4.3",
+        "id": "phase2:4.3",
         "title": "Integrate Python Grammar",
         "description": "Add and configure the Tree-Sitter grammar for Python to enable parsing of Python code.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "4.1"
+          "phase2:4.1"
         ],
         "created_at": "2025-11-24T02:55:11.059796+00:00",
         "updated_at": "2025-11-24T02:55:11.059796+00:00"
       },
       {
-        "id": "4.4",
+        "id": "phase2:4.4",
         "title": "Integrate Markdown and Git Commit Grammars",
         "description": "Add and configure the Tree-Sitter grammars for Markdown and Git Commit formats to enable parsing of these.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "4.1"
+          "phase2:4.1"
         ],
         "created_at": "2025-11-24T02:55:11.059803+00:00",
         "updated_at": "2025-11-24T02:55:11.059803+00:00"
       },
       {
-        "id": "4.5",
+        "id": "phase2:4.5",
         "title": "Test Parsing Accuracy on Sample Files",
         "description": "Create or obtain sample files for Rust, Python, Markdown, and Git Commit, and test the parsing accuracy for each language to ensure proper integration.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "4.1",
-          "4.2",
-          "4.3",
-          "4.4"
+          "phase2:4.1",
+          "phase2:4.2",
+          "phase2:4.3",
+          "phase2:4.4"
         ],
         "created_at": "2025-11-24T02:55:11.059809+00:00",
         "updated_at": "2025-11-24T02:55:11.059809+00:00"
       },
       {
-        "id": "5.1",
+        "id": "phase2:5.1",
         "title": "Design AST Node Models and Schemas",
         "description": "Define data models and schemas for representing AST nodes to support semantic chunking, ensuring they capture necessary code structure elements.",
         "status": "pending",
@@ -2208,75 +2211,75 @@
         "updated_at": "2025-11-24T02:55:15.487916+00:00"
       },
       {
-        "id": "5.2",
+        "id": "phase2:5.2",
         "title": "Implement AST Parsing Logic",
         "description": "Develop logic to parse code into AST nodes, handling different programming languages and edge cases.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "5.1"
+          "phase2:5.1"
         ],
         "created_at": "2025-11-24T02:55:15.487926+00:00",
         "updated_at": "2025-11-24T02:55:15.487926+00:00"
       },
       {
-        "id": "5.3",
+        "id": "phase2:5.3",
         "title": "Develop Semantic Chunking Algorithm",
         "description": "Create the core algorithm for grouping AST nodes into semantic chunks based on code semantics, replacing text-based splitting.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "5.2"
+          "phase2:5.2"
         ],
         "created_at": "2025-11-24T02:55:15.487932+00:00",
         "updated_at": "2025-11-24T02:55:15.487932+00:00"
       },
       {
-        "id": "5.4",
+        "id": "phase2:5.4",
         "title": "Integrate Chunking with Ingestion Pipeline",
         "description": "Modify the ingestion pipeline to incorporate the AST-based chunking strategy, ensuring seamless data flow.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "5.3"
+          "phase2:5.3"
         ],
         "created_at": "2025-11-24T02:55:15.487936+00:00",
         "updated_at": "2025-11-24T02:55:15.487936+00:00"
       },
       {
-        "id": "5.5",
+        "id": "phase2:5.5",
         "title": "Unit Test Chunking Components",
         "description": "Write and run unit tests for AST parsing, chunking algorithm, and pipeline integration to verify individual components.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "5.2",
-          "5.3",
-          "5.4"
+          "phase2:5.2",
+          "phase2:5.3",
+          "phase2:5.4"
         ],
         "created_at": "2025-11-24T02:55:15.487941+00:00",
         "updated_at": "2025-11-24T02:55:15.487941+00:00"
       },
       {
-        "id": "5.6",
+        "id": "phase2:5.6",
         "title": "Verify Chunking Quality on Codebases",
         "description": "Test the integrated chunking strategy on various codebases, evaluate quality, and iterate on improvements.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "5.4",
-          "5.5"
+          "phase2:5.4",
+          "phase2:5.5"
         ],
         "created_at": "2025-11-24T02:55:15.487946+00:00",
         "updated_at": "2025-11-24T02:55:15.487946+00:00"
       },
       {
-        "id": "6.1",
+        "id": "phase2:6.1",
         "title": "Integrate Rayon Dependency",
         "description": "Add Rayon crate to the project dependencies and ensure it compiles correctly. This includes updating Cargo.toml and resolving any initial integration issues.",
         "status": "pending",
@@ -2287,60 +2290,60 @@
         "updated_at": "2025-11-24T02:55:19.231528+00:00"
       },
       {
-        "id": "6.2",
+        "id": "phase2:6.2",
         "title": "Refactor Indexing Logic for Parallelism",
         "description": "Modify the existing indexing code in the ingestion pipeline to use Rayon's parallel iterators and collections, ensuring thread-safety and avoiding race conditions.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "6.1"
+          "phase2:6.1"
         ],
         "created_at": "2025-11-24T02:55:19.231545+00:00",
         "updated_at": "2025-11-24T02:55:19.231545+00:00"
       },
       {
-        "id": "6.3",
+        "id": "phase2:6.3",
         "title": "Optimize for Large Repositories",
         "description": "Profile the parallel indexing implementation and apply optimizations such as chunking data, adjusting thread pools, and minimizing memory overhead for large datasets.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "6.2"
+          "phase2:6.2"
         ],
         "created_at": "2025-11-24T02:55:19.231551+00:00",
         "updated_at": "2025-11-24T02:55:19.231551+00:00"
       },
       {
-        "id": "6.4",
+        "id": "phase2:6.4",
         "title": "Implement Benchmarking",
         "description": "Create a benchmarking script or module to measure indexing speed before and after parallelization, using tools like Criterion or custom timers for accurate comparisons.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "6.3"
+          "phase2:6.3"
         ],
         "created_at": "2025-11-24T02:55:19.231556+00:00",
         "updated_at": "2025-11-24T02:55:19.231556+00:00"
       },
       {
-        "id": "6.5",
+        "id": "phase2:6.5",
         "title": "Test and Document Changes",
         "description": "Write unit and integration tests for the parallel indexing functionality, verify correctness, and update documentation to describe the new parallel processing feature.",
         "status": "pending",
         "complexity": 0,
         "priority": "low",
         "dependencies": [
-          "6.2",
-          "6.4"
+          "phase2:6.2",
+          "phase2:6.4"
         ],
         "created_at": "2025-11-24T02:55:19.231560+00:00",
         "updated_at": "2025-11-24T02:55:19.231560+00:00"
       },
       {
-        "id": "7.1",
+        "id": "phase2:7.1",
         "title": "Evaluate and Select State Machine Library",
         "description": "Research rust-fsm and GraphFlow libraries, compare their features, compatibility with the project, and choose the most suitable one based on requirements for state machine engine.",
         "status": "pending",
@@ -2351,46 +2354,46 @@
         "updated_at": "2025-11-24T02:55:22.645023+00:00"
       },
       {
-        "id": "7.2",
+        "id": "phase2:7.2",
         "title": "Integrate Selected Library into Project",
         "description": "Add the chosen library (rust-fsm or GraphFlow) as a dependency in the project's Cargo.toml or equivalent, and ensure it builds without errors in the development environment.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "7.1"
+          "phase2:7.1"
         ],
         "created_at": "2025-11-24T02:55:22.645042+00:00",
         "updated_at": "2025-11-24T02:55:22.645042+00:00"
       },
       {
-        "id": "7.3",
+        "id": "phase2:7.3",
         "title": "Implement Basic State Machine Structure and Transitions",
         "description": "Define basic states, events, and transitions using the integrated library. Create a simple state machine class or module with methods to initialize and trigger transitions.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "7.2"
+          "phase2:7.2"
         ],
         "created_at": "2025-11-24T02:55:22.645053+00:00",
         "updated_at": "2025-11-24T02:55:22.645053+00:00"
       },
       {
-        "id": "7.4",
+        "id": "phase2:7.4",
         "title": "Develop and Run Tests for Simple State Machines",
         "description": "Write unit tests to verify basic state transitions, edge cases, and error handling. Execute tests to ensure the state machine behaves as expected.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "7.3"
+          "phase2:7.3"
         ],
         "created_at": "2025-11-24T02:55:22.645064+00:00",
         "updated_at": "2025-11-24T02:55:22.645064+00:00"
       },
       {
-        "id": "8.1",
+        "id": "phase2:8.1",
         "title": "Define State Chart Data Models",
         "description": "Create data structures and schemas to represent state definitions, transitions, and overall state chart structure for Swarm.toml files.",
         "status": "pending",
@@ -2401,20 +2404,20 @@
         "updated_at": "2025-11-24T02:55:28.107128+00:00"
       },
       {
-        "id": "8.2",
+        "id": "phase2:8.2",
         "title": "Implement TOML Parsing Logic",
         "description": "Develop the core parser code that reads Swarm.toml files and constructs the state chart objects using the defined models.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "8.1"
+          "phase2:8.1"
         ],
         "created_at": "2025-11-24T02:55:28.107154+00:00",
         "updated_at": "2025-11-24T02:55:28.107154+00:00"
       },
       {
-        "id": "8.3",
+        "id": "phase2:8.3",
         "title": "Create Sample TOML Files",
         "description": "Prepare a set of sample Swarm.toml files with various state definitions and transitions to test the parser.",
         "status": "pending",
@@ -2425,21 +2428,21 @@
         "updated_at": "2025-11-24T02:55:28.107163+00:00"
       },
       {
-        "id": "8.4",
+        "id": "phase2:8.4",
         "title": "Validate Parser with Samples",
         "description": "Test the parser against the sample files, verify correct parsing of states and transitions, and fix any issues found.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "8.2",
-          "8.3"
+          "phase2:8.2",
+          "phase2:8.3"
         ],
         "created_at": "2025-11-24T02:55:28.107170+00:00",
         "updated_at": "2025-11-24T02:55:28.107170+00:00"
       },
       {
-        "id": "9.1",
+        "id": "phase2:9.1",
         "title": "Define Deadlock Models and Schemas",
         "description": "Research deadlock concepts in state machines and define data models/schemas for representing state transitions, locks, and potential deadlock scenarios.",
         "status": "pending",
@@ -2450,73 +2453,73 @@
         "updated_at": "2025-11-24T02:55:33.868196+00:00"
       },
       {
-        "id": "9.2",
+        "id": "phase2:9.2",
         "title": "Design Deadlock Detection Algorithm",
         "description": "Design a compile-time algorithm to analyze state machine graphs for cycles or mutual exclusions that could lead to deadlocks, ensuring it fits within the existing compilation pipeline.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.1"
+          "phase2:9.1"
         ],
         "created_at": "2025-11-24T02:55:33.868225+00:00",
         "updated_at": "2025-11-24T02:55:33.868225+00:00"
       },
       {
-        "id": "9.3",
+        "id": "phase2:9.3",
         "title": "Implement Core Verification Logic",
         "description": "Implement the deadlock detection logic in code, including graph traversal and cycle detection mechanisms, making it modular and reusable.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.2"
+          "phase2:9.2"
         ],
         "created_at": "2025-11-24T02:55:33.868238+00:00",
         "updated_at": "2025-11-24T02:55:33.868238+00:00"
       },
       {
-        "id": "9.4",
+        "id": "phase2:9.4",
         "title": "Integrate Verification with Parser",
         "description": "Modify the parser to invoke the deadlock verification checks during compilation, handling errors and warnings for detected potential deadlocks.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.3"
+          "phase2:9.3"
         ],
         "created_at": "2025-11-24T02:55:33.868465+00:00",
         "updated_at": "2025-11-24T02:55:33.868465+00:00"
       },
       {
-        "id": "9.5",
+        "id": "phase2:9.5",
         "title": "Create Test Cases for State Charts",
         "description": "Develop a set of diverse state chart examples, including those prone to deadlocks and those that are safe, to validate the verification logic.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "9.1"
+          "phase2:9.1"
         ],
         "created_at": "2025-11-24T02:55:33.868475+00:00",
         "updated_at": "2025-11-24T02:55:33.868475+00:00"
       },
       {
-        "id": "9.6",
+        "id": "phase2:9.6",
         "title": "Test and Validate Implementation",
         "description": "Run the verification on the test state charts, analyze results for accuracy, fix any issues, and ensure integration with the parser works seamlessly.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "9.4",
-          "9.5"
+          "phase2:9.4",
+          "phase2:9.5"
         ],
         "created_at": "2025-11-24T02:55:33.868485+00:00",
         "updated_at": "2025-11-24T02:55:33.868485+00:00"
       },
       {
-        "id": "10.1",
+        "id": "phase2:10.1",
         "title": "Parse Swarm.toml Definitions",
         "description": "Create a parser to read and validate Swarm.toml files, defining data structures or schemas to represent the swarm configurations.",
         "status": "pending",
@@ -2527,47 +2530,47 @@
         "updated_at": "2025-11-24T02:55:37.259254+00:00"
       },
       {
-        "id": "10.2",
+        "id": "phase2:10.2",
         "title": "Implement Mermaid Diagram Generation",
         "description": "Build the core logic to convert parsed Swarm.toml data into Mermaid diagram syntax, handling nodes, edges, and layouts.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "10.1"
+          "phase2:10.1"
         ],
         "created_at": "2025-11-24T02:55:37.259277+00:00",
         "updated_at": "2025-11-24T02:55:37.259277+00:00"
       },
       {
-        "id": "10.3",
+        "id": "phase2:10.3",
         "title": "Add Diagram Output Functionality",
         "description": "Implement functionality to output generated Mermaid diagrams for visualization, such as saving to files or integrating with a rendering tool.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "10.2"
+          "phase2:10.2"
         ],
         "created_at": "2025-11-24T02:55:37.259286+00:00",
         "updated_at": "2025-11-24T02:55:37.259286+00:00"
       },
       {
-        "id": "10.4",
+        "id": "phase2:10.4",
         "title": "Verify Diagram Accuracy",
         "description": "Test the generator with sample Swarm.toml inputs, compare outputs against expected diagrams, and ensure accuracy and correctness.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "10.2",
-          "10.3"
+          "phase2:10.2",
+          "phase2:10.3"
         ],
         "created_at": "2025-11-24T02:55:37.259293+00:00",
         "updated_at": "2025-11-24T02:55:37.259293+00:00"
       },
       {
-        "id": "11.1",
+        "id": "phase2:11.1",
         "title": "Define Lease Model and Schema",
         "description": "Create a data model and schema for file leases, including fields for file identifier, lease holder, TTL (time-to-live), and lease start time. Ensure it integrates with the existing ContextSyncer data structures.",
         "status": "pending",
@@ -2578,59 +2581,59 @@
         "updated_at": "2025-11-24T02:55:44.941829+00:00"
       },
       {
-        "id": "11.2",
+        "id": "phase2:11.2",
         "title": "Implement Lease Acquisition Logic",
         "description": "Develop the core logic for acquiring a lease on a file, including checking for existing leases, setting the TTL, and storing the lease information. Handle cases where the lease is already held or expired.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "11.1"
+          "phase2:11.1"
         ],
         "created_at": "2025-11-24T02:55:44.941855+00:00",
         "updated_at": "2025-11-24T02:55:44.941855+00:00"
       },
       {
-        "id": "11.3",
+        "id": "phase2:11.3",
         "title": "Implement Lease Release Logic",
         "description": "Develop the logic for releasing a lease, including validation of the lease holder and updating the lease status. Ensure expired leases are automatically released or invalidated.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "11.2"
+          "phase2:11.2"
         ],
         "created_at": "2025-11-24T02:55:44.941866+00:00",
         "updated_at": "2025-11-24T02:55:44.941866+00:00"
       },
       {
-        "id": "11.4",
+        "id": "phase2:11.4",
         "title": "Integrate Locking Mechanism into ContextSyncer",
         "description": "Add the TTL-based locking to the ContextSyncer, ensuring file operations respect the lease state. Implement lease management within the syncer's file handling processes.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "11.3"
+          "phase2:11.3"
         ],
         "created_at": "2025-11-24T02:55:44.941876+00:00",
         "updated_at": "2025-11-24T02:55:44.941876+00:00"
       },
       {
-        "id": "11.5",
+        "id": "phase2:11.5",
         "title": "Test Locking and Unlocking Files",
         "description": "Write and run tests for acquiring and releasing locks on files, including scenarios for concurrent access, TTL expiration, and edge cases like invalid releases.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "11.4"
+          "phase2:11.4"
         ],
         "created_at": "2025-11-24T02:55:44.941887+00:00",
         "updated_at": "2025-11-24T02:55:44.941887+00:00"
       },
       {
-        "id": "12.1",
+        "id": "phase2:12.1",
         "title": "Define Hash Schema and Model",
         "description": "Define the data schema and model to include hash fields for files, specifying how hashes are stored and associated with file versions.",
         "status": "pending",
@@ -2641,59 +2644,59 @@
         "updated_at": "2025-11-24T02:55:48.443798+00:00"
       },
       {
-        "id": "12.2",
+        "id": "phase2:12.2",
         "title": "Implement Hash Generation Logic",
         "description": "Create a utility function to generate hashes for file content, ensuring it's deterministic and efficient for comparison.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "12.1"
+          "phase2:12.1"
         ],
         "created_at": "2025-11-24T02:55:48.443804+00:00",
         "updated_at": "2025-11-24T02:55:48.443804+00:00"
       },
       {
-        "id": "12.3",
+        "id": "phase2:12.3",
         "title": "Integrate Concurrency Check in Write Operations",
         "description": "Modify file write functions to include optimistic concurrency checks: compute and compare hashes, allowing writes only if they match.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "12.2"
+          "phase2:12.2"
         ],
         "created_at": "2025-11-24T02:55:48.443807+00:00",
         "updated_at": "2025-11-24T02:55:48.443807+00:00"
       },
       {
-        "id": "12.4",
+        "id": "phase2:12.4",
         "title": "Implement Rejection Handling",
         "description": "Add error handling for hash mismatches, including appropriate responses or exceptions when writes are rejected due to concurrency conflicts.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "12.3"
+          "phase2:12.3"
         ],
         "created_at": "2025-11-24T02:55:48.443809+00:00",
         "updated_at": "2025-11-24T02:55:48.443809+00:00"
       },
       {
-        "id": "12.5",
+        "id": "phase2:12.5",
         "title": "Test Concurrency Scenarios",
         "description": "Develop and run tests simulating multiple agents attempting concurrent file writes, verifying hash checks and rejections work correctly.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "12.4"
+          "phase2:12.4"
         ],
         "created_at": "2025-11-24T02:55:48.443811+00:00",
         "updated_at": "2025-11-24T02:55:48.443811+00:00"
       },
       {
-        "id": "14.1",
+        "id": "phase2:14.1",
         "title": "Define Auto-Deny Policies and Timeout Configurations",
         "description": "Create models or schemas for auto-deny policy rules and timeout settings, including parameters like time limits and deny conditions.",
         "status": "pending",
@@ -2704,46 +2707,46 @@
         "updated_at": "2025-11-24T02:55:53.160781+00:00"
       },
       {
-        "id": "14.2",
+        "id": "phase2:14.2",
         "title": "Implement Auto-Deny and Timeout Logic in Approval Manager",
         "description": "Add the core logic to handle auto-denying approvals based on policies and managing timeouts within the Approval Manager.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "14.1"
+          "phase2:14.1"
         ],
         "created_at": "2025-11-24T02:55:53.160789+00:00",
         "updated_at": "2025-11-24T02:55:53.160789+00:00"
       },
       {
-        "id": "14.3",
+        "id": "phase2:14.3",
         "title": "Configure Default Behaviors",
         "description": "Set up and configure default auto-deny policies and timeout behaviors in the system.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "14.2"
+          "phase2:14.2"
         ],
         "created_at": "2025-11-24T02:55:53.160794+00:00",
         "updated_at": "2025-11-24T02:55:53.160794+00:00"
       },
       {
-        "id": "14.4",
+        "id": "phase2:14.4",
         "title": "Add Tests for Timeout Simulation and Auto-Deny Verification",
         "description": "Implement unit and integration tests that simulate timeouts and verify the auto-deny logic works correctly.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "14.2"
+          "phase2:14.2"
         ],
         "created_at": "2025-11-24T02:55:53.160798+00:00",
         "updated_at": "2025-11-24T02:55:53.160798+00:00"
       },
       {
-        "id": "15.1",
+        "id": "phase2:15.1",
         "title": "Define Approval API Schemas",
         "description": "Define request/response schemas and data models for the approval API endpoints, including structures for approval/denial actions and ApprovalQueue interactions.",
         "status": "pending",
@@ -2754,46 +2757,46 @@
         "updated_at": "2025-11-24T02:55:57.340854+00:00"
       },
       {
-        "id": "15.2",
+        "id": "phase2:15.2",
         "title": "Implement Approval Core Logic",
         "description": "Implement the business logic to handle approve/deny actions in the ApprovalQueue, including validation, state updates, and error handling.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "15.1"
+          "phase2:15.1"
         ],
         "created_at": "2025-11-24T02:55:57.340862+00:00",
         "updated_at": "2025-11-24T02:55:57.340862+00:00"
       },
       {
-        "id": "15.3",
+        "id": "phase2:15.3",
         "title": "Implement API Endpoints",
         "description": "Create and implement the REST API endpoints (e.g., POST for approve/deny) that allow external UIs to interact with the ApprovalQueue.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "15.2"
+          "phase2:15.2"
         ],
         "created_at": "2025-11-24T02:55:57.340866+00:00",
         "updated_at": "2025-11-24T02:55:57.340866+00:00"
       },
       {
-        "id": "15.4",
+        "id": "phase2:15.4",
         "title": "Test API Calls",
         "description": "Write and execute tests for the API endpoints, covering successful approvals/denials, error cases, and integration with the ApprovalQueue.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "15.3"
+          "phase2:15.3"
         ],
         "created_at": "2025-11-24T02:55:57.340869+00:00",
         "updated_at": "2025-11-24T02:55:57.340869+00:00"
       },
       {
-        "id": "16.1",
+        "id": "phase2:16.1",
         "title": "Set up Global Storage Directory",
         "description": "Create the ~/.descartes/thoughts directory structure and initialize it for global storage of thoughts. Ensure the directory is accessible and properly configured.",
         "status": "pending",
@@ -2804,33 +2807,33 @@
         "updated_at": "2025-11-24T02:55:59.612867+00:00"
       },
       {
-        "id": "16.2",
+        "id": "phase2:16.2",
         "title": "Implement Storage and Retrieval Logic",
         "description": "Develop functions or methods to store and retrieve notes/thoughts in the ~/.descartes/thoughts directory. Handle file operations for writing and reading thoughts.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "16.1"
+          "phase2:16.1"
         ],
         "created_at": "2025-11-24T02:55:59.612893+00:00",
         "updated_at": "2025-11-24T02:55:59.612893+00:00"
       },
       {
-        "id": "16.3",
+        "id": "phase2:16.3",
         "title": "Test Storing and Reading Thoughts",
         "description": "Write and run tests to verify that thoughts can be stored and retrieved correctly from the global storage. Ensure edge cases like empty thoughts or invalid paths are handled.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "16.2"
+          "phase2:16.2"
         ],
         "created_at": "2025-11-24T02:55:59.612900+00:00",
         "updated_at": "2025-11-24T02:55:59.612900+00:00"
       },
       {
-        "id": "17.1",
+        "id": "phase2:17.1",
         "title": "Define Symlinking Requirements",
         "description": "Analyze the existing project structure and define the specifications for symlinking thoughts to project-specific directories, including path formats, naming conventions, and any necessary data models or schemas.",
         "status": "pending",
@@ -2841,46 +2844,46 @@
         "updated_at": "2025-11-24T02:56:08.338724+00:00"
       },
       {
-        "id": "17.2",
+        "id": "phase2:17.2",
         "title": "Implement Core Symlinking Logic",
         "description": "Develop the core function or module to create symlinks from thoughts (notes) to the appropriate project directories, handling path resolution and symlink creation.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "17.1"
+          "phase2:17.1"
         ],
         "created_at": "2025-11-24T02:56:08.338734+00:00",
         "updated_at": "2025-11-24T02:56:08.338734+00:00"
       },
       {
-        "id": "17.3",
+        "id": "phase2:17.3",
         "title": "Ensure Proper Linking and Access",
         "description": "Add logic to verify symlink integrity, resolve any broken links, and ensure proper file access permissions for the symlinked thoughts within project directories.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "17.2"
+          "phase2:17.2"
         ],
         "created_at": "2025-11-24T02:56:08.338739+00:00",
         "updated_at": "2025-11-24T02:56:08.338739+00:00"
       },
       {
-        "id": "17.4",
+        "id": "phase2:17.4",
         "title": "Validate Symlinks in Test Projects",
         "description": "Set up test projects and validate the symlinking logic by creating symlinks, testing access, and ensuring they work correctly in a controlled environment.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "17.3"
+          "phase2:17.3"
         ],
         "created_at": "2025-11-24T02:56:08.338743+00:00",
         "updated_at": "2025-11-24T02:56:08.338743+00:00"
       },
       {
-        "id": "18.1",
+        "id": "phase2:18.1",
         "title": "Define Thought Schema for Tantivy",
         "description": "Create and define the schema for indexing thoughts in Tantivy, including fields like thought ID, content, timestamp, and any metadata needed for agent retrieval.",
         "status": "pending",
@@ -2891,46 +2894,46 @@
         "updated_at": "2025-11-24T02:56:11.823258+00:00"
       },
       {
-        "id": "18.2",
+        "id": "phase2:18.2",
         "title": "Implement Thought Indexing Logic",
         "description": "Develop the core logic to index thoughts into the Tantivy search index, handling document creation, adding to the index, and committing changes.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "18.1"
+          "phase2:18.1"
         ],
         "created_at": "2025-11-24T02:56:11.823268+00:00",
         "updated_at": "2025-11-24T02:56:11.823268+00:00"
       },
       {
-        "id": "18.3",
+        "id": "phase2:18.3",
         "title": "Implement Search Functionality",
         "description": "Build the search API or function to query the Tantivy index for thoughts, supporting retrieval based on keywords, filters, and relevance scoring for agent use.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "18.2"
+          "phase2:18.2"
         ],
         "created_at": "2025-11-24T02:56:11.823273+00:00",
         "updated_at": "2025-11-24T02:56:11.823273+00:00"
       },
       {
-        "id": "18.4",
+        "id": "phase2:18.4",
         "title": "Test Search and Indexing",
         "description": "Create and run tests to verify that thoughts are correctly indexed, searchable, and retrievable, including edge cases and performance checks.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "18.3"
+          "phase2:18.3"
         ],
         "created_at": "2025-11-24T02:56:11.823277+00:00",
         "updated_at": "2025-11-24T02:56:11.823277+00:00"
       },
       {
-        "id": "19.1",
+        "id": "phase2:19.1",
         "title": "Design and Create Tasks Table Schema",
         "description": "Design the initial SQLite schema for the tasks table, including basic fields like id, title, description, status, etc. Create the table in the database.",
         "status": "pending",
@@ -2941,33 +2944,33 @@
         "updated_at": "2025-11-24T02:56:16.417384+00:00"
       },
       {
-        "id": "19.2",
+        "id": "phase2:19.2",
         "title": "Refine and Finalize Schema for Required Fields",
         "description": "Review and refine the tasks schema to ensure it supports all required fields for the Global Task Manager, such as dates, priorities, assignees, etc. Make any necessary alterations.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "19.1"
+          "phase2:19.1"
         ],
         "created_at": "2025-11-24T02:56:16.417393+00:00",
         "updated_at": "2025-11-24T02:56:16.417393+00:00"
       },
       {
-        "id": "19.3",
+        "id": "phase2:19.3",
         "title": "Populate Database with Sample Tasks",
         "description": "Insert sample tasks into the finalized schema to test and demonstrate its functionality, ensuring data integrity and coverage of all fields.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "19.2"
+          "phase2:19.2"
         ],
         "created_at": "2025-11-24T02:56:16.417397+00:00",
         "updated_at": "2025-11-24T02:56:16.417397+00:00"
       },
       {
-        "id": "20.1",
+        "id": "phase2:20.1",
         "title": "Integrate SQLite Schema for Tasks",
         "description": "Define and integrate the SQLite database schema for tasks in the StateStore module, ensuring it supports the required fields for CRUD operations.",
         "status": "pending",
@@ -2978,46 +2981,46 @@
         "updated_at": "2025-11-24T02:56:20.140870+00:00"
       },
       {
-        "id": "20.2",
+        "id": "phase2:20.2",
         "title": "Implement Create Operation",
         "description": "Add the create functionality to the StateStore module to insert new tasks into the SQLite database.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "20.1"
+          "phase2:20.1"
         ],
         "created_at": "2025-11-24T02:56:20.140878+00:00",
         "updated_at": "2025-11-24T02:56:20.140878+00:00"
       },
       {
-        "id": "20.3",
+        "id": "phase2:20.3",
         "title": "Implement Update and Delete Operations",
         "description": "Add the update and delete functionalities to the StateStore module to modify and remove tasks from the SQLite database.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "20.2"
+          "phase2:20.2"
         ],
         "created_at": "2025-11-24T02:56:20.140882+00:00",
         "updated_at": "2025-11-24T02:56:20.140882+00:00"
       },
       {
-        "id": "20.4",
+        "id": "phase2:20.4",
         "title": "Implement Read Operation and Test CRUD",
         "description": "Add the read functionality to retrieve tasks and create comprehensive tests for creating, reading, updating, and deleting tasks in the StateStore module.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "20.3"
+          "phase2:20.3"
         ],
         "created_at": "2025-11-24T02:56:20.140885+00:00",
         "updated_at": "2025-11-24T02:56:20.140885+00:00"
       },
       {
-        "id": "21.1",
+        "id": "phase2:21.1",
         "title": "Define Configuration Fields",
         "description": "Research and define the necessary configuration fields required for SCUD integration in the .descartes/config.toml file, ensuring all key aspects are covered.",
         "status": "pending",
@@ -3028,46 +3031,46 @@
         "updated_at": "2025-11-24T02:56:24.861673+00:00"
       },
       {
-        "id": "21.2",
+        "id": "phase2:21.2",
         "title": "Design Schema Structure",
         "description": "Design the overall structure and format of the .descartes/config.toml schema, incorporating the defined fields into a valid TOML format.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "21.1"
+          "phase2:21.1"
         ],
         "created_at": "2025-11-24T02:56:24.861686+00:00",
         "updated_at": "2025-11-24T02:56:24.861686+00:00"
       },
       {
-        "id": "21.3",
+        "id": "phase2:21.3",
         "title": "Implement Schema Parsing",
         "description": "Implement the code to parse the .descartes/config.toml schema, handling loading and basic structure validation.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "21.2"
+          "phase2:21.2"
         ],
         "created_at": "2025-11-24T02:56:24.861692+00:00",
         "updated_at": "2025-11-24T02:56:24.861692+00:00"
       },
       {
-        "id": "21.4",
+        "id": "phase2:21.4",
         "title": "Validate Schema Parsing",
         "description": "Add validation logic to ensure the parsed schema meets requirements and run tests to confirm correct parsing and error handling.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "21.3"
+          "phase2:21.3"
         ],
         "created_at": "2025-11-24T02:56:24.861713+00:00",
         "updated_at": "2025-11-24T02:56:24.861713+00:00"
       },
       {
-        "id": "22.1",
+        "id": "phase2:22.1",
         "title": "Integrate Shared Schema into SCUD",
         "description": "Add the shared schema definitions to SCUD's codebase, ensuring it can reference the shared schema for database interactions. This includes importing or defining the schema models.",
         "status": "pending",
@@ -3078,46 +3081,46 @@
         "updated_at": "2025-11-24T02:56:28.391724+00:00"
       },
       {
-        "id": "22.2",
+        "id": "phase2:22.2",
         "title": "Implement Database Reading Logic",
         "description": "Develop the core logic in SCUD to read data from the database using the shared schema, including query functions and data retrieval methods.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "22.1"
+          "phase2:22.1"
         ],
         "created_at": "2025-11-24T02:56:28.391732+00:00",
         "updated_at": "2025-11-24T02:56:28.391732+00:00"
       },
       {
-        "id": "22.3",
+        "id": "phase2:22.3",
         "title": "Ensure Compatibility and Access",
         "description": "Verify that SCUD has proper access permissions and that the reading logic is compatible with the shared schema, resolving any integration issues.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "22.2"
+          "phase2:22.2"
         ],
         "created_at": "2025-11-24T02:56:28.391735+00:00",
         "updated_at": "2025-11-24T02:56:28.391735+00:00"
       },
       {
-        "id": "22.4",
+        "id": "phase2:22.4",
         "title": "Test SCUD Reading Sample Data",
         "description": "Create and run tests to validate that SCUD can successfully read sample data from the database using the shared schema, including edge cases.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "22.3"
+          "phase2:22.3"
         ],
         "created_at": "2025-11-24T02:56:28.391737+00:00",
         "updated_at": "2025-11-24T02:56:28.391737+00:00"
       },
       {
-        "id": "23.1",
+        "id": "phase2:23.1",
         "title": "Define Secret Data Model",
         "description": "Create a data model or schema for storing secrets, including fields for encrypted data, metadata like timestamps, and any necessary identifiers.",
         "status": "pending",
@@ -3128,46 +3131,46 @@
         "updated_at": "2025-11-24T02:56:32.289760+00:00"
       },
       {
-        "id": "23.2",
+        "id": "phase2:23.2",
         "title": "Implement AES-256 Encryption/Decryption Logic",
         "description": "Develop functions for encrypting and decrypting secrets using AES-256, including key generation and handling edge cases like empty inputs or invalid keys.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "23.1"
+          "phase2:23.1"
         ],
         "created_at": "2025-11-24T02:56:32.289774+00:00",
         "updated_at": "2025-11-24T02:56:32.289774+00:00"
       },
       {
-        "id": "23.3",
+        "id": "phase2:23.3",
         "title": "Build Secure Storage and Retrieval Mechanism",
         "description": "Implement local storage (e.g., file-based or in-memory) for encrypted secrets, with methods to securely store and retrieve them, ensuring data integrity.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "23.2"
+          "phase2:23.2"
         ],
         "created_at": "2025-11-24T02:56:32.289778+00:00",
         "updated_at": "2025-11-24T02:56:32.289778+00:00"
       },
       {
-        "id": "23.4",
+        "id": "phase2:23.4",
         "title": "Test Secure Storage and Retrieval",
         "description": "Create unit tests to verify encryption/decryption, storage security, retrieval accuracy, and edge cases like corruption or unauthorized access attempts.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "23.3"
+          "phase2:23.3"
         ],
         "created_at": "2025-11-24T02:56:32.289782+00:00",
         "updated_at": "2025-11-24T02:56:32.289782+00:00"
       },
       {
-        "id": "24.1",
+        "id": "phase2:24.1",
         "title": "Identify Secrets to Mask",
         "description": "Define a list of sensitive data patterns (e.g., API keys, passwords, tokens) that need to be masked in logs. Research common secret formats and create a configurable list.",
         "status": "pending",
@@ -3178,46 +3181,46 @@
         "updated_at": "2025-11-24T02:56:36.181193+00:00"
       },
       {
-        "id": "24.2",
+        "id": "phase2:24.2",
         "title": "Implement Masking Logic",
         "description": "Develop a utility function or class that scans log messages for identified secrets and replaces them with masked placeholders (e.g., '***MASKED***'). Ensure it handles various formats and is efficient.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "24.1"
+          "phase2:24.1"
         ],
         "created_at": "2025-11-24T02:56:36.181217+00:00",
         "updated_at": "2025-11-24T02:56:36.181217+00:00"
       },
       {
-        "id": "24.3",
+        "id": "phase2:24.3",
         "title": "Integrate Masking into Logging Outputs",
         "description": "Modify the logging framework to apply the masking logic to all log outputs before writing to files, consoles, or external services. Ensure it's applied universally across the application.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "24.2"
+          "phase2:24.2"
         ],
         "created_at": "2025-11-24T02:56:36.181224+00:00",
         "updated_at": "2025-11-24T02:56:36.181224+00:00"
       },
       {
-        "id": "24.4",
+        "id": "phase2:24.4",
         "title": "Verify Masking in Test Logs",
         "description": "Create unit and integration tests that generate logs with secrets and verify that they are properly masked. Include edge cases like partial matches and multiple secrets in one log entry.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "24.3"
+          "phase2:24.3"
         ],
         "created_at": "2025-11-24T02:56:36.181231+00:00",
         "updated_at": "2025-11-24T02:56:36.181231+00:00"
       },
       {
-        "id": "25.1",
+        "id": "phase2:25.1",
         "title": "Define NotificationRouter Trait",
         "description": "Create the foundational NotificationRouter trait with methods for handling notifications, ensuring it is well-defined and ready for implementation.",
         "status": "pending",
@@ -3228,34 +3231,34 @@
         "updated_at": "2025-11-24T02:56:38.955696+00:00"
       },
       {
-        "id": "25.2",
+        "id": "phase2:25.2",
         "title": "Set Up Interfaces for Different Adapters",
         "description": "Implement interfaces for various notification adapters (e.g., email, SMS) that integrate with the NotificationRouter trait.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "25.1"
+          "phase2:25.1"
         ],
         "created_at": "2025-11-24T02:56:38.955716+00:00",
         "updated_at": "2025-11-24T02:56:38.955716+00:00"
       },
       {
-        "id": "25.3",
+        "id": "phase2:25.3",
         "title": "Test Trait Implementation",
         "description": "Write and run tests to verify the NotificationRouter trait and its adapter interfaces work correctly.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "25.1",
-          "25.2"
+          "phase2:25.1",
+          "phase2:25.2"
         ],
         "created_at": "2025-11-24T02:56:38.955723+00:00",
         "updated_at": "2025-11-24T02:56:38.955723+00:00"
       },
       {
-        "id": "26.1",
+        "id": "phase2:26.1",
         "title": "Set up TelegramAdapter foundation",
         "description": "Create the TelegramAdapter class with basic structure, including necessary imports and initialization with bot token from environment variables.",
         "status": "pending",
@@ -3266,54 +3269,54 @@
         "updated_at": "2025-11-24T02:56:43.420080+00:00"
       },
       {
-        "id": "26.2",
+        "id": "phase2:26.2",
         "title": "Implement message sending logic",
         "description": "Implement the core method in TelegramAdapter to send messages using the Telegram Bot API, handling API calls and basic error handling.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "26.1"
+          "phase2:26.1"
         ],
         "created_at": "2025-11-24T02:56:43.420086+00:00",
         "updated_at": "2025-11-24T02:56:43.420086+00:00"
       },
       {
-        "id": "26.3",
+        "id": "phase2:26.3",
         "title": "Integrate with NotificationRouter",
         "description": "Modify NotificationRouter to include TelegramAdapter as a notification channel, ensuring it can route notifications to Telegram via the adapter.",
         "status": "pending",
         "complexity": 0,
         "priority": "high",
         "dependencies": [
-          "26.2"
+          "phase2:26.2"
         ],
         "created_at": "2025-11-24T02:56:43.420106+00:00",
         "updated_at": "2025-11-24T02:56:43.420106+00:00"
       },
       {
-        "id": "26.4",
+        "id": "phase2:26.4",
         "title": "Unit test TelegramAdapter",
         "description": "Write and run unit tests for the TelegramAdapter's message sending functionality, mocking the Telegram API to verify correct behavior.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "26.2"
+          "phase2:26.2"
         ],
         "created_at": "2025-11-24T02:56:43.420108+00:00",
         "updated_at": "2025-11-24T02:56:43.420108+00:00"
       },
       {
-        "id": "26.5",
+        "id": "phase2:26.5",
         "title": "Test end-to-end message sending",
         "description": "Perform end-to-end testing by sending actual messages via Telegram to a test chat, verifying integration with NotificationRouter and real API responses.",
         "status": "pending",
         "complexity": 0,
         "priority": "medium",
         "dependencies": [
-          "26.3",
-          "26.4"
+          "phase2:26.3",
+          "phase2:26.4"
         ],
         "created_at": "2025-11-24T02:56:43.420110+00:00",
         "updated_at": "2025-11-24T02:56:43.420110+00:00"

@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "cli", "gui"]
+members = ["core", "cli", "gui", "agent-runner"]
 resolver = "2"
 
 [workspace.package]
@@ -41,3 +41,6 @@ ndjson = "0.1"
 
 # UUID
 uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Configuration
+toml = "0.8"
