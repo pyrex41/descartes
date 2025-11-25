@@ -148,7 +148,7 @@ fn print_logs_text(rows: &[sqlx::sqlite::SqliteRow]) -> Result<()> {
 
         println!(
             "{} {} {} {}",
-            time_str.to_string().dim(),
+            time_str.to_string().dimmed(),
             event_colored,
             actor_colored,
             content

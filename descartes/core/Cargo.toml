@@ -27,7 +27,6 @@ hyper = { workspace = true }
 sqlx = { workspace = true }
 
 # Git
-gitoxide = { workspace = true }
 gix = { workspace = true }
 
 # UUID
@@ -38,7 +37,7 @@ bytes = "1.5"
 dashmap = "5.5"
 parking_lot = "0.12"
 futures = "0.3"
-chrono = { version = "=0.4.39", features = ["serde"] }
+chrono = { workspace = true }
 dirs = "5.0"
 toml = { workspace = true }
 

@@ -1,6 +1,6 @@
 /// Simple StateStore implementation for CLI
 use async_trait::async_trait;
-use descartes_core::{Event, StateStore, StateStoreResult, Task};
+use descartes_core::{Event, StateStore, StateStoreResult, Task, TaskComplexity, TaskPriority};
 use sqlx::sqlite::SqlitePool;
 use uuid::Uuid;
 
@@ -12,7 +12,7 @@ impl SimpleStateStore {
     pub async fn new(database_url: &str) -> StateStoreResult<Self> {
         let pool = SqlitePool::connect(database_url)
             .await
-            .map_err(|e| descartes_core::StateStoreError::ConnectionError(e.to_string()))?;
+            .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         Ok(Self { pool })
     }
@@ -55,7 +55,7 @@ impl StateStore for SimpleStateStore {
         .bind(&event.git_commit)
         .execute(&self.pool)
         .await
-        .map_err(|e| descartes_core::StateStoreError::WriteError(e.to_string()))?;
+        .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
@@ -67,7 +67,7 @@ impl StateStore for SimpleStateStore {
         .bind(session_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| descartes_core::StateStoreError::ReadError(e.to_string()))?;
+        .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         let events = rows
             .into_iter()
@@ -84,7 +84,7 @@ impl StateStore for SimpleStateStore {
         .bind(event_type)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| descartes_core::StateStoreError::ReadError(e.to_string()))?;
+        .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         let events = rows
             .into_iter()
@@ -117,7 +117,7 @@ impl StateStore for SimpleStateStore {
         .bind(metadata_json)
         .execute(&self.pool)
         .await
-        .map_err(|e| descartes_core::StateStoreError::WriteError(e.to_string()))?;
+        .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
@@ -129,7 +129,7 @@ impl StateStore for SimpleStateStore {
         .bind(task_id.to_string())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| descartes_core::StateStoreError::ReadError(e.to_string()))?;
+        .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         if let Some(row) = row {
             Ok(Some(self.row_to_task(&row)?))
@@ -144,7 +144,7 @@ impl StateStore for SimpleStateStore {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| descartes_core::StateStoreError::ReadError(e.to_string()))?;
+        .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         let tasks = rows
             .into_iter()
@@ -169,7 +169,7 @@ impl StateStore for SimpleStateStore {
         .bind(&search_pattern)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| descartes_core::StateStoreError::ReadError(e.to_string()))?;
+        .map_err(|e| descartes_core::StateStoreError::DatabaseError(e.to_string()))?;
 
         let events = rows
             .into_iter()
@@ -186,7 +186,7 @@ impl SimpleStateStore {
 
         let id_str: String = row.get("id");
         let id = Uuid::parse_str(&id_str)
-            .map_err(|e| descartes_core::StateStoreError::ParseError(e.to_string()))?;
+            .map_err(|e| descartes_core::StateStoreError::SerializationError(e.to_string()))?;
 
         let actor_type_str: String = row.get("actor_type");
         let actor_type = match actor_type_str.as_str() {
@@ -217,7 +217,7 @@ impl SimpleStateStore {
 
         let id_str: String = row.get("id");
         let id = Uuid::parse_str(&id_str)
-            .map_err(|e| descartes_core::StateStoreError::ParseError(e.to_string()))?;
+            .map_err(|e| descartes_core::StateStoreError::SerializationError(e.to_string()))?;
 
         let status_str: String = row.get("status");
         let status = match status_str.as_str() {
@@ -236,7 +236,10 @@ impl SimpleStateStore {
             title: row.get("title"),
             description: row.get("description"),
             status,
+            priority: TaskPriority::default(),
+            complexity: TaskComplexity::default(),
             assigned_to: row.get("assigned_to"),
+            dependencies: vec![],
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
             metadata,

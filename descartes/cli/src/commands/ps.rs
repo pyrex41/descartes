@@ -38,7 +38,7 @@ fn print_table(rows: &[sqlx::sqlite::SqliteRow]) -> Result<()> {
     use sqlx::Row;
 
     println!("\n{}", "Running Agents".green().bold());
-    println!("{}", "─".repeat(120).dim());
+    println!("{}", "─".repeat(120).dimmed());
 
     // Header
     println!(
@@ -50,7 +50,7 @@ fn print_table(rows: &[sqlx::sqlite::SqliteRow]) -> Result<()> {
         "STARTED".bold(),
         "RUNTIME".bold()
     );
-    println!("{}", "─".repeat(120).dim());
+    println!("{}", "─".repeat(120).dimmed());
 
     // Rows
     for row in rows {
@@ -76,7 +76,7 @@ fn print_table(rows: &[sqlx::sqlite::SqliteRow]) -> Result<()> {
             "Idle" => status.yellow(),
             "Completed" => status.blue(),
             "Failed" => status.red(),
-            "Terminated" => status.red().dim(),
+            "Terminated" => status.red().dimmed(),
             _ => status.white(),
         };
 
@@ -86,12 +86,12 @@ fn print_table(rows: &[sqlx::sqlite::SqliteRow]) -> Result<()> {
             name,
             status_colored.to_string(),
             backend.yellow(),
-            started_str.dim(),
+            started_str.dimmed(),
             runtime
         );
     }
 
-    println!("{}", "─".repeat(120).dim());
+    println!("{}", "─".repeat(120).dimmed());
     println!("\nTotal: {}", rows.len().to_string().cyan());
 
     Ok(())

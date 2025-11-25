@@ -46,8 +46,8 @@ pub use errors::{
 pub use traits::{
     ActorType, AgentConfig, AgentHandle, AgentInfo, AgentRunner, AgentSignal, AgentStatus,
     ContextSyncer, Event, ExitStatus, FinishReason, Message, MessageRole, ModelBackend,
-    ModelProviderMode, ModelRequest, ModelResponse, StateStore, Task, TaskStatus, Tool, ToolCall,
-    ToolParameters,
+    ModelProviderMode, ModelRequest, ModelResponse, StateStore, Task, TaskComplexity, TaskPriority,
+    TaskStatus, Tool, ToolCall, ToolParameters,
 };
 
 pub use providers::{

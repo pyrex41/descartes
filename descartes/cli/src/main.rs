@@ -7,6 +7,12 @@ use std::path::{Path, PathBuf};
 mod commands;
 mod state;
 
+/// Load configuration from the given path or default location
+fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
+    let manager = ConfigManager::load(config_path)?;
+    Ok(manager.config().clone())
+}
+
 use commands::{init, kill, logs, ps, spawn};
 
 #[derive(Parser)]

@@ -31,8 +31,7 @@ hyper = "0.14"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 
 # Git
-gitoxide = "0.19"
-gix = "0.58"
+gix = "0.68"
 
 # CLI
 clap = { version = "4.4", features = ["derive"] }
@@ -50,4 +49,4 @@ toml = "0.8"
 statig = "0.3"
 
 # Date/Time
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4.41", features = ["serde"] }

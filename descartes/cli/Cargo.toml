@@ -19,7 +19,7 @@ sqlx = { workspace = true }
 uuid = { workspace = true }
 futures = "0.3"
 indicatif = "0.17"
-chrono = "=0.4.39"
+chrono = { workspace = true }
 colored = "2.0"
 atty = "0.2"
 async-trait = { workspace = true }
@@ -27,3 +27,6 @@ async-trait = { workspace = true }
 [[bin]]
 name = "descartes"
 path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3.8"

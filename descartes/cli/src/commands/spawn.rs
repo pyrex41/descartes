@@ -1,15 +1,14 @@
 use anyhow::Result;
 use colored::Colorize;
 use descartes_core::{
-    ActorType, DescaratesConfig, Event, Message, MessageRole, ModelBackend, ModelRequest,
+    DescaratesConfig, Message, MessageRole, ModelBackend, ModelRequest,
     ProviderFactory,
 };
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::collections::HashMap;
 use std::io::{self, BufRead};
-use std::time::SystemTime;
 use tracing::{info, warn};
-use uuid::Uuid;
 
 pub async fn execute(
     config: &DescaratesConfig,
@@ -36,7 +35,7 @@ pub async fn execute(
     // Check for piped input
     let mut full_task = task.to_string();
     if !atty::is(atty::Stream::Stdin) {
-        println!("\n{}", "Reading from stdin...".dim());
+        println!("\n{}", "Reading from stdin...".dimmed());
         let stdin = io::stdin();
         let mut piped_content = String::new();
         for line in stdin.lock().lines() {
@@ -49,10 +48,10 @@ pub async fn execute(
     }
 
     // Create provider backend
-    let backend = create_backend(config, provider_name, &model_name).await?;
+    let backend = create_backend(config, provider_name, &model_name)?;
 
     // Create model request
-    let mut messages = vec![Message {
+    let messages = vec![Message {
         role: MessageRole::User,
         content: full_task.clone(),
     }];
@@ -80,7 +79,7 @@ pub async fn execute(
 
 async fn execute_streaming(backend: &Box<dyn ModelBackend>, request: ModelRequest) -> Result<()> {
     println!("\n{}", "Streaming response:".green());
-    println!("{}", "─".repeat(80).dim());
+    println!("{}", "─".repeat(80).dimmed());
 
     let mut stream = backend.stream(request).await?;
 
@@ -98,7 +97,7 @@ async fn execute_streaming(backend: &Box<dyn ModelBackend>, request: ModelReques
         }
     }
 
-    println!("\n{}", "─".repeat(80).dim());
+    println!("\n{}", "─".repeat(80).dimmed());
     Ok(())
 }
 
@@ -120,9 +119,9 @@ async fn execute_non_streaming(
     spinner.finish_and_clear();
 
     println!("\n{}", "Response:".green());
-    println!("{}", "─".repeat(80).dim());
+    println!("{}", "─".repeat(80).dimmed());
     println!("{}", response.content);
-    println!("{}", "─".repeat(80).dim());
+    println!("{}", "─".repeat(80).dimmed());
 
     if let Some(tokens) = response.tokens_used {
         println!("\nTokens used: {}", tokens.to_string().cyan());
@@ -131,28 +130,50 @@ async fn execute_non_streaming(
     Ok(())
 }
 
-async fn create_backend(
+fn create_backend(
     config: &DescaratesConfig,
     provider: &str,
-    model: &str,
+    _model: &str,
 ) -> Result<Box<dyn ModelBackend>> {
     info!("Creating backend for provider: {}", provider);
 
-    let factory = ProviderFactory::new(config.clone());
-    let backend = factory.create_backend(provider, model).await?;
+    // Build config HashMap from DescaratesConfig
+    let mut provider_config: HashMap<String, String> = HashMap::new();
 
-    // Health check
-    match backend.health_check().await {
-        Ok(true) => {
-            info!("Backend health check passed");
+    match provider {
+        "anthropic" => {
+            if let Some(ref api_key) = config.providers.anthropic.api_key {
+                provider_config.insert("api_key".to_string(), api_key.clone());
+            }
+            provider_config.insert("endpoint".to_string(), config.providers.anthropic.endpoint.clone());
         }
-        Ok(false) => {
-            warn!("Backend health check failed, but continuing...");
+        "openai" => {
+            if let Some(ref api_key) = config.providers.openai.api_key {
+                provider_config.insert("api_key".to_string(), api_key.clone());
+            }
+            provider_config.insert("endpoint".to_string(), config.providers.openai.endpoint.clone());
         }
-        Err(e) => {
-            warn!("Backend health check error: {}, continuing anyway", e);
+        "ollama" => {
+            provider_config.insert("endpoint".to_string(), config.providers.ollama.endpoint.clone());
+        }
+        "deepseek" => {
+            if let Some(ref api_key) = config.providers.deepseek.api_key {
+                provider_config.insert("api_key".to_string(), api_key.clone());
+            }
+            provider_config.insert("endpoint".to_string(), config.providers.deepseek.endpoint.clone());
+        }
+        "groq" => {
+            if let Some(ref api_key) = config.providers.groq.api_key {
+                provider_config.insert("api_key".to_string(), api_key.clone());
+            }
+            provider_config.insert("endpoint".to_string(), config.providers.groq.endpoint.clone());
+        }
+        _ => {
+            anyhow::bail!("Unknown provider: {}", provider);
         }
     }
+
+    let backend = ProviderFactory::create(provider, provider_config)?;
 
     Ok(backend)
 }
