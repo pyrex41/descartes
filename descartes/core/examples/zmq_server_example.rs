@@ -16,11 +16,10 @@
 /// ```bash
 /// cargo run --example zmq_client_example
 /// ```
-
-use descartes_core::{ZmqAgentServer, ZmqServerConfig, ProcessRunnerConfig};
+use descartes_core::{ProcessRunnerConfig, ZmqAgentServer, ZmqServerConfig};
 use std::sync::Arc;
 use tokio::signal;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use tracing_subscriber;
 
 #[tokio::main]
@@ -56,7 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("  Endpoint: {}", config.endpoint);
     info!("  Server ID: {}", config.server_id);
     info!("  Max agents: {}", config.max_agents);
-    info!("  Status updates: enabled (every {}s)", config.status_update_interval_secs);
+    info!(
+        "  Status updates: enabled (every {}s)",
+        config.status_update_interval_secs
+    );
 
     // Create the server
     let server = Arc::new(ZmqAgentServer::new(config));

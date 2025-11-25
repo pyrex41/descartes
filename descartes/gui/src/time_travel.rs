@@ -7,15 +7,14 @@
 /// - Playback controls for automatic replay
 /// - Event details display
 /// - Git commit integration
-
 use chrono::{DateTime, Utc};
 use descartes_core::{AgentHistoryEvent, HistoryEventType, HistorySnapshot};
+use iced::widget::canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke, Text};
 use iced::widget::{button, column, container, row, text, Column, Row, Space};
 use iced::{
     alignment::{Horizontal, Vertical},
     border, mouse, Color, Element, Length, Point, Rectangle, Renderer, Size, Theme,
 };
-use iced::widget::canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke, Text};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -72,8 +71,7 @@ impl Default for TimeTravelState {
 impl TimeTravelState {
     /// Get the currently selected event
     pub fn selected_event(&self) -> Option<&AgentHistoryEvent> {
-        self.selected_index
-            .and_then(|idx| self.events.get(idx))
+        self.selected_index.and_then(|idx| self.events.get(idx))
     }
 
     /// Get timestamp of selected event
@@ -142,9 +140,14 @@ impl TimeTravelState {
 
     /// Jump to a snapshot
     pub fn jump_to_snapshot(&mut self, snapshot_id: &uuid::Uuid) {
-        if let Some(snapshot) = self.snapshots.iter().find(|s| s.snapshot_id == *snapshot_id) {
+        if let Some(snapshot) = self
+            .snapshots
+            .iter()
+            .find(|s| s.snapshot_id == *snapshot_id)
+        {
             // Find the event closest to this snapshot's timestamp
-            if let Some((idx, _)) = self.events
+            if let Some((idx, _)) = self
+                .events
                 .iter()
                 .enumerate()
                 .min_by_key(|(_, e)| (e.timestamp - snapshot.timestamp).abs())
@@ -427,8 +430,8 @@ fn view_event_details(state: &TimeTravelState) -> Element<TimeTravelMessage> {
         let event_type_color = event_type_color(&event.event_type);
         let event_type_icon = event_type_icon(&event.event_type);
 
-        let event_data_str = serde_json::to_string_pretty(&event.event_data)
-            .unwrap_or_else(|_| "{}".to_string());
+        let event_data_str =
+            serde_json::to_string_pretty(&event.event_data).unwrap_or_else(|_| "{}".to_string());
 
         let tags_display = if event.tags.is_empty() {
             text("No tags").size(12)
@@ -615,11 +618,7 @@ impl<Message> canvas::Program<Message> for TimelineCanvas {
         }
 
         // Draw background
-        frame.fill_rectangle(
-            Point::ORIGIN,
-            bounds.size(),
-            Color::from_rgb8(30, 30, 40),
-        );
+        frame.fill_rectangle(Point::ORIGIN, bounds.size(), Color::from_rgb8(30, 30, 40));
 
         // Draw timeline axis
         let y_center = bounds.height / 2.0;
@@ -676,10 +675,7 @@ impl<Message> canvas::Program<Message> for TimelineCanvas {
             // Draw git commit marker if present
             if self.state.timeline_settings.show_git_commits && event.git_commit_hash.is_some() {
                 frame.fill(
-                    &Path::rectangle(
-                        Point::new(x - 2.0, y_center - 15.0),
-                        Size::new(4.0, 10.0),
-                    ),
+                    &Path::rectangle(Point::new(x - 2.0, y_center - 15.0), Size::new(4.0, 10.0)),
                     Color::from_rgb8(100, 200, 255),
                 );
             }

@@ -28,15 +28,13 @@
 ///       ├── read_agent_stdout()
 ///       └── read_agent_stderr()
 /// ```
-
 use crate::errors::{AgentError, AgentResult};
 use crate::traits::{AgentConfig, AgentInfo, AgentStatus};
 use crate::zmq_agent_runner::{
-    BatchControlCommand, BatchControlResponse, CommandResponse, ControlCommand,
-    ControlCommandType, CustomActionRequest, HealthCheckRequest, HealthCheckResponse,
-    ListAgentsRequest, ListAgentsResponse, ZmqOutputStream, OutputQueryRequest,
-    OutputQueryResponse, SpawnRequest, SpawnResponse, StatusUpdate, ZmqAgentRunner, ZmqMessage,
-    ZmqRunnerConfig,
+    BatchControlCommand, BatchControlResponse, CommandResponse, ControlCommand, ControlCommandType,
+    CustomActionRequest, HealthCheckRequest, HealthCheckResponse, ListAgentsRequest,
+    ListAgentsResponse, OutputQueryRequest, OutputQueryResponse, SpawnRequest, SpawnResponse,
+    StatusUpdate, ZmqAgentRunner, ZmqMessage, ZmqOutputStream, ZmqRunnerConfig,
 };
 use crate::zmq_communication::{SocketType, ZmqConnection, ZmqMessageRouter};
 use async_trait::async_trait;
@@ -68,7 +66,8 @@ pub struct ZmqClient {
     /// Message router for request/response correlation
     router: Arc<ZmqMessageRouter>,
     /// Status update subscribers
-    status_subscribers: Arc<RwLock<Vec<tokio::sync::mpsc::UnboundedSender<AgentResult<StatusUpdate>>>>>,
+    status_subscribers:
+        Arc<RwLock<Vec<tokio::sync::mpsc::UnboundedSender<AgentResult<StatusUpdate>>>>>,
     /// Command queue for when disconnected
     command_queue: Arc<Mutex<VecDeque<QueuedCommand>>>,
     /// Maximum queue size (prevents unbounded growth during long disconnections)
@@ -95,11 +94,7 @@ impl ZmqClient {
     /// let client = ZmqClient::new(config);
     /// ```
     pub fn new(config: ZmqRunnerConfig) -> Self {
-        let connection = ZmqConnection::new(
-            SocketType::Req,
-            &config.endpoint,
-            config.clone(),
-        );
+        let connection = ZmqConnection::new(SocketType::Req, &config.endpoint, config.clone());
 
         Self {
             connection: Arc::new(Mutex::new(connection)),
@@ -118,11 +113,7 @@ impl ZmqClient {
     /// * `socket_type` - ZMQ socket type to use
     /// * `config` - Configuration for the client
     pub fn new_with_socket_type(socket_type: SocketType, config: ZmqRunnerConfig) -> Self {
-        let connection = ZmqConnection::new(
-            socket_type,
-            &config.endpoint,
-            config.clone(),
-        );
+        let connection = ZmqConnection::new(socket_type, &config.endpoint, config.clone());
 
         Self {
             connection: Arc::new(Mutex::new(connection)),
@@ -156,7 +147,10 @@ impl ZmqClient {
             .connection
             .lock()
             .await
-            .request_response(&request, Some(Duration::from_secs(self.config.request_timeout_secs)))
+            .request_response(
+                &request,
+                Some(Duration::from_secs(self.config.request_timeout_secs)),
+            )
             .await?;
 
         match response {
@@ -170,8 +164,7 @@ impl ZmqClient {
 
                 if !resp.success {
                     return Err(AgentError::ExecutionError(
-                        resp.error
-                            .unwrap_or_else(|| "Command failed".to_string()),
+                        resp.error.unwrap_or_else(|| "Command failed".to_string()),
                     ));
                 }
 
@@ -236,7 +229,12 @@ impl ZmqClient {
             .connection
             .lock()
             .await
-            .request_response(&message, Some(Duration::from_secs(timeout_secs.unwrap_or(self.config.request_timeout_secs))))
+            .request_response(
+                &message,
+                Some(Duration::from_secs(
+                    timeout_secs.unwrap_or(self.config.request_timeout_secs),
+                )),
+            )
             .await?;
 
         match response {
@@ -250,8 +248,7 @@ impl ZmqClient {
 
                 if !resp.success {
                     return Err(AgentError::ExecutionError(
-                        resp.error
-                            .unwrap_or_else(|| "Action failed".to_string()),
+                        resp.error.unwrap_or_else(|| "Action failed".to_string()),
                     ));
                 }
 
@@ -325,7 +322,10 @@ impl ZmqClient {
             .connection
             .lock()
             .await
-            .request_response(&message, Some(Duration::from_secs(self.config.request_timeout_secs)))
+            .request_response(
+                &message,
+                Some(Duration::from_secs(self.config.request_timeout_secs)),
+            )
             .await?;
 
         match response {
@@ -413,7 +413,10 @@ impl ZmqClient {
             .connection
             .lock()
             .await
-            .request_response(&message, Some(Duration::from_secs(self.config.request_timeout_secs * 2)))
+            .request_response(
+                &message,
+                Some(Duration::from_secs(self.config.request_timeout_secs * 2)),
+            )
             .await?;
 
         match response {
@@ -506,7 +509,10 @@ impl ZmqClient {
                 .connection
                 .lock()
                 .await
-                .request_response(&queued_cmd.message, Some(Duration::from_secs(self.config.request_timeout_secs)))
+                .request_response(
+                    &queued_cmd.message,
+                    Some(Duration::from_secs(self.config.request_timeout_secs)),
+                )
                 .await;
 
             // Send result to the waiting caller (if still listening)
@@ -565,11 +571,7 @@ impl ZmqAgentRunner for ZmqClient {
         }
 
         // Create new connection with updated endpoint
-        let mut new_connection = ZmqConnection::new(
-            SocketType::Req,
-            endpoint,
-            self.config.clone(),
-        );
+        let mut new_connection = ZmqConnection::new(SocketType::Req, endpoint, self.config.clone());
 
         new_connection.connect().await?;
 
@@ -624,7 +626,12 @@ impl ZmqAgentRunner for ZmqClient {
             .connection
             .lock()
             .await
-            .request_response(&message, Some(Duration::from_secs(timeout_secs.unwrap_or(self.config.request_timeout_secs))))
+            .request_response(
+                &message,
+                Some(Duration::from_secs(
+                    timeout_secs.unwrap_or(self.config.request_timeout_secs),
+                )),
+            )
             .await?;
 
         match response {
@@ -638,8 +645,7 @@ impl ZmqAgentRunner for ZmqClient {
 
                 if !resp.success {
                     return Err(AgentError::ExecutionError(
-                        resp.error
-                            .unwrap_or_else(|| "Spawn failed".to_string()),
+                        resp.error.unwrap_or_else(|| "Spawn failed".to_string()),
                     ));
                 }
 
@@ -672,7 +678,10 @@ impl ZmqAgentRunner for ZmqClient {
             .connection
             .lock()
             .await
-            .request_response(&message, Some(Duration::from_secs(self.config.request_timeout_secs)))
+            .request_response(
+                &message,
+                Some(Duration::from_secs(self.config.request_timeout_secs)),
+            )
             .await?;
 
         match response {
@@ -717,9 +726,9 @@ impl ZmqAgentRunner for ZmqClient {
             .send_control_command(agent_id, ControlCommandType::GetStatus, None)
             .await?;
 
-        response.status.ok_or_else(|| {
-            AgentError::ExecutionError("No status in response".to_string())
-        })
+        response
+            .status
+            .ok_or_else(|| AgentError::ExecutionError("No status in response".to_string()))
     }
 
     async fn pause_agent(&self, agent_id: &Uuid) -> AgentResult<()> {
@@ -751,12 +760,8 @@ impl ZmqAgentRunner for ZmqClient {
             "data": base64::encode(data),
         });
 
-        self.send_control_command(
-            agent_id,
-            ControlCommandType::WriteStdin,
-            Some(payload),
-        )
-        .await?;
+        self.send_control_command(agent_id, ControlCommandType::WriteStdin, Some(payload))
+            .await?;
 
         Ok(())
     }
@@ -808,7 +813,10 @@ impl ZmqAgentRunner for ZmqClient {
             .connection
             .lock()
             .await
-            .request_response(&message, Some(Duration::from_secs(self.config.request_timeout_secs)))
+            .request_response(
+                &message,
+                Some(Duration::from_secs(self.config.request_timeout_secs)),
+            )
             .await?;
 
         match response {

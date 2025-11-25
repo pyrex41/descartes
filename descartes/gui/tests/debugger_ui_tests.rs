@@ -276,7 +276,10 @@ fn test_add_breakpoint() {
     assert!(command.is_some());
 
     match command.unwrap() {
-        DebugCommand::SetBreakpoint { location, condition } => {
+        DebugCommand::SetBreakpoint {
+            location,
+            condition,
+        } => {
             match location {
                 BreakpointLocation::StepCount { step } => {
                     assert_eq!(step, 5);
@@ -366,9 +369,7 @@ fn test_update_breakpoint_form_step_count() {
 
     let command = update(
         &mut state,
-        DebuggerMessage::UpdateBreakpointForm(BreakpointFormField::StepCount(
-            "10".to_string(),
-        )),
+        DebuggerMessage::UpdateBreakpointForm(BreakpointFormField::StepCount("10".to_string())),
     );
 
     assert_eq!(state.breakpoint_form.step_count, "10");
@@ -399,9 +400,7 @@ fn test_update_breakpoint_form_condition() {
 
     let command = update(
         &mut state,
-        DebuggerMessage::UpdateBreakpointForm(BreakpointFormField::Condition(
-            "x > 5".to_string(),
-        )),
+        DebuggerMessage::UpdateBreakpointForm(BreakpointFormField::Condition("x > 5".to_string())),
     );
 
     assert_eq!(state.breakpoint_form.condition, "x > 5");
@@ -748,10 +747,7 @@ fn test_full_ui_workflow() {
     // Add breakpoint
     state.breakpoint_form.step_count = "10".to_string();
     let cmd = update(&mut state, DebuggerMessage::AddBreakpoint);
-    assert!(matches!(
-        cmd,
-        Some(DebugCommand::SetBreakpoint { .. })
-    ));
+    assert!(matches!(cmd, Some(DebugCommand::SetBreakpoint { .. })));
 
     // Step
     let cmd = update(&mut state, DebuggerMessage::Step);

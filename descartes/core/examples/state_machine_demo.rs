@@ -160,7 +160,10 @@ async fn concurrent_workflows_example() {
             .expect("Failed to register");
     }
 
-    println!("Registered workflows: {:?}\n", orchestrator.list_workflows().await);
+    println!(
+        "Registered workflows: {:?}\n",
+        orchestrator.list_workflows().await
+    );
 
     // Run workflows concurrently
     let mut handles = vec![];
@@ -192,7 +195,9 @@ async fn concurrent_workflows_example() {
 }
 
 async fn custom_event_example() {
-    let sm = Arc::new(WorkflowStateMachine::new("custom-event-workflow".to_string()));
+    let sm = Arc::new(WorkflowStateMachine::new(
+        "custom-event-workflow".to_string(),
+    ));
 
     // Store context data
     sm.set_context("task_name", serde_json::json!("Feature Implementation"))
@@ -286,9 +291,7 @@ async fn history_example() {
     for entry in recent {
         println!(
             "  {} -> {} via {}",
-            entry.transition.from_state,
-            entry.transition.to_state,
-            entry.transition.event
+            entry.transition.from_state, entry.transition.to_state, entry.transition.event
         );
     }
 

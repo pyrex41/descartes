@@ -9,7 +9,12 @@ use tracing::{info, warn};
 pub async fn execute(name: Option<&str>, dir: Option<&Path>) -> Result<()> {
     let project_name = name.unwrap_or("descartes-project");
 
-    println!("{}", format!("Initializing Descartes project: {}", project_name).green().bold());
+    println!(
+        "{}",
+        format!("Initializing Descartes project: {}", project_name)
+            .green()
+            .bold()
+    );
 
     // Determine base directory
     let base_dir = if let Some(d) = dir {
@@ -59,9 +64,15 @@ pub async fn execute(name: Option<&str>, dir: Option<&Path>) -> Result<()> {
 
     println!("\n{}", "Project initialized successfully!".green().bold());
     println!("\nNext steps:");
-    println!("  1. Edit the configuration: {}", format!("{}/config.toml", base_dir.display()).cyan());
+    println!(
+        "  1. Edit the configuration: {}",
+        format!("{}/config.toml", base_dir.display()).cyan()
+    );
     println!("  2. Add your API keys to the config or set environment variables");
-    println!("  3. Run: {} to spawn your first agent", "descartes spawn --task \"your task\"".yellow());
+    println!(
+        "  3. Run: {} to spawn your first agent",
+        "descartes spawn --task \"your task\"".yellow()
+    );
     println!("\nFor more information, run: {}", "descartes --help".cyan());
 
     Ok(())
@@ -168,9 +179,8 @@ fn create_default_config(base_dir: &Path, project_name: &str) -> Result<()> {
     config.storage.base_path = base_dir.display().to_string();
 
     // Create config manager and save
-    let mut manager = ConfigManager::load(Some(&config_path)).unwrap_or_else(|_| {
-        ConfigManager::load(None).expect("Failed to create config manager")
-    });
+    let mut manager = ConfigManager::load(Some(&config_path))
+        .unwrap_or_else(|_| ConfigManager::load(None).expect("Failed to create config manager"));
 
     // Load from environment
     manager.load_from_env()?;

@@ -22,8 +22,8 @@ async fn create_test_server() -> (
     Arc<dyn descartes_core::traits::StateStore>,
     PathBuf,
 ) {
-    let agent_runner = Arc::new(LocalProcessRunner::new())
-        as Arc<dyn descartes_core::traits::AgentRunner>;
+    let agent_runner =
+        Arc::new(LocalProcessRunner::new()) as Arc<dyn descartes_core::traits::AgentRunner>;
 
     let temp_db = tempdir().unwrap();
     let db_path = temp_db.path().join("test.db");
@@ -34,11 +34,8 @@ async fn create_test_server() -> (
     let socket_dir = tempdir().unwrap();
     let socket_path = socket_dir.path().join("test-rpc.sock");
 
-    let server = UnixSocketRpcServer::new(
-        socket_path.clone(),
-        agent_runner,
-        Arc::clone(&state_store),
-    );
+    let server =
+        UnixSocketRpcServer::new(socket_path.clone(), agent_runner, Arc::clone(&state_store));
 
     (server, state_store, socket_path)
 }
@@ -66,7 +63,10 @@ async fn test_spawn_method_compatibility() {
     // Verify response format
     assert!(agent_id.is_ok(), "Spawn should succeed");
     let agent_id = agent_id.unwrap();
-    assert!(Uuid::parse_str(&agent_id).is_ok(), "Agent ID should be valid UUID");
+    assert!(
+        Uuid::parse_str(&agent_id).is_ok(),
+        "Agent ID should be valid UUID"
+    );
 
     // Cleanup
     handle.stop().unwrap();

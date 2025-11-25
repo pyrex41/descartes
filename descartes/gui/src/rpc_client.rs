@@ -2,8 +2,7 @@
 ///
 /// This module provides a wrapper around the RPC client for use in the Iced GUI.
 /// It handles background communication with the daemon and provides a message-based interface.
-
-use descartes_daemon::{RpcClient, RpcClientBuilder, DaemonError};
+use descartes_daemon::{DaemonError, RpcClient, RpcClientBuilder};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;

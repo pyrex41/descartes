@@ -30,7 +30,6 @@
 ///       ├── Timeout errors
 ///       └── Serialization errors
 /// ```
-
 use crate::errors::{AgentError, AgentResult};
 use crate::zmq_agent_runner::{
     deserialize_zmq_message, serialize_zmq_message, validate_message_size, ZmqMessage,
@@ -42,7 +41,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use uuid::Uuid;
-use zeromq::{Socket, SocketRecv, SocketSend, DealerSocket, RouterSocket, ReqSocket, RepSocket};
+use zeromq::{DealerSocket, RepSocket, ReqSocket, RouterSocket, Socket, SocketRecv, SocketSend};
 
 /// Maximum number of reconnection attempts before giving up
 const MAX_RECONNECT_ATTEMPTS: u32 = 10;
@@ -246,30 +245,30 @@ impl ZmqConnection {
         let socket = match self.socket_type {
             SocketType::Req => {
                 let mut sock = ReqSocket::new();
-                sock.connect(&self.endpoint)
-                    .await
-                    .map_err(|e| AgentError::ExecutionError(format!("Failed to connect REQ socket: {}", e)))?;
+                sock.connect(&self.endpoint).await.map_err(|e| {
+                    AgentError::ExecutionError(format!("Failed to connect REQ socket: {}", e))
+                })?;
                 Box::new(ReqSocketWrapper(sock)) as Box<dyn SocketWrapper>
             }
             SocketType::Rep => {
                 let mut sock = RepSocket::new();
-                sock.bind(&self.endpoint)
-                    .await
-                    .map_err(|e| AgentError::ExecutionError(format!("Failed to bind REP socket: {}", e)))?;
+                sock.bind(&self.endpoint).await.map_err(|e| {
+                    AgentError::ExecutionError(format!("Failed to bind REP socket: {}", e))
+                })?;
                 Box::new(RepSocketWrapper(sock)) as Box<dyn SocketWrapper>
             }
             SocketType::Dealer => {
                 let mut sock = DealerSocket::new();
-                sock.connect(&self.endpoint)
-                    .await
-                    .map_err(|e| AgentError::ExecutionError(format!("Failed to connect DEALER socket: {}", e)))?;
+                sock.connect(&self.endpoint).await.map_err(|e| {
+                    AgentError::ExecutionError(format!("Failed to connect DEALER socket: {}", e))
+                })?;
                 Box::new(DealerSocketWrapper(sock)) as Box<dyn SocketWrapper>
             }
             SocketType::Router => {
                 let mut sock = RouterSocket::new();
-                sock.bind(&self.endpoint)
-                    .await
-                    .map_err(|e| AgentError::ExecutionError(format!("Failed to bind ROUTER socket: {}", e)))?;
+                sock.bind(&self.endpoint).await.map_err(|e| {
+                    AgentError::ExecutionError(format!("Failed to bind ROUTER socket: {}", e))
+                })?;
                 Box::new(RouterSocketWrapper(sock)) as Box<dyn SocketWrapper>
             }
         };
@@ -348,10 +347,9 @@ impl ZmqConnection {
         // Send via socket
         let mut socket_guard = self.socket.lock().await;
         if let Some(socket) = socket_guard.as_mut() {
-            socket
-                .send(bytes.clone())
-                .await
-                .map_err(|e| AgentError::ExecutionError(format!("Failed to send ZMQ message: {}", e)))?;
+            socket.send(bytes.clone()).await.map_err(|e| {
+                AgentError::ExecutionError(format!("Failed to send ZMQ message: {}", e))
+            })?;
 
             // Update statistics
             let mut stats = self.stats.write();
@@ -366,7 +364,9 @@ impl ZmqConnection {
 
             Ok(())
         } else {
-            Err(AgentError::ExecutionError("Socket not initialized".to_string()))
+            Err(AgentError::ExecutionError(
+                "Socket not initialized".to_string(),
+            ))
         }
     }
 
@@ -406,8 +406,13 @@ impl ZmqConnection {
             match result {
                 Ok(Ok(zmq_msg)) => {
                     // Extract bytes from ZmqMessage (get first frame)
-                    let bytes: Vec<u8> = zmq_msg.into_vec().into_iter().next()
-                        .ok_or_else(|| AgentError::ExecutionError("Empty message received".to_string()))?
+                    let bytes: Vec<u8> = zmq_msg
+                        .into_vec()
+                        .into_iter()
+                        .next()
+                        .ok_or_else(|| {
+                            AgentError::ExecutionError("Empty message received".to_string())
+                        })?
                         .to_vec();
                     validate_message_size(bytes.len())?;
 
@@ -443,7 +448,9 @@ impl ZmqConnection {
                 }
             }
         } else {
-            Err(AgentError::ExecutionError("Socket not initialized".to_string()))
+            Err(AgentError::ExecutionError(
+                "Socket not initialized".to_string(),
+            ))
         }
     }
 
@@ -522,18 +529,11 @@ impl ZmqConnection {
             match self.connect().await {
                 Ok(_) => {
                     self.stats.write().reconnections += 1;
-                    tracing::info!(
-                        "Reconnection successful after {} attempts",
-                        attempt
-                    );
+                    tracing::info!("Reconnection successful after {} attempts", attempt);
                     return Ok(());
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Reconnection attempt {} failed: {}",
-                        attempt,
-                        e
-                    );
+                    tracing::warn!("Reconnection attempt {} failed: {}", attempt, e);
 
                     // Exponential backoff (double delay, cap at max)
                     delay_ms = std::cmp::min(delay_ms * 2, MAX_RECONNECT_DELAY_MS);
@@ -556,11 +556,7 @@ impl ZmqConnection {
         pending.retain(|request_id, pending_req| {
             let elapsed = now.duration_since(pending_req.sent_at);
             if elapsed > pending_req.timeout {
-                tracing::warn!(
-                    "Request {} timed out after {:?}",
-                    request_id,
-                    elapsed
-                );
+                tracing::warn!("Request {} timed out after {:?}", request_id, elapsed);
                 // Remove this entry (receiver will be dropped, caller will get error)
                 false
             } else {
@@ -584,7 +580,8 @@ impl Drop for ZmqConnection {
 /// enabling asynchronous request/response patterns over ZMQ.
 pub struct ZmqMessageRouter {
     /// Pending requests awaiting responses
-    pending_requests: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<AgentResult<ZmqMessage>>>>>,
+    pending_requests:
+        Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<AgentResult<ZmqMessage>>>>>,
 }
 
 impl ZmqMessageRouter {
@@ -630,9 +627,7 @@ impl ZmqMessageRouter {
     ) -> AgentResult<()> {
         if let Some(tx) = self.pending_requests.lock().await.remove(request_id) {
             tx.send(response).map_err(|_| {
-                AgentError::ExecutionError(
-                    "Failed to send response: receiver dropped".to_string(),
-                )
+                AgentError::ExecutionError("Failed to send response: receiver dropped".to_string())
             })?;
             Ok(())
         } else {

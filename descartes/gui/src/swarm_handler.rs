@@ -3,15 +3,13 @@
 //! This module implements a StreamHandler that bridges the agent stream parser
 //! with the Swarm Monitor UI, providing real-time updates of agent states.
 
-use descartes_core::{
-    AgentProgress, AgentError, AgentStatus, OutputStream, LifecycleEvent,
-};
-use descartes_core::agent_stream_parser::StreamHandler;
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use descartes_core::agent_stream_parser::StreamHandler;
 use descartes_core::AgentRuntimeState;
+use descartes_core::{AgentError, AgentProgress, AgentStatus, LifecycleEvent, OutputStream};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 // ============================================================================
 // GUI STREAM HANDLER
@@ -59,7 +57,8 @@ impl GuiStreamHandler {
     fn get_or_create_agent(&self, agent_id: Uuid) -> AgentRuntimeState {
         let mut agents = self.agents.lock().unwrap();
 
-        agents.entry(agent_id)
+        agents
+            .entry(agent_id)
             .or_insert_with(|| {
                 AgentRuntimeState::new(
                     agent_id,
@@ -101,14 +100,11 @@ impl Default for GuiStreamHandler {
 }
 
 impl StreamHandler for GuiStreamHandler {
-    fn on_status_update(
-        &mut self,
-        agent_id: Uuid,
-        status: AgentStatus,
-        _timestamp: DateTime<Utc>,
-    ) {
+    fn on_status_update(&mut self, agent_id: Uuid, status: AgentStatus, _timestamp: DateTime<Utc>) {
         self.update_agent(agent_id, |agent| {
-            agent.transition_to(status, Some("Status update from stream".to_string())).ok();
+            agent
+                .transition_to(status, Some("Status update from stream".to_string()))
+                .ok();
 
             // Clear thought if transitioning out of Thinking state
             if agent.status != AgentStatus::Thinking {
@@ -117,18 +113,15 @@ impl StreamHandler for GuiStreamHandler {
         });
     }
 
-    fn on_thought_update(
-        &mut self,
-        agent_id: Uuid,
-        thought: String,
-        _timestamp: DateTime<Utc>,
-    ) {
+    fn on_thought_update(&mut self, agent_id: Uuid, thought: String, _timestamp: DateTime<Utc>) {
         self.update_agent(agent_id, |agent| {
             agent.update_thought(thought);
 
             // Auto-transition to Thinking state if not already
             if agent.status != AgentStatus::Thinking {
-                agent.transition_to(AgentStatus::Thinking, Some("Thought detected".to_string())).ok();
+                agent
+                    .transition_to(AgentStatus::Thinking, Some("Thought detected".to_string()))
+                    .ok();
             }
         });
     }
@@ -155,24 +148,16 @@ impl StreamHandler for GuiStreamHandler {
         tracing::debug!("Agent {} {:?}: {}", agent_id, stream, content);
     }
 
-    fn on_error(
-        &mut self,
-        agent_id: Uuid,
-        error: AgentError,
-        _timestamp: DateTime<Utc>,
-    ) {
+    fn on_error(&mut self, agent_id: Uuid, error: AgentError, _timestamp: DateTime<Utc>) {
         self.update_agent(agent_id, |agent| {
             agent.set_error(error.clone());
-            agent.transition_to(AgentStatus::Failed, Some(error.message.clone())).ok();
+            agent
+                .transition_to(AgentStatus::Failed, Some(error.message.clone()))
+                .ok();
         });
     }
 
-    fn on_lifecycle(
-        &mut self,
-        agent_id: Uuid,
-        event: LifecycleEvent,
-        _timestamp: DateTime<Utc>,
-    ) {
+    fn on_lifecycle(&mut self, agent_id: Uuid, event: LifecycleEvent, _timestamp: DateTime<Utc>) {
         let status = match event {
             LifecycleEvent::Spawned => AgentStatus::Idle,
             LifecycleEvent::Started => AgentStatus::Initializing,
@@ -184,7 +169,9 @@ impl StreamHandler for GuiStreamHandler {
         };
 
         self.update_agent(agent_id, |agent| {
-            agent.transition_to(status, Some(format!("Lifecycle event: {:?}", event))).ok();
+            agent
+                .transition_to(status, Some(format!("Lifecycle event: {:?}", event)))
+                .ok();
         });
     }
 
@@ -214,7 +201,9 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Analyze codebase for patterns".to_string(),
         "anthropic".to_string(),
     );
-    agent1.transition_to(AgentStatus::Running, Some("Analyzing files".to_string())).ok();
+    agent1
+        .transition_to(AgentStatus::Running, Some("Analyzing files".to_string()))
+        .ok();
     agent1.update_progress(AgentProgress::with_steps(15, 30));
     agents.insert(agent1_id, agent1);
 
@@ -226,8 +215,12 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Solve complex algorithmic problem".to_string(),
         "anthropic".to_string(),
     );
-    agent2.transition_to(AgentStatus::Thinking, Some("Processing".to_string())).ok();
-    agent2.update_thought("Evaluating different approaches to optimize the sorting algorithm...".to_string());
+    agent2
+        .transition_to(AgentStatus::Thinking, Some("Processing".to_string()))
+        .ok();
+    agent2.update_thought(
+        "Evaluating different approaches to optimize the sorting algorithm...".to_string(),
+    );
     agent2.update_progress(AgentProgress::new(45.0));
     agents.insert(agent2_id, agent2);
 
@@ -239,8 +232,13 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Generate API endpoints".to_string(),
         "openai".to_string(),
     );
-    agent3.transition_to(AgentStatus::Thinking, Some("Planning".to_string())).ok();
-    agent3.update_thought("Considering RESTful design patterns and best practices for the API structure...".to_string());
+    agent3
+        .transition_to(AgentStatus::Thinking, Some("Planning".to_string()))
+        .ok();
+    agent3.update_thought(
+        "Considering RESTful design patterns and best practices for the API structure..."
+            .to_string(),
+    );
     agents.insert(agent3_id, agent3);
 
     // Agent 4: Paused agent
@@ -253,7 +251,12 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
     );
     agent4.transition_to(AgentStatus::Initializing, None).ok();
     agent4.transition_to(AgentStatus::Running, None).ok();
-    agent4.transition_to(AgentStatus::Paused, Some("User requested pause".to_string())).ok();
+    agent4
+        .transition_to(
+            AgentStatus::Paused,
+            Some("User requested pause".to_string()),
+        )
+        .ok();
     agent4.update_progress(AgentProgress::with_steps(5, 20));
     agents.insert(agent4_id, agent4);
 
@@ -266,7 +269,12 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "anthropic".to_string(),
     );
     agent5.transition_to(AgentStatus::Running, None).ok();
-    agent5.transition_to(AgentStatus::Completed, Some("Documentation complete".to_string())).ok();
+    agent5
+        .transition_to(
+            AgentStatus::Completed,
+            Some("Documentation complete".to_string()),
+        )
+        .ok();
     agent5.update_progress(AgentProgress::new(100.0));
     agents.insert(agent5_id, agent5);
 
@@ -283,7 +291,9 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "CONNECTION_FAILED".to_string(),
         "Failed to connect to database: connection timeout".to_string(),
     ));
-    agent6.transition_to(AgentStatus::Failed, Some("Connection error".to_string())).ok();
+    agent6
+        .transition_to(AgentStatus::Failed, Some("Connection error".to_string()))
+        .ok();
     agents.insert(agent6_id, agent6);
 
     // Agent 7: Idle agent
@@ -304,7 +314,9 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Process large dataset".to_string(),
         "anthropic".to_string(),
     );
-    agent8.transition_to(AgentStatus::Initializing, Some("Loading data".to_string())).ok();
+    agent8
+        .transition_to(AgentStatus::Initializing, Some("Loading data".to_string()))
+        .ok();
     agents.insert(agent8_id, agent8);
 
     // Agent 9: Another running agent with progress

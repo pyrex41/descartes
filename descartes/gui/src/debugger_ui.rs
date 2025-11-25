@@ -16,7 +16,9 @@ use descartes_core::debugger::{
     ExecutionState, ThoughtSnapshot,
 };
 use descartes_core::state_machine::WorkflowState;
-use iced::widget::{button, checkbox, column, container, row, scrollable, text, Column, Row, Space};
+use iced::widget::{
+    button, checkbox, column, container, row, scrollable, text, Column, Row, Space,
+};
 use iced::{
     alignment::{Horizontal, Vertical},
     border, Color, Element, Length, Theme,
@@ -227,10 +229,10 @@ pub enum UiSetting {
 /// Keyboard shortcuts for debugger
 #[derive(Debug, Clone, Copy)]
 pub enum DebuggerKeyboardShortcut {
-    Continue,       // F5
-    StepOver,       // F10
-    StepInto,       // F11
-    StepOut,        // Shift+F11
+    Continue,         // F5
+    StepOver,         // F10
+    StepInto,         // F11
+    StepOut,          // Shift+F11
     ToggleBreakpoint, // F9
 }
 
@@ -330,12 +332,20 @@ fn view_control_bar(
 
     // Step buttons (only enabled when paused)
     let step_btn = create_control_button("Step", "⏭", is_paused, DebuggerMessage::Step);
-    let step_over_btn = create_control_button("Step Over (F10)", "⤵", is_paused, DebuggerMessage::StepOver);
-    let step_into_btn = create_control_button("Step Into (F11)", "⤓", is_paused, DebuggerMessage::StepInto);
-    let step_out_btn = create_control_button("Step Out (Shift+F11)", "⤴", is_paused, DebuggerMessage::StepOut);
+    let step_over_btn =
+        create_control_button("Step Over (F10)", "⤵", is_paused, DebuggerMessage::StepOver);
+    let step_into_btn =
+        create_control_button("Step Into (F11)", "⤓", is_paused, DebuggerMessage::StepInto);
+    let step_out_btn = create_control_button(
+        "Step Out (Shift+F11)",
+        "⤴",
+        is_paused,
+        DebuggerMessage::StepOut,
+    );
 
     // Continue button
-    let continue_btn = create_control_button("Continue (F5)", "▶▶", is_paused, DebuggerMessage::Continue);
+    let continue_btn =
+        create_control_button("Continue (F5)", "▶▶", is_paused, DebuggerMessage::Continue);
 
     // Status indicator
     let status_text = format!("Status: {}", execution_state);
@@ -347,15 +357,13 @@ fn view_control_bar(
         Color::from_rgb8(200, 200, 200)
     };
 
-    let status_indicator = container(
-        text(status_text).size(14).style(status_color)
-    )
-    .padding(10)
-    .style(move |theme: &Theme| container::Style {
-        background: Some(theme.palette().background.into()),
-        border: border::rounded(4),
-        ..Default::default()
-    });
+    let status_indicator = container(text(status_text).size(14).style(status_color))
+        .padding(10)
+        .style(move |theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: border::rounded(4),
+            ..Default::default()
+        });
 
     // Step counter
     let step_counter = text(format!("Step: {}", debugger_state.step_count))
@@ -405,10 +413,7 @@ fn create_control_button(
     .align_y(Vertical::Center);
 
     if enabled {
-        button(btn_content)
-            .on_press(message)
-            .padding(8)
-            .into()
+        button(btn_content).on_press(message).padding(8).into()
     } else {
         button(btn_content)
             .padding(8)
@@ -479,23 +484,16 @@ fn view_thought_panel(
         .into()
     };
 
-    container(
-        column![
-            title,
-            Space::with_height(10),
-            content,
-        ]
-        .spacing(5),
-    )
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .padding(15)
-    .style(|theme: &Theme| container::Style {
-        background: Some(theme.palette().background.into()),
-        border: border::rounded(8),
-        ..Default::default()
-    })
-    .into()
+    container(column![title, Space::with_height(10), content,].spacing(5))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(15)
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: border::rounded(8),
+            ..Default::default()
+        })
+        .into()
 }
 
 /// View thought content with metadata
@@ -511,20 +509,28 @@ fn view_thought_content(
             text(&thought.thought_id).size(11),
         ],
         row![
-            text("Step:").size(11).style(Color::from_rgb8(150, 150, 150)),
+            text("Step:")
+                .size(11)
+                .style(Color::from_rgb8(150, 150, 150)),
             Space::with_width(10),
             text(format!("{}", thought.step_number)).size(11),
         ],
         row![
-            text("Timestamp:").size(11).style(Color::from_rgb8(150, 150, 150)),
+            text("Timestamp:")
+                .size(11)
+                .style(Color::from_rgb8(150, 150, 150)),
             Space::with_width(10),
             text(&thought.timestamp).size(11),
         ],
         if !thought.tags.is_empty() {
             row![
-                text("Tags:").size(11).style(Color::from_rgb8(150, 150, 150)),
+                text("Tags:")
+                    .size(11)
+                    .style(Color::from_rgb8(150, 150, 150)),
                 Space::with_width(10),
-                text(thought.tags.join(", ")).size(11).style(Color::from_rgb8(100, 200, 255)),
+                text(thought.tags.join(", "))
+                    .size(11)
+                    .style(Color::from_rgb8(100, 200, 255)),
             ]
         } else {
             row![]
@@ -542,20 +548,20 @@ fn view_thought_content(
         text(&thought.content).size(13)
     };
 
-    let content_box = container(
-        scrollable(content_text)
-    )
-    .padding(10)
-    .style(|theme: &Theme| container::Style {
-        background: Some(Color::from_rgb8(20, 20, 30).into()),
-        border: border::rounded(4),
-        ..Default::default()
-    });
+    let content_box = container(scrollable(content_text))
+        .padding(10)
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgb8(20, 20, 30).into()),
+            border: border::rounded(4),
+            ..Default::default()
+        });
 
     column![
         metadata,
         Space::with_height(10),
-        text("Content:").size(12).style(Color::from_rgb8(150, 150, 150)),
+        text("Content:")
+            .size(12)
+            .style(Color::from_rgb8(150, 150, 150)),
         Space::with_height(5),
         content_box,
     ]
@@ -659,12 +665,7 @@ fn view_variables_tab(context: &DebugContext) -> Element<DebuggerMessage> {
         })
         .collect();
 
-    scrollable(
-        column(variables)
-            .spacing(5)
-            .padding(10)
-    )
-    .into()
+    scrollable(column(variables).spacing(5).padding(10)).into()
 }
 
 /// View call stack tab
@@ -688,20 +689,19 @@ fn view_call_stack_tab(context: &DebugContext) -> Element<DebuggerMessage> {
         .map(|(i, frame)| view_call_frame(i, frame))
         .collect();
 
-    scrollable(
-        column(frames)
-            .spacing(5)
-            .padding(10)
-    )
-    .into()
+    scrollable(column(frames).spacing(5).padding(10)).into()
 }
 
 /// View a single call frame
 fn view_call_frame(index: usize, frame: &CallFrame) -> Element<DebuggerMessage> {
     let frame_header = row![
-        text(format!("#{}", index)).size(12).style(Color::from_rgb8(150, 150, 150)),
+        text(format!("#{}", index))
+            .size(12)
+            .style(Color::from_rgb8(150, 150, 150)),
         Space::with_width(10),
-        text(&frame.name).size(13).style(Color::from_rgb8(255, 200, 100)),
+        text(&frame.name)
+            .size(13)
+            .style(Color::from_rgb8(255, 200, 100)),
     ]
     .align_y(Vertical::Center);
 
@@ -717,17 +717,14 @@ fn view_call_frame(index: usize, frame: &CallFrame) -> Element<DebuggerMessage> 
     .spacing(2)
     .padding([0, 0, 0, 25]);
 
-    container(
-        column![frame_header, Space::with_height(5), frame_info]
-            .spacing(5)
-    )
-    .padding(8)
-    .style(|theme: &Theme| container::Style {
-        background: Some(Color::from_rgb8(30, 30, 40).into()),
-        border: border::rounded(4),
-        ..Default::default()
-    })
-    .into()
+    container(column![frame_header, Space::with_height(5), frame_info].spacing(5))
+        .padding(8)
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgb8(30, 30, 40).into()),
+            border: border::rounded(4),
+            ..Default::default()
+        })
+        .into()
 }
 
 /// View workflow state tab
@@ -792,7 +789,7 @@ fn view_workflow_diagram(current_state: &WorkflowState) -> Element<DebuggerMessa
             container(
                 text(format!("{}", state))
                     .size(11)
-                    .align_x(Horizontal::Center)
+                    .align_x(Horizontal::Center),
             )
             .padding(6)
             .width(Length::Fill)
@@ -801,27 +798,22 @@ fn view_workflow_diagram(current_state: &WorkflowState) -> Element<DebuggerMessa
         })
         .collect();
 
-    column(state_buttons)
-        .spacing(5)
-        .padding(5)
-        .into()
+    column(state_buttons).spacing(5).padding(5).into()
 }
 
 /// View metadata tab
 fn view_metadata_tab(context: &DebugContext) -> Element<DebuggerMessage> {
-    let metadata_str = serde_json::to_string_pretty(&context.metadata)
-        .unwrap_or_else(|_| "{}".to_string());
+    let metadata_str =
+        serde_json::to_string_pretty(&context.metadata).unwrap_or_else(|_| "{}".to_string());
 
     scrollable(
-        container(
-            text(metadata_str).size(12)
-        )
-        .padding(10)
-        .style(|theme: &Theme| container::Style {
-            background: Some(Color::from_rgb8(20, 20, 30).into()),
-            border: border::rounded(4),
-            ..Default::default()
-        })
+        container(text(metadata_str).size(12))
+            .padding(10)
+            .style(|theme: &Theme| container::Style {
+                background: Some(Color::from_rgb8(20, 20, 30).into()),
+                border: border::rounded(4),
+                ..Default::default()
+            }),
     )
     .into()
 }
@@ -860,13 +852,9 @@ fn view_breakpoint_panel(
             .map(|bp| view_breakpoint_item(bp, state.hovered_breakpoint.as_ref()))
             .collect();
 
-        scrollable(
-            column(items)
-                .spacing(5)
-                .padding(10)
-        )
-        .height(150)
-        .into()
+        scrollable(column(items).spacing(5).padding(10))
+            .height(150)
+            .into()
     };
 
     let content = column![
@@ -930,11 +918,7 @@ fn view_breakpoint_item(
     let content = row![
         checkbox_elem,
         Space::with_width(10),
-        column![
-            location_text,
-            description,
-        ]
-        .spacing(2),
+        column![location_text, description,].spacing(2),
         Space::with_width(Length::Fill),
         hit_count,
         Space::with_width(10),
@@ -971,7 +955,9 @@ fn view_breakpoint_form(form_state: &BreakpointFormState) -> Element<DebuggerMes
         text("Add New Breakpoint").size(16),
         Space::with_height(10),
         text("Break at step:").size(12),
-        text("(Enter step number)").size(10).style(Color::from_rgb8(150, 150, 150)),
+        text("(Enter step number)")
+            .size(10)
+            .style(Color::from_rgb8(150, 150, 150)),
         Space::with_height(5),
         row![
             button(text("Add").size(12))
@@ -1043,13 +1029,9 @@ pub fn update(state: &mut DebuggerUiState, message: DebuggerMessage) -> Option<D
             })
         }
 
-        DebuggerMessage::RemoveBreakpoint(id) => {
-            Some(DebugCommand::RemoveBreakpoint { id })
-        }
+        DebuggerMessage::RemoveBreakpoint(id) => Some(DebugCommand::RemoveBreakpoint { id }),
 
-        DebuggerMessage::ToggleBreakpoint(id) => {
-            Some(DebugCommand::ToggleBreakpoint { id })
-        }
+        DebuggerMessage::ToggleBreakpoint(id) => Some(DebugCommand::ToggleBreakpoint { id }),
 
         DebuggerMessage::BreakpointHovered(id) => {
             state.hovered_breakpoint = id;
@@ -1088,9 +1070,7 @@ pub fn update(state: &mut DebuggerUiState, message: DebuggerMessage) -> Option<D
         }
 
         // Navigation
-        DebuggerMessage::GoToHistory(index) => {
-            Some(DebugCommand::GotoHistory { index })
-        }
+        DebuggerMessage::GoToHistory(index) => Some(DebugCommand::GotoHistory { index }),
 
         DebuggerMessage::SelectCallFrame(_index) => {
             // Could navigate to specific call frame
@@ -1199,7 +1179,10 @@ fn workflow_state_color(state: &WorkflowState) -> Color {
 // BUTTON STYLES
 // ============================================================================
 
-fn button_style_primary(theme: &Theme, status: iced::widget::button::Status) -> iced::widget::button::Style {
+fn button_style_primary(
+    theme: &Theme,
+    status: iced::widget::button::Status,
+) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(50, 100, 200).into()),
         text_color: Color::WHITE,
@@ -1208,7 +1191,10 @@ fn button_style_primary(theme: &Theme, status: iced::widget::button::Status) -> 
     }
 }
 
-fn button_style_success(theme: &Theme, status: iced::widget::button::Status) -> iced::widget::button::Style {
+fn button_style_success(
+    theme: &Theme,
+    status: iced::widget::button::Status,
+) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(50, 200, 100).into()),
         text_color: Color::WHITE,
@@ -1217,7 +1203,10 @@ fn button_style_success(theme: &Theme, status: iced::widget::button::Status) -> 
     }
 }
 
-fn button_style_danger(theme: &Theme, status: iced::widget::button::Status) -> iced::widget::button::Style {
+fn button_style_danger(
+    theme: &Theme,
+    status: iced::widget::button::Status,
+) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(200, 50, 50).into()),
         text_color: Color::WHITE,
@@ -1226,7 +1215,10 @@ fn button_style_danger(theme: &Theme, status: iced::widget::button::Status) -> i
     }
 }
 
-fn button_style_disabled(theme: &Theme, status: iced::widget::button::Status) -> iced::widget::button::Style {
+fn button_style_disabled(
+    theme: &Theme,
+    status: iced::widget::button::Status,
+) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(60, 60, 70).into()),
         text_color: Color::from_rgb8(100, 100, 110),

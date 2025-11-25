@@ -1,5 +1,4 @@
 /// JSON-RPC 2.0 server implementation
-
 use crate::auth::{AuthContext, AuthManager};
 use crate::errors::{DaemonError, DaemonResult};
 use crate::handlers::RpcHandlers;
@@ -53,7 +52,10 @@ impl JsonRpcServer {
             "agent.list" => self.call_agent_list(request.params, auth_context).await,
             "agent.kill" => self.call_agent_kill(request.params, auth_context).await,
             "agent.logs" => self.call_agent_logs(request.params, auth_context).await,
-            "workflow.execute" => self.call_workflow_execute(request.params, auth_context).await,
+            "workflow.execute" => {
+                self.call_workflow_execute(request.params, auth_context)
+                    .await
+            }
             "state.query" => self.call_state_query(request.params, auth_context).await,
             "system.health" => self.call_system_health(request.params, auth_context).await,
             "system.metrics" => self.call_system_metrics(request.params, auth_context).await,
@@ -67,7 +69,10 @@ impl JsonRpcServer {
         // Build response
         match result {
             Ok(data) => {
-                info!("RPC request successful: {} (duration: {:.3}s)", method, duration);
+                info!(
+                    "RPC request successful: {} (duration: {:.3}s)",
+                    method, duration
+                );
                 RpcResponse::success(data, request_id)
             }
             Err(e) => {
@@ -76,7 +81,10 @@ impl JsonRpcServer {
                 let error = e.to_rpc_error();
                 RpcResponse::error(
                     error["code"].as_i64().unwrap_or(-32603),
-                    error["message"].as_str().unwrap_or("Internal error").to_string(),
+                    error["message"]
+                        .as_str()
+                        .unwrap_or("Internal error")
+                        .to_string(),
                     request_id,
                 )
             }
@@ -96,7 +104,8 @@ impl JsonRpcServer {
         params: Option<Value>,
         auth: AuthContext,
     ) -> DaemonResult<Value> {
-        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+        let params =
+            params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
         self.handlers.handle_agent_spawn(params, auth).await
     }
 
@@ -114,7 +123,8 @@ impl JsonRpcServer {
         params: Option<Value>,
         auth: AuthContext,
     ) -> DaemonResult<Value> {
-        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+        let params =
+            params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
         self.handlers.handle_agent_kill(params, auth).await
     }
 
@@ -123,7 +133,8 @@ impl JsonRpcServer {
         params: Option<Value>,
         auth: AuthContext,
     ) -> DaemonResult<Value> {
-        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+        let params =
+            params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
         self.handlers.handle_agent_logs(params, auth).await
     }
 
@@ -132,7 +143,8 @@ impl JsonRpcServer {
         params: Option<Value>,
         auth: AuthContext,
     ) -> DaemonResult<Value> {
-        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+        let params =
+            params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
         self.handlers.handle_workflow_execute(params, auth).await
     }
 

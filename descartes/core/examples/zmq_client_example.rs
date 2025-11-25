@@ -8,10 +8,7 @@
 /// - Monitor agent status
 /// - Handle I/O operations
 /// - Subscribe to status updates
-
-use descartes_core::{
-    AgentConfig, AgentStatus, ZmqAgentRunner, ZmqClient, ZmqRunnerConfig,
-};
+use descartes_core::{AgentConfig, AgentStatus, ZmqAgentRunner, ZmqClient, ZmqRunnerConfig};
 use futures::StreamExt;
 use std::collections::HashMap;
 
@@ -89,7 +86,10 @@ async fn spawn_agent_example() -> Result<(), Box<dyn std::error::Error>> {
         model_backend: "claude".to_string(),
         task: "Process and analyze system logs".to_string(),
         context: Some("Production server logs from the last 24 hours".to_string()),
-        system_prompt: Some("You are an expert log analyst. Focus on identifying errors and security issues.".to_string()),
+        system_prompt: Some(
+            "You are an expert log analyst. Focus on identifying errors and security issues."
+                .to_string(),
+        ),
         environment: {
             let mut env = HashMap::new();
             env.insert("LOG_LEVEL".to_string(), "DEBUG".to_string());

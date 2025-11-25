@@ -35,7 +35,12 @@ pub trait DescartesRpc {
     /// # Returns
     /// The ID of the spawned agent
     #[method(name = "spawn")]
-    async fn spawn(&self, name: String, agent_type: String, config: Value) -> Result<String, ErrorObjectOwned>;
+    async fn spawn(
+        &self,
+        name: String,
+        agent_type: String,
+        config: Value,
+    ) -> Result<String, ErrorObjectOwned>;
 
     /// List all tasks in the system
     ///
@@ -56,7 +61,11 @@ pub trait DescartesRpc {
     /// # Returns
     /// Confirmation of the approval
     #[method(name = "approve")]
-    async fn approve(&self, task_id: String, approved: bool) -> Result<ApprovalResult, ErrorObjectOwned>;
+    async fn approve(
+        &self,
+        task_id: String,
+        approved: bool,
+    ) -> Result<ApprovalResult, ErrorObjectOwned>;
 
     /// Get the current state of the system or a specific entity
     ///
@@ -116,7 +125,12 @@ use jsonrpsee::types::ErrorObjectOwned;
 
 #[async_trait]
 impl DescartesRpcServer for RpcServerImpl {
-    async fn spawn(&self, name: String, agent_type: String, config: Value) -> Result<String, ErrorObjectOwned> {
+    async fn spawn(
+        &self,
+        name: String,
+        agent_type: String,
+        config: Value,
+    ) -> Result<String, ErrorObjectOwned> {
         info!("Spawning agent: {} (type: {})", name, agent_type);
 
         // Parse configuration from JSON
@@ -152,17 +166,10 @@ impl DescartesRpcServer for RpcServerImpl {
         };
 
         // Spawn the agent using the agent runner
-        let agent_handle = self.agent_runner
-            .spawn(agent_config)
-            .await
-            .map_err(|e| {
-                error!("Failed to spawn agent: {}", e);
-                ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Failed to spawn agent: {}", e),
-                    None::<()>,
-                )
-            })?;
+        let agent_handle = self.agent_runner.spawn(agent_config).await.map_err(|e| {
+            error!("Failed to spawn agent: {}", e);
+            ErrorObjectOwned::owned(-32603, format!("Failed to spawn agent: {}", e), None::<()>)
+        })?;
 
         let agent_id = agent_handle.id();
         let agent_id_str = agent_id.to_string();
@@ -178,17 +185,10 @@ impl DescartesRpcServer for RpcServerImpl {
         info!("Listing tasks with filter: {:?}", filter);
 
         // Get all tasks from state store
-        let tasks = self.state_store
-            .get_tasks()
-            .await
-            .map_err(|e| {
-                error!("Failed to get tasks: {}", e);
-                ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Failed to get tasks: {}", e),
-                    None::<()>,
-                )
-            })?;
+        let tasks = self.state_store.get_tasks().await.map_err(|e| {
+            error!("Failed to get tasks: {}", e);
+            ErrorObjectOwned::owned(-32603, format!("Failed to get tasks: {}", e), None::<()>)
+        })?;
 
         // Apply filters if provided
         let mut filtered_tasks = tasks;
@@ -201,9 +201,7 @@ impl DescartesRpcServer for RpcServerImpl {
             }
 
             if let Some(assigned_to) = filter_obj.get("assigned_to").and_then(|s| s.as_str()) {
-                filtered_tasks.retain(|task| {
-                    task.assigned_to.as_deref() == Some(assigned_to)
-                });
+                filtered_tasks.retain(|task| task.assigned_to.as_deref() == Some(assigned_to));
             }
         }
 
@@ -223,38 +221,31 @@ impl DescartesRpcServer for RpcServerImpl {
         Ok(task_infos)
     }
 
-    async fn approve(&self, task_id: String, approved: bool) -> Result<ApprovalResult, ErrorObjectOwned> {
+    async fn approve(
+        &self,
+        task_id: String,
+        approved: bool,
+    ) -> Result<ApprovalResult, ErrorObjectOwned> {
         info!("Approving task: {} (approved: {})", task_id, approved);
 
         // Parse task ID as UUID
         let task_uuid = Uuid::parse_str(&task_id).map_err(|e| {
             error!("Invalid task ID format: {}", e);
-            ErrorObjectOwned::owned(
-                -32602,
-                format!("Invalid task ID format: {}", e),
-                None::<()>,
-            )
+            ErrorObjectOwned::owned(-32602, format!("Invalid task ID format: {}", e), None::<()>)
         })?;
 
         // Get the task from state store
-        let mut task = self.state_store
+        let mut task = self
+            .state_store
             .get_task(&task_uuid)
             .await
             .map_err(|e| {
                 error!("Failed to get task: {}", e);
-                ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Failed to get task: {}", e),
-                    None::<()>,
-                )
+                ErrorObjectOwned::owned(-32603, format!("Failed to get task: {}", e), None::<()>)
             })?
             .ok_or_else(|| {
                 error!("Task not found: {}", task_id);
-                ErrorObjectOwned::owned(
-                    -32602,
-                    format!("Task not found: {}", task_id),
-                    None::<()>,
-                )
+                ErrorObjectOwned::owned(-32602, format!("Task not found: {}", task_id), None::<()>)
             })?;
 
         // Update task status based on approval
@@ -269,22 +260,18 @@ impl DescartesRpcServer for RpcServerImpl {
         let mut metadata = task.metadata.unwrap_or_else(|| serde_json::json!({}));
         if let Some(obj) = metadata.as_object_mut() {
             obj.insert("approved".to_string(), serde_json::json!(approved));
-            obj.insert("approval_timestamp".to_string(), serde_json::json!(task.updated_at));
+            obj.insert(
+                "approval_timestamp".to_string(),
+                serde_json::json!(task.updated_at),
+            );
         }
         task.metadata = Some(metadata);
 
         // Save the updated task
-        self.state_store
-            .save_task(&task)
-            .await
-            .map_err(|e| {
-                error!("Failed to save task: {}", e);
-                ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Failed to save task: {}", e),
-                    None::<()>,
-                )
-            })?;
+        self.state_store.save_task(&task).await.map_err(|e| {
+            error!("Failed to save task: {}", e);
+            ErrorObjectOwned::owned(-32603, format!("Failed to save task: {}", e), None::<()>)
+        })?;
 
         let result = ApprovalResult {
             task_id,
@@ -303,7 +290,8 @@ impl DescartesRpcServer for RpcServerImpl {
             // Try to parse as agent ID
             if let Ok(agent_uuid) = Uuid::parse_str(&entity_id_str) {
                 // Get agent info from agent runner
-                let agent_info = self.agent_runner
+                let agent_info = self
+                    .agent_runner
                     .get_agent(&agent_uuid)
                     .await
                     .map_err(|e| {
@@ -347,29 +335,15 @@ impl DescartesRpcServer for RpcServerImpl {
         }
 
         // Return system-wide state
-        let agents = self.agent_runner
-            .list_agents()
-            .await
-            .map_err(|e| {
-                error!("Failed to list agents: {}", e);
-                ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Failed to list agents: {}", e),
-                    None::<()>,
-                )
-            })?;
+        let agents = self.agent_runner.list_agents().await.map_err(|e| {
+            error!("Failed to list agents: {}", e);
+            ErrorObjectOwned::owned(-32603, format!("Failed to list agents: {}", e), None::<()>)
+        })?;
 
-        let tasks = self.state_store
-            .get_tasks()
-            .await
-            .map_err(|e| {
-                error!("Failed to get tasks: {}", e);
-                ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Failed to get tasks: {}", e),
-                    None::<()>,
-                )
-            })?;
+        let tasks = self.state_store.get_tasks().await.map_err(|e| {
+            error!("Failed to get tasks: {}", e);
+            ErrorObjectOwned::owned(-32603, format!("Failed to get tasks: {}", e), None::<()>)
+        })?;
 
         let state = serde_json::json!({
             "entity_type": "system",
@@ -443,9 +417,11 @@ impl UnixSocketRpcServer {
 
         // Build the server
         let server = Server::builder()
-            .build(self.socket_path.to_str().ok_or_else(|| {
-                DaemonError::ServerError("Invalid socket path".to_string())
-            })?)
+            .build(
+                self.socket_path
+                    .to_str()
+                    .ok_or_else(|| DaemonError::ServerError("Invalid socket path".to_string()))?,
+            )
             .await
             .map_err(|e| {
                 DaemonError::ServerError(format!("Failed to bind to Unix socket: {}", e))
@@ -482,8 +458,12 @@ mod tests {
     use descartes_core::state_store::SqliteStateStore;
     use tempfile::tempdir;
 
-    async fn create_test_dependencies() -> (Arc<dyn descartes_core::traits::AgentRunner>, Arc<dyn descartes_core::traits::StateStore>) {
-        let agent_runner = Arc::new(LocalProcessRunner::new()) as Arc<dyn descartes_core::traits::AgentRunner>;
+    async fn create_test_dependencies() -> (
+        Arc<dyn descartes_core::traits::AgentRunner>,
+        Arc<dyn descartes_core::traits::StateStore>,
+    ) {
+        let agent_runner =
+            Arc::new(LocalProcessRunner::new()) as Arc<dyn descartes_core::traits::AgentRunner>;
 
         let temp_db = tempdir().unwrap();
         let db_path = temp_db.path().join("test.db");
@@ -548,7 +528,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_tasks_with_data() {
-        use descartes_core::traits::{TaskPriority, TaskComplexity};
+        use descartes_core::traits::{TaskComplexity, TaskPriority};
 
         let (agent_runner, state_store) = create_test_dependencies().await;
 
@@ -611,7 +591,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_approve_task() {
-        use descartes_core::traits::{TaskPriority, TaskComplexity};
+        use descartes_core::traits::{TaskComplexity, TaskPriority};
 
         let (agent_runner, state_store) = create_test_dependencies().await;
 
@@ -650,7 +630,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_approve_task_rejection() {
-        use descartes_core::traits::{TaskPriority, TaskComplexity};
+        use descartes_core::traits::{TaskComplexity, TaskPriority};
 
         let (agent_runner, state_store) = create_test_dependencies().await;
 
@@ -723,7 +703,9 @@ mod tests {
         let (agent_runner, state_store) = create_test_dependencies().await;
         let server_impl = RpcServerImpl::new(agent_runner, state_store);
 
-        let result = server_impl.get_state(Some("invalid-uuid".to_string())).await;
+        let result = server_impl
+            .get_state(Some("invalid-uuid".to_string()))
+            .await;
         assert!(result.is_err());
     }
 }

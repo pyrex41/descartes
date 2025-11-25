@@ -30,8 +30,8 @@
 //! ```
 
 use crate::agent_state::{
-    AgentError, AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage,
-    LifecycleEvent, OutputStream,
+    AgentError, AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage, LifecycleEvent,
+    OutputStream,
 };
 use chrono::Utc;
 use serde_json;
@@ -115,12 +115,7 @@ pub trait StreamHandler: Send + Sync {
     );
 
     /// Called when an agent error is received
-    fn on_error(
-        &mut self,
-        agent_id: Uuid,
-        error: AgentError,
-        timestamp: chrono::DateTime<Utc>,
-    );
+    fn on_error(&mut self, agent_id: Uuid, error: AgentError, timestamp: chrono::DateTime<Utc>);
 
     /// Called when an agent lifecycle event is received
     fn on_lifecycle(
@@ -249,10 +244,7 @@ impl AgentStreamParser {
     ///
     /// This is the main entry point for async stream processing. It reads
     /// lines from the stream, parses JSON messages, and dispatches events.
-    pub async fn process_stream<R: AsyncRead + Unpin>(
-        &mut self,
-        stream: R,
-    ) -> StreamResult<()> {
+    pub async fn process_stream<R: AsyncRead + Unpin>(&mut self, stream: R) -> StreamResult<()> {
         let mut reader = BufReader::with_capacity(self.config.buffer_capacity, stream);
         let mut line = String::new();
 
@@ -707,12 +699,7 @@ impl StreamHandler for LoggingHandler {
         tracing::debug!("Agent {} {:?}: {}", agent_id, stream, content);
     }
 
-    fn on_error(
-        &mut self,
-        agent_id: Uuid,
-        error: AgentError,
-        _timestamp: chrono::DateTime<Utc>,
-    ) {
+    fn on_error(&mut self, agent_id: Uuid, error: AgentError, _timestamp: chrono::DateTime<Utc>) {
         tracing::error!("Agent {} error: {}", agent_id, error.message);
     }
 
@@ -845,10 +832,7 @@ mod tests {
 
         let agent = parser.get_agent(&agent_id).unwrap();
         assert_eq!(agent.status, AgentStatus::Thinking);
-        assert_eq!(
-            agent.current_thought,
-            Some("Analyzing code...".to_string())
-        );
+        assert_eq!(agent.current_thought, Some("Analyzing code...".to_string()));
     }
 
     #[test]

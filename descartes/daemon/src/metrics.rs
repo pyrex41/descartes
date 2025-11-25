@@ -1,5 +1,4 @@
 /// Metrics collection and exposure
-
 use crate::errors::{DaemonError, DaemonResult};
 use crate::types::{MetricsAgents, MetricsResponse, MetricsSystem};
 use chrono::Utc;
@@ -42,8 +41,8 @@ impl MetricsCollector {
             .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
 
         let opts = HistogramOpts::new("request_duration_seconds", "Request duration");
-        let request_duration = Histogram::with_opts(opts)
-            .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
+        let request_duration =
+            Histogram::with_opts(opts).map_err(|e| DaemonError::MetricsError(e.to_string()))?;
         registry
             .register(Box::new(request_duration.clone()))
             .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
@@ -138,7 +137,8 @@ impl MetricsCollector {
         let metrics = self.registry.gather();
         let mut buffer = Vec::new();
         let encoder = prometheus::TextEncoder::new();
-        encoder.encode(&metrics, &mut buffer)
+        encoder
+            .encode(&metrics, &mut buffer)
             .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
         String::from_utf8(buffer).map_err(|e| DaemonError::MetricsError(e.to_string()))
     }
@@ -154,11 +154,12 @@ impl MetricsCollector {
         };
 
         let uptime_secs = self.server_start.elapsed().as_secs();
-        self.server_uptime_secs.store(uptime_secs, std::sync::atomic::Ordering::Relaxed);
+        self.server_uptime_secs
+            .store(uptime_secs, std::sync::atomic::Ordering::Relaxed);
 
         let system = MetricsSystem {
             uptime_secs,
-            memory_usage_mb: 0.0, // TODO: Implement actual memory tracking
+            memory_usage_mb: 0.0,   // TODO: Implement actual memory tracking
             cpu_usage_percent: 0.0, // TODO: Implement actual CPU tracking
             active_connections: self.connections_active.get() as usize,
         };

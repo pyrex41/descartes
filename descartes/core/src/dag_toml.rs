@@ -33,8 +33,7 @@
 /// task = "task1_id"
 /// depends_on = ["task2_id", "task3_id"]
 /// ```
-
-use crate::dag::{DAG, DAGEdge, DAGError, DAGNode, DAGResult, EdgeType, Position};
+use crate::dag::{DAGEdge, DAGError, DAGNode, DAGResult, EdgeType, Position, DAG};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -227,7 +226,9 @@ impl TomlDAG {
                     .metadata
                     .iter()
                     .filter_map(|(k, v)| {
-                        json_value_to_toml(v).ok().map(|toml_val| (k.clone(), toml_val))
+                        json_value_to_toml(v)
+                            .ok()
+                            .map(|toml_val| (k.clone(), toml_val))
                     })
                     .collect(),
                 tags: node.tags.clone(),
@@ -247,7 +248,9 @@ impl TomlDAG {
                     .metadata
                     .iter()
                     .filter_map(|(k, v)| {
-                        json_value_to_toml(v).ok().map(|toml_val| (k.clone(), toml_val))
+                        json_value_to_toml(v)
+                            .ok()
+                            .map(|toml_val| (k.clone(), toml_val))
                     })
                     .collect(),
             };
@@ -264,7 +267,9 @@ impl TomlDAG {
                 .metadata
                 .iter()
                 .filter_map(|(k, v)| {
-                    json_value_to_toml(v).ok().map(|toml_val| (k.clone(), toml_val))
+                    json_value_to_toml(v)
+                        .ok()
+                        .map(|toml_val| (k.clone(), toml_val))
                 })
                 .collect(),
         }
@@ -319,8 +324,7 @@ fn toml_value_to_json(value: &toml::Value) -> DAGResult<serde_json::Value> {
         }
         toml::Value::Boolean(b) => Ok(serde_json::Value::Bool(*b)),
         toml::Value::Array(arr) => {
-            let json_arr: Result<Vec<_>, _> =
-                arr.iter().map(toml_value_to_json).collect();
+            let json_arr: Result<Vec<_>, _> = arr.iter().map(toml_value_to_json).collect();
             Ok(serde_json::Value::Array(json_arr?))
         }
         toml::Value::Table(table) => {
@@ -351,8 +355,7 @@ fn json_value_to_toml(value: &serde_json::Value) -> DAGResult<toml::Value> {
         }
         serde_json::Value::Bool(b) => Ok(toml::Value::Boolean(*b)),
         serde_json::Value::Array(arr) => {
-            let toml_arr: Result<Vec<_>, _> =
-                arr.iter().map(json_value_to_toml).collect();
+            let toml_arr: Result<Vec<_>, _> = arr.iter().map(json_value_to_toml).collect();
             Ok(toml::Value::Array(toml_arr?))
         }
         serde_json::Value::Object(obj) => {

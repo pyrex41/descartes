@@ -568,7 +568,9 @@ terminal = true
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         let enum_code = workflow.generate_state_enum();
         assert!(enum_code.contains("Start"));
@@ -621,7 +623,9 @@ terminal = true
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         let event_enum = workflow.generate_event_enum();
         assert!(event_enum.contains("process"));
@@ -662,7 +666,9 @@ handlers = []
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         let context = workflow.generate_context_struct();
         assert!(context.contains("pub struct"));
@@ -709,7 +715,9 @@ terminal = true
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         let state_machine = workflow.generate_state_machine_code();
         assert!(state_machine.contains("impl"));
@@ -755,7 +763,9 @@ terminal = true
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         let diagram = workflow.generate_mermaid_diagram();
         assert!(diagram.contains("mermaid"));
@@ -891,7 +901,9 @@ handlers = []
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         assert_eq!(workflow.states["Start"].entry_actions.len(), 2);
         assert_eq!(workflow.states["Start"].exit_actions.len(), 2);
@@ -1027,7 +1039,9 @@ handlers = []
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         assert!(workflow.states["Start"].parallel_execution);
     }
@@ -1070,9 +1084,14 @@ terminal = true
 
         let parser = SwarmParser::new();
         let config = parser.parse_string(toml_content).unwrap();
-        let workflow = parser.validate_workflow(&config.workflows[0], &config).unwrap();
+        let workflow = parser
+            .validate_workflow(&config.workflows[0], &config)
+            .unwrap();
 
         assert_eq!(workflow.states["Start"].timeout_seconds, Some(3600));
-        assert_eq!(workflow.states["Start"].timeout_target, Some("Timeout".to_string()));
+        assert_eq!(
+            workflow.states["Start"].timeout_target,
+            Some("Timeout".to_string())
+        );
     }
 }

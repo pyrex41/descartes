@@ -1,13 +1,12 @@
+use chrono::Utc;
 /// Comprehensive integration tests for SqliteStateStore
-
 use descartes_core::{
-    SqliteStateStore, AgentState, Event, ActorType, Task, TaskStatus, StateStore,
+    ActorType, AgentState, Event, SqliteStateStore, StateStore, Task, TaskStatus,
 };
 use serde_json::json;
-use uuid::Uuid;
-use chrono::Utc;
 use std::fs;
 use std::path::Path;
+use uuid::Uuid;
 
 fn setup_test_db(name: &str) -> String {
     let db_path = format!("/tmp/test_state_{}.db", name);
@@ -48,13 +47,17 @@ async fn test_save_and_load_agent_state() {
         state_data: json!({
             "iteration": 42,
             "tasks": 10
-        }).to_string(),
+        })
+        .to_string(),
         created_at: Utc::now().timestamp(),
         updated_at: Utc::now().timestamp(),
         version: 1,
     };
 
-    store.save_agent_state(&state).await.expect("Failed to save");
+    store
+        .save_agent_state(&state)
+        .await
+        .expect("Failed to save");
 
     let loaded = store
         .load_agent_state("test_agent_1")
@@ -90,7 +93,10 @@ async fn test_list_agents() {
             version: 1,
         };
 
-        store.save_agent_state(&state).await.expect("Failed to save");
+        store
+            .save_agent_state(&state)
+            .await
+            .expect("Failed to save");
     }
 
     let agents = store.list_agents().await.expect("Failed to list");
@@ -303,7 +309,10 @@ async fn test_save_and_retrieve_events() {
         git_commit: Some("abc123".to_string()),
     };
 
-    store.save_event(&event).await.expect("Failed to save event");
+    store
+        .save_event(&event)
+        .await
+        .expect("Failed to save event");
 
     let events = store
         .get_events(session_id)
@@ -472,10 +481,7 @@ async fn test_get_all_tasks() {
         store.save_task(&task).await.expect("Failed to save");
     }
 
-    let tasks = store
-        .get_tasks()
-        .await
-        .expect("Failed to get tasks");
+    let tasks = store.get_tasks().await.expect("Failed to get tasks");
 
     assert_eq!(tasks.len(), 3);
 }

@@ -153,10 +153,7 @@ impl SqliteWorkflowStore {
     }
 
     /// Save or update a workflow state
-    pub async fn save_workflow(
-        &self,
-        workflow: &WorkflowStateMachine,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn save_workflow(&self, workflow: &WorkflowStateMachine) -> Result<(), sqlx::Error> {
         let serialized = workflow.serialize().await.map_err(|e| {
             sqlx::Error::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -193,13 +190,15 @@ impl SqliteWorkflowStore {
     }
 
     /// Load a workflow state from storage
-    pub async fn load_workflow(&self, workflow_id: &str) -> Result<SerializedWorkflow, sqlx::Error> {
-        let record = sqlx::query_as::<_, WorkflowRecord>(
-            "SELECT * FROM workflows WHERE workflow_id = ?"
-        )
-        .bind(workflow_id)
-        .fetch_one(&self.pool)
-        .await?;
+    pub async fn load_workflow(
+        &self,
+        workflow_id: &str,
+    ) -> Result<SerializedWorkflow, sqlx::Error> {
+        let record =
+            sqlx::query_as::<_, WorkflowRecord>("SELECT * FROM workflows WHERE workflow_id = ?")
+                .bind(workflow_id)
+                .fetch_one(&self.pool)
+                .await?;
 
         let history = sqlx::query_as::<_, TransitionRecord>(
             r#"
@@ -222,8 +221,7 @@ impl SqliteWorkflowStore {
             _ => WorkflowState::Idle,
         };
 
-        let context: serde_json::Value =
-            serde_json::from_str(&record.context).unwrap_or(json!({}));
+        let context: serde_json::Value = serde_json::from_str(&record.context).unwrap_or(json!({}));
 
         let history_entries: Vec<StateHistoryEntry> = history
             .into_iter()
@@ -409,11 +407,9 @@ impl SqliteWorkflowStore {
 
     /// List all workflows
     pub async fn list_workflows(&self) -> Result<Vec<WorkflowRecord>, sqlx::Error> {
-        sqlx::query_as::<_, WorkflowRecord>(
-            "SELECT * FROM workflows ORDER BY updated_at DESC"
-        )
-        .fetch_all(&self.pool)
-        .await
+        sqlx::query_as::<_, WorkflowRecord>("SELECT * FROM workflows ORDER BY updated_at DESC")
+            .fetch_all(&self.pool)
+            .await
     }
 
     /// Delete a workflow and its history
@@ -548,9 +544,6 @@ mod tests {
 
         assert_eq!(loaded.workflow_id, "test-workflow");
         assert_eq!(loaded.current_state, WorkflowState::Running);
-        assert_eq!(
-            loaded.context.get("key"),
-            Some(&serde_json::json!("value"))
-        );
+        assert_eq!(loaded.context.get("key"), Some(&serde_json::json!("value")));
     }
 }

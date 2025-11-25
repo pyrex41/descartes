@@ -1,5 +1,4 @@
 /// HTTP and WebSocket server implementation
-
 use crate::auth::AuthManager;
 use crate::config::DaemonConfig;
 use crate::errors::{DaemonError, DaemonResult};
@@ -183,17 +182,15 @@ async fn handle_http_request(
                         .to_string()
                     })
                 }
-                Err(e) => {
-                    json!({
-                        "jsonrpc": "2.0",
-                        "error": {
-                            "code": -32700,
-                            "message": format!("Parse error: {}", e)
-                        },
-                        "id": serde_json::Value::Null
-                    })
-                    .to_string()
-                }
+                Err(e) => json!({
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32700,
+                        "message": format!("Parse error: {}", e)
+                    },
+                    "id": serde_json::Value::Null
+                })
+                .to_string(),
             };
 
             metrics.record_connection_closed();

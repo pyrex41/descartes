@@ -1,7 +1,6 @@
 /// Comprehensive IPC/Message Bus System for inter-agent communication
 /// Supports multiple transports: Unix sockets, shared memory, stdin/stdout
 /// Includes pub/sub messaging, request/response protocol, and reliability features
-
 use async_trait::async_trait;
 use bincode;
 use dashmap::DashMap;
@@ -451,11 +450,7 @@ impl BackpressureController {
 
         if pending >= self.config.max_pending as u64 {
             // Apply backpressure
-            let result = timeout(
-                self.config.timeout,
-                sleep(self.config.wait_duration),
-            )
-            .await;
+            let result = timeout(self.config.timeout, sleep(self.config.wait_duration)).await;
 
             if result.is_err() {
                 return Err("Backpressure timeout".to_string());
@@ -635,7 +630,8 @@ impl RequestResponseTracker {
     /// Register a pending request
     pub fn register_request(&self, message: IpcMessage) -> String {
         let request_id = message.id.clone();
-        self.pending.insert(request_id.clone(), (message, SystemTime::now()));
+        self.pending
+            .insert(request_id.clone(), (message, SystemTime::now()));
         request_id
     }
 
@@ -663,7 +659,10 @@ impl RequestResponseTracker {
             self.pending.remove(&req_id);
         }
 
-        self.pending.iter().map(|entry| entry.value().0.clone()).collect()
+        self.pending
+            .iter()
+            .map(|entry| entry.value().0.clone())
+            .collect()
     }
 
     /// Get pending request count
@@ -755,9 +754,7 @@ impl MessageBus {
                 per_topic: HashMap::new(),
                 per_sender: HashMap::new(),
             })),
-            message_history: Arc::new(Mutex::new(VecDeque::with_capacity(
-                config.max_history_size,
-            ))),
+            message_history: Arc::new(Mutex::new(VecDeque::with_capacity(config.max_history_size))),
             config,
         }
     }
@@ -880,10 +877,7 @@ impl MessageBus {
     }
 
     /// Send a request and wait for response
-    pub async fn request(
-        &self,
-        mut request: IpcMessage,
-    ) -> Result<IpcMessage, String> {
+    pub async fn request(&self, mut request: IpcMessage) -> Result<IpcMessage, String> {
         if request.msg_type != MessageType::Request {
             request.msg_type = MessageType::Request;
         }
@@ -1046,7 +1040,8 @@ mod tests {
         let subs = bus.get_subscribers("topic1");
         assert_eq!(subs.len(), 2);
 
-        bus.unsubscribe("topic1", "agent1").expect("Unsubscribe failed");
+        bus.unsubscribe("topic1", "agent1")
+            .expect("Unsubscribe failed");
 
         let subs = bus.get_subscribers("topic1");
         assert_eq!(subs.len(), 1);

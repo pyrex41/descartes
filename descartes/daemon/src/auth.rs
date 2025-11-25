@@ -1,5 +1,4 @@
 /// Authentication and authorization
-
 use crate::config::AuthConfig;
 use crate::errors::{DaemonError, DaemonResult};
 use crate::types::AuthToken;
@@ -60,13 +59,9 @@ impl AuthManager {
 
     /// Verify a token
     pub fn verify_token(&self, token: &str) -> DaemonResult<Claims> {
-        decode::<Claims>(
-            token,
-            &self.decoding_key,
-            &Validation::default(),
-        )
-        .map(|data| data.claims)
-        .map_err(|e| DaemonError::AuthError(format!("Token verification failed: {}", e)))
+        decode::<Claims>(token, &self.decoding_key, &Validation::default())
+            .map(|data| data.claims)
+            .map_err(|e| DaemonError::AuthError(format!("Token verification failed: {}", e)))
     }
 
     /// Verify API key
@@ -138,7 +133,9 @@ mod tests {
         };
 
         let manager = AuthManager::new(config).unwrap();
-        let token = manager.generate_token("user1", vec!["read".to_string()]).unwrap();
+        let token = manager
+            .generate_token("user1", vec!["read".to_string()])
+            .unwrap();
 
         assert!(!token.token.is_empty());
         assert_eq!(token.scope, vec!["read"]);
@@ -154,7 +151,9 @@ mod tests {
         };
 
         let manager = AuthManager::new(config).unwrap();
-        let token_info = manager.generate_token("user1", vec!["read".to_string()]).unwrap();
+        let token_info = manager
+            .generate_token("user1", vec!["read".to_string()])
+            .unwrap();
         let claims = manager.verify_token(&token_info.token).unwrap();
 
         assert_eq!(claims.sub, "user1");
@@ -191,10 +190,7 @@ mod tests {
 
     #[test]
     fn test_auth_context_wildcard() {
-        let ctx = AuthContext::new(
-            "admin".to_string(),
-            vec!["*".to_string()],
-        );
+        let ctx = AuthContext::new("admin".to_string(), vec!["*".to_string()]);
 
         assert!(ctx.can_perform("any:action"));
         assert!(ctx.can_perform("admin:action"));

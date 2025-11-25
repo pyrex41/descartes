@@ -52,7 +52,13 @@ impl SemanticExtractor {
         file_path: &str,
         id_counter: &mut usize,
     ) -> ParserResult<SemanticNode> {
-        let node_id = format!("{}_{}_{}_{}", file_path, node.start_byte(), node.end_byte(), id_counter);
+        let node_id = format!(
+            "{}_{}_{}_{}",
+            file_path,
+            node.start_byte(),
+            node.end_byte(),
+            id_counter
+        );
         *id_counter += 1;
 
         let (node_type, name) = self.classify_node(node, source_code)?;
@@ -103,7 +109,11 @@ impl SemanticExtractor {
     }
 
     /// Classify the node type and extract its name
-    fn classify_node(&self, node: &Node, source_code: &str) -> ParserResult<(SemanticNodeType, String)> {
+    fn classify_node(
+        &self,
+        node: &Node,
+        source_code: &str,
+    ) -> ParserResult<(SemanticNodeType, String)> {
         let kind = node.kind();
         let name = self.extract_name(node, source_code).unwrap_or_default();
 
@@ -186,7 +196,9 @@ impl SemanticExtractor {
     /// Classify a JavaScript/TypeScript node
     fn classify_js_node(&self, kind: &str, _node: &Node) -> SemanticNodeType {
         match kind {
-            "function_declaration" | "function_expression" | "arrow_function" => SemanticNodeType::Function,
+            "function_declaration" | "function_expression" | "arrow_function" => {
+                SemanticNodeType::Function
+            }
             "class_declaration" => SemanticNodeType::Class,
             "import_statement" => SemanticNodeType::Import,
             "export_statement" => SemanticNodeType::Export,
@@ -311,9 +323,15 @@ mod tests {
         let extractor = SemanticExtractor::new(Language::Rust);
         let nodes = extractor.extract_nodes(&tree, code, "test.rs").unwrap();
 
-        let has_function = nodes.iter().any(|n| n.node_type == SemanticNodeType::Function);
-        let has_struct = nodes.iter().any(|n| n.node_type == SemanticNodeType::Struct);
-        let has_import = nodes.iter().any(|n| n.node_type == SemanticNodeType::Import);
+        let has_function = nodes
+            .iter()
+            .any(|n| n.node_type == SemanticNodeType::Function);
+        let has_struct = nodes
+            .iter()
+            .any(|n| n.node_type == SemanticNodeType::Struct);
+        let has_import = nodes
+            .iter()
+            .any(|n| n.node_type == SemanticNodeType::Import);
 
         assert!(has_function || has_struct || has_import);
     }

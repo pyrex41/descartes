@@ -11,10 +11,9 @@
 /// - Support for categorizing thoughts via tags/folders
 /// - Project-specific symlink management to global thoughts
 /// - Atomic operations for safe concurrent access
-
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::os::unix::fs as unix_fs;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tracing::{debug, info, warn};
 
@@ -124,7 +123,10 @@ impl ThoughtsStorage {
     ///
     /// Sets proper Unix permissions (user-only access: 0o700)
     pub fn initialize(&self) -> ThoughtsResult<()> {
-        debug!("Initializing thoughts storage at: {:?}", self.config.global_root);
+        debug!(
+            "Initializing thoughts storage at: {:?}",
+            self.config.global_root
+        );
 
         // Create main root directory
         self.create_directory(&self.config.global_root)?;
@@ -144,7 +146,10 @@ impl ThoughtsStorage {
         // Create root metadata file if it doesn't exist
         self.create_root_metadata()?;
 
-        info!("Thoughts storage initialized at: {:?}", self.config.global_root);
+        info!(
+            "Thoughts storage initialized at: {:?}",
+            self.config.global_root
+        );
         Ok(())
     }
 
@@ -171,7 +176,10 @@ impl ThoughtsStorage {
             use std::os::unix::fs::PermissionsExt;
             let perms = fs::Permissions::from_mode(self.config.dir_permissions);
             fs::set_permissions(path, perms)?;
-            debug!("Set permissions {:o} on: {:?}", self.config.dir_permissions, path);
+            debug!(
+                "Set permissions {:o} on: {:?}",
+                self.config.dir_permissions, path
+            );
         }
 
         Ok(())
@@ -235,7 +243,9 @@ impl ThoughtsStorage {
 
     /// Load a thought by ID
     pub fn load_thought(&self, thought_id: &str) -> ThoughtsResult<ThoughtMetadata> {
-        let metadata_file = self.get_thought_directory(thought_id)?.join("metadata.json");
+        let metadata_file = self
+            .get_thought_directory(thought_id)?
+            .join("metadata.json");
 
         if !metadata_file.exists() {
             return Err(ThoughtsError::InvalidPath(format!(
@@ -299,7 +309,11 @@ impl ThoughtsStorage {
             }
         }
 
-        debug!("Found {} thoughts with tag: {}", matching_thoughts.len(), tag);
+        debug!(
+            "Found {} thoughts with tag: {}",
+            matching_thoughts.len(),
+            tag
+        );
         Ok(matching_thoughts)
     }
 
@@ -331,10 +345,7 @@ impl ThoughtsStorage {
                 "Created symlink: {:?} -> {:?}",
                 symlink_path, self.config.global_root
             );
-            info!(
-                "Created project symlink at: {:?}",
-                symlink_path
-            );
+            info!("Created project symlink at: {:?}", symlink_path);
         }
 
         #[cfg(not(unix))]
@@ -622,7 +633,12 @@ mod tests {
 
         storage.archive_thought("test-archive").unwrap();
         assert_eq!(storage.list_thoughts().unwrap().len(), 0);
-        assert!(storage.config.global_root.join("archive").join("test-archive").exists());
+        assert!(storage
+            .config
+            .global_root
+            .join("archive")
+            .join("test-archive")
+            .exists());
     }
 
     #[test]

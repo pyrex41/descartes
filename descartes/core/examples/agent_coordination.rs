@@ -3,7 +3,6 @@
 /// This example shows how to use the IPC message bus to coordinate
 /// multiple agents in a workflow, including pub/sub, request/response,
 /// and state sharing patterns.
-
 use descartes_core::{
     IpcMessage, MessageBus, MessageBusConfig, MessageHandler, MessageType, RoutingRule,
 };
@@ -55,12 +54,8 @@ impl Agent {
         recipient: String,
         payload: serde_json::Value,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        let msg = IpcMessage::new(
-            MessageType::DirectMessage,
-            self.id.clone(),
-            payload,
-        )
-        .with_recipient(recipient);
+        let msg = IpcMessage::new(MessageType::DirectMessage, self.id.clone(), payload)
+            .with_recipient(recipient);
 
         Ok(self.bus.send(msg).await?)
     }
@@ -182,14 +177,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = bus.router();
 
     // Register handlers
-    router.register_handler(
-        "coordinator".to_string(),
-        Arc::new(CoordinatorHandler),
-    )?;
-    router.register_handler(
-        "data_processor".to_string(),
-        Arc::new(DataProcessorHandler),
-    )?;
+    router.register_handler("coordinator".to_string(), Arc::new(CoordinatorHandler))?;
+    router.register_handler("data_processor".to_string(), Arc::new(DataProcessorHandler))?;
     router.register_handler(
         "result_aggregator".to_string(),
         Arc::new(ResultAggregatorHandler),
@@ -239,8 +228,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create agents
     let coordinator = Arc::new(Agent::new("coordinator".to_string(), Arc::clone(&bus)));
-    let data_collector =
-        Arc::new(Agent::new("data_collector".to_string(), Arc::clone(&bus)));
+    let data_collector = Arc::new(Agent::new("data_collector".to_string(), Arc::clone(&bus)));
     let analyzer = Arc::new(Agent::new("analyzer".to_string(), Arc::clone(&bus)));
     let trader = Arc::new(Agent::new("trader".to_string(), Arc::clone(&bus)));
 
@@ -279,9 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // 2. Analyzer makes a request to get more data
-    println!(
-        "\n2. Analyzer requesting detailed market data from Data Collector..."
-    );
+    println!("\n2. Analyzer requesting detailed market data from Data Collector...");
     analyzer
         .request(
             "data_collector".to_string(),

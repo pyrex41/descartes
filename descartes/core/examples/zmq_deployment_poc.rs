@@ -40,10 +40,9 @@
 /// 2. Create multiple clients
 /// 3. Demonstrate various deployment scenarios
 /// 4. Clean up and shutdown gracefully
-
 use descartes_core::{
-    AgentConfig, AgentStatus, ZmqAgentRunner, ZmqAgentServer, ZmqClient, ZmqRunnerConfig,
-    ZmqServerConfig, ProcessRunnerConfig, ControlCommandType,
+    AgentConfig, AgentStatus, ControlCommandType, ProcessRunnerConfig, ZmqAgentRunner,
+    ZmqAgentServer, ZmqClient, ZmqRunnerConfig, ZmqServerConfig,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -113,7 +112,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Scenario 3: Agent Spawning and Management
     info!("🚀 Scenario 3: Agent Spawning and Management");
     let agent_ids = spawn_agents(&clients, &config).await?;
-    info!("✅ Spawned {} agents across {} clients", agent_ids.len(), clients.len());
+    info!(
+        "✅ Spawned {} agents across {} clients",
+        agent_ids.len(),
+        clients.len()
+    );
     info!("");
 
     // Scenario 4: Agent Lifecycle Management
@@ -279,10 +282,7 @@ async fn spawn_agents(
 
             match client.spawn_remote(agent_config.clone(), Some(300)).await {
                 Ok(agent_info) => {
-                    info!(
-                        "  ✓ Spawned {} (ID: {})",
-                        agent_config.name, agent_info.id
-                    );
+                    info!("  ✓ Spawned {} (ID: {})", agent_config.name, agent_info.id);
                     agent_ids.push(agent_info.id);
                 }
                 Err(e) => {
@@ -384,9 +384,7 @@ async fn perform_health_checks(
 }
 
 /// Demonstrate error handling and recovery scenarios
-async fn demonstrate_error_handling(
-    client: &ZmqClient,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn demonstrate_error_handling(client: &ZmqClient) -> Result<(), Box<dyn std::error::Error>> {
     info!("Testing error handling scenarios...");
 
     // Test 1: Query non-existent agent
@@ -493,7 +491,10 @@ async fn run_load_tests(config: &DeploymentConfig) -> Result<(), Box<dyn std::er
     info!("  Load test completed in {:?}", duration);
     info!("    Successful: {}", successful);
     info!("    Failed: {}", failed);
-    info!("    Rate: {:.2} agents/sec", successful as f64 / duration.as_secs_f64());
+    info!(
+        "    Rate: {:.2} agents/sec",
+        successful as f64 / duration.as_secs_f64()
+    );
 
     Ok(())
 }
@@ -513,12 +514,7 @@ async fn demonstrate_batch_operations(
     // Batch pause (if supported)
     info!("  Batch pause operation on {} agents", agent_ids.len());
     match client
-        .batch_control(
-            agent_ids.to_vec(),
-            ControlCommandType::Pause,
-            None,
-            false,
-        )
+        .batch_control(agent_ids.to_vec(), ControlCommandType::Pause, None, false)
         .await
     {
         Ok(response) => {
@@ -553,7 +549,10 @@ async fn demonstrate_output_querying(
         Ok(Some(data)) => {
             info!("    Stdout: {} bytes", data.len());
             if let Ok(text) = String::from_utf8(data) {
-                info!("    Content: {}", text.chars().take(100).collect::<String>());
+                info!(
+                    "    Content: {}",
+                    text.chars().take(100).collect::<String>()
+                );
             }
         }
         Ok(None) => {
@@ -609,9 +608,7 @@ async fn cleanup_agents(
 }
 
 /// Shutdown the server gracefully
-async fn shutdown_server(
-    server: Arc<ZmqAgentServer>,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn shutdown_server(server: Arc<ZmqAgentServer>) -> Result<(), Box<dyn std::error::Error>> {
     info!("Shutting down server...");
 
     // Get final statistics

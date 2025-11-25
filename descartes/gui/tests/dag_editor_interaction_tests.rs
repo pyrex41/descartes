@@ -1,3 +1,5 @@
+use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, Position, DAG};
+use descartes_gui::dag_canvas_interactions::*;
 /// Tests for DAG Editor Drag-and-Drop Interactions
 ///
 /// This test suite validates all drag-and-drop functionality including:
@@ -7,12 +9,9 @@
 /// - Canvas panning
 /// - Zoom to cursor
 /// - Undo/redo operations
-
 use descartes_gui::dag_editor::*;
-use descartes_gui::dag_canvas_interactions::*;
-use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType, Position};
-use iced::{Point, Vector, mouse, keyboard};
 use iced::mouse::ScrollDelta;
+use iced::{keyboard, mouse, Point, Vector};
 use uuid::Uuid;
 
 // ============================================================================
@@ -110,7 +109,8 @@ fn test_multi_node_drag() {
     assert_eq!(state.interaction.selected_nodes.len(), 2);
 
     // Get initial positions
-    let initial_positions: Vec<_> = node_ids.iter()
+    let initial_positions: Vec<_> = node_ids
+        .iter()
         .filter(|id| state.interaction.selected_nodes.contains(id))
         .map(|id| state.dag.get_node(*id).unwrap().position)
         .collect();
@@ -123,7 +123,8 @@ fn test_multi_node_drag() {
     handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, drag_pos);
 
     // Check that both nodes moved
-    let final_positions: Vec<_> = node_ids.iter()
+    let final_positions: Vec<_> = node_ids
+        .iter()
         .filter(|id| state.interaction.selected_nodes.contains(id))
         .map(|id| state.dag.get_node(*id).unwrap().position)
         .collect();
@@ -188,7 +189,10 @@ fn test_edge_creation_via_drag() {
         keyboard::Modifiers::default(),
     );
 
-    assert!(matches!(result, Some(InteractionResult::EdgeCreationStarted(_))));
+    assert!(matches!(
+        result,
+        Some(InteractionResult::EdgeCreationStarted(_))
+    ));
     assert!(extended.edge_creation.is_some());
 
     // Drag to target node
@@ -236,7 +240,10 @@ fn test_edge_creation_cycle_prevention() {
     let result = handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, to_pos);
 
     // Edge should not be created (would create cycle)
-    assert!(matches!(result, Some(InteractionResult::EdgeCreationFailed(_))));
+    assert!(matches!(
+        result,
+        Some(InteractionResult::EdgeCreationFailed(_))
+    ));
     assert_eq!(state.dag.edges.len(), initial_edge_count);
 }
 
@@ -355,7 +362,10 @@ fn test_select_all_keyboard_shortcut() {
     );
 
     assert!(matches!(result, Some(InteractionResult::AllNodesSelected)));
-    assert_eq!(state.interaction.selected_nodes.len(), state.dag.nodes.len());
+    assert_eq!(
+        state.interaction.selected_nodes.len(),
+        state.dag.nodes.len()
+    );
 }
 
 // ============================================================================
@@ -484,8 +494,16 @@ fn test_zoom_to_cursor_position() {
     let diff_x = (world_pos_before.x - world_pos_after.x).abs();
     let diff_y = (world_pos_before.y - world_pos_after.y).abs();
 
-    assert!(diff_x < 5.0, "Cursor X position drifted too much: {}", diff_x);
-    assert!(diff_y < 5.0, "Cursor Y position drifted too much: {}", diff_y);
+    assert!(
+        diff_x < 5.0,
+        "Cursor X position drifted too much: {}",
+        diff_x
+    );
+    assert!(
+        diff_y < 5.0,
+        "Cursor Y position drifted too much: {}",
+        diff_y
+    );
 }
 
 // ============================================================================
@@ -500,7 +518,10 @@ fn test_undo_node_addition() {
 
     // Add a node
     let position = Position::new(400.0, 400.0);
-    update(&mut state, DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)));
+    update(
+        &mut state,
+        DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)),
+    );
 
     assert_eq!(state.dag.nodes.len(), initial_count + 1);
 
@@ -538,11 +559,10 @@ fn test_undo_edge_creation() {
     let initial_count = state.dag.edges.len();
 
     // Create an edge
-    update(&mut state, DAGEditorMessage::CreateEdge(
-        node_ids[0],
-        node_ids[1],
-        EdgeType::Dependency,
-    ));
+    update(
+        &mut state,
+        DAGEditorMessage::CreateEdge(node_ids[0], node_ids[1], EdgeType::Dependency),
+    );
 
     assert_eq!(state.dag.edges.len(), initial_count + 1);
 
@@ -561,7 +581,10 @@ fn test_redo_operations() {
 
     // Add a node
     let position = Position::new(400.0, 400.0);
-    update(&mut state, DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)));
+    update(
+        &mut state,
+        DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)),
+    );
 
     // Undo
     update(&mut state, DAGEditorMessage::Undo);
@@ -579,7 +602,10 @@ fn test_keyboard_undo_redo_shortcuts() {
 
     // Add a node
     let position = Position::new(400.0, 400.0);
-    update(&mut state, DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)));
+    update(
+        &mut state,
+        DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)),
+    );
 
     let count_after_add = state.dag.nodes.len();
 
@@ -651,7 +677,10 @@ fn test_escape_cancels_operations() {
         keyboard::Modifiers::default(),
     );
 
-    assert!(matches!(result, Some(InteractionResult::OperationCancelled)));
+    assert!(matches!(
+        result,
+        Some(InteractionResult::OperationCancelled)
+    ));
     assert!(extended.edge_creation.is_none());
 }
 
@@ -691,7 +720,10 @@ fn test_drag_large_selection() {
 
     // All selected nodes should have moved
     assert!(state.interaction.drag_state.is_some());
-    assert_eq!(state.interaction.drag_state.as_ref().unwrap().nodes.len(), 50);
+    assert_eq!(
+        state.interaction.drag_state.as_ref().unwrap().nodes.len(),
+        50
+    );
 }
 
 // ============================================================================
@@ -751,9 +783,18 @@ fn test_cycle_detection_complex() {
     state.dag.add_node(node_d).unwrap();
 
     // Create edges: A -> B -> C -> D
-    state.dag.add_edge(DAGEdge::new(id_a, id_b, EdgeType::Dependency)).unwrap();
-    state.dag.add_edge(DAGEdge::new(id_b, id_c, EdgeType::Dependency)).unwrap();
-    state.dag.add_edge(DAGEdge::new(id_c, id_d, EdgeType::Dependency)).unwrap();
+    state
+        .dag
+        .add_edge(DAGEdge::new(id_a, id_b, EdgeType::Dependency))
+        .unwrap();
+    state
+        .dag
+        .add_edge(DAGEdge::new(id_b, id_c, EdgeType::Dependency))
+        .unwrap();
+    state
+        .dag
+        .add_edge(DAGEdge::new(id_c, id_d, EdgeType::Dependency))
+        .unwrap();
 
     // Verify D -> A would create cycle
     assert!(would_create_cycle(&state.dag, id_d, id_a));

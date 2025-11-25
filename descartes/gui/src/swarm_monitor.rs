@@ -15,12 +15,12 @@
 //! - **Error Display**: Clear error messages for failed agents
 //! - **Timeline View**: Status transition history
 
-use iced::widget::{button, column, container, row, scrollable, text, text_input, Space, progress_bar};
-use iced::{alignment, Color, Element, Length, Theme};
+use descartes_core::{AgentError, AgentProgress, AgentRuntimeState, AgentStatus, StatusTransition};
 use iced::widget::rule;
-use descartes_core::{
-    AgentRuntimeState, AgentStatus, AgentProgress, AgentError, StatusTransition,
+use iced::widget::{
+    button, column, container, progress_bar, row, scrollable, text, text_input, Space,
 };
+use iced::{alignment, Color, Element, Length, Theme};
 use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
@@ -196,7 +196,10 @@ impl SwarmMonitorState {
             GroupingMode::ByStatus => {
                 let mut groups: HashMap<AgentStatus, Vec<&AgentRuntimeState>> = HashMap::new();
                 for agent in filtered {
-                    groups.entry(agent.status).or_insert_with(Vec::new).push(agent);
+                    groups
+                        .entry(agent.status)
+                        .or_insert_with(Vec::new)
+                        .push(agent);
                 }
 
                 let mut result: Vec<(String, Vec<&AgentRuntimeState>)> = groups
@@ -216,9 +219,8 @@ impl SwarmMonitorState {
                         .push(agent);
                 }
 
-                let mut result: Vec<(String, Vec<&AgentRuntimeState>)> = groups
-                    .into_iter()
-                    .collect();
+                let mut result: Vec<(String, Vec<&AgentRuntimeState>)> =
+                    groups.into_iter().collect();
 
                 result.sort_by(|a, b| a.0.cmp(&b.0));
                 result
@@ -364,7 +366,9 @@ impl SwarmMonitorState {
             }
             AgentEvent::AgentStatusChanged { agent_id, status } => {
                 if let Some(agent) = self.agents.get_mut(&agent_id) {
-                    agent.transition_to(status, Some("Status update from event stream".to_string())).ok();
+                    agent
+                        .transition_to(status, Some("Status update from event stream".to_string()))
+                        .ok();
                 }
             }
             AgentEvent::AgentThoughtUpdate { agent_id, thought } => {
@@ -379,13 +383,17 @@ impl SwarmMonitorState {
             }
             AgentEvent::AgentCompleted { agent_id } => {
                 if let Some(agent) = self.agents.get_mut(&agent_id) {
-                    agent.transition_to(AgentStatus::Completed, Some("Agent completed".to_string())).ok();
+                    agent
+                        .transition_to(AgentStatus::Completed, Some("Agent completed".to_string()))
+                        .ok();
                 }
             }
             AgentEvent::AgentFailed { agent_id, error } => {
                 if let Some(agent) = self.agents.get_mut(&agent_id) {
                     agent.set_error(error);
-                    agent.transition_to(AgentStatus::Failed, Some("Agent failed".to_string())).ok();
+                    agent
+                        .transition_to(AgentStatus::Failed, Some("Agent failed".to_string()))
+                        .ok();
                 }
             }
             AgentEvent::AgentTerminated { agent_id } => {
@@ -490,7 +498,7 @@ pub struct SwarmStatistics {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentFilter {
     All,
-    Active,         // Running, Thinking, Initializing
+    Active, // Running, Thinking, Initializing
     Idle,
     Running,
     Thinking,
@@ -680,8 +688,7 @@ pub fn subscription() -> iced::Subscription<SwarmMonitorMessage> {
     use std::time::Duration;
 
     // Target 60 FPS: 1000ms / 60 = ~16.67ms per frame
-    time::every(Duration::from_millis(16))
-        .map(|_| SwarmMonitorMessage::AnimationTick)
+    time::every(Duration::from_millis(16)).map(|_| SwarmMonitorMessage::AnimationTick)
 }
 
 // ============================================================================
@@ -690,9 +697,7 @@ pub fn subscription() -> iced::Subscription<SwarmMonitorMessage> {
 
 /// Render the swarm monitor view
 pub fn view(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
-    let title = text("Swarm Monitor")
-        .size(32)
-        .width(Length::Shrink);
+    let title = text("Swarm Monitor").size(32).width(Length::Shrink);
 
     // Statistics panel
     let stats_panel = view_statistics_panel(state);
@@ -749,18 +754,15 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
         .on_press(SwarmMonitorMessage::ToggleLiveUpdates);
 
     let live_updates_box = if state.live_updates_enabled {
-        container(live_updates_btn)
-            .style(|theme: &Theme| {
-                container::Style {
-                    background: Some(Color::from_rgb(0.3, 0.8, 0.3).into()),
-                    border: iced::Border {
-                        width: 1.0,
-                        color: Color::from_rgb(0.5, 1.0, 0.5),
-                        radius: 4.0.into(),
-                    },
-                    ..Default::default()
-                }
-            })
+        container(live_updates_btn).style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgb(0.3, 0.8, 0.3).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: Color::from_rgb(0.5, 1.0, 0.5),
+                radius: 4.0.into(),
+            },
+            ..Default::default()
+        })
     } else {
         container(live_updates_btn)
     };
@@ -776,18 +778,15 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
         .on_press(SwarmMonitorMessage::ToggleWebSocket);
 
     let websocket_box = if state.websocket_enabled {
-        container(websocket_btn)
-            .style(|theme: &Theme| {
-                container::Style {
-                    background: Some(Color::from_rgb(0.3, 0.7, 0.9).into()),
-                    border: iced::Border {
-                        width: 1.0,
-                        color: Color::from_rgb(0.5, 0.9, 1.0),
-                        radius: 4.0.into(),
-                    },
-                    ..Default::default()
-                }
-            })
+        container(websocket_btn).style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgb(0.3, 0.7, 0.9).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: Color::from_rgb(0.5, 0.9, 1.0),
+                radius: 4.0.into(),
+            },
+            ..Default::default()
+        })
     } else {
         container(websocket_btn)
     };
@@ -796,40 +795,37 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
     let status_color = state.connection_status.color();
     let status_badge = container(text(state.connection_status.label()).size(11))
         .padding(6)
-        .style(move |theme: &Theme| {
-            container::Style {
-                background: Some(status_color.scale_alpha(0.3).into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: status_color,
-                    radius: 4.0.into(),
-                },
-                text_color: Some(status_color),
-                ..Default::default()
-            }
+        .style(move |theme: &Theme| container::Style {
+            background: Some(status_color.scale_alpha(0.3).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: status_color,
+                radius: 4.0.into(),
+            },
+            text_color: Some(status_color),
+            ..Default::default()
         });
 
     // Performance stats
-    let fps_text = text(format!("FPS: {:.1}", perf_stats.fps))
-        .size(12)
-        .style(if perf_stats.is_acceptable {
-            Color::from_rgb(0.3, 0.8, 0.3)
-        } else {
-            Color::from_rgb(0.9, 0.5, 0.3)
-        });
+    let fps_text =
+        text(format!("FPS: {:.1}", perf_stats.fps))
+            .size(12)
+            .style(if perf_stats.is_acceptable {
+                Color::from_rgb(0.3, 0.8, 0.3)
+            } else {
+                Color::from_rgb(0.9, 0.5, 0.3)
+            });
 
     let frame_time_text = text(format!(
         "Frame: {:.2}ms / {:.2}ms",
-        perf_stats.avg_frame_time_ms,
-        perf_stats.max_frame_time_ms
+        perf_stats.avg_frame_time_ms, perf_stats.max_frame_time_ms
     ))
     .size(11)
     .style(Color::from_rgb(0.7, 0.7, 0.8));
 
     let agent_count_text = text(format!(
         "Agents: {} ({} active)",
-        perf_stats.total_agents,
-        perf_stats.active_agents
+        perf_stats.total_agents, perf_stats.active_agents
     ))
     .size(11)
     .style(Color::from_rgb(0.7, 0.7, 0.8));
@@ -853,16 +849,14 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
     container(controls_row)
         .padding(12)
         .width(Length::Fill)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.6).into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: Color::from_rgba(0.3, 0.3, 0.4, 0.5),
-                    radius: 6.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.6).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: Color::from_rgba(0.3, 0.3, 0.4, 0.5),
+                radius: 6.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
@@ -871,10 +865,26 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
 fn view_statistics_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
     let stats = state.compute_statistics();
 
-    let total = stat_box("Total", &stats.total_agents.to_string(), Color::from_rgb(0.4, 0.4, 0.9));
-    let active = stat_box("Active", &stats.total_active.to_string(), Color::from_rgb(0.3, 0.8, 0.3));
-    let completed = stat_box("Completed", &stats.total_completed.to_string(), Color::from_rgb(0.5, 0.5, 0.5));
-    let failed = stat_box("Failed", &stats.total_failed.to_string(), Color::from_rgb(0.9, 0.3, 0.3));
+    let total = stat_box(
+        "Total",
+        &stats.total_agents.to_string(),
+        Color::from_rgb(0.4, 0.4, 0.9),
+    );
+    let active = stat_box(
+        "Active",
+        &stats.total_active.to_string(),
+        Color::from_rgb(0.3, 0.8, 0.3),
+    );
+    let completed = stat_box(
+        "Completed",
+        &stats.total_completed.to_string(),
+        Color::from_rgb(0.5, 0.5, 0.5),
+    );
+    let failed = stat_box(
+        "Failed",
+        &stats.total_failed.to_string(),
+        Color::from_rgb(0.9, 0.3, 0.3),
+    );
 
     let avg_time = if let Some(avg) = stats.avg_execution_time {
         format!("{:.1}s", avg)
@@ -889,16 +899,14 @@ fn view_statistics_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessa
 
     container(stats_row)
         .padding(15)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.5).into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: Color::from_rgba(0.4, 0.4, 0.6, 0.3),
-                    radius: 8.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.5).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: Color::from_rgba(0.4, 0.4, 0.6, 0.3),
+                radius: 8.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
@@ -915,16 +923,14 @@ fn stat_box(label: &str, value: &str, color: Color) -> Element<SwarmMonitorMessa
     container(content)
         .padding(10)
         .width(Length::Fill)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.8).into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: color.scale_alpha(0.3),
-                    radius: 6.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.8).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: color.scale_alpha(0.3),
+                radius: 6.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
@@ -952,16 +958,14 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
             if is_active {
                 container(btn)
-                    .style(|theme: &Theme| {
-                        container::Style {
-                            background: Some(Color::from_rgb(0.3, 0.5, 0.9).into()),
-                            border: iced::Border {
-                                width: 1.0,
-                                color: Color::from_rgb(0.5, 0.7, 1.0),
-                                radius: 4.0.into(),
-                            },
-                            ..Default::default()
-                        }
+                    .style(|theme: &Theme| container::Style {
+                        background: Some(Color::from_rgb(0.3, 0.5, 0.9).into()),
+                        border: iced::Border {
+                            width: 1.0,
+                            color: Color::from_rgb(0.5, 0.7, 1.0),
+                            radius: 4.0.into(),
+                        },
+                        ..Default::default()
                     })
                     .into()
             } else {
@@ -970,9 +974,7 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
         })
         .collect();
 
-    let filter_row = row(filter_buttons)
-        .spacing(8)
-        .width(Length::Shrink);
+    let filter_row = row(filter_buttons).spacing(8).width(Length::Shrink);
 
     // Search input
     let search_input = text_input("Search agents...", &state.search_query)
@@ -999,16 +1001,14 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
             if is_active {
                 container(btn)
-                    .style(|theme: &Theme| {
-                        container::Style {
-                            background: Some(Color::from_rgb(0.3, 0.7, 0.5).into()),
-                            border: iced::Border {
-                                width: 1.0,
-                                color: Color::from_rgb(0.5, 0.9, 0.7),
-                                radius: 4.0.into(),
-                            },
-                            ..Default::default()
-                        }
+                    .style(|theme: &Theme| container::Style {
+                        background: Some(Color::from_rgb(0.3, 0.7, 0.5).into()),
+                        border: iced::Border {
+                            width: 1.0,
+                            color: Color::from_rgb(0.5, 0.9, 0.7),
+                            radius: 4.0.into(),
+                        },
+                        ..Default::default()
                     })
                     .into()
             } else {
@@ -1024,11 +1024,7 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
         .align_y(alignment::Vertical::Center);
 
     // Sort buttons
-    let sort_modes = vec![
-        SortMode::ByName,
-        SortMode::ByStatus,
-        SortMode::ByUpdatedAt,
-    ];
+    let sort_modes = vec![SortMode::ByName, SortMode::ByStatus, SortMode::ByUpdatedAt];
 
     let sort_label = text("Sort:").size(14);
 
@@ -1042,16 +1038,14 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
             if is_active {
                 container(btn)
-                    .style(|theme: &Theme| {
-                        container::Style {
-                            background: Some(Color::from_rgb(0.7, 0.5, 0.9).into()),
-                            border: iced::Border {
-                                width: 1.0,
-                                color: Color::from_rgb(0.9, 0.7, 1.0),
-                                radius: 4.0.into(),
-                            },
-                            ..Default::default()
-                        }
+                    .style(|theme: &Theme| container::Style {
+                        background: Some(Color::from_rgb(0.7, 0.5, 0.9).into()),
+                        border: iced::Border {
+                            width: 1.0,
+                            color: Color::from_rgb(0.9, 0.7, 1.0),
+                            radius: 4.0.into(),
+                        },
+                        ..Default::default()
                     })
                     .into()
             } else {
@@ -1079,16 +1073,14 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
     container(controls)
         .padding(15)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.3).into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: Color::from_rgba(0.4, 0.4, 0.6, 0.3),
-                    radius: 8.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.3).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: Color::from_rgba(0.4, 0.4, 0.6, 0.3),
+                radius: 8.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
@@ -1101,7 +1093,7 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
         return container(
             text("No agents found")
                 .size(18)
-                .style(Color::from_rgb(0.6, 0.6, 0.6))
+                .style(Color::from_rgb(0.6, 0.6, 0.6)),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -1137,9 +1129,7 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
                     current_row.push(Space::with_width(Length::FillPortion(1)).into());
                 }
 
-                let grid_row = row(current_row.clone())
-                    .spacing(15)
-                    .width(Length::Fill);
+                let grid_row = row(current_row.clone()).spacing(15).width(Length::Fill);
 
                 agent_elements.push(grid_row.into());
                 current_row.clear();
@@ -1157,21 +1147,22 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
 }
 
 /// Render an individual agent card
-fn view_agent_card(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
+fn view_agent_card(
+    agent: &AgentRuntimeState,
+    state: &SwarmMonitorState,
+) -> Element<SwarmMonitorMessage> {
     let status_color = get_status_color(agent.status);
     let status_badge = container(text(agent.status.to_string().to_uppercase()).size(10))
         .padding(4)
-        .style(move |theme: &Theme| {
-            container::Style {
-                background: Some(status_color.into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: status_color.scale_alpha(0.5),
-                    radius: 4.0.into(),
-                },
-                text_color: Some(Color::WHITE),
-                ..Default::default()
-            }
+        .style(move |theme: &Theme| container::Style {
+            background: Some(status_color.into()),
+            border: iced::Border {
+                width: 1.0,
+                color: status_color.scale_alpha(0.5),
+                radius: 4.0.into(),
+            },
+            text_color: Some(Color::WHITE),
+            ..Default::default()
         });
 
     // Agent name and ID
@@ -1196,9 +1187,7 @@ fn view_agent_card(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> Elem
     if agent.status == AgentStatus::Thinking {
         if let Some(thought) = &agent.current_thought {
             let thinking_icon = text("💭").size(16);
-            let thought_text = text(thought)
-                .size(12)
-                .style(Color::from_rgb(0.5, 0.8, 1.0));
+            let thought_text = text(thought).size(12).style(Color::from_rgb(0.5, 0.8, 1.0));
 
             let thinking_row = row![thinking_icon, thought_text]
                 .spacing(8)
@@ -1221,7 +1210,9 @@ fn view_agent_card(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> Elem
                     }
                 });
 
-            card_content = card_content.push(Space::with_height(8)).push(thinking_container);
+            card_content = card_content
+                .push(Space::with_height(8))
+                .push(thinking_container);
         }
     }
 
@@ -1252,11 +1243,11 @@ fn view_agent_card(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> Elem
             .spacing(6)
             .align_y(alignment::Vertical::Center);
 
-        let error_container = container(error_row)
-            .padding(6)
-            .width(Length::Fill)
-            .style(|theme: &Theme| {
-                container::Style {
+        let error_container =
+            container(error_row)
+                .padding(6)
+                .width(Length::Fill)
+                .style(|theme: &Theme| container::Style {
                     background: Some(Color::from_rgba(0.9, 0.2, 0.2, 0.2).into()),
                     border: iced::Border {
                         width: 1.0,
@@ -1264,10 +1255,11 @@ fn view_agent_card(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> Elem
                         radius: 4.0.into(),
                     },
                     ..Default::default()
-                }
-            });
+                });
 
-        card_content = card_content.push(Space::with_height(8)).push(error_container);
+        card_content = card_content
+            .push(Space::with_height(8))
+            .push(error_container);
     }
 
     // Timestamps
@@ -1291,22 +1283,23 @@ fn view_agent_card(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> Elem
 
     container(card_button)
         .width(Length::FillPortion(1))
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.8).into()),
-                border: iced::Border {
-                    width: 2.0,
-                    color: status_color.scale_alpha(0.4),
-                    radius: 8.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.8).into()),
+            border: iced::Border {
+                width: 2.0,
+                color: status_color.scale_alpha(0.4),
+                radius: 8.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
 
 /// Render detailed view for a single agent
-fn view_agent_detail(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
+fn view_agent_detail(
+    agent: &AgentRuntimeState,
+    state: &SwarmMonitorState,
+) -> Element<SwarmMonitorMessage> {
     let back_button = button(text("← Back to Grid").size(14))
         .padding(10)
         .on_press(SwarmMonitorMessage::DeselectAgent);
@@ -1317,17 +1310,15 @@ fn view_agent_detail(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> El
     let name_text = text(&agent.name).size(24).style(Color::WHITE);
     let status_badge = container(text(agent.status.to_string().to_uppercase()).size(12))
         .padding(8)
-        .style(move |theme: &Theme| {
-            container::Style {
-                background: Some(status_color.into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: status_color.scale_alpha(0.5),
-                    radius: 4.0.into(),
-                },
-                text_color: Some(Color::WHITE),
-                ..Default::default()
-            }
+        .style(move |theme: &Theme| container::Style {
+            background: Some(status_color.into()),
+            border: iced::Border {
+                width: 1.0,
+                color: status_color.scale_alpha(0.5),
+                radius: 4.0.into(),
+            },
+            text_color: Some(Color::WHITE),
+            ..Default::default()
         });
 
     let header = row![name_text, Space::with_width(Length::Fill), status_badge]
@@ -1340,19 +1331,34 @@ fn view_agent_detail(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> El
         .push(detail_row("Agent ID", &agent.agent_id.to_string()))
         .push(detail_row("Task", &agent.task))
         .push(detail_row("Model", &agent.model_backend))
-        .push(detail_row("Created", &agent.created_at.format("%Y-%m-%d %H:%M:%S").to_string()))
-        .push(detail_row("Updated", &agent.updated_at.format("%Y-%m-%d %H:%M:%S").to_string()));
+        .push(detail_row(
+            "Created",
+            &agent.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+        ))
+        .push(detail_row(
+            "Updated",
+            &agent.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+        ));
 
     if let Some(started) = agent.started_at {
-        details = details.push(detail_row("Started", &started.format("%Y-%m-%d %H:%M:%S").to_string()));
+        details = details.push(detail_row(
+            "Started",
+            &started.format("%Y-%m-%d %H:%M:%S").to_string(),
+        ));
     }
 
     if let Some(completed) = agent.completed_at {
-        details = details.push(detail_row("Completed", &completed.format("%Y-%m-%d %H:%M:%S").to_string()));
+        details = details.push(detail_row(
+            "Completed",
+            &completed.format("%Y-%m-%d %H:%M:%S").to_string(),
+        ));
     }
 
     if let Some(exec_time) = agent.execution_time() {
-        details = details.push(detail_row("Execution Time", &format!("{:.2}s", exec_time.num_seconds())));
+        details = details.push(detail_row(
+            "Execution Time",
+            &format!("{:.2}s", exec_time.num_seconds()),
+        ));
     }
 
     if let Some(pid) = agent.pid {
@@ -1361,46 +1367,53 @@ fn view_agent_detail(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> El
 
     // Current thought
     if let Some(thought) = &agent.current_thought {
-        let thought_header = text("Current Thought:").size(16).style(Color::from_rgb(0.8, 0.8, 0.9));
+        let thought_header = text("Current Thought:")
+            .size(16)
+            .style(Color::from_rgb(0.8, 0.8, 0.9));
         let thought_content = text(thought).size(14).style(Color::from_rgb(0.6, 0.8, 1.0));
 
-        let thought_box = container(
-            column![thought_header, Space::with_height(8), thought_content]
-                .spacing(5)
-        )
-        .padding(15)
-        .width(Length::Fill)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(Color::from_rgba(0.2, 0.4, 0.6, 0.3).into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: Color::from_rgba(0.4, 0.6, 0.8, 0.5),
-                    radius: 8.0.into(),
-                },
-                ..Default::default()
-            }
-        });
+        let thought_box =
+            container(column![thought_header, Space::with_height(8), thought_content].spacing(5))
+                .padding(15)
+                .width(Length::Fill)
+                .style(|theme: &Theme| container::Style {
+                    background: Some(Color::from_rgba(0.2, 0.4, 0.6, 0.3).into()),
+                    border: iced::Border {
+                        width: 1.0,
+                        color: Color::from_rgba(0.4, 0.6, 0.8, 0.5),
+                        radius: 8.0.into(),
+                    },
+                    ..Default::default()
+                });
 
         details = details.push(Space::with_height(10)).push(thought_box);
     }
 
     // Progress
     if let Some(progress) = &agent.progress {
-        let progress_header = text("Progress:").size(16).style(Color::from_rgb(0.8, 0.8, 0.9));
+        let progress_header = text("Progress:")
+            .size(16)
+            .style(Color::from_rgb(0.8, 0.8, 0.9));
         let progress_value = progress.percentage / 100.0;
         let progress_bar_widget = progress_bar(0.0..=1.0, progress_value);
         let progress_label = text(format!("{:.1}%", progress.percentage)).size(14);
 
-        let mut progress_col = column![progress_header, Space::with_height(8), progress_bar_widget, progress_label]
-            .spacing(5);
+        let mut progress_col = column![
+            progress_header,
+            Space::with_height(8),
+            progress_bar_widget,
+            progress_label
+        ]
+        .spacing(5);
 
         if let (Some(current), Some(total)) = (progress.current_step, progress.total_steps) {
-            progress_col = progress_col.push(text(format!("Step {} of {}", current, total)).size(12));
+            progress_col =
+                progress_col.push(text(format!("Step {} of {}", current, total)).size(12));
         }
 
         if let Some(msg) = &progress.message {
-            progress_col = progress_col.push(text(msg).size(12).style(Color::from_rgb(0.7, 0.7, 0.8)));
+            progress_col =
+                progress_col.push(text(msg).size(12).style(Color::from_rgb(0.7, 0.7, 0.8)));
         }
 
         details = details.push(Space::with_height(10)).push(progress_col);
@@ -1408,24 +1421,35 @@ fn view_agent_detail(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> El
 
     // Error
     if let Some(error) = &agent.error {
-        let error_header = text("Error:").size(16).style(Color::from_rgb(1.0, 0.4, 0.4));
+        let error_header = text("Error:")
+            .size(16)
+            .style(Color::from_rgb(1.0, 0.4, 0.4));
         let error_code = text(format!("Code: {}", error.code)).size(12);
-        let error_message = text(&error.message).size(14).style(Color::from_rgb(1.0, 0.5, 0.5));
+        let error_message = text(&error.message)
+            .size(14)
+            .style(Color::from_rgb(1.0, 0.5, 0.5));
 
-        let mut error_col = column![error_header, Space::with_height(8), error_code, error_message]
-            .spacing(5);
+        let mut error_col = column![
+            error_header,
+            Space::with_height(8),
+            error_code,
+            error_message
+        ]
+        .spacing(5);
 
         if let Some(details_str) = &error.details {
             error_col = error_col.push(Space::with_height(5)).push(
-                text(details_str).size(11).style(Color::from_rgb(0.8, 0.4, 0.4))
+                text(details_str)
+                    .size(11)
+                    .style(Color::from_rgb(0.8, 0.4, 0.4)),
             );
         }
 
-        let error_box = container(error_col)
-            .padding(15)
-            .width(Length::Fill)
-            .style(|theme: &Theme| {
-                container::Style {
+        let error_box =
+            container(error_col)
+                .padding(15)
+                .width(Length::Fill)
+                .style(|theme: &Theme| container::Style {
                     background: Some(Color::from_rgba(0.6, 0.2, 0.2, 0.3).into()),
                     border: iced::Border {
                         width: 1.0,
@@ -1433,14 +1457,15 @@ fn view_agent_detail(agent: &AgentRuntimeState, state: &SwarmMonitorState) -> El
                         radius: 8.0.into(),
                     },
                     ..Default::default()
-                }
-            });
+                });
 
         details = details.push(Space::with_height(10)).push(error_box);
     }
 
     // Timeline
-    let timeline_header = text("Status Timeline:").size(16).style(Color::from_rgb(0.8, 0.8, 0.9));
+    let timeline_header = text("Status Timeline:")
+        .size(16)
+        .style(Color::from_rgb(0.8, 0.8, 0.9));
     let timeline = view_timeline(&agent.timeline);
 
     let content = column![
@@ -1467,13 +1492,10 @@ fn detail_row(label: &str, value: &str) -> Element<SwarmMonitorMessage> {
     let label_text = text(label).size(12).style(Color::from_rgb(0.6, 0.6, 0.7));
     let value_text = text(value).size(14).style(Color::from_rgb(0.9, 0.9, 0.95));
 
-    row![
-        container(label_text).width(150),
-        value_text,
-    ]
-    .spacing(20)
-    .align_y(alignment::Vertical::Center)
-    .into()
+    row![container(label_text).width(150), value_text,]
+        .spacing(20)
+        .align_y(alignment::Vertical::Center)
+        .into()
 }
 
 /// Render agent timeline
@@ -1519,16 +1541,14 @@ fn view_timeline(timeline: &[StatusTransition]) -> Element<SwarmMonitorMessage> 
     container(timeline_col)
         .padding(15)
         .width(Length::Fill)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.5).into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: Color::from_rgba(0.3, 0.3, 0.4, 0.5),
-                    radius: 8.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.5).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: Color::from_rgba(0.3, 0.3, 0.4, 0.5),
+                radius: 8.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }

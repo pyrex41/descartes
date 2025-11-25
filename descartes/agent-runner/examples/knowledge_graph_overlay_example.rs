@@ -2,10 +2,7 @@
 ///
 /// This example demonstrates how to use the knowledge graph overlay system
 /// to analyze a codebase, extract entities, and perform semantic queries.
-
-use agent_runner::{
-    FileTreeBuilder, KnowledgeGraphOverlay, KnowledgeNodeType, OverlayConfig,
-};
+use agent_runner::{FileTreeBuilder, KnowledgeGraphOverlay, KnowledgeNodeType, OverlayConfig};
 use std::fs;
 use std::path::Path;
 
@@ -158,10 +155,7 @@ fn demonstrate_file_queries(
     if let Some(node) = kg.nodes.values().next() {
         println!("   Finding definition of '{}':", node.qualified_name);
         if let Some(def) = overlay.find_definition(&node.qualified_name, kg) {
-            println!(
-                "     Defined in: {:?}",
-                def.file_path.file_name().unwrap()
-            );
+            println!("     Defined in: {:?}", def.file_path.file_name().unwrap());
             println!("     Lines: {:?}", def.line_range);
         }
         println!();
@@ -212,9 +206,7 @@ fn demonstrate_incremental_update(
     Ok(())
 }
 
-fn demonstrate_caching(
-    overlay: &KnowledgeGraphOverlay,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn demonstrate_caching(overlay: &KnowledgeGraphOverlay) -> Result<(), Box<dyn std::error::Error>> {
     println!("6. Cache statistics...\n");
 
     let cache_stats = overlay.cache_stats();

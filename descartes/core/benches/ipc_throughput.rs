@@ -1,3 +1,6 @@
+use serde_json::{json, Value};
+use std::fs;
+use std::io::{Read, Write};
 /// IPC Layer Throughput Benchmarks
 /// Measures message throughput across different IPC mechanisms
 ///
@@ -6,11 +9,7 @@
 /// - Large messages (> 1MB) throughput
 /// - Sustained throughput under load
 /// - Memory usage patterns
-
 use std::time::Instant;
-use std::io::{Write, Read};
-use std::fs;
-use serde_json::{json, Value};
 
 /// Configuration for throughput benchmarks
 #[derive(Debug, Clone)]
@@ -217,12 +216,18 @@ pub fn compare_ipc_mechanisms() {
     println!("THROUGHPUT COMPARISON SUMMARY");
     println!("─────────────────────────────────────────────────────────────");
     println!("                 Small Messages (msg/sec) | Large Messages (MB/sec)");
-    println!("stdin/stdout:    {:.0} msg/sec             | {:.2} MB/sec",
-             stdin_stdout_small.msg_per_sec, stdin_stdout_large.mb_per_sec);
-    println!("Unix socket:     {:.0} msg/sec             | {:.2} MB/sec",
-             unix_socket_small.msg_per_sec, unix_socket_large.mb_per_sec);
-    println!("Shared memory:   {:.0} msg/sec             | {:.2} MB/sec",
-             shared_mem_small.msg_per_sec, shared_mem_large.mb_per_sec);
+    println!(
+        "stdin/stdout:    {:.0} msg/sec             | {:.2} MB/sec",
+        stdin_stdout_small.msg_per_sec, stdin_stdout_large.mb_per_sec
+    );
+    println!(
+        "Unix socket:     {:.0} msg/sec             | {:.2} MB/sec",
+        unix_socket_small.msg_per_sec, unix_socket_large.mb_per_sec
+    );
+    println!(
+        "Shared memory:   {:.0} msg/sec             | {:.2} MB/sec",
+        shared_mem_small.msg_per_sec, shared_mem_large.mb_per_sec
+    );
 }
 
 #[cfg(test)]

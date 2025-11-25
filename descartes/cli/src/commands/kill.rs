@@ -18,12 +18,10 @@ pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result
     let pool = sqlx::sqlite::SqlitePool::connect(&db_url).await?;
 
     // Check if agent exists and get status
-    let row = sqlx::query(
-        "SELECT id, name, status FROM agents WHERE id = ?1"
-    )
-    .bind(id)
-    .fetch_optional(&pool)
-    .await?;
+    let row = sqlx::query("SELECT id, name, status FROM agents WHERE id = ?1")
+        .bind(id)
+        .fetch_optional(&pool)
+        .await?;
 
     if row.is_none() {
         anyhow::bail!("Agent not found: {}", id);
@@ -61,7 +59,7 @@ pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result
         UPDATE agents
         SET status = 'Terminated', completed_at = ?1
         WHERE id = ?2
-        "#
+        "#,
     )
     .bind(now)
     .bind(id)
@@ -74,7 +72,7 @@ pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result
         r#"
         INSERT INTO events (id, event_type, timestamp, session_id, actor_type, actor_id, content)
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-        "#
+        "#,
     )
     .bind(&event_id)
     .bind("agent_terminated")
@@ -82,7 +80,10 @@ pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result
     .bind(id)
     .bind("System")
     .bind("cli")
-    .bind(format!("Agent {} terminated with signal {}", name, signal_type))
+    .bind(format!(
+        "Agent {} terminated with signal {}",
+        name, signal_type
+    ))
     .execute(&pool)
     .await?;
 
@@ -90,7 +91,10 @@ pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result
 
     // Show cleanup message
     if force {
-        println!("{}", "Note: Forced termination may leave resources in inconsistent state.".yellow());
+        println!(
+            "{}",
+            "Note: Forced termination may leave resources in inconsistent state.".yellow()
+        );
     }
 
     Ok(())

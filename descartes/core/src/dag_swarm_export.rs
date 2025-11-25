@@ -28,8 +28,7 @@
 /// let swarm_toml = export_dag_to_swarm_toml(&dag, &config).unwrap();
 /// println!("{}", swarm_toml);
 /// ```
-
-use crate::dag::{DAG, DAGEdge, DAGError, DAGNode, DAGResult, EdgeType};
+use crate::dag::{DAGEdge, DAGError, DAGNode, DAGResult, EdgeType, DAG};
 use crate::swarm_parser::{
     AgentConfig, Handler, ResourceConfig, State, SwarmConfig, Workflow, WorkflowMetadata,
     WorkflowMetadataDetails,
@@ -289,7 +288,11 @@ fn build_workflow_from_dag(dag: &DAG, config: &SwarmExportConfig) -> DAGResult<W
 }
 
 /// Build a state from a DAG node
-fn build_state_from_node(node: &DAGNode, dag: &DAG, config: &SwarmExportConfig) -> DAGResult<State> {
+fn build_state_from_node(
+    node: &DAGNode,
+    dag: &DAG,
+    config: &SwarmExportConfig,
+) -> DAGResult<State> {
     // Determine if terminal (no outgoing edges)
     let is_terminal = dag.get_outgoing_edges(node.node_id).is_empty();
 
@@ -362,7 +365,13 @@ fn get_state_name(node: &DAGNode, config: &SwarmExportConfig) -> String {
 /// Sanitize state name (replace spaces, special chars)
 fn sanitize_state_name(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect::<String>()
         .trim_matches('_')
         .to_string()
@@ -375,7 +384,10 @@ fn get_event_name(edge: &DAGEdge, config: &SwarmExportConfig) -> String {
         sanitize_state_name(label)
     } else if let Some(event) = edge.metadata.get("event") {
         // Check metadata for event name
-        event.as_str().unwrap_or(&config.default_event_name).to_string()
+        event
+            .as_str()
+            .unwrap_or(&config.default_event_name)
+            .to_string()
     } else {
         // Use edge type as event name
         match edge.edge_type {
@@ -598,8 +610,10 @@ pub fn import_swarm_toml_to_dag(
         }
 
         if let Some(parent) = &state.parent {
-            node.metadata
-                .insert("parent".to_string(), serde_json::Value::String(parent.clone()));
+            node.metadata.insert(
+                "parent".to_string(),
+                serde_json::Value::String(parent.clone()),
+            );
         }
 
         if state.parallel_execution {
@@ -678,11 +692,7 @@ pub fn import_swarm_toml_to_dag(
 }
 
 /// Save a DAG as Swarm.toml file
-pub fn save_dag_as_swarm_toml(
-    dag: &DAG,
-    path: &Path,
-    config: &SwarmExportConfig,
-) -> DAGResult<()> {
+pub fn save_dag_as_swarm_toml(dag: &DAG, path: &Path, config: &SwarmExportConfig) -> DAGResult<()> {
     let toml_content = export_dag_to_swarm_toml(dag, config)?;
     std::fs::write(path, toml_content)
         .map_err(|e| DAGError::SerializationError(format!("Failed to write file: {}", e)))?;

@@ -2,7 +2,6 @@
 ///
 ///This module provides a wrapper around the Unix socket RPC client for use in the Iced GUI.
 /// It handles background communication with the daemon via Unix sockets.
-
 use descartes_daemon::{DaemonError, UnixSocketRpcClient};
 use serde_json::Value;
 use std::path::PathBuf;

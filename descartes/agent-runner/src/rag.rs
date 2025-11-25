@@ -7,7 +7,6 @@
 /// - Semantic chunking using tree-sitter
 /// - Embedding generation and caching
 /// - Integration with existing parser and database infrastructure
-
 use crate::errors::{ParserError, ParserResult};
 use crate::parser::SemanticParser;
 use crate::types::{Language, SemanticNode};
@@ -172,9 +171,10 @@ pub trait EmbeddingProvider: Send + Sync {
     /// Generate embedding for a single text
     async fn embed(&self, text: &str) -> ParserResult<Vec<f32>> {
         let results = self.embed_batch(&[text.to_string()]).await?;
-        results.into_iter().next().ok_or_else(|| {
-            ParserError::Unknown("Failed to generate embedding".to_string())
-        })
+        results
+            .into_iter()
+            .next()
+            .ok_or_else(|| ParserError::Unknown("Failed to generate embedding".to_string()))
     }
 
     /// Get the dimension of embeddings produced
@@ -205,16 +205,19 @@ impl OpenAiEmbeddings {
 #[async_trait]
 impl EmbeddingProvider for OpenAiEmbeddings {
     async fn embed_batch(&self, texts: &[String]) -> ParserResult<Vec<Vec<f32>>> {
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            ParserError::Unknown(format!("Semaphore error: {}", e))
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|e| ParserError::Unknown(format!("Semaphore error: {}", e)))?;
 
         let payload = serde_json::json!({
             "model": self.model,
             "input": texts,
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.openai.com/v1/embeddings")
             .bearer_auth(&self.api_key)
             .json(&payload)
@@ -282,9 +285,11 @@ impl AnthropicEmbeddings {
 #[async_trait]
 impl EmbeddingProvider for AnthropicEmbeddings {
     async fn embed_batch(&self, texts: &[String]) -> ParserResult<Vec<Vec<f32>>> {
-        let _permit = self.semaphore.acquire().await.map_err(|e| {
-            ParserError::Unknown(format!("Semaphore error: {}", e))
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|e| ParserError::Unknown(format!("Semaphore error: {}", e)))?;
 
         // Anthropic uses Voyage AI for embeddings
         let payload = serde_json::json!({
@@ -292,7 +297,8 @@ impl EmbeddingProvider for AnthropicEmbeddings {
             "input": texts,
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.voyageai.com/v1/embeddings")
             .bearer_auth(&self.api_key)
             .json(&payload)
@@ -438,7 +444,8 @@ impl SemanticChunker {
 
         // Create chunks from semantic nodes
         for node in &parse_result.nodes {
-            let chunk = self.create_chunk_from_node(node, &parse_result.file_path, &mut chunk_id_counter)?;
+            let chunk =
+                self.create_chunk_from_node(node, &parse_result.file_path, &mut chunk_id_counter)?;
 
             // If node is too large, split it
             if chunk.content.len() > self.max_chunk_size {
@@ -527,7 +534,12 @@ impl SemanticChunker {
     }
 
     /// Chunk raw source code without parsing
-    pub fn chunk_text(&self, text: &str, file_path: &str, language: Language) -> ParserResult<Vec<CodeChunk>> {
+    pub fn chunk_text(
+        &self,
+        text: &str,
+        file_path: &str,
+        language: Language,
+    ) -> ParserResult<Vec<CodeChunk>> {
         let lines: Vec<&str> = text.lines().collect();
         let mut chunks = Vec::new();
         let mut chunk_id_counter = 0;
@@ -581,9 +593,9 @@ impl VectorStore {
 
         // Create directory if it doesn't exist
         if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent).await.map_err(|e| {
-                ParserError::IoError(e)
-            })?;
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| ParserError::IoError(e))?;
         }
 
         Ok(Self {
@@ -596,9 +608,10 @@ impl VectorStore {
 
     /// Initialize the vector store
     pub async fn initialize(&mut self) -> ParserResult<()> {
-        let uri = self.db_path.to_str().ok_or_else(|| {
-            ParserError::Unknown("Invalid database path".to_string())
-        })?;
+        let uri = self
+            .db_path
+            .to_str()
+            .ok_or_else(|| ParserError::Unknown("Invalid database path".to_string()))?;
 
         let conn = lancedb::connect(uri).execute().await.map_err(|e| {
             ParserError::DatabaseError(format!("Failed to connect to LanceDB: {}", e))
@@ -610,14 +623,14 @@ impl VectorStore {
 
     /// Add chunks to the vector store
     pub async fn add_chunks(&self, chunks: &[CodeChunk]) -> ParserResult<()> {
-        let conn = self.connection.as_ref().ok_or_else(|| {
-            ParserError::DatabaseError("VectorStore not initialized".to_string())
-        })?;
+        let conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| ParserError::DatabaseError("VectorStore not initialized".to_string()))?;
 
         // Filter chunks that have embeddings
-        let chunks_with_embeddings: Vec<_> = chunks.iter()
-            .filter(|c| c.embedding.is_some())
-            .collect();
+        let chunks_with_embeddings: Vec<_> =
+            chunks.iter().filter(|c| c.embedding.is_some()).collect();
 
         if chunks_with_embeddings.is_empty() {
             return Ok(());
@@ -625,22 +638,28 @@ impl VectorStore {
 
         // Convert to Arrow record batch (simplified - in production use proper Arrow types)
         // For now, we'll use a workaround with JSON serialization
-        let data: Vec<serde_json::Value> = chunks_with_embeddings.iter().map(|chunk| {
-            serde_json::json!({
-                "id": chunk.id,
-                "content": chunk.content,
-                "file_path": chunk.file_path,
-                "language": chunk.language.as_str(),
-                "line_start": chunk.line_range.0,
-                "line_end": chunk.line_range.1,
-                "chunk_type": chunk.chunk_type,
-                "embedding": chunk.embedding.as_ref().unwrap(),
-                "metadata": serde_json::to_string(&chunk.metadata).unwrap_or_default(),
+        let data: Vec<serde_json::Value> = chunks_with_embeddings
+            .iter()
+            .map(|chunk| {
+                serde_json::json!({
+                    "id": chunk.id,
+                    "content": chunk.content,
+                    "file_path": chunk.file_path,
+                    "language": chunk.language.as_str(),
+                    "line_start": chunk.line_range.0,
+                    "line_end": chunk.line_range.1,
+                    "chunk_type": chunk.chunk_type,
+                    "embedding": chunk.embedding.as_ref().unwrap(),
+                    "metadata": serde_json::to_string(&chunk.metadata).unwrap_or_default(),
+                })
             })
-        }).collect();
+            .collect();
 
         // Create or append to table
-        let table_exists = conn.table_names().execute().await
+        let table_exists = conn
+            .table_names()
+            .execute()
+            .await
             .map(|names| names.contains(&self.table_name))
             .unwrap_or(false);
 
@@ -657,10 +676,15 @@ impl VectorStore {
     }
 
     /// Search for similar chunks
-    pub async fn search(&self, query_embedding: &[f32], top_k: usize) -> ParserResult<Vec<(String, f32)>> {
-        let _conn = self.connection.as_ref().ok_or_else(|| {
-            ParserError::DatabaseError("VectorStore not initialized".to_string())
-        })?;
+    pub async fn search(
+        &self,
+        query_embedding: &[f32],
+        top_k: usize,
+    ) -> ParserResult<Vec<(String, f32)>> {
+        let _conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| ParserError::DatabaseError("VectorStore not initialized".to_string()))?;
 
         // In a real implementation, this would query LanceDB
         // For now, return placeholder
@@ -675,9 +699,10 @@ impl VectorStore {
 
     /// Delete chunks by IDs
     pub async fn delete_chunks(&self, chunk_ids: &[String]) -> ParserResult<()> {
-        let _conn = self.connection.as_ref().ok_or_else(|| {
-            ParserError::DatabaseError("VectorStore not initialized".to_string())
-        })?;
+        let _conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| ParserError::DatabaseError("VectorStore not initialized".to_string()))?;
 
         tracing::info!("Would delete {} chunks from LanceDB", chunk_ids.len());
         Ok(())
@@ -685,9 +710,10 @@ impl VectorStore {
 
     /// Clear all data
     pub async fn clear(&self) -> ParserResult<()> {
-        let conn = self.connection.as_ref().ok_or_else(|| {
-            ParserError::DatabaseError("VectorStore not initialized".to_string())
-        })?;
+        let conn = self
+            .connection
+            .as_ref()
+            .ok_or_else(|| ParserError::DatabaseError("VectorStore not initialized".to_string()))?;
 
         let _ = conn.drop_table(&self.table_name).await;
         Ok(())
@@ -731,9 +757,7 @@ impl FullTextSearch {
     /// Initialize the full-text index
     pub fn initialize(&mut self) -> ParserResult<()> {
         // Create directory if it doesn't exist
-        std::fs::create_dir_all(&self.index_path).map_err(|e| {
-            ParserError::IoError(e)
-        })?;
+        std::fs::create_dir_all(&self.index_path).map_err(|e| ParserError::IoError(e))?;
 
         // Create or open index
         let index = if self.index_path.join("meta.json").exists() {
@@ -770,24 +794,25 @@ impl FullTextSearch {
         let metadata_field = self.schema.get_field("metadata").unwrap();
 
         for chunk in chunks {
-            let metadata_json = serde_json::to_string(&chunk.metadata)
-                .unwrap_or_default();
+            let metadata_json = serde_json::to_string(&chunk.metadata).unwrap_or_default();
 
-            writer.add_document(doc!(
-                id_field => chunk.id.clone(),
-                content_field => chunk.content.clone(),
-                file_path_field => chunk.file_path.clone(),
-                language_field => chunk.language.as_str(),
-                chunk_type_field => chunk.chunk_type.clone(),
-                metadata_field => metadata_json,
-            )).map_err(|e| {
-                ParserError::DatabaseError(format!("Failed to add document: {}", e))
-            })?;
+            writer
+                .add_document(doc!(
+                    id_field => chunk.id.clone(),
+                    content_field => chunk.content.clone(),
+                    file_path_field => chunk.file_path.clone(),
+                    language_field => chunk.language.as_str(),
+                    chunk_type_field => chunk.chunk_type.clone(),
+                    metadata_field => metadata_json,
+                ))
+                .map_err(|e| {
+                    ParserError::DatabaseError(format!("Failed to add document: {}", e))
+                })?;
         }
 
-        writer.commit().map_err(|e| {
-            ParserError::DatabaseError(format!("Failed to commit: {}", e))
-        })?;
+        writer
+            .commit()
+            .map_err(|e| ParserError::DatabaseError(format!("Failed to commit: {}", e)))?;
 
         Ok(())
     }
@@ -798,34 +823,32 @@ impl FullTextSearch {
             ParserError::DatabaseError("FullTextSearch not initialized".to_string())
         })?;
 
-        let reader = index.reader_builder()
+        let reader = index
+            .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
             .try_into()
-            .map_err(|e| {
-                ParserError::DatabaseError(format!("Failed to create reader: {}", e))
-            })?;
+            .map_err(|e| ParserError::DatabaseError(format!("Failed to create reader: {}", e)))?;
 
         let searcher = reader.searcher();
 
         let content_field = self.schema.get_field("content").unwrap();
         let query_parser = QueryParser::for_index(index, vec![content_field]);
 
-        let query = query_parser.parse_query(query_str).map_err(|e| {
-            ParserError::QueryCompileError(format!("Failed to parse query: {}", e))
-        })?;
+        let query = query_parser
+            .parse_query(query_str)
+            .map_err(|e| ParserError::QueryCompileError(format!("Failed to parse query: {}", e)))?;
 
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(top_k)).map_err(|e| {
-            ParserError::DatabaseError(format!("Search failed: {}", e))
-        })?;
+        let top_docs = searcher
+            .search(&query, &TopDocs::with_limit(top_k))
+            .map_err(|e| ParserError::DatabaseError(format!("Search failed: {}", e)))?;
 
         let id_field = self.schema.get_field("id").unwrap();
 
-        let results: Vec<(String, f32)> = top_docs.iter()
+        let results: Vec<(String, f32)> = top_docs
+            .iter()
             .map(|(score, doc_address)| {
                 let doc = searcher.doc(*doc_address).ok()?;
-                let id = doc.get_first(id_field)?
-                    .as_text()?
-                    .to_string();
+                let id = doc.get_first(id_field)?.as_text()?.to_string();
                 Some((id, *score))
             })
             .filter_map(|x| x)
@@ -837,12 +860,12 @@ impl FullTextSearch {
     /// Clear the index
     pub fn clear(&mut self) -> ParserResult<()> {
         if let Some(writer) = self.writer.as_mut() {
-            writer.delete_all_documents().map_err(|e| {
-                ParserError::DatabaseError(format!("Failed to clear index: {}", e))
-            })?;
-            writer.commit().map_err(|e| {
-                ParserError::DatabaseError(format!("Failed to commit: {}", e))
-            })?;
+            writer
+                .delete_all_documents()
+                .map_err(|e| ParserError::DatabaseError(format!("Failed to clear index: {}", e)))?;
+            writer
+                .commit()
+                .map_err(|e| ParserError::DatabaseError(format!("Failed to commit: {}", e)))?;
         }
         Ok(())
     }
@@ -867,7 +890,10 @@ impl RagSystem {
     /// Create a new RAG system
     pub async fn new(config: RagConfig) -> ParserResult<Self> {
         // Create embedding provider
-        let embedding_provider: Arc<dyn EmbeddingProvider> = match config.embedding_provider.as_str() {
+        let embedding_provider: Arc<dyn EmbeddingProvider> = match config
+            .embedding_provider
+            .as_str()
+        {
             "openai" => {
                 let api_key = config.api_key.clone().ok_or_else(|| {
                     ParserError::Unknown("API key required for OpenAI embeddings".to_string())
@@ -909,7 +935,8 @@ impl RagSystem {
         let chunker = SemanticChunker::new(config.max_chunk_size, config.chunk_overlap)?;
 
         // Create vector store
-        let mut vector_store = VectorStore::new(&config.lance_db_path, config.embedding_dimension).await?;
+        let mut vector_store =
+            VectorStore::new(&config.lance_db_path, config.embedding_dimension).await?;
         vector_store.initialize().await?;
 
         // Create full-text search
@@ -989,13 +1016,18 @@ impl RagSystem {
         }
 
         // Unwrap all results
-        results.into_iter()
+        results
+            .into_iter()
             .map(|r| r.ok_or_else(|| ParserError::Unknown("Missing embedding".to_string())))
             .collect()
     }
 
     /// Search using vector similarity
-    pub async fn vector_search(&self, query: &str, top_k: usize) -> ParserResult<Vec<SearchResult>> {
+    pub async fn vector_search(
+        &self,
+        query: &str,
+        top_k: usize,
+    ) -> ParserResult<Vec<SearchResult>> {
         // Generate query embedding
         let query_embedding = if let Some(cache) = &self.embedding_cache {
             if let Some(embedding) = cache.get(query) {
@@ -1013,7 +1045,8 @@ impl RagSystem {
         let results = self.vector_store.search(&query_embedding, top_k).await?;
 
         // Convert to SearchResults
-        Ok(results.iter()
+        Ok(results
+            .iter()
             .filter_map(|(chunk_id, score)| {
                 self.chunks.get(chunk_id).map(|chunk| SearchResult {
                     chunk: chunk.clone(),
@@ -1030,7 +1063,8 @@ impl RagSystem {
     pub fn fulltext_search(&self, query: &str, top_k: usize) -> ParserResult<Vec<SearchResult>> {
         let results = self.fulltext_search.search(query, top_k)?;
 
-        Ok(results.iter()
+        Ok(results
+            .iter()
             .filter_map(|(chunk_id, score)| {
                 self.chunks.get(chunk_id).map(|chunk| SearchResult {
                     chunk: chunk.clone(),
@@ -1046,10 +1080,10 @@ impl RagSystem {
     /// Hybrid search combining vector and full-text
     pub async fn hybrid_search(&self, query: &str) -> ParserResult<Vec<SearchResult>> {
         // Perform both searches in parallel
-        let (vector_results, fulltext_results) = tokio::join!(
-            self.vector_search(query, self.config.vector_top_k),
-            async { self.fulltext_search(query, self.config.fulltext_top_k) }
-        );
+        let (vector_results, fulltext_results) =
+            tokio::join!(self.vector_search(query, self.config.vector_top_k), async {
+                self.fulltext_search(query, self.config.fulltext_top_k)
+            });
 
         let vector_results = vector_results?;
         let fulltext_results = fulltext_results?;
@@ -1062,7 +1096,8 @@ impl RagSystem {
         }
 
         for result in fulltext_results {
-            combined.entry(result.chunk.id.clone())
+            combined
+                .entry(result.chunk.id.clone())
                 .and_modify(|e| {
                     e.fulltext_score = result.fulltext_score;
                     e.search_type = "hybrid".to_string();
@@ -1077,7 +1112,11 @@ impl RagSystem {
 
         // Sort by combined score
         let mut results: Vec<SearchResult> = combined.into_values().collect();
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(results)
     }
@@ -1095,7 +1134,9 @@ impl RagSystem {
 
     /// Get statistics
     pub fn stats(&self) -> RagStats {
-        let cache_stats = self.embedding_cache.as_ref()
+        let cache_stats = self
+            .embedding_cache
+            .as_ref()
             .map(|c| c.stats())
             .unwrap_or((0, 0));
 

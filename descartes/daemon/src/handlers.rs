@@ -1,12 +1,11 @@
 /// RPC method handlers
-
 use crate::auth::AuthContext;
 use crate::errors::{DaemonError, DaemonResult};
 use crate::types::*;
 use chrono::Utc;
+use dashmap::DashMap;
 use serde_json::{json, Value};
 use std::sync::Arc;
-use dashmap::DashMap;
 use uuid::Uuid;
 
 /// RPC handlers
@@ -116,14 +115,12 @@ impl RpcHandlers {
             .ok_or_else(|| DaemonError::AgentNotFound(request.agent_id.clone()))?;
 
         // TODO: Fetch actual logs from agent runner
-        let logs = vec![
-            LogEntry {
-                timestamp: Utc::now(),
-                level: "info".to_string(),
-                message: "Agent started".to_string(),
-                context: None,
-            },
-        ];
+        let logs = vec![LogEntry {
+            timestamp: Utc::now(),
+            level: "info".to_string(),
+            message: "Agent started".to_string(),
+            context: None,
+        }];
 
         let response = AgentLogsResponse {
             agent_id: request.agent_id,
@@ -245,7 +242,9 @@ mod tests {
             "agent_type": "basic",
             "config": {}
         });
-        let _ = handlers.handle_agent_spawn(spawn_params, auth.clone()).await;
+        let _ = handlers
+            .handle_agent_spawn(spawn_params, auth.clone())
+            .await;
 
         // List agents
         let result = handlers.handle_agent_list(json!({}), auth).await;
@@ -266,7 +265,9 @@ mod tests {
             "agent_type": "basic",
             "config": {}
         });
-        let spawn_result = handlers.handle_agent_spawn(spawn_params, auth.clone()).await;
+        let spawn_result = handlers
+            .handle_agent_spawn(spawn_params, auth.clone())
+            .await;
         let spawn_response: AgentSpawnResponse =
             serde_json::from_value(spawn_result.unwrap()).unwrap();
 

@@ -10,7 +10,6 @@
 /// - Semantic code understanding and querying
 /// - Relationship tracking between code entities
 /// - Integration with RAG and semantic parsing systems
-
 use crate::types::{Language, SemanticNodeType};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -129,7 +128,12 @@ pub struct FileTreeNode {
 
 impl FileTreeNode {
     /// Create a new file tree node
-    pub fn new(path: PathBuf, node_type: FileNodeType, parent_id: Option<String>, depth: usize) -> Self {
+    pub fn new(
+        path: PathBuf,
+        node_type: FileNodeType,
+        parent_id: Option<String>,
+        depth: usize,
+    ) -> Self {
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -318,10 +322,7 @@ impl FileTree {
 
     /// Get all files (non-directories) in the tree
     pub fn get_all_files(&self) -> Vec<&FileTreeNode> {
-        self.nodes
-            .values()
-            .filter(|node| node.is_file())
-            .collect()
+        self.nodes.values().filter(|node| node.is_file()).collect()
     }
 
     /// Get all directories in the tree
@@ -532,11 +533,7 @@ pub struct KnowledgeNode {
 
 impl KnowledgeNode {
     /// Create a new knowledge node
-    pub fn new(
-        content_type: KnowledgeNodeType,
-        name: String,
-        qualified_name: String,
-    ) -> Self {
+    pub fn new(content_type: KnowledgeNodeType, name: String, qualified_name: String) -> Self {
         Self {
             node_id: Uuid::new_v4().to_string(),
             content_type,
@@ -596,11 +593,7 @@ pub struct FileReference {
 }
 
 impl FileReference {
-    pub fn new(
-        file_node_id: String,
-        file_path: PathBuf,
-        line_range: (usize, usize),
-    ) -> Self {
+    pub fn new(file_node_id: String, file_path: PathBuf, line_range: (usize, usize)) -> Self {
         Self {
             file_node_id,
             file_path,
@@ -1037,12 +1030,7 @@ mod tests {
     fn test_file_tree_operations() {
         let mut tree = FileTree::new(PathBuf::from("/test"));
 
-        let root = FileTreeNode::new(
-            PathBuf::from("/test"),
-            FileNodeType::Directory,
-            None,
-            0,
-        );
+        let root = FileTreeNode::new(PathBuf::from("/test"), FileNodeType::Directory, None, 0);
         let root_id = tree.add_node(root);
 
         let file = FileTreeNode::new(
@@ -1098,11 +1086,7 @@ mod tests {
         let node1_id = graph.add_node(node1);
         let node2_id = graph.add_node(node2);
 
-        let edge = KnowledgeEdge::new(
-            node1_id.clone(),
-            node2_id.clone(),
-            RelationshipType::Calls,
-        );
+        let edge = KnowledgeEdge::new(node1_id.clone(), node2_id.clone(), RelationshipType::Calls);
         graph.add_edge(edge);
 
         assert_eq!(graph.nodes.len(), 2);
@@ -1137,8 +1121,16 @@ mod tests {
         let id2 = graph.add_node(node2);
         let id3 = graph.add_node(node3);
 
-        graph.add_edge(KnowledgeEdge::new(id1.clone(), id2.clone(), RelationshipType::Calls));
-        graph.add_edge(KnowledgeEdge::new(id2.clone(), id3.clone(), RelationshipType::Calls));
+        graph.add_edge(KnowledgeEdge::new(
+            id1.clone(),
+            id2.clone(),
+            RelationshipType::Calls,
+        ));
+        graph.add_edge(KnowledgeEdge::new(
+            id2.clone(),
+            id3.clone(),
+            RelationshipType::Calls,
+        ));
 
         let path = graph.find_path(&id1, &id3);
         assert!(path.is_some());

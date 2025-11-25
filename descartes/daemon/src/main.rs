@@ -1,6 +1,5 @@
 /// Descartes RPC Daemon - Main entry point
 /// Starts the JSON-RPC 2.0 server for remote agent control
-
 use clap::Parser;
 use descartes_daemon::{DaemonConfig, RpcServer};
 use std::path::PathBuf;
@@ -46,7 +45,11 @@ struct Args {
     enable_auth: bool,
 
     /// JWT secret
-    #[arg(long, value_name = "SECRET", help = "JWT secret (required if auth enabled)")]
+    #[arg(
+        long,
+        value_name = "SECRET",
+        help = "JWT secret (required if auth enabled)"
+    )]
     jwt_secret: Option<String>,
 
     /// Log level
@@ -70,7 +73,11 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // Setup logging
-    let log_level = if args.verbose { "debug" } else { &args.log_level };
+    let log_level = if args.verbose {
+        "debug"
+    } else {
+        &args.log_level
+    };
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env().add_directive(log_level.parse()?))
         .with_target(false)

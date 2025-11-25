@@ -1,6 +1,5 @@
 /// SQLite-backed implementation of the StateStore trait
 /// Provides persistent agent state management with history tracking and migrations
-
 use crate::errors::{StateStoreError, StateStoreResult};
 use crate::traits::{ActorType, Event, StateStore, Task, TaskStatus};
 use async_trait::async_trait;
@@ -97,20 +96,26 @@ impl SqliteStateStore {
     /// # Arguments
     /// * `db_path` - Path to the SQLite database file
     /// * `enable_compression` - Whether to compress state data
-    pub async fn new<P: AsRef<Path>>(db_path: P, enable_compression: bool) -> StateStoreResult<Self> {
+    pub async fn new<P: AsRef<Path>>(
+        db_path: P,
+        enable_compression: bool,
+    ) -> StateStoreResult<Self> {
         let db_path = db_path.as_ref().to_path_buf();
 
         // Ensure parent directory exists
         if let Some(parent) = db_path.parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create directory: {}", e)))?;
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to create directory: {}", e))
+                })?;
             }
         }
 
         // Create connection options with foreign keys enabled
         let connect_options = SqliteConnectOptions::from_str(db_path.to_string_lossy().as_ref())
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to parse database path: {}", e)))?
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to parse database path: {}", e))
+            })?
             .create_if_missing(true)
             .foreign_keys(true);
 
@@ -121,7 +126,9 @@ impl SqliteStateStore {
             .acquire_timeout(std::time::Duration::from_secs(30))
             .connect_with(connect_options)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create database pool: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to create database pool: {}", e))
+            })?;
 
         Ok(SqliteStateStore {
             pool,
@@ -161,17 +168,28 @@ impl SqliteStateStore {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StateStoreError::MigrationError(format!("Failed to create migrations table: {}", e)))?;
+        .map_err(|e| {
+            StateStoreError::MigrationError(format!("Failed to create migrations table: {}", e))
+        })?;
 
         // Get current schema version
-        let max_version: i32 = sqlx::query_scalar("SELECT COALESCE(MAX(version), 0) FROM migrations")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| StateStoreError::MigrationError(format!("Failed to query migration version: {}", e)))?;
+        let max_version: i32 =
+            sqlx::query_scalar("SELECT COALESCE(MAX(version), 0) FROM migrations")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StateStoreError::MigrationError(format!(
+                        "Failed to query migration version: {}",
+                        e
+                    ))
+                })?;
 
         // Define migrations as inline SQL strings
         let migrations = vec![
-            (1, "create_agent_states", "Create agent states table",
+            (
+                1,
+                "create_agent_states",
+                "Create agent states table",
                 r#"CREATE TABLE IF NOT EXISTS agent_states (
                     key TEXT PRIMARY KEY NOT NULL,
                     agent_id TEXT NOT NULL UNIQUE,
@@ -187,8 +205,12 @@ impl SqliteStateStore {
                 CREATE INDEX IF NOT EXISTS idx_agent_states_agent_id ON agent_states(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_agent_states_status ON agent_states(status) WHERE is_deleted = 0;
                 CREATE INDEX IF NOT EXISTS idx_agent_states_updated_at ON agent_states(updated_at) WHERE is_deleted = 0;
-                CREATE INDEX IF NOT EXISTS idx_agent_states_created_at ON agent_states(created_at);"#),
-            (2, "create_state_transitions", "Create state transition history table",
+                CREATE INDEX IF NOT EXISTS idx_agent_states_created_at ON agent_states(created_at);"#,
+            ),
+            (
+                2,
+                "create_state_transitions",
+                "Create state transition history table",
                 r#"CREATE TABLE IF NOT EXISTS state_transitions (
                     id TEXT PRIMARY KEY NOT NULL,
                     agent_id TEXT NOT NULL,
@@ -200,8 +222,12 @@ impl SqliteStateStore {
                 );
                 CREATE INDEX IF NOT EXISTS idx_state_transitions_agent_id ON state_transitions(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_state_transitions_timestamp ON state_transitions(timestamp);
-                CREATE INDEX IF NOT EXISTS idx_state_transitions_agent_timestamp ON state_transitions(agent_id, timestamp);"#),
-            (3, "create_state_snapshots", "Create state snapshots table",
+                CREATE INDEX IF NOT EXISTS idx_state_transitions_agent_timestamp ON state_transitions(agent_id, timestamp);"#,
+            ),
+            (
+                3,
+                "create_state_snapshots",
+                "Create state snapshots table",
                 r#"CREATE TABLE IF NOT EXISTS state_snapshots (
                     id TEXT PRIMARY KEY NOT NULL,
                     agent_id TEXT NOT NULL,
@@ -212,8 +238,12 @@ impl SqliteStateStore {
                 );
                 CREATE INDEX IF NOT EXISTS idx_state_snapshots_agent_id ON state_snapshots(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_state_snapshots_created_at ON state_snapshots(created_at);
-                CREATE INDEX IF NOT EXISTS idx_state_snapshots_agent_created ON state_snapshots(agent_id, created_at DESC);"#),
-            (4, "add_state_indexes", "Add performance indexes",
+                CREATE INDEX IF NOT EXISTS idx_state_snapshots_agent_created ON state_snapshots(agent_id, created_at DESC);"#,
+            ),
+            (
+                4,
+                "add_state_indexes",
+                "Add performance indexes",
                 r#"CREATE INDEX IF NOT EXISTS idx_events_session_timestamp ON events(session_id, timestamp DESC);
                 CREATE INDEX IF NOT EXISTS idx_events_actor_id ON events(actor_id);
                 CREATE INDEX IF NOT EXISTS idx_events_type_timestamp ON events(event_type, timestamp DESC);
@@ -223,8 +253,12 @@ impl SqliteStateStore {
                 CREATE INDEX IF NOT EXISTS idx_tasks_status_updated ON tasks(status, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_sessions_agent_id ON sessions(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);"#),
-            (5, "enhance_task_model", "Add priority, complexity, and dependencies to tasks",
+                CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);"#,
+            ),
+            (
+                5,
+                "enhance_task_model",
+                "Add priority, complexity, and dependencies to tasks",
                 r#"CREATE TABLE IF NOT EXISTS task_dependencies (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     task_id TEXT NOT NULL,
@@ -239,18 +273,19 @@ impl SqliteStateStore {
                 CREATE INDEX IF NOT EXISTS idx_tasks_priority_status ON tasks(priority, status);
                 CREATE INDEX IF NOT EXISTS idx_tasks_complexity_status ON tasks(complexity, status);
                 CREATE INDEX IF NOT EXISTS idx_task_dependencies_task_id ON task_dependencies(task_id);
-                CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies(depends_on_task_id);"#),
+                CREATE INDEX IF NOT EXISTS idx_task_dependencies_depends_on ON task_dependencies(depends_on_task_id);"#,
+            ),
         ];
 
         // Apply pending migrations
         for (version, name, desc, sql) in migrations {
             if version > max_version {
-                sqlx::query(sql)
-                    .execute(&self.pool)
-                    .await
-                    .map_err(|e| StateStoreError::MigrationError(
-                        format!("Failed to apply migration {}: {}", name, e)
-                    ))?;
+                sqlx::query(sql).execute(&self.pool).await.map_err(|e| {
+                    StateStoreError::MigrationError(format!(
+                        "Failed to apply migration {}: {}",
+                        name, e
+                    ))
+                })?;
 
                 // Record migration
                 let now = Utc::now().timestamp();
@@ -295,7 +330,9 @@ impl StateStore for SqliteStateStore {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create events table: {}", e)))?;
+        .map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to create events table: {}", e))
+        })?;
 
         sqlx::query(
             r#"
@@ -317,7 +354,9 @@ impl StateStore for SqliteStateStore {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create tasks table: {}", e)))?;
+        .map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to create tasks table: {}", e))
+        })?;
 
         sqlx::query(
             r#"
@@ -334,7 +373,9 @@ impl StateStore for SqliteStateStore {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create sessions table: {}", e)))?;
+        .map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to create sessions table: {}", e))
+        })?;
 
         // Apply schema migrations
         self.apply_migrations().await?;
@@ -393,7 +434,8 @@ impl StateStore for SqliteStateStore {
                 let metadata = metadata_str.and_then(|m| serde_json::from_str(&m).ok());
 
                 Event {
-                    id: Uuid::parse_str(&row.get::<String, _>("id")).unwrap_or_else(|_| Uuid::new_v4()),
+                    id: Uuid::parse_str(&row.get::<String, _>("id"))
+                        .unwrap_or_else(|_| Uuid::new_v4()),
                     event_type: row.get("event_type"),
                     timestamp: row.get("timestamp"),
                     session_id: row.get("session_id"),
@@ -434,7 +476,8 @@ impl StateStore for SqliteStateStore {
                 let metadata = metadata_str.and_then(|m| serde_json::from_str(&m).ok());
 
                 Event {
-                    id: Uuid::parse_str(&row.get::<String, _>("id")).unwrap_or_else(|_| Uuid::new_v4()),
+                    id: Uuid::parse_str(&row.get::<String, _>("id"))
+                        .unwrap_or_else(|_| Uuid::new_v4()),
                     event_type: row.get("event_type"),
                     timestamp: row.get("timestamp"),
                     session_id: row.get("session_id"),
@@ -452,8 +495,9 @@ impl StateStore for SqliteStateStore {
 
     async fn save_task(&self, task: &Task) -> StateStoreResult<()> {
         let metadata = task.metadata.as_ref().map(|m| m.to_string());
-        let dependencies_json = serde_json::to_string(&task.dependencies)
-            .map_err(|e| StateStoreError::SerializationError(format!("Failed to serialize dependencies: {}", e)))?;
+        let dependencies_json = serde_json::to_string(&task.dependencies).map_err(|e| {
+            StateStoreError::SerializationError(format!("Failed to serialize dependencies: {}", e))
+        })?;
 
         sqlx::query(
             r#"
@@ -483,7 +527,9 @@ impl StateStore for SqliteStateStore {
             .bind(task.id.to_string())
             .execute(&self.pool)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to delete old dependencies: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to delete old dependencies: {}", e))
+            })?;
 
         // Insert new dependencies
         for dep_id in &task.dependencies {
@@ -511,7 +557,7 @@ impl StateStore for SqliteStateStore {
         .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch task: {}", e)))?;
 
         Ok(row.map(|r| {
-            use crate::traits::{TaskPriority, TaskComplexity};
+            use crate::traits::{TaskComplexity, TaskPriority};
             use std::str::FromStr;
 
             let status_str: String = r.get("status");
@@ -530,7 +576,8 @@ impl StateStore for SqliteStateStore {
             let complexity = TaskComplexity::from_str(&complexity_str).unwrap_or_default();
 
             let dependencies_str: String = r.get("dependencies");
-            let dependencies: Vec<Uuid> = serde_json::from_str(&dependencies_str).unwrap_or_default();
+            let dependencies: Vec<Uuid> =
+                serde_json::from_str(&dependencies_str).unwrap_or_default();
 
             let metadata_str: Option<String> = r.get("metadata");
             let metadata = metadata_str.and_then(|m| serde_json::from_str(&m).ok());
@@ -562,7 +609,7 @@ impl StateStore for SqliteStateStore {
         let tasks = rows
             .iter()
             .map(|r| {
-                use crate::traits::{TaskPriority, TaskComplexity};
+                use crate::traits::{TaskComplexity, TaskPriority};
                 use std::str::FromStr;
 
                 let status_str: String = r.get("status");
@@ -581,13 +628,15 @@ impl StateStore for SqliteStateStore {
                 let complexity = TaskComplexity::from_str(&complexity_str).unwrap_or_default();
 
                 let dependencies_str: String = r.get("dependencies");
-                let dependencies: Vec<Uuid> = serde_json::from_str(&dependencies_str).unwrap_or_default();
+                let dependencies: Vec<Uuid> =
+                    serde_json::from_str(&dependencies_str).unwrap_or_default();
 
                 let metadata_str: Option<String> = r.get("metadata");
                 let metadata = metadata_str.and_then(|m| serde_json::from_str(&m).ok());
 
                 Task {
-                    id: Uuid::parse_str(&r.get::<String, _>("id")).unwrap_or_else(|_| Uuid::new_v4()),
+                    id: Uuid::parse_str(&r.get::<String, _>("id"))
+                        .unwrap_or_else(|_| Uuid::new_v4()),
                     title: r.get("title"),
                     description: r.get("description"),
                     status,
@@ -639,7 +688,8 @@ impl StateStore for SqliteStateStore {
                 let metadata = metadata_str.and_then(|m| serde_json::from_str(&m).ok());
 
                 Event {
-                    id: Uuid::parse_str(&row.get::<String, _>("id")).unwrap_or_else(|_| Uuid::new_v4()),
+                    id: Uuid::parse_str(&row.get::<String, _>("id"))
+                        .unwrap_or_else(|_| Uuid::new_v4()),
                     event_type: row.get("event_type"),
                     timestamp: row.get("timestamp"),
                     session_id: row.get("session_id"),
@@ -679,7 +729,9 @@ impl SqliteStateStore {
         .bind(Utc::now().timestamp())
         .execute(&self.pool)
         .await
-        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to save agent state: {}", e)))?;
+        .map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to save agent state: {}", e))
+        })?;
 
         Ok(())
     }
@@ -745,7 +797,11 @@ impl SqliteStateStore {
     }
 
     /// Update agent status
-    pub async fn update_agent_status(&self, agent_id: &str, new_status: &str) -> StateStoreResult<()> {
+    pub async fn update_agent_status(
+        &self,
+        agent_id: &str,
+        new_status: &str,
+    ) -> StateStoreResult<()> {
         let key = self.get_full_key(agent_id);
 
         sqlx::query("UPDATE agent_states SET status = ?, updated_at = ? WHERE key = ?")
@@ -754,7 +810,9 @@ impl SqliteStateStore {
             .bind(&key)
             .execute(&self.pool)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to update agent status: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to update agent status: {}", e))
+            })?;
 
         Ok(())
     }
@@ -767,7 +825,9 @@ impl SqliteStateStore {
             .bind(&key)
             .execute(&self.pool)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to delete agent: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to delete agent: {}", e))
+            })?;
 
         Ok(())
     }
@@ -798,13 +858,19 @@ impl SqliteStateStore {
         .bind(now)
         .execute(&self.pool)
         .await
-        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to record state transition: {}", e)))?;
+        .map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to record state transition: {}", e))
+        })?;
 
         Ok(())
     }
 
     /// Get state history for an agent
-    pub async fn get_state_history(&self, agent_id: &str, limit: i32) -> StateStoreResult<Vec<StateTransition>> {
+    pub async fn get_state_history(
+        &self,
+        agent_id: &str,
+        limit: i32,
+    ) -> StateStoreResult<Vec<StateTransition>> {
         let rows = sqlx::query(
             "SELECT id, agent_id, state_before, state_after, reason, timestamp FROM state_transitions WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?"
         )
@@ -831,7 +897,11 @@ impl SqliteStateStore {
     }
 
     /// Create a state snapshot
-    pub async fn create_snapshot(&self, agent_id: &str, description: Option<String>) -> StateStoreResult<String> {
+    pub async fn create_snapshot(
+        &self,
+        agent_id: &str,
+        description: Option<String>,
+    ) -> StateStoreResult<String> {
         let snapshot_id = Uuid::new_v4().to_string();
         let now = Utc::now().timestamp();
 
@@ -851,11 +921,16 @@ impl SqliteStateStore {
             .bind(now)
             .execute(&self.pool)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create snapshot: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to create snapshot: {}", e))
+            })?;
 
             Ok(snapshot_id)
         } else {
-            Err(StateStoreError::NotFound(format!("Agent {} not found", agent_id)))
+            Err(StateStoreError::NotFound(format!(
+                "Agent {} not found",
+                agent_id
+            )))
         }
     }
 
@@ -865,29 +940,41 @@ impl SqliteStateStore {
             .bind(snapshot_id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch snapshot: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to fetch snapshot: {}", e))
+            })?;
 
         if let Some(r) = row {
             let agent_id: String = r.get("agent_id");
             let state_data: String = r.get("state_data");
 
             // Update agent state with snapshot data
-            sqlx::query("UPDATE agent_states SET state_data = ?, updated_at = ? WHERE agent_id = ?")
-                .bind(&state_data)
-                .bind(Utc::now().timestamp())
-                .bind(&agent_id)
-                .execute(&self.pool)
-                .await
-                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to restore snapshot: {}", e)))?;
+            sqlx::query(
+                "UPDATE agent_states SET state_data = ?, updated_at = ? WHERE agent_id = ?",
+            )
+            .bind(&state_data)
+            .bind(Utc::now().timestamp())
+            .bind(&agent_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to restore snapshot: {}", e))
+            })?;
 
             Ok(())
         } else {
-            Err(StateStoreError::NotFound(format!("Snapshot {} not found", snapshot_id)))
+            Err(StateStoreError::NotFound(format!(
+                "Snapshot {} not found",
+                snapshot_id
+            )))
         }
     }
 
     /// List all snapshots for an agent
-    pub async fn list_snapshots(&self, agent_id: &str) -> StateStoreResult<Vec<(String, Option<String>, i64)>> {
+    pub async fn list_snapshots(
+        &self,
+        agent_id: &str,
+    ) -> StateStoreResult<Vec<(String, Option<String>, i64)>> {
         let rows = sqlx::query("SELECT id, description, created_at FROM state_snapshots WHERE agent_id = ? ORDER BY created_at DESC")
             .bind(agent_id)
             .fetch_all(&self.pool)
@@ -910,10 +997,14 @@ impl SqliteStateStore {
 
     /// Get migration history
     pub async fn get_migration_history(&self) -> StateStoreResult<Vec<Migration>> {
-        let rows = sqlx::query("SELECT version, name, description, applied_at FROM migrations ORDER BY version ASC")
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| StateStoreError::MigrationError(format!("Failed to fetch migrations: {}", e)))?;
+        let rows = sqlx::query(
+            "SELECT version, name, description, applied_at FROM migrations ORDER BY version ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| {
+            StateStoreError::MigrationError(format!("Failed to fetch migrations: {}", e))
+        })?;
 
         let migrations = rows
             .iter()
@@ -934,11 +1025,9 @@ impl SqliteStateStore {
         F: for<'a> std::future::Future<Output = StateStoreResult<T>>,
     {
         // Start transaction
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to start transaction: {}", e)))?;
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to start transaction: {}", e))
+        })?;
 
         // Execute operations (note: we can't use the transaction here without refactoring)
         // For now, operations auto-commit. A full implementation would need transaction support in queries
@@ -947,9 +1036,9 @@ impl SqliteStateStore {
         // Commit or rollback
         match result {
             Ok(val) => {
-                tx.commit()
-                    .await
-                    .map_err(|e| StateStoreError::DatabaseError(format!("Failed to commit transaction: {}", e)))?;
+                tx.commit().await.map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to commit transaction: {}", e))
+                })?;
                 Ok(val)
             }
             Err(e) => {
@@ -974,7 +1063,10 @@ mod tests {
         let mut store = SqliteStateStore::new("/tmp/test_state.db", false)
             .await
             .expect("Failed to create state store");
-        store.initialize().await.expect("Failed to initialize store");
+        store
+            .initialize()
+            .await
+            .expect("Failed to initialize store");
     }
 
     #[tokio::test]
@@ -982,7 +1074,10 @@ mod tests {
         let mut store = SqliteStateStore::new("/tmp/test_events.db", false)
             .await
             .expect("Failed to create state store");
-        store.initialize().await.expect("Failed to initialize store");
+        store
+            .initialize()
+            .await
+            .expect("Failed to initialize store");
 
         let event = Event {
             id: Uuid::new_v4(),
@@ -996,8 +1091,14 @@ mod tests {
             git_commit: None,
         };
 
-        store.save_event(&event).await.expect("Failed to save event");
-        let events = store.get_events("session_1").await.expect("Failed to get events");
+        store
+            .save_event(&event)
+            .await
+            .expect("Failed to save event");
+        let events = store
+            .get_events("session_1")
+            .await
+            .expect("Failed to get events");
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, "test");
@@ -1005,12 +1106,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_load_task() {
-        use crate::traits::{TaskPriority, TaskComplexity};
+        use crate::traits::{TaskComplexity, TaskPriority};
 
         let mut store = SqliteStateStore::new("/tmp/test_tasks.db", false)
             .await
             .expect("Failed to create state store");
-        store.initialize().await.expect("Failed to initialize store");
+        store
+            .initialize()
+            .await
+            .expect("Failed to initialize store");
 
         let task = Task {
             id: Uuid::new_v4(),
@@ -1041,7 +1145,10 @@ mod tests {
         let mut store = SqliteStateStore::new("/tmp/test_search.db", false)
             .await
             .expect("Failed to create state store");
-        store.initialize().await.expect("Failed to initialize store");
+        store
+            .initialize()
+            .await
+            .expect("Failed to initialize store");
 
         let event = Event {
             id: Uuid::new_v4(),
@@ -1055,8 +1162,14 @@ mod tests {
             git_commit: None,
         };
 
-        store.save_event(&event).await.expect("Failed to save event");
-        let results = store.search_events("Searchable").await.expect("Failed to search");
+        store
+            .save_event(&event)
+            .await
+            .expect("Failed to save event");
+        let results = store
+            .search_events("Searchable")
+            .await
+            .expect("Failed to search");
 
         assert_eq!(results.len(), 1);
     }

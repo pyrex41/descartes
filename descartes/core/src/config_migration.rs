@@ -1,18 +1,24 @@
 /// Configuration migration system for version upgrades
 /// Handles migrations between different config versions to ensure backwards compatibility
-
 use crate::config::DescaratesConfig;
 use crate::errors::{AgentError, AgentResult};
 use serde_json::{json, Value};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// Configuration migration handler
 pub struct ConfigMigration;
 
 impl ConfigMigration {
     /// Migrate configuration from older versions to current version
-    pub fn migrate(mut config: DescaratesConfig, from_version: &str, to_version: &str) -> AgentResult<DescaratesConfig> {
-        info!("Migrating configuration from {} to {}", from_version, to_version);
+    pub fn migrate(
+        mut config: DescaratesConfig,
+        from_version: &str,
+        to_version: &str,
+    ) -> AgentResult<DescaratesConfig> {
+        info!(
+            "Migrating configuration from {} to {}",
+            from_version, to_version
+        );
 
         let from_major = parse_version(from_version)?;
         let to_major = parse_version(to_version)?;
@@ -34,7 +40,10 @@ impl ConfigMigration {
     }
 
     /// Migrate to a specific version
-    fn migrate_to_version(mut config: DescaratesConfig, version: u32) -> AgentResult<DescaratesConfig> {
+    fn migrate_to_version(
+        mut config: DescaratesConfig,
+        version: u32,
+    ) -> AgentResult<DescaratesConfig> {
         match version {
             1 => {
                 debug!("Applying migrations for v1.0.0");
@@ -137,9 +146,7 @@ fn parse_version(version: &str) -> AgentResult<u32> {
         .split('.')
         .next()
         .and_then(|major| major.parse::<u32>().ok())
-        .ok_or_else(|| AgentError::ExecutionError(
-            format!("Invalid version format: {}", version)
-        ))
+        .ok_or_else(|| AgentError::ExecutionError(format!("Invalid version format: {}", version)))
 }
 
 #[cfg(test)]

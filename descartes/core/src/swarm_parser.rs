@@ -12,7 +12,6 @@
 /// config.validate()?;
 /// let state_machine = config.generate_state_machine()?;
 /// ```
-
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -270,9 +269,7 @@ impl SwarmParser {
         }
 
         if config.metadata.name.is_empty() {
-            return Err(SwarmParseError::MissingField(
-                "metadata.name".to_string(),
-            ));
+            return Err(SwarmParseError::MissingField("metadata.name".to_string()));
         }
 
         // Validate that we have at least one workflow
@@ -293,9 +290,7 @@ impl SwarmParser {
     ) -> SwarmResult<ValidatedWorkflow> {
         // Validate basic structure
         if workflow.name.is_empty() {
-            return Err(SwarmParseError::MissingField(
-                "workflow.name".to_string(),
-            ));
+            return Err(SwarmParseError::MissingField("workflow.name".to_string()));
         }
 
         if workflow.states.is_empty() {
@@ -327,7 +322,10 @@ impl SwarmParser {
             for handler in &state.handlers {
                 for guard in &handler.guards {
                     if !workflow.guards.contains_key(guard)
-                        && !config.guards.as_ref().map_or(false, |g| g.contains_key(guard))
+                        && !config
+                            .guards
+                            .as_ref()
+                            .map_or(false, |g| g.contains_key(guard))
                     {
                         return Err(SwarmParseError::InvalidGuard(format!(
                             "Guard '{}' referenced in state '{}' is not defined",
@@ -553,7 +551,10 @@ impl ValidatedWorkflow {
             self.name
         ));
         states_code.push_str("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]\n");
-        states_code.push_str(&format!("pub enum {}State {{\n", capitalize_first(&self.name)));
+        states_code.push_str(&format!(
+            "pub enum {}State {{\n",
+            capitalize_first(&self.name)
+        ));
 
         for state_name in self.states.keys() {
             states_code.push_str(&format!("    {},\n", state_name));
@@ -579,7 +580,10 @@ impl ValidatedWorkflow {
             self.name
         ));
         events_code.push_str("#[derive(Debug, Clone, PartialEq, Eq, Hash)]\n");
-        events_code.push_str(&format!("pub enum {}Event {{\n", capitalize_first(&self.name)));
+        events_code.push_str(&format!(
+            "pub enum {}Event {{\n",
+            capitalize_first(&self.name)
+        ));
 
         for event in events {
             events_code.push_str(&format!("    {},\n", event));
@@ -652,10 +656,7 @@ impl ValidatedWorkflow {
         code.push_str(&self.generate_event_enum());
         code.push_str(&self.generate_context_struct());
 
-        code.push_str(&format!(
-            "impl {}State {{\n",
-            capitalize_first(&self.name)
-        ));
+        code.push_str(&format!("impl {}State {{\n", capitalize_first(&self.name)));
         code.push_str("    /// Handle an event in the current state\n");
         code.push_str(&format!(
             "    pub fn on_event(\n        self,\n        event: {}Event,\n        context: &mut {}Context,\n    ) -> Self {{\n",
@@ -679,7 +680,11 @@ impl ValidatedWorkflow {
                     code.push_str(&handler.guards.join(", "));
                 }
 
-                code.push_str(&format!(" {}State::{} }}\n", capitalize_first(&self.name), handler.target));
+                code.push_str(&format!(
+                    " {}State::{} }}\n",
+                    capitalize_first(&self.name),
+                    handler.target
+                ));
             }
         }
 

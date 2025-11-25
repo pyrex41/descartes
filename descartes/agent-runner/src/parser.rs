@@ -3,7 +3,7 @@ use crate::errors::ParserResult;
 use crate::grammar::create_parser;
 use crate::semantic::{SemanticAnalysis, SemanticExtractor, SemanticStatistics};
 use crate::traversal::AstTraversal;
-use crate::types::{Language, ParseResult, ParserConfig, ParseStatistics, SemanticNode};
+use crate::types::{Language, ParseResult, ParseStatistics, ParserConfig, SemanticNode};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -45,9 +45,8 @@ impl SemanticParser {
         let language = self.detect_language(file_path)?;
 
         // Read file
-        let source_code = fs::read_to_string(file_path).map_err(|e| {
-            crate::errors::ParserError::IoError(e)
-        })?;
+        let source_code =
+            fs::read_to_string(file_path).map_err(|e| crate::errors::ParserError::IoError(e))?;
 
         // Parse
         let parser = self.parsers.get_mut(&language).ok_or_else(|| {
@@ -122,7 +121,9 @@ impl SemanticParser {
         let results = file_paths
             .par_iter()
             .map(|file_path| {
-                let mut parser = match create_parser(self.detect_language(file_path).unwrap_or(Language::Rust)) {
+                let mut parser = match create_parser(
+                    self.detect_language(file_path).unwrap_or(Language::Rust),
+                ) {
                     Ok(p) => p,
                     Err(e) => {
                         return ParseResult {
@@ -194,15 +195,15 @@ impl SemanticParser {
     /// Detect language from file extension
     fn detect_language(&self, file_path: &str) -> ParserResult<Language> {
         let path = Path::new(file_path);
-        let extension = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .ok_or_else(|| {
-                crate::errors::ParserError::InvalidLanguage("Unknown file extension".to_string())
-            })?;
+        let extension = path.extension().and_then(|e| e.to_str()).ok_or_else(|| {
+            crate::errors::ParserError::InvalidLanguage("Unknown file extension".to_string())
+        })?;
 
         Language::from_str(extension).ok_or_else(|| {
-            crate::errors::ParserError::InvalidLanguage(format!("Unsupported extension: {}", extension))
+            crate::errors::ParserError::InvalidLanguage(format!(
+                "Unsupported extension: {}",
+                extension
+            ))
         })
     }
 
@@ -296,14 +297,13 @@ impl SemanticParser {
         let mut node_counts: HashMap<String, usize> = HashMap::new();
         for result in &results {
             for node in &result.nodes {
-                *node_counts.entry(node.node_type.as_str().to_string()).or_insert(0) += 1;
+                *node_counts
+                    .entry(node.node_type.as_str().to_string())
+                    .or_insert(0) += 1;
             }
         }
 
-        let errors: Vec<String> = results
-            .iter()
-            .filter_map(|r| r.error.clone())
-            .collect();
+        let errors: Vec<String> = results.iter().filter_map(|r| r.error.clone()).collect();
 
         Ok(ParseStatistics {
             total_nodes,
@@ -335,7 +335,9 @@ mod tests {
         "#;
 
         let mut parser = SemanticParser::new().unwrap();
-        let result = parser.parse_source(code, Language::Rust, "main.rs").unwrap();
+        let result = parser
+            .parse_source(code, Language::Rust, "main.rs")
+            .unwrap();
 
         assert_eq!(result.language, Language::Rust);
         assert!(!result.nodes.is_empty());
@@ -349,7 +351,9 @@ mod tests {
         "#;
 
         let mut parser = SemanticParser::new().unwrap();
-        let result = parser.parse_source(code, Language::Python, "main.py").unwrap();
+        let result = parser
+            .parse_source(code, Language::Python, "main.py")
+            .unwrap();
 
         assert_eq!(result.language, Language::Python);
     }
@@ -360,7 +364,13 @@ mod tests {
 
         assert_eq!(parser.detect_language("test.rs").unwrap(), Language::Rust);
         assert_eq!(parser.detect_language("test.py").unwrap(), Language::Python);
-        assert_eq!(parser.detect_language("test.js").unwrap(), Language::JavaScript);
-        assert_eq!(parser.detect_language("test.ts").unwrap(), Language::TypeScript);
+        assert_eq!(
+            parser.detect_language("test.js").unwrap(),
+            Language::JavaScript
+        );
+        assert_eq!(
+            parser.detect_language("test.ts").unwrap(),
+            Language::TypeScript
+        );
     }
 }

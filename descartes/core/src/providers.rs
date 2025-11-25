@@ -24,10 +24,7 @@ impl OpenAiProvider {
     pub fn new(api_key: String, endpoint: Option<String>) -> Self {
         let endpoint = endpoint.unwrap_or_else(|| "https://api.openai.com/v1".to_string());
         Self {
-            _mode: ModelProviderMode::Api {
-                endpoint,
-                api_key,
-            },
+            _mode: ModelProviderMode::Api { endpoint, api_key },
             client: None,
             available_models: vec![
                 "gpt-4".to_string(),
@@ -55,11 +52,7 @@ impl ModelBackend for OpenAiProvider {
 
     async fn health_check(&self) -> AgentResult<bool> {
         if let Some(client) = &self.client {
-            if let ModelProviderMode::Api {
-                endpoint,
-                api_key,
-            } = &self._mode
-            {
+            if let ModelProviderMode::Api { endpoint, api_key } = &self._mode {
                 let resp = client
                     .get(&format!("{}/models", endpoint))
                     .bearer_auth(api_key)
@@ -80,11 +73,7 @@ impl ModelBackend for OpenAiProvider {
             .as_ref()
             .ok_or_else(|| ProviderError::BackendError("Client not initialized".to_string()))?;
 
-        if let ModelProviderMode::Api {
-            endpoint,
-            api_key,
-        } = &self._mode
-        {
+        if let ModelProviderMode::Api { endpoint, api_key } = &self._mode {
             let payload = json!({
                 "model": request.model,
                 "messages": request.messages,
@@ -129,10 +118,7 @@ impl ModelBackend for OpenAiProvider {
                 tool_calls: None,
             })
         } else {
-            Err(ProviderError::BackendError(
-                "Invalid mode for OpenAI provider".to_string(),
-            )
-            .into())
+            Err(ProviderError::BackendError("Invalid mode for OpenAI provider".to_string()).into())
         }
     }
 
@@ -171,10 +157,7 @@ impl AnthropicProvider {
     pub fn new(api_key: String, endpoint: Option<String>) -> Self {
         let endpoint = endpoint.unwrap_or_else(|| "https://api.anthropic.com/v1".to_string());
         Self {
-            _mode: ModelProviderMode::Api {
-                endpoint,
-                api_key,
-            },
+            _mode: ModelProviderMode::Api { endpoint, api_key },
             client: None,
             available_models: vec![
                 "claude-3-opus-20240229".to_string(),
@@ -211,11 +194,7 @@ impl ModelBackend for AnthropicProvider {
             .as_ref()
             .ok_or_else(|| ProviderError::BackendError("Client not initialized".to_string()))?;
 
-        if let ModelProviderMode::Api {
-            endpoint,
-            api_key,
-        } = &self._mode
-        {
+        if let ModelProviderMode::Api { endpoint, api_key } = &self._mode {
             let payload = json!({
                 "model": request.model,
                 "max_tokens": request.max_tokens.unwrap_or(2048),
@@ -260,10 +239,10 @@ impl ModelBackend for AnthropicProvider {
                 tool_calls: None,
             })
         } else {
-            Err(ProviderError::BackendError(
-                "Invalid mode for Anthropic provider".to_string(),
+            Err(
+                ProviderError::BackendError("Invalid mode for Anthropic provider".to_string())
+                    .into(),
             )
-            .into())
         }
     }
 
@@ -370,10 +349,10 @@ impl ModelBackend for ClaudeCodeAdapter {
         _request: ModelRequest,
     ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<ModelResponse>> + Unpin + Send>>
     {
-        Err(ProviderError::UnsupportedFeature(
-            "Streaming implementation pending".to_string(),
+        Err(
+            ProviderError::UnsupportedFeature("Streaming implementation pending".to_string())
+                .into(),
         )
-        .into())
     }
 
     async fn list_models(&self) -> AgentResult<Vec<String>> {
@@ -428,9 +407,10 @@ impl ModelBackend for HeadlessCliAdapter {
             .await;
 
         if output.is_err() {
-            return Err(ProviderError::InitializationError(
-                format!("Command '{}' not found or not executable", self.command),
-            )
+            return Err(ProviderError::InitializationError(format!(
+                "Command '{}' not found or not executable",
+                self.command
+            ))
             .into());
         }
 
@@ -462,10 +442,10 @@ impl ModelBackend for HeadlessCliAdapter {
         _request: ModelRequest,
     ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<ModelResponse>> + Unpin + Send>>
     {
-        Err(ProviderError::UnsupportedFeature(
-            "Streaming implementation pending".to_string(),
+        Err(
+            ProviderError::UnsupportedFeature("Streaming implementation pending".to_string())
+                .into(),
         )
-        .into())
     }
 
     async fn list_models(&self) -> AgentResult<Vec<String>> {
@@ -675,9 +655,7 @@ impl ProviderFactory {
                 let api_key = config
                     .get("api_key")
                     .ok_or_else(|| {
-                        ProviderError::ConfigError(
-                            "Missing 'api_key' for Anthropic".to_string(),
-                        )
+                        ProviderError::ConfigError("Missing 'api_key' for Anthropic".to_string())
                     })?
                     .clone();
                 let endpoint = config.get("endpoint").cloned();
@@ -701,9 +679,7 @@ impl ProviderFactory {
                 let command = config
                     .get("command")
                     .ok_or_else(|| {
-                        ProviderError::ConfigError(
-                            "Missing 'command' for headless CLI".to_string(),
-                        )
+                        ProviderError::ConfigError("Missing 'command' for headless CLI".to_string())
                     })?
                     .clone();
                 let args = config
@@ -712,9 +688,10 @@ impl ProviderFactory {
                     .unwrap_or_default();
                 Ok(Box::new(HeadlessCliAdapter::new(command, args)))
             }
-            _ => Err(ProviderError::ConfigError(
-                format!("Unknown provider: {}", provider_name),
-            )),
+            _ => Err(ProviderError::ConfigError(format!(
+                "Unknown provider: {}",
+                provider_name
+            ))),
         }
     }
 }

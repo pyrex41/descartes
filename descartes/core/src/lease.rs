@@ -7,7 +7,6 @@
 /// - Lease renewal for long-running operations
 /// - Prevention of deadlocks with timeout mechanisms
 /// - Tracking of which agent holds which files
-
 use crate::errors::AgentResult;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
@@ -82,12 +81,7 @@ impl std::fmt::Display for LeaseStatus {
 
 impl Lease {
     /// Create a new lease with the given parameters
-    pub fn new(
-        file_path: PathBuf,
-        agent_id: Uuid,
-        ttl: Duration,
-        max_renewals: i32,
-    ) -> Self {
+    pub fn new(file_path: PathBuf, agent_id: Uuid, ttl: Duration, max_renewals: i32) -> Self {
         let id = Uuid::new_v4();
         let created_at = Utc::now();
         let expires_at = created_at + ttl;
@@ -119,7 +113,10 @@ impl Lease {
     pub fn time_remaining(&self) -> Option<Duration> {
         let now = Utc::now();
         if now < self.expires_at {
-            (self.expires_at - now).to_std().ok().and_then(|d| Duration::from_std(d).ok())
+            (self.expires_at - now)
+                .to_std()
+                .ok()
+                .and_then(|d| Duration::from_std(d).ok())
         } else {
             None
         }
@@ -260,14 +257,15 @@ pub trait LeaseManager: Send + Sync {
     ///
     /// Extends the expiration time of an active lease.
     /// The agent must own the lease to renew it.
-    async fn renew_lease(&self, request: LeaseRenewalRequest)
-        -> AgentResult<LeaseRenewalResponse>;
+    async fn renew_lease(&self, request: LeaseRenewalRequest) -> AgentResult<LeaseRenewalResponse>;
 
     /// Release a lease
     ///
     /// Marks the lease as released, allowing other agents to acquire it.
-    async fn release_lease(&self, request: LeaseReleaseRequest)
-        -> AgentResult<LeaseReleaseResponse>;
+    async fn release_lease(
+        &self,
+        request: LeaseReleaseRequest,
+    ) -> AgentResult<LeaseReleaseResponse>;
 
     /// Get a lease by ID
     async fn get_lease(&self, lease_id: &Uuid) -> AgentResult<Option<Lease>>;

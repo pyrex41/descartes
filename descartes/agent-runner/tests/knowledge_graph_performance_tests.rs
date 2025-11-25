@@ -48,11 +48,8 @@ mod performance_tests {
                     _ => RelationshipType::DependsOn,
                 };
 
-                let edge = KnowledgeEdge::new(
-                    node_ids[i].clone(),
-                    node_ids[target_idx].clone(),
-                    rel_type,
-                );
+                let edge =
+                    KnowledgeEdge::new(node_ids[i].clone(), node_ids[target_idx].clone(), rel_type);
                 graph.add_edge(edge);
             }
         }
@@ -66,7 +63,10 @@ mod performance_tests {
         let graph = create_large_graph(1000, 5);
         let duration = start.elapsed();
 
-        println!("Created graph with 1000 nodes and ~5000 edges in {:?}", duration);
+        println!(
+            "Created graph with 1000 nodes and ~5000 edges in {:?}",
+            duration
+        );
 
         assert_eq!(graph.nodes.len(), 1000);
         assert!(duration < Duration::from_secs(1), "Graph creation too slow");
@@ -232,10 +232,7 @@ mod performance_tests {
             duration
         );
         assert!(results.len() > 0);
-        assert!(
-            duration < Duration::from_millis(50),
-            "Search too slow"
-        );
+        assert!(duration < Duration::from_millis(50), "Search too slow");
     }
 
     #[test]
@@ -354,10 +351,7 @@ mod stress_tests {
 
         let duration = start.elapsed();
 
-        println!(
-            "Created massive graph with 50000 nodes in {:?}",
-            duration
-        );
+        println!("Created massive graph with 50000 nodes in {:?}", duration);
         assert_eq!(graph.nodes.len(), 50_000);
         // Should handle large graphs
         assert!(duration < Duration::from_secs(30));
@@ -379,8 +373,7 @@ mod stress_tests {
             let node_id = graph.add_node(node);
 
             if let Some(prev) = prev_id {
-                let edge =
-                    KnowledgeEdge::new(prev, node_id.clone(), RelationshipType::Calls);
+                let edge = KnowledgeEdge::new(prev, node_id.clone(), RelationshipType::Calls);
                 graph.add_edge(edge);
             }
             prev_id = Some(node_id);

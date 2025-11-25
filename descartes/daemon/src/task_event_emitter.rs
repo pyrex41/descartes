@@ -69,10 +69,7 @@ pub enum TaskChangeEvent {
         timestamp: i64,
     },
     /// Task was deleted
-    Deleted {
-        task_id: String,
-        timestamp: i64,
-    },
+    Deleted { task_id: String, timestamp: i64 },
 }
 
 /// Debounce state for a specific task
@@ -117,10 +114,7 @@ impl TaskEventEmitter {
     }
 
     /// Create with default configuration
-    pub fn with_defaults(
-        state_store: Arc<dyn StateStore>,
-        event_bus: Arc<EventBus>,
-    ) -> Self {
+    pub fn with_defaults(state_store: Arc<dyn StateStore>, event_bus: Arc<EventBus>) -> Self {
         Self::new(state_store, event_bus, TaskEventEmitterConfig::default())
     }
 
@@ -230,7 +224,10 @@ impl TaskEventEmitter {
         }
 
         if self.config.verbose_logging {
-            tracing::info!("Task event emitter cache initialized with {} tasks", cache.len());
+            tracing::info!(
+                "Task event emitter cache initialized with {} tasks",
+                cache.len()
+            );
         }
 
         Ok(())
@@ -246,7 +243,9 @@ impl TaskEventEmitter {
                 TaskChangeEvent::Deleted { task_id, .. } => task_id.clone(),
             };
 
-            let should_emit = self.should_emit_after_debounce(&task_id, &change_event).await;
+            let should_emit = self
+                .should_emit_after_debounce(&task_id, &change_event)
+                .await;
 
             if !should_emit {
                 if self.config.verbose_logging {
@@ -268,11 +267,7 @@ impl TaskEventEmitter {
     }
 
     /// Check if event should be emitted after debouncing
-    async fn should_emit_after_debounce(
-        &self,
-        task_id: &str,
-        event: &TaskChangeEvent,
-    ) -> bool {
+    async fn should_emit_after_debounce(&self, task_id: &str, event: &TaskChangeEvent) -> bool {
         let mut debounce_state = self.debounce_state.write().await;
         let now = Instant::now();
         let debounce_duration = Duration::from_millis(self.config.debounce_interval_ms);
@@ -306,7 +301,11 @@ impl TaskEventEmitter {
     /// Convert TaskChangeEvent to DescartesEvent
     fn convert_to_descartes_event(&self, change_event: TaskChangeEvent) -> DescartesEvent {
         let (task_id, event_type, data) = match change_event {
-            TaskChangeEvent::Created { task_id, task, timestamp } => {
+            TaskChangeEvent::Created {
+                task_id,
+                task,
+                timestamp,
+            } => {
                 let data = json!({
                     "change_type": "created",
                     "task": task,
@@ -419,7 +418,10 @@ mod tests {
         let mut state_store = SqliteStateStore::new(db_path, false)
             .await
             .expect("Failed to create state store");
-        state_store.initialize().await.expect("Failed to initialize");
+        state_store
+            .initialize()
+            .await
+            .expect("Failed to initialize");
 
         let state_store = Arc::new(state_store);
         let event_bus = Arc::new(EventBus::new());
@@ -437,7 +439,10 @@ mod tests {
             config,
         );
 
-        emitter.initialize_cache().await.expect("Failed to initialize cache");
+        emitter
+            .initialize_cache()
+            .await
+            .expect("Failed to initialize cache");
 
         (emitter, state_store, event_bus)
     }
@@ -480,7 +485,12 @@ mod tests {
                 assert_eq!(task_event.event_type, TaskEventType::Created);
 
                 // Verify task data is included
-                let change_type = task_event.data.get("change_type").unwrap().as_str().unwrap();
+                let change_type = task_event
+                    .data
+                    .get("change_type")
+                    .unwrap()
+                    .as_str()
+                    .unwrap();
                 assert_eq!(change_type, "created");
             }
             _ => panic!("Expected TaskEvent"),
@@ -534,10 +544,14 @@ mod tests {
                 assert_eq!(task_event.task_id, task.id.to_string());
 
                 // Verify status change is captured
-                let previous_status = task_event.data.get("previous_status")
+                let previous_status = task_event
+                    .data
+                    .get("previous_status")
                     .and_then(|v| v.as_str())
                     .unwrap();
-                let new_status = task_event.data.get("new_status")
+                let new_status = task_event
+                    .data
+                    .get("new_status")
                     .and_then(|v| v.as_str())
                     .unwrap();
 
@@ -559,7 +573,10 @@ mod tests {
                 .expect("Failed to create state store");
             store.initialize().await.expect("Failed to initialize");
 
-            (Arc::new(store) as Arc<dyn StateStore>, Arc::new(EventBus::new()))
+            (
+                Arc::new(store) as Arc<dyn StateStore>,
+                Arc::new(EventBus::new()),
+            )
         };
 
         let config = TaskEventEmitterConfig {
@@ -570,7 +587,10 @@ mod tests {
         };
 
         let emitter = TaskEventEmitter::new(state_store, event_bus.clone(), config);
-        emitter.initialize_cache().await.expect("Failed to initialize cache");
+        emitter
+            .initialize_cache()
+            .await
+            .expect("Failed to initialize cache");
 
         // Subscribe to events
         let (_sub_id, mut rx) = event_bus.subscribe(None).await;
@@ -605,7 +625,11 @@ mod tests {
         }
 
         // Should be less than 5 events due to debouncing
-        assert!(event_count < 5, "Expected debouncing to reduce events, got {}", event_count);
+        assert!(
+            event_count < 5,
+            "Expected debouncing to reduce events, got {}",
+            event_count
+        );
     }
 
     #[tokio::test]

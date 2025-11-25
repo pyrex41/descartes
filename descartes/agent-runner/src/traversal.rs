@@ -88,9 +88,7 @@ impl<'a> AstTraversal<'a> {
             }
 
             let sibling_count = if node.parent().is_some() {
-                node.parent()
-                    .map(|p| p.child_count())
-                    .unwrap_or(1)
+                node.parent().map(|p| p.child_count()).unwrap_or(1)
             } else {
                 1
             };

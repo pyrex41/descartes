@@ -6,9 +6,9 @@
 //! - Filtering and search performance
 //! - Batch updates
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use descartes_gui::swarm_monitor::{SwarmMonitorState, AgentEvent};
-use descartes_core::{AgentRuntimeState, AgentStatus, AgentProgress};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use descartes_core::{AgentProgress, AgentRuntimeState, AgentStatus};
+use descartes_gui::swarm_monitor::{AgentEvent, SwarmMonitorState};
 use std::collections::HashMap;
 use uuid::Uuid;
 

@@ -6,7 +6,6 @@
 /// - Vector storage
 /// - Full-text indexing
 /// - Hybrid search
-
 use agent_runner::rag::*;
 use agent_runner::{Language, ParserResult};
 use async_trait::async_trait;
@@ -36,7 +35,7 @@ impl MockEmbeddingProvider {
         (0..self.dimension)
             .map(|i| {
                 let val = ((hash.wrapping_add(i as u64)) as f32) / u64::MAX as f32;
-                (val - 0.5) * 2.0  // Normalize to [-1, 1]
+                (val - 0.5) * 2.0 // Normalize to [-1, 1]
             })
             .collect()
     }
@@ -79,7 +78,7 @@ fn test_embedding_cache() {
 
 #[test]
 fn test_embedding_cache_eviction() {
-    let cache = EmbeddingCache::new(3);  // Small cache
+    let cache = EmbeddingCache::new(3); // Small cache
 
     // Fill cache
     cache.put("text1", vec![1.0]);
@@ -116,8 +115,8 @@ fn test_embedding_cache_lru_update() {
     // Add new item - should evict text2 (oldest)
     cache.put("text4", vec![4.0]);
 
-    assert!(cache.get("text1").is_some());  // Should still exist
-    assert!(cache.get("text2").is_none());  // Should be evicted
+    assert!(cache.get("text1").is_some()); // Should still exist
+    assert!(cache.get("text2").is_none()); // Should be evicted
     assert!(cache.get("text3").is_some());
     assert!(cache.get("text4").is_some());
 }
@@ -180,9 +179,7 @@ struct Point {
 }
 "#;
 
-    let chunks = chunker
-        .chunk_text(text, "test.rs", Language::Rust)
-        .unwrap();
+    let chunks = chunker.chunk_text(text, "test.rs", Language::Rust).unwrap();
 
     assert!(!chunks.is_empty());
 
@@ -516,7 +513,7 @@ fn test_search_result_hybrid_scoring() {
 
     let result = SearchResult {
         chunk,
-        score: 0.0,  // Will be computed
+        score: 0.0, // Will be computed
         search_type: "hybrid".to_string(),
         vector_score: Some(0.8),
         fulltext_score: Some(0.6),

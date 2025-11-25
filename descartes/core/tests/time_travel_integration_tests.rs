@@ -8,11 +8,13 @@
 //! - Undo functionality
 
 use descartes_core::{
-    agent_history::{AgentHistoryEvent, AgentHistoryStore, HistoryEventType, SqliteAgentHistoryStore},
+    agent_history::{
+        AgentHistoryEvent, AgentHistoryStore, HistoryEventType, SqliteAgentHistoryStore,
+    },
     body_restore::{BodyRestoreManager, GitBodyRestoreManager},
     brain_restore::BrainRestore,
     time_travel_integration::{
-        DefaultRewindManager, RewindConfig, RewindManager, RewindPoint, ResumeContext,
+        DefaultRewindManager, ResumeContext, RewindConfig, RewindManager, RewindPoint,
     },
 };
 use serde_json::json;
@@ -206,7 +208,10 @@ async fn test_can_rewind_to() {
     };
 
     let confirmation = manager.can_rewind_to(&point).await;
-    assert!(confirmation.is_ok(), "Should be able to rewind to valid point");
+    assert!(
+        confirmation.is_ok(),
+        "Should be able to rewind to valid point"
+    );
 }
 
 // ============================================================================
@@ -343,10 +348,7 @@ async fn test_rewind_creates_backup() {
     let result = manager.rewind_to(point, config).await.unwrap();
 
     assert!(result.success);
-    assert!(
-        !result.backup.backup_id.is_nil(),
-        "Should have backup ID"
-    );
+    assert!(!result.backup.backup_id.is_nil(), "Should have backup ID");
     assert!(
         result.backup.repository_state.head_commit.len() > 0,
         "Should have repository backup"
@@ -501,7 +503,10 @@ async fn test_create_snapshot() {
         .await;
 
     assert!(snapshot_id.is_ok(), "Should create snapshot");
-    assert!(!snapshot_id.unwrap().is_nil(), "Should have valid snapshot ID");
+    assert!(
+        !snapshot_id.unwrap().is_nil(),
+        "Should have valid snapshot ID"
+    );
 }
 
 #[tokio::test]
@@ -524,9 +529,7 @@ async fn test_rewind_to_snapshot() {
     // Get rewind points should include the snapshot
     let points = manager.get_rewind_points("agent-1").await.unwrap();
 
-    let snapshot_point = points
-        .iter()
-        .find(|p| p.snapshot_id == Some(snapshot_id));
+    let snapshot_point = points.iter().find(|p| p.snapshot_id == Some(snapshot_id));
 
     assert!(
         snapshot_point.is_some(),
@@ -806,8 +809,8 @@ async fn test_complete_rewind_resume_cycle() {
     assert!(rewind_result.success, "Rewind should succeed");
 
     // Create resume context
-    let resume_ctx = ResumeContext::from_rewind_result(&rewind_result, "agent-1".to_string())
-        .unwrap();
+    let resume_ctx =
+        ResumeContext::from_rewind_result(&rewind_result, "agent-1".to_string()).unwrap();
     assert_eq!(resume_ctx.resume_event_index, 1);
 
     // Resume execution
@@ -854,7 +857,10 @@ async fn test_state_conflict_detection() {
         !validation.git_commit_matches,
         "Should detect git commit mismatch"
     );
-    assert!(!validation.errors.is_empty(), "Should have validation errors");
+    assert!(
+        !validation.errors.is_empty(),
+        "Should have validation errors"
+    );
 }
 
 #[tokio::test]
@@ -937,11 +943,7 @@ async fn test_performance_large_event_history() {
     let start = std::time::Instant::now();
     let points = manager.get_rewind_points("agent-1").await.unwrap();
     let points_time = start.elapsed();
-    println!(
-        "Got {} rewind points in {:?}",
-        points.len(),
-        points_time
-    );
+    println!("Got {} rewind points in {:?}", points.len(), points_time);
     assert!(!points.is_empty());
 
     // Test: Rewind to middle event (event 500)
@@ -1015,7 +1017,10 @@ async fn test_performance_many_git_commits() {
     let points = manager.get_rewind_points("agent-1").await.unwrap();
     let points_time = start.elapsed();
     println!("Got {} rewind points in {:?}", points.len(), points_time);
-    assert!(points.len() >= 100, "Should have at least 100 rewind points");
+    assert!(
+        points.len() >= 100,
+        "Should have at least 100 rewind points"
+    );
 
     // Test: Rewind to commit 25
     let start = std::time::Instant::now();
@@ -1081,10 +1086,7 @@ async fn test_performance_snapshot_creation() {
         .unwrap();
     let snapshot_time = start.elapsed();
 
-    println!(
-        "Created snapshot of 500 events in {:?}",
-        snapshot_time
-    );
+    println!("Created snapshot of 500 events in {:?}", snapshot_time);
     assert!(!snapshot_id.is_nil());
 
     // Should complete in reasonable time

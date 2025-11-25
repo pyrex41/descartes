@@ -1,7 +1,6 @@
 /// Configuration file watcher and hot-reloading system
 /// Monitors config file changes and notifies subscribers of updates
-
-use crate::config::{DescaratesConfig, ConfigManager};
+use crate::config::{ConfigManager, DescaratesConfig};
 use crate::errors::AgentResult;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -144,7 +143,10 @@ impl HotReloadManager {
     }
 
     /// Check for changes and notify listeners if needed
-    pub fn check_and_reload(&self, current_config: DescaratesConfig) -> AgentResult<Option<DescaratesConfig>> {
+    pub fn check_and_reload(
+        &self,
+        current_config: DescaratesConfig,
+    ) -> AgentResult<Option<DescaratesConfig>> {
         if let Some(new_config) = self.watcher.load_if_changed()? {
             // Create change event
             let event = ConfigChangeEvent {
@@ -192,7 +194,8 @@ mod tests {
 
         // Create empty config file
         let mut file = fs::File::create(&config_path).unwrap();
-        file.write_all(b"[providers]\nprimary = \"anthropic\"").unwrap();
+        file.write_all(b"[providers]\nprimary = \"anthropic\"")
+            .unwrap();
 
         let watcher = ConfigWatcher::new(config_path);
         assert!(watcher.is_enabled());
@@ -204,7 +207,8 @@ mod tests {
         let config_path = temp_dir.path().join("config.toml");
 
         let mut file = fs::File::create(&config_path).unwrap();
-        file.write_all(b"[providers]\nprimary = \"anthropic\"").unwrap();
+        file.write_all(b"[providers]\nprimary = \"anthropic\"")
+            .unwrap();
 
         let watcher = ConfigWatcher::new(config_path);
 
@@ -221,7 +225,8 @@ mod tests {
         let config_path = temp_dir.path().join("config.toml");
 
         let mut file = fs::File::create(&config_path).unwrap();
-        file.write_all(b"[providers]\nprimary = \"anthropic\"").unwrap();
+        file.write_all(b"[providers]\nprimary = \"anthropic\"")
+            .unwrap();
 
         let manager = HotReloadManager::new(config_path);
         assert!(manager.watcher().is_enabled());

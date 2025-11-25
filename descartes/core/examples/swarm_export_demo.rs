@@ -7,11 +7,10 @@
 /// 4. Save/load from files
 ///
 /// Run with: cargo run --example swarm_export_demo
-
-use descartes_core::dag::{DAG, DAGEdge, DAGNode, EdgeType};
+use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, DAG};
 use descartes_core::dag_swarm_export::{
-    export_dag_to_swarm_toml, import_swarm_toml_to_dag, save_dag_as_swarm_toml,
-    load_dag_from_swarm_toml, SwarmExportConfig,
+    export_dag_to_swarm_toml, import_swarm_toml_to_dag, load_dag_from_swarm_toml,
+    save_dag_as_swarm_toml, SwarmExportConfig,
 };
 use descartes_core::swarm_parser::{AgentConfig, ResourceConfig, SwarmConfig};
 use std::path::PathBuf;
@@ -145,7 +144,10 @@ fn example_parallel_review() -> Result<(), Box<dyn std::error::Error>> {
 
     let approved = DAGNode::new_auto("Approved")
         .with_description("Code approved by parallel review consensus")
-        .with_metadata("entry_actions", serde_json::json!(["merge_code", "notify_team"]))
+        .with_metadata(
+            "entry_actions",
+            serde_json::json!(["merge_code", "notify_team"]),
+        )
         .with_position(500.0, 100.0);
 
     let changes_needed = DAGNode::new_auto("ChangesNeeded")
@@ -360,8 +362,10 @@ fn example_development_workflow() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut edge = DAGEdge::dependency(deployment_id, complete_id);
     edge.label = Some("deployment_successful".to_string());
-    edge.metadata
-        .insert("guards".to_string(), serde_json::json!(["no_blocking_issues"]));
+    edge.metadata.insert(
+        "guards".to_string(),
+        serde_json::json!(["no_blocking_issues"]),
+    );
     dag.add_edge(edge)?;
 
     // Add blocked transitions
@@ -440,7 +444,10 @@ fn example_development_workflow() -> Result<(), Box<dyn std::error::Error>> {
         );
 
     // Add guards
-    config = config.with_guard("no_blocking_issues", "context.blocking_issues == 0".to_string());
+    config = config.with_guard(
+        "no_blocking_issues",
+        "context.blocking_issues == 0".to_string(),
+    );
 
     let swarm_toml = export_dag_to_swarm_toml(&dag, &config)?;
 

@@ -11,7 +11,6 @@
 /// - Support incremental updates when files change
 /// - Provide query operations for semantic navigation
 /// - Cache parsed knowledge for performance
-
 use crate::errors::{ParserError, ParserResult};
 use crate::knowledge_graph::{
     FileReference, FileTree, FileTreeNode, KnowledgeEdge, KnowledgeGraph, KnowledgeNode,
@@ -190,10 +189,7 @@ impl KnowledgeGraphOverlay {
     ///
     /// # Returns
     /// * `KnowledgeGraph` - The generated knowledge graph
-    pub fn generate_and_link(
-        &mut self,
-        file_tree: &mut FileTree,
-    ) -> ParserResult<KnowledgeGraph> {
+    pub fn generate_and_link(&mut self, file_tree: &mut FileTree) -> ParserResult<KnowledgeGraph> {
         let mut knowledge_graph = self.generate_knowledge_overlay(file_tree)?;
 
         // Link knowledge nodes back to file tree
@@ -237,11 +233,9 @@ impl KnowledgeGraphOverlay {
         // Convert semantic nodes to knowledge nodes
         let mut node_ids = Vec::new();
         for semantic_node in parse_result.nodes {
-            if let Some(node_id) = self.add_semantic_node_to_graph(
-                semantic_node,
-                file_node,
-                knowledge_graph,
-            )? {
+            if let Some(node_id) =
+                self.add_semantic_node_to_graph(semantic_node, file_node, knowledge_graph)?
+            {
                 node_ids.push(node_id);
             }
         }
@@ -282,7 +276,13 @@ impl KnowledgeGraphOverlay {
         knowledge_node.parameters = semantic_node
             .parameters
             .iter()
-            .map(|p| format!("{}: {}", p.name, p.type_annotation.as_deref().unwrap_or("_")))
+            .map(|p| {
+                format!(
+                    "{}: {}",
+                    p.name,
+                    p.type_annotation.as_deref().unwrap_or("_")
+                )
+            })
             .collect();
         knowledge_node.type_parameters = semantic_node.type_parameters;
         knowledge_node.visibility = semantic_node.visibility;
@@ -376,10 +376,7 @@ impl KnowledgeGraphOverlay {
             }
         }
 
-        tracing::debug!(
-            "Extracted {} relationships",
-            knowledge_graph.edges.len()
-        );
+        tracing::debug!("Extracted {} relationships", knowledge_graph.edges.len());
 
         Ok(())
     }
@@ -666,9 +663,7 @@ impl KnowledgeGraphOverlay {
         knowledge_graph
             .nodes
             .values()
-            .filter(|node| {
-                node.name.contains(pattern) || node.qualified_name.contains(pattern)
-            })
+            .filter(|node| node.name.contains(pattern) || node.qualified_name.contains(pattern))
             .collect()
     }
 
@@ -739,11 +734,8 @@ impl KnowledgeGraphOverlay {
         node_ids: Vec<String>,
         edge_ids: Vec<String>,
     ) -> ParserResult<()> {
-        let metadata = fs::metadata(file_path)
-            .map_err(|e| ParserError::IoError(e))?;
-        let modified_time = metadata
-            .modified()
-            .map_err(|e| ParserError::IoError(e))?;
+        let metadata = fs::metadata(file_path).map_err(|e| ParserError::IoError(e))?;
+        let modified_time = metadata.modified().map_err(|e| ParserError::IoError(e))?;
 
         let entry = CacheEntry {
             file_path: file_path.to_path_buf(),
@@ -938,7 +930,9 @@ fn new_function() {
         .unwrap();
 
         // Update knowledge graph
-        overlay.update_file(&main_path, &file_tree, &mut kg).unwrap();
+        overlay
+            .update_file(&main_path, &file_tree, &mut kg)
+            .unwrap();
 
         // The count might change depending on what was extracted
         // Just verify the operation completed without error

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 /// Message Serialization/Deserialization Benchmarks
 /// Measures overhead of different serialization formats
 ///
@@ -6,10 +8,7 @@
 /// - Binary format (rkyv) performance
 /// - Compression impact
 /// - Large message handling
-
 use std::time::Instant;
-use serde_json::{json, Value};
-use serde::{Serialize, Deserialize};
 
 /// Sample message type for benchmarking
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,10 +65,14 @@ impl SerializationResults {
     /// Pretty print the results
     pub fn print_summary(&self) {
         println!("Format: {}", self.format);
-        println!("  Serialize:      {:.2} ms ({:.0} msg/sec)",
-                 self.serialize_time_ms, self.serialize_throughput);
-        println!("  Deserialize:    {:.2} ms ({:.0} msg/sec)",
-                 self.deserialize_time_ms, self.deserialize_throughput);
+        println!(
+            "  Serialize:      {:.2} ms ({:.0} msg/sec)",
+            self.serialize_time_ms, self.serialize_throughput
+        );
+        println!(
+            "  Deserialize:    {:.2} ms ({:.0} msg/sec)",
+            self.deserialize_time_ms, self.deserialize_throughput
+        );
         println!("  Avg size:       {} bytes", self.avg_size_bytes);
         println!();
     }
@@ -89,7 +92,10 @@ impl SerializationResults {
 }
 
 /// Benchmark JSON serialization
-pub fn benchmark_json_serialization(message_count: usize, content_size: usize) -> SerializationResults {
+pub fn benchmark_json_serialization(
+    message_count: usize,
+    content_size: usize,
+) -> SerializationResults {
     let messages: Vec<AgentMessage> = (0..message_count)
         .map(|_| AgentMessage::sample(content_size))
         .collect();
@@ -278,9 +284,11 @@ pub fn run_serialization_benchmarks() {
     println!("─────────────────────────────────────────────────────────────");
     println!("JSON:          {} bytes", json_small.avg_size_bytes);
     println!("JSON compact:  {} bytes", json_compact_small.avg_size_bytes);
-    println!("bincode:       {} bytes ({:.1}% smaller than JSON)",
-             bincode_small.avg_size_bytes,
-             (1.0 - (bincode_small.avg_size_bytes as f64 / json_small.avg_size_bytes as f64)) * 100.0);
+    println!(
+        "bincode:       {} bytes ({:.1}% smaller than JSON)",
+        bincode_small.avg_size_bytes,
+        (1.0 - (bincode_small.avg_size_bytes as f64 / json_small.avg_size_bytes as f64)) * 100.0
+    );
     println!("JSON (compr.): {} bytes", compressed_small.avg_size_bytes);
     println!();
 
@@ -288,14 +296,22 @@ pub fn run_serialization_benchmarks() {
     println!("THROUGHPUT COMPARISON (messages/sec)");
     println!("─────────────────────────────────────────────────────────────");
     println!("                     Serialize         Deserialize");
-    println!("JSON:                {:.0} msg/sec      {:.0} msg/sec",
-             json_small.serialize_throughput, json_small.deserialize_throughput);
-    println!("JSON compact:        {:.0} msg/sec      {:.0} msg/sec",
-             json_compact_small.serialize_throughput, json_compact_small.deserialize_throughput);
-    println!("bincode:             {:.0} msg/sec      {:.0} msg/sec",
-             bincode_small.serialize_throughput, bincode_small.deserialize_throughput);
-    println!("JSON (compressed):   {:.0} msg/sec      {:.0} msg/sec",
-             compressed_small.serialize_throughput, compressed_small.deserialize_throughput);
+    println!(
+        "JSON:                {:.0} msg/sec      {:.0} msg/sec",
+        json_small.serialize_throughput, json_small.deserialize_throughput
+    );
+    println!(
+        "JSON compact:        {:.0} msg/sec      {:.0} msg/sec",
+        json_compact_small.serialize_throughput, json_compact_small.deserialize_throughput
+    );
+    println!(
+        "bincode:             {:.0} msg/sec      {:.0} msg/sec",
+        bincode_small.serialize_throughput, bincode_small.deserialize_throughput
+    );
+    println!(
+        "JSON (compressed):   {:.0} msg/sec      {:.0} msg/sec",
+        compressed_small.serialize_throughput, compressed_small.deserialize_throughput
+    );
     println!();
 }
 

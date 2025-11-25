@@ -1,6 +1,5 @@
 /// Notification system for multi-channel alerts and messaging.
 /// Supports Telegram, Slack, Email, Webhooks with retry logic, templating, and rate limiting.
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -469,7 +468,10 @@ pub trait NotificationRouter: Send + Sync {
 
     /// Send a notification through the router.
     /// This will apply routing rules, rate limiting, and retries automatically.
-    async fn send_notification(&self, payload: NotificationPayload) -> Result<Vec<NotificationSendResult>, String>;
+    async fn send_notification(
+        &self,
+        payload: NotificationPayload,
+    ) -> Result<Vec<NotificationSendResult>, String>;
 
     /// Send a notification to specific channels directly (bypasses routing rules).
     async fn send_to_channels(

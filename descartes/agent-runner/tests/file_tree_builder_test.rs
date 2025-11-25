@@ -8,10 +8,9 @@
 /// - Query operations
 /// - Language detection
 /// - Git status integration
-
 use agent_runner::{
-    FileTree, FileTreeBuilder, FileTreeBuilderConfig, FileTreeUpdater,
-    FileNodeType, Language, detect_language, is_binary_file, count_lines,
+    count_lines, detect_language, is_binary_file, FileNodeType, FileTree, FileTreeBuilder,
+    FileTreeBuilderConfig, FileTreeUpdater, Language,
 };
 use std::fs;
 use std::io::Write;
@@ -109,8 +108,10 @@ fn test_scan_directory_basic() {
     assert!(tree.directory_count > 3, "Expected multiple directories");
     assert!(tree.root_id.is_some(), "Tree should have a root");
 
-    println!("Scanned tree: {} files, {} directories",
-             tree.file_count, tree.directory_count);
+    println!(
+        "Scanned tree: {} files, {} directories",
+        tree.file_count, tree.directory_count
+    );
 }
 
 #[test]
@@ -145,9 +146,8 @@ fn test_scan_directory_with_ignore_patterns() {
     let tree = builder.scan_directory(temp_dir.path()).unwrap();
 
     // Should not include ignored files
-    let json_files = tree.find_nodes(|node| {
-        node.path.extension().and_then(|e| e.to_str()) == Some("json")
-    });
+    let json_files =
+        tree.find_nodes(|node| node.path.extension().and_then(|e| e.to_str()) == Some("json"));
     assert_eq!(json_files.len(), 0, "JSON files should be ignored");
 }
 
@@ -167,7 +167,10 @@ fn test_scan_directory_metadata_collection() {
         assert!(file.metadata.size.is_some(), "File should have size");
         assert!(file.metadata.language == Some(Language::Rust));
         if !file.metadata.is_binary {
-            assert!(file.metadata.line_count.is_some(), "Text file should have line count");
+            assert!(
+                file.metadata.line_count.is_some(),
+                "Text file should have line count"
+            );
         }
     }
 }
@@ -209,9 +212,7 @@ fn test_build_from_paths_creates_parents() {
     create_test_project(temp_dir.path()).unwrap();
 
     // Only specify leaf files
-    let paths = vec![
-        temp_dir.path().join("src/modules/parser/lexer.rs"),
-    ];
+    let paths = vec![temp_dir.path().join("src/modules/parser/lexer.rs")];
 
     let mut builder = FileTreeBuilder::new();
     let tree = builder.build_from_paths(&paths, temp_dir.path()).unwrap();
@@ -221,9 +222,18 @@ fn test_build_from_paths_creates_parents() {
     let modules_dir = temp_dir.path().join("src/modules");
     let parser_dir = temp_dir.path().join("src/modules/parser");
 
-    assert!(tree.get_node_by_path(&src_dir).is_some(), "src directory should exist");
-    assert!(tree.get_node_by_path(&modules_dir).is_some(), "modules directory should exist");
-    assert!(tree.get_node_by_path(&parser_dir).is_some(), "parser directory should exist");
+    assert!(
+        tree.get_node_by_path(&src_dir).is_some(),
+        "src directory should exist"
+    );
+    assert!(
+        tree.get_node_by_path(&modules_dir).is_some(),
+        "modules directory should exist"
+    );
+    assert!(
+        tree.get_node_by_path(&parser_dir).is_some(),
+        "parser directory should exist"
+    );
 }
 
 #[test]
@@ -325,7 +335,10 @@ fn test_find_by_path_pattern() {
     let tree = builder.scan_directory(temp_dir.path()).unwrap();
 
     let parser_files = tree.find_by_path_pattern("parser");
-    assert!(parser_files.len() > 0, "Should find files in parser directory");
+    assert!(
+        parser_files.len() > 0,
+        "Should find files in parser directory"
+    );
 }
 
 #[test]
@@ -389,8 +402,7 @@ fn test_find_nodes_predicate() {
 
     // Find all Rust files with more than 2 lines
     let large_rust_files = tree.find_nodes(|node| {
-        node.metadata.language == Some(Language::Rust)
-            && node.metadata.line_count.unwrap_or(0) > 2
+        node.metadata.language == Some(Language::Rust) && node.metadata.line_count.unwrap_or(0) > 2
     });
 
     assert!(large_rust_files.len() > 0);
@@ -403,14 +415,35 @@ fn test_find_nodes_predicate() {
 #[test]
 fn test_language_detection() {
     assert_eq!(detect_language(Path::new("test.rs")), Some(Language::Rust));
-    assert_eq!(detect_language(Path::new("test.py")), Some(Language::Python));
-    assert_eq!(detect_language(Path::new("test.js")), Some(Language::JavaScript));
-    assert_eq!(detect_language(Path::new("test.ts")), Some(Language::TypeScript));
+    assert_eq!(
+        detect_language(Path::new("test.py")),
+        Some(Language::Python)
+    );
+    assert_eq!(
+        detect_language(Path::new("test.js")),
+        Some(Language::JavaScript)
+    );
+    assert_eq!(
+        detect_language(Path::new("test.ts")),
+        Some(Language::TypeScript)
+    );
     assert_eq!(detect_language(Path::new("test.go")), Some(Language::Go));
-    assert_eq!(detect_language(Path::new("test.java")), Some(Language::Java));
-    assert_eq!(detect_language(Path::new("test.md")), Some(Language::Markdown));
-    assert_eq!(detect_language(Path::new("test.json")), Some(Language::Json));
-    assert_eq!(detect_language(Path::new("test.yaml")), Some(Language::Yaml));
+    assert_eq!(
+        detect_language(Path::new("test.java")),
+        Some(Language::Java)
+    );
+    assert_eq!(
+        detect_language(Path::new("test.md")),
+        Some(Language::Markdown)
+    );
+    assert_eq!(
+        detect_language(Path::new("test.json")),
+        Some(Language::Json)
+    );
+    assert_eq!(
+        detect_language(Path::new("test.yaml")),
+        Some(Language::Yaml)
+    );
     assert_eq!(detect_language(Path::new("test.txt")), None);
 }
 
@@ -471,7 +504,10 @@ fn test_timestamp_metadata() {
     for file in files {
         if file.is_file() {
             // Modified time should be present
-            assert!(file.metadata.modified.is_some(), "File should have modified time");
+            assert!(
+                file.metadata.modified.is_some(),
+                "File should have modified time"
+            );
         }
     }
 }
@@ -573,7 +609,8 @@ fn test_update_metadata() {
     let mut tree = builder.scan_directory(temp_dir.path()).unwrap();
 
     let file_path = temp_dir.path().join("README.md");
-    let original_size = tree.get_node_by_path(&file_path)
+    let original_size = tree
+        .get_node_by_path(&file_path)
         .unwrap()
         .metadata
         .size
@@ -585,7 +622,8 @@ fn test_update_metadata() {
     let mut updater = FileTreeUpdater::new();
     updater.update_metadata(&mut tree, &file_path).unwrap();
 
-    let new_size = tree.get_node_by_path(&file_path)
+    let new_size = tree
+        .get_node_by_path(&file_path)
         .unwrap()
         .metadata
         .size
@@ -610,7 +648,10 @@ fn test_move_file_same_directory() {
 
     assert!(tree.get_node_by_path(&new_path).is_some());
     assert!(tree.get_node_by_path(&old_path).is_none());
-    assert_eq!(tree.get_node_by_path(&new_path).unwrap().name, "README_NEW.md");
+    assert_eq!(
+        tree.get_node_by_path(&new_path).unwrap().name,
+        "README_NEW.md"
+    );
 }
 
 #[test]
@@ -625,7 +666,8 @@ fn test_move_file_different_directory() {
     let new_path = temp_dir.path().join("src/README.md");
 
     // Get original parent
-    let old_parent = tree.get_node_by_path(&temp_dir.path().to_path_buf())
+    let old_parent = tree
+        .get_node_by_path(&temp_dir.path().to_path_buf())
         .unwrap()
         .node_id
         .clone();

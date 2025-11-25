@@ -8,9 +8,8 @@
 /// 5. Traverse the graph
 /// 6. Serialize to/from TOML
 /// 7. Analyze DAG statistics
-
-use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType};
-use descartes_core::dag_toml::{TomlDAG, save_dag_to_toml, load_dag_from_toml};
+use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, DAG};
+use descartes_core::dag_toml::{load_dag_from_toml, save_dag_to_toml, TomlDAG};
 use uuid::Uuid;
 
 fn main() {
@@ -74,7 +73,10 @@ fn main() {
         let end = nodes[nodes.len() - 1];
 
         if let (Some(start_node), Some(end_node)) = (dag.get_node(start), dag.get_node(end)) {
-            println!("Finding paths from '{}' to '{}':", start_node.label, end_node.label);
+            println!(
+                "Finding paths from '{}' to '{}':",
+                start_node.label, end_node.label
+            );
 
             match dag.find_all_paths(start, end) {
                 Ok(paths) => {
@@ -83,7 +85,8 @@ fn main() {
                     } else {
                         for (i, path) in paths.iter().enumerate() {
                             print!("  Path {}: ", i + 1);
-                            let path_names: Vec<_> = path.iter()
+                            let path_names: Vec<_> = path
+                                .iter()
                                 .filter_map(|id| dag.get_node(*id).map(|n| &n.label))
                                 .collect();
                             println!("{}", path_names.join(" -> "));
@@ -144,12 +147,9 @@ fn main() {
     println!("\nExample 6: Different Edge Types");
     let mut multi_edge_dag = DAG::new("Multi-Edge Type DAG");
 
-    let task1 = DAGNode::new_auto("Core Implementation")
-        .with_metadata("priority", "critical");
-    let task2 = DAGNode::new_auto("Documentation")
-        .with_metadata("priority", "low");
-    let task3 = DAGNode::new_auto("Deployment")
-        .with_metadata("priority", "high");
+    let task1 = DAGNode::new_auto("Core Implementation").with_metadata("priority", "critical");
+    let task2 = DAGNode::new_auto("Documentation").with_metadata("priority", "low");
+    let task3 = DAGNode::new_auto("Deployment").with_metadata("priority", "high");
 
     let t1 = task1.node_id;
     let t2 = task2.node_id;
@@ -160,10 +160,14 @@ fn main() {
     multi_edge_dag.add_node(task3).unwrap();
 
     // Hard dependency: deployment must wait for implementation
-    multi_edge_dag.add_edge(DAGEdge::new(t1, t3, EdgeType::Dependency)).unwrap();
+    multi_edge_dag
+        .add_edge(DAGEdge::new(t1, t3, EdgeType::Dependency))
+        .unwrap();
 
     // Soft dependency: docs should wait but can proceed independently
-    multi_edge_dag.add_edge(DAGEdge::new(t1, t2, EdgeType::SoftDependency)).unwrap();
+    multi_edge_dag
+        .add_edge(DAGEdge::new(t1, t2, EdgeType::SoftDependency))
+        .unwrap();
 
     println!("Edge types in use:");
     for (_, edge) in &multi_edge_dag.edges {
@@ -241,24 +245,29 @@ fn build_development_workflow() -> DAG {
 
     // Define dependencies (edges)
     // Design must be complete before implementation
-    dag.add_edge(DAGEdge::dependency(design_id, backend_id)
-        .with_label("requires_design")).unwrap();
-    dag.add_edge(DAGEdge::dependency(design_id, frontend_id)
-        .with_label("requires_design")).unwrap();
+    dag.add_edge(DAGEdge::dependency(design_id, backend_id).with_label("requires_design"))
+        .unwrap();
+    dag.add_edge(DAGEdge::dependency(design_id, frontend_id).with_label("requires_design"))
+        .unwrap();
 
     // Implementation must be complete before testing
-    dag.add_edge(DAGEdge::dependency(backend_id, unit_tests_id)
-        .with_label("needs_backend")).unwrap();
-    dag.add_edge(DAGEdge::dependency(frontend_id, unit_tests_id)
-        .with_label("needs_frontend")).unwrap();
+    dag.add_edge(DAGEdge::dependency(backend_id, unit_tests_id).with_label("needs_backend"))
+        .unwrap();
+    dag.add_edge(DAGEdge::dependency(frontend_id, unit_tests_id).with_label("needs_frontend"))
+        .unwrap();
 
     // Unit tests before integration tests
-    dag.add_edge(DAGEdge::dependency(unit_tests_id, integration_tests_id)
-        .with_label("needs_unit_tests")).unwrap();
+    dag.add_edge(
+        DAGEdge::dependency(unit_tests_id, integration_tests_id).with_label("needs_unit_tests"),
+    )
+    .unwrap();
 
     // Integration tests before deployment
-    dag.add_edge(DAGEdge::dependency(integration_tests_id, deployment_id)
-        .with_label("needs_integration_tests")).unwrap();
+    dag.add_edge(
+        DAGEdge::dependency(integration_tests_id, deployment_id)
+            .with_label("needs_integration_tests"),
+    )
+    .unwrap();
 
     dag
 }

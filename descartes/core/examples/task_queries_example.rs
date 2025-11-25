@@ -1,11 +1,10 @@
+use chrono::Utc;
 /// Example demonstrating task retrieval and querying functionality
 /// This example shows how to use the TaskQueries API to retrieve, filter, and manage tasks
-
 use descartes_core::{
-    SqliteStateStore, StateStore, Task, TaskComplexity, TaskPriority, TaskStatus,
-    TaskQueries, TaskQueryBuilder, TaskSortField, SortOrder,
+    SortOrder, SqliteStateStore, StateStore, Task, TaskComplexity, TaskPriority, TaskQueries,
+    TaskQueryBuilder, TaskSortField, TaskStatus,
 };
-use chrono::Utc;
 use uuid::Uuid;
 
 #[tokio::main]
@@ -44,7 +43,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("High priority tasks: {}", high_priority.len());
 
     // Get tasks by complexity
-    let complex_tasks = queries.get_tasks_by_complexity(TaskComplexity::Complex).await?;
+    let complex_tasks = queries
+        .get_tasks_by_complexity(TaskComplexity::Complex)
+        .await?;
     println!("Complex tasks: {}", complex_tasks.len());
     println!();
 
@@ -142,8 +143,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ready_tasks = queries.get_ready_tasks().await?;
     println!("Tasks ready to work on: {}", ready_tasks.len());
     for task in &ready_tasks {
-        println!("  - {} (Priority: {:?}, Complexity: {:?})",
-                 task.title, task.priority, task.complexity);
+        println!(
+            "  - {} (Priority: {:?}, Complexity: {:?})",
+            task.title, task.priority, task.complexity
+        );
     }
     println!();
 
@@ -180,8 +183,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("High/Critical priority Todo/InProgress tasks for Alice or Bob:");
     for task in &complex_query_results {
-        println!("  - {} (Priority: {:?}, Status: {:?}, Assigned: {:?})",
-                 task.title, task.priority, task.status, task.assigned_to);
+        println!(
+            "  - {} (Priority: {:?}, Status: {:?}, Assigned: {:?})",
+            task.title, task.priority, task.status, task.assigned_to
+        );
     }
 
     println!("\n=== Example completed successfully ===");
@@ -235,7 +240,9 @@ async fn create_sample_tasks(store: &SqliteStateStore) -> Result<(), Box<dyn std
         Task {
             id: Uuid::new_v4(),
             title: "Set up CI/CD pipeline".to_string(),
-            description: Some("Configure GitHub Actions for automated testing and deployment".to_string()),
+            description: Some(
+                "Configure GitHub Actions for automated testing and deployment".to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::Critical,
             complexity: TaskComplexity::Complex,
@@ -248,7 +255,9 @@ async fn create_sample_tasks(store: &SqliteStateStore) -> Result<(), Box<dyn std
         Task {
             id: Uuid::new_v4(),
             title: "Add error handling".to_string(),
-            description: Some("Implement comprehensive error handling across the application".to_string()),
+            description: Some(
+                "Implement comprehensive error handling across the application".to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Moderate,
@@ -294,7 +303,9 @@ async fn create_sample_tasks(store: &SqliteStateStore) -> Result<(), Box<dyn std
 }
 
 /// Create tasks with dependencies
-async fn create_dependent_tasks(store: &SqliteStateStore) -> Result<(Task, Task), Box<dyn std::error::Error>> {
+async fn create_dependent_tasks(
+    store: &SqliteStateStore,
+) -> Result<(Task, Task), Box<dyn std::error::Error>> {
     let now = Utc::now().timestamp();
 
     // Task A - prerequisite

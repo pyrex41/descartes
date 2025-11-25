@@ -7,7 +7,7 @@
 //!   1. Start the RPC server: cargo run --bin descartes-daemon
 //!   2. Run this example: cargo run --example cli_rpc_integration
 
-use descartes_daemon::{UnixSocketRpcClient, DaemonError};
+use descartes_daemon::{DaemonError, UnixSocketRpcClient};
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -45,7 +45,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "system_prompt": "You are an expert Rust programmer."
     });
 
-    match client.spawn("hello-world-agent", "rust-dev", agent_config).await {
+    match client
+        .spawn("hello-world-agent", "rust-dev", agent_config)
+        .await
+    {
         Ok(agent_id) => {
             println!("✓ Agent spawned successfully");
             println!("  Agent ID: {}\n", agent_id);

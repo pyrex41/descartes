@@ -95,17 +95,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("?");
 
-                            println!(
-                                "📝 [Event] Task UPDATED: {}",
-                                task_event.task_id
-                            );
+                            println!("📝 [Event] Task UPDATED: {}", task_event.task_id);
                             println!("   Status: {} → {}", prev_status, new_status);
                         }
                         "deleted" => {
-                            println!(
-                                "🗑️  [Event] Task DELETED: {}",
-                                task_event.task_id
-                            );
+                            println!("🗑️  [Event] Task DELETED: {}", task_event.task_id);
                         }
                         _ => {}
                     }
@@ -267,22 +261,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stats.pending_debounced_events
     );
     println!("Debouncing enabled: {}", stats.config.enable_debouncing);
-    println!(
-        "Debounce interval: {}ms",
-        stats.config.debounce_interval_ms
-    );
+    println!("Debounce interval: {}ms", stats.config.debounce_interval_ms);
 
     // Retrieve all tasks
     println!("\n--- All Tasks in Database ---");
     let all_tasks = emitter.get_tasks().await?;
     println!("Total tasks: {}", all_tasks.len());
     for task in &all_tasks {
-        println!(
-            "  - {} [{}] {:?}",
-            task.title,
-            task.id,
-            task.status
-        );
+        println!("  - {} [{}] {:?}", task.title, task.id, task.status);
     }
 
     println!("\n7. Waiting for final events to process...");

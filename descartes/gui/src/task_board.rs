@@ -5,7 +5,6 @@
 /// - Task cards with priority, complexity, and dependency indicators
 /// - Filtering and sorting controls
 /// - Real-time updates from daemon
-
 use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::DescartesEvent;
 use iced::widget::{button, column, container, row, scrollable, text, Column, Row, Space};
@@ -290,7 +289,9 @@ impl TaskBoardState {
 
     /// Mark task as having a pending update
     pub fn mark_pending_update(&mut self, task_id: Uuid) {
-        self.realtime_state.pending_updates.insert(task_id, Instant::now());
+        self.realtime_state
+            .pending_updates
+            .insert(task_id, Instant::now());
     }
 
     /// Clear pending update for a task
@@ -389,10 +390,7 @@ fn view_header(state: &TaskBoardState) -> Element<TaskBoardMessage> {
         .spacing(10)
         .align_y(Alignment::Center);
 
-    container(header_row)
-        .width(Length::Fill)
-        .padding(10)
-        .into()
+    container(header_row).width(Length::Fill).padding(10).into()
 }
 
 /// Render the filter controls
@@ -585,13 +583,11 @@ fn view_task_card<'a>(task: &Task, state: &TaskBoardState) -> Element<'a, TaskBo
     let is_selected = state.selected_task.as_ref() == Some(&task.id);
 
     // Title
-    let title = text(&task.title)
-        .size(14)
-        .color(if is_selected {
-            color!(0xffffff)
-        } else {
-            color!(0xdddddd)
-        });
+    let title = text(&task.title).size(14).color(if is_selected {
+        color!(0xffffff)
+    } else {
+        color!(0xdddddd)
+    });
 
     // Priority badge
     let priority_badge = view_priority_badge(task.priority);
@@ -601,7 +597,9 @@ fn view_task_card<'a>(task: &Task, state: &TaskBoardState) -> Element<'a, TaskBo
 
     // Assignee info
     let assignee_text = if let Some(ref assignee) = task.assigned_to {
-        text(format!("@{}", assignee)).size(12).color(color!(0x888888))
+        text(format!("@{}", assignee))
+            .size(12)
+            .color(color!(0x888888))
     } else {
         text("Unassigned").size(12).color(color!(0x666666))
     };
@@ -682,9 +680,7 @@ fn view_task_card<'a>(task: &Task, state: &TaskBoardState) -> Element<'a, TaskBo
             }
         });
 
-    container(card_button)
-        .width(Length::Fill)
-        .into()
+    container(card_button).width(Length::Fill).into()
 }
 
 /// Render a priority badge

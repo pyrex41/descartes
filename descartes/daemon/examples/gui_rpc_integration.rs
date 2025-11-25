@@ -7,7 +7,7 @@
 //!   1. Start the RPC server: cargo run --bin descartes-daemon
 //!   2. Run this example: cargo run --example gui_rpc_integration
 
-use descartes_daemon::{UnixSocketRpcClient, TaskInfo};
+use descartes_daemon::{TaskInfo, UnixSocketRpcClient};
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -79,8 +79,7 @@ impl GuiState {
         let state = self.client.get_state(None).await?;
         let status = format!(
             "Agents: {} | Tasks: {}",
-            state["agents"]["total"],
-            state["tasks"]["total"]
+            state["agents"]["total"], state["tasks"]["total"]
         );
         *self.system_status.write().await = status;
         Ok(())

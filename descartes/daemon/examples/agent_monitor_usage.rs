@@ -9,11 +9,14 @@
 //! ```
 
 use descartes_core::{
-    agent_state::{AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage, LifecycleEvent},
+    agent_state::{
+        AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage, LifecycleEvent,
+    },
     AgentError as RuntimeAgentError,
 };
 use descartes_daemon::{
-    AgentMonitor, AgentMonitoringRpcImpl, AgentMonitoringRpcServer, AgentStatusFilter, EventBus, EventFilter, EventCategory,
+    AgentMonitor, AgentMonitoringRpcImpl, AgentMonitoringRpcServer, AgentStatusFilter, EventBus,
+    EventCategory, EventFilter,
 };
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -143,7 +146,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
         }
 
-        println!("   Progress: Step {}/5 ({:.0}%)", step, (step as f32 / 5.0) * 100.0);
+        println!(
+            "   Progress: Step {}/5 ({:.0}%)",
+            step,
+            (step as f32 / 5.0) * 100.0
+        );
         sleep(Duration::from_millis(500)).await;
     }
 
@@ -193,7 +200,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Total agents: {}", all_agents.len());
 
     for agent in &all_agents {
-        println!("     - {} ({}) - Status: {}", agent.name, agent.agent_id, agent.status);
+        println!(
+            "     - {} ({}) - Status: {}",
+            agent.name, agent.agent_id, agent.status
+        );
     }
 
     println!();

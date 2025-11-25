@@ -9,10 +9,9 @@
 /// 6. Graceful shutdown
 ///
 /// Run with: cargo run --example agent_runner_example
-
 use descartes_core::{
-    AgentConfig, AgentRunner, AgentSignal, AgentStatus, LocalProcessRunner, ProcessRunnerConfig,
-    GracefulShutdown,
+    AgentConfig, AgentRunner, AgentSignal, AgentStatus, GracefulShutdown, LocalProcessRunner,
+    ProcessRunnerConfig,
 };
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};

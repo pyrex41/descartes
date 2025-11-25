@@ -43,6 +43,7 @@
 //! ```
 
 use crate::events::{AgentEvent, AgentEventType, DescartesEvent, EventBus};
+use chrono::Utc;
 use descartes_core::{
     agent_state::{
         AgentError, AgentProgress, AgentRuntimeState, AgentStateCollection, AgentStatistics,
@@ -50,7 +51,6 @@ use descartes_core::{
     },
     agent_stream_parser::{AgentStreamParser, ParserConfig, StreamHandler, StreamResult},
 };
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -511,10 +511,7 @@ impl StreamHandler for EventBusHandler {
         progress: AgentProgress,
         _timestamp: chrono::DateTime<Utc>,
     ) {
-        debug!(
-            "Agent {} progress: {:.1}%",
-            agent_id, progress.percentage
-        );
+        debug!("Agent {} progress: {:.1}%", agent_id, progress.percentage);
 
         let event = DescartesEvent::AgentEvent(crate::events::AgentEvent {
             id: Uuid::new_v4().to_string(),
@@ -565,12 +562,7 @@ impl StreamHandler for EventBusHandler {
         });
     }
 
-    fn on_error(
-        &mut self,
-        agent_id: Uuid,
-        error: AgentError,
-        _timestamp: chrono::DateTime<Utc>,
-    ) {
+    fn on_error(&mut self, agent_id: Uuid, error: AgentError, _timestamp: chrono::DateTime<Utc>) {
         error!("Agent {} error: {}", agent_id, error.message);
 
         let event = AgentEvent::failed(agent_id.to_string(), error.message);
@@ -701,9 +693,7 @@ mod tests {
             "task2".to_string(),
             "claude".to_string(),
         );
-        agent2
-            .transition_to(AgentStatus::Running, None)
-            .ok();
+        agent2.transition_to(AgentStatus::Running, None).ok();
 
         monitor.register_agent(agent1).await;
         monitor.register_agent(agent2).await;

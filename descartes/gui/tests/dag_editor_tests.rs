@@ -1,3 +1,5 @@
+use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, Position, DAG};
+use descartes_gui::dag_canvas_interactions::*;
 /// Enhanced Tests for DAG Editor Visual Components
 ///
 /// This test suite validates the visual editor functionality including:
@@ -9,10 +11,7 @@
 /// - Zoom and pan operations
 /// - Grid and snap-to-grid
 /// - Performance with large graphs
-
 use descartes_gui::dag_editor::*;
-use descartes_gui::dag_canvas_interactions::*;
-use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType, Position};
 use iced::{Point, Vector};
 use uuid::Uuid;
 
@@ -312,7 +311,10 @@ fn test_zoom_to_point() {
     let cursor_pos = Point::new(400.0, 300.0);
     let new_zoom = 2.0;
 
-    update(&mut state, DAGEditorMessage::ZoomToPoint(cursor_pos, new_zoom));
+    update(
+        &mut state,
+        DAGEditorMessage::ZoomToPoint(cursor_pos, new_zoom),
+    );
 
     assert_eq!(state.canvas_state.zoom, 2.0);
 }
@@ -480,7 +482,10 @@ fn test_create_edge() {
     state.dag.add_node(node2).unwrap();
 
     let initial_count = state.dag.edges.len();
-    update(&mut state, DAGEditorMessage::CreateEdge(id1, id2, EdgeType::Dependency));
+    update(
+        &mut state,
+        DAGEditorMessage::CreateEdge(id1, id2, EdgeType::Dependency),
+    );
 
     assert_eq!(state.dag.edges.len(), initial_count + 1);
 }
@@ -599,7 +604,10 @@ fn test_statistics_after_modifications() {
     assert_eq!(state.statistics.as_ref().unwrap().node_count, 1);
 
     // Add another node
-    update(&mut state, DAGEditorMessage::AddNode(Point::new(100.0, 100.0)));
+    update(
+        &mut state,
+        DAGEditorMessage::AddNode(Point::new(100.0, 100.0)),
+    );
 
     // Statistics should be updated automatically
     assert_eq!(state.statistics.as_ref().unwrap().node_count, 2);

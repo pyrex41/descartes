@@ -6,7 +6,6 @@
 /// 3. Advanced routing rules with filtering
 /// 4. Error handling and recovery
 /// 5. Statistics monitoring
-
 use descartes_core::{
     IpcMessage, MessageBus, MessageBusConfig, MessageHandler, MessageType, RoutingRule,
 };
@@ -110,10 +109,7 @@ impl MessageHandler for ResultAggregator {
             "[ResultAggregator] Aggregating result from {}",
             message.sender
         );
-        println!(
-            "[ResultAggregator] Data: {:?}",
-            message.payload
-        );
+        println!("[ResultAggregator] Data: {:?}", message.payload);
         println!(
             "[ResultAggregator] Total results processed: {}",
             self.results_aggregated.load(Ordering::Relaxed)
@@ -169,7 +165,10 @@ impl MessageHandler for AuditLogger {
             "[AuditLog] [{}] {} -> {} | Type: {} | Priority: {} | Data: {:?}",
             chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
             message.sender,
-            message.recipient.as_ref().unwrap_or(&"broadcast".to_string()),
+            message
+                .recipient
+                .as_ref()
+                .unwrap_or(&"broadcast".to_string()),
             message.msg_type,
             message.priority,
             message.payload
@@ -433,16 +432,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========================================================================
 
     println!("--- Handler Statistics ---\n");
-    println!("Market Validator: {} messages processed",
-             validator.messages_processed.load(Ordering::Relaxed));
-    println!("Trade Executor: {} orders executed",
-             executor.orders_executed.load(Ordering::Relaxed));
-    println!("Result Aggregator: {} results aggregated",
-             aggregator.results_aggregated.load(Ordering::Relaxed));
-    println!("Health Monitor: {} alerts issued",
-             health_monitor.alerts_issued.load(Ordering::Relaxed));
-    println!("Audit Logger: {} messages logged",
-             audit_logger.logged_messages.load(Ordering::Relaxed));
+    println!(
+        "Market Validator: {} messages processed",
+        validator.messages_processed.load(Ordering::Relaxed)
+    );
+    println!(
+        "Trade Executor: {} orders executed",
+        executor.orders_executed.load(Ordering::Relaxed)
+    );
+    println!(
+        "Result Aggregator: {} results aggregated",
+        aggregator.results_aggregated.load(Ordering::Relaxed)
+    );
+    println!(
+        "Health Monitor: {} alerts issued",
+        health_monitor.alerts_issued.load(Ordering::Relaxed)
+    );
+    println!(
+        "Audit Logger: {} messages logged",
+        audit_logger.logged_messages.load(Ordering::Relaxed)
+    );
 
     // ========================================================================
     // Display bus statistics

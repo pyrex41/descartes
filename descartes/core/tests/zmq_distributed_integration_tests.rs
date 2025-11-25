@@ -9,10 +9,9 @@
 /// - Error handling and timeouts
 ///
 /// Note: These tests spawn actual server and client processes and may take longer to run.
-
 use descartes_core::{
-    AgentConfig, AgentStatus, ControlCommandType, ZmqAgentRunner, ZmqAgentServer, ZmqClient,
-    ZmqRunnerConfig, ZmqServerConfig, ProcessRunnerConfig, ZmqOutputStream,
+    AgentConfig, AgentStatus, ControlCommandType, ProcessRunnerConfig, ZmqAgentRunner,
+    ZmqAgentServer, ZmqClient, ZmqOutputStream, ZmqRunnerConfig, ZmqServerConfig,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -476,8 +475,11 @@ async fn test_batch_operations() {
             client.spawn_remote(config, Some(60)),
         )
         .await
-        .unwrap_or_else(|_| Err(descartes_core::AgentError::ExecutionError("Timeout".to_string())))
-        {
+        .unwrap_or_else(|_| {
+            Err(descartes_core::AgentError::ExecutionError(
+                "Timeout".to_string(),
+            ))
+        }) {
             agent_ids.push(agent_info.id);
         }
     }
@@ -506,7 +508,10 @@ async fn test_batch_operations() {
             println!("Batch operation results:");
             println!("  Successful: {}", response.successful);
             println!("  Failed: {}", response.failed);
-            assert!(response.successful > 0, "Some batch operations should succeed");
+            assert!(
+                response.successful > 0,
+                "Some batch operations should succeed"
+            );
         }
         Ok(Err(e)) => eprintln!("Batch operation failed: {}", e),
         Err(_) => eprintln!("Batch operation timed out"),
@@ -544,8 +549,11 @@ async fn test_output_querying() {
     // Spawn an agent
     let config = test_utils::create_test_agent_config("output-test-agent");
 
-    let agent_info = match timeout(Duration::from_secs(30), client.spawn_remote(config, Some(60)))
-        .await
+    let agent_info = match timeout(
+        Duration::from_secs(30),
+        client.spawn_remote(config, Some(60)),
+    )
+    .await
     {
         Ok(Ok(info)) => info,
         _ => {
@@ -562,7 +570,13 @@ async fn test_output_querying() {
     // Query stdout
     match timeout(
         Duration::from_secs(5),
-        client.query_agent_output(&agent_info.id, ZmqOutputStream::Stdout, None, Some(10), None),
+        client.query_agent_output(
+            &agent_info.id,
+            ZmqOutputStream::Stdout,
+            None,
+            Some(10),
+            None,
+        ),
     )
     .await
     {
@@ -613,10 +627,7 @@ async fn test_server_statistics() {
     println!("  Control commands: {}", stats.control_commands);
 
     // Verify server is tracking operations
-    assert!(
-        stats.health_checks > 0,
-        "Server should track health checks"
-    );
+    assert!(stats.health_checks > 0, "Server should track health checks");
 
     // Cleanup
     let _ = client.disconnect().await;
@@ -647,8 +658,11 @@ async fn test_custom_actions() {
     // Spawn an agent
     let config = test_utils::create_test_agent_config("custom-action-agent");
 
-    let agent_info = match timeout(Duration::from_secs(30), client.spawn_remote(config, Some(60)))
-        .await
+    let agent_info = match timeout(
+        Duration::from_secs(30),
+        client.spawn_remote(config, Some(60)),
+    )
+    .await
     {
         Ok(Ok(info)) => info,
         _ => {

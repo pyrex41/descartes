@@ -115,7 +115,9 @@ impl ExecutionState {
     pub fn is_stepping(&self) -> bool {
         matches!(
             self,
-            ExecutionState::SteppingInto | ExecutionState::SteppingOver | ExecutionState::SteppingOut
+            ExecutionState::SteppingInto
+                | ExecutionState::SteppingOver
+                | ExecutionState::SteppingOut
         )
     }
 }
@@ -179,7 +181,10 @@ impl ThoughtSnapshot {
                 "title": thought.title,
                 "project_id": thought.project_id,
             }),
-            agent_id: thought.agent_id.as_ref().and_then(|id| Uuid::parse_str(id).ok()),
+            agent_id: thought
+                .agent_id
+                .as_ref()
+                .and_then(|id| Uuid::parse_str(id).ok()),
             step_number,
         }
     }
@@ -902,18 +907,16 @@ impl DebuggerState {
 
     /// Save to file
     pub fn save_to_file(&self, path: &std::path::Path) -> std::io::Result<()> {
-        let json = self.to_json().map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-        })?;
+        let json = self
+            .to_json()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         std::fs::write(path, json)
     }
 
     /// Load from file
     pub fn load_from_file(path: &std::path::Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        Self::from_json(&json).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-        })
+        Self::from_json(&json).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
 }
 
@@ -1151,7 +1154,8 @@ impl Debugger {
     pub fn handle_breakpoint_hit(&mut self, breakpoint: &Breakpoint) -> DebuggerResult<()> {
         // Pause execution
         self.state.execution_state = ExecutionState::Paused;
-        self.state.update_statistics(DebugEvent::BreakpointHit(breakpoint.id));
+        self.state
+            .update_statistics(DebugEvent::BreakpointHit(breakpoint.id));
 
         // Trigger breakpoint callback
         if let Some(ref callback) = self.on_breakpoint {
@@ -1213,15 +1217,13 @@ impl Debugger {
 
     /// Push a new call frame onto the stack
     pub fn push_call_frame(&mut self, name: String, workflow_state: WorkflowState) -> Uuid {
-        let parent_id = self.state.current_context.current_frame()
+        let parent_id = self
+            .state
+            .current_context
+            .current_frame()
             .map(|f| f.frame_id);
 
-        let frame = CallFrame::new(
-            name,
-            workflow_state,
-            self.state.step_count,
-            parent_id,
-        );
+        let frame = CallFrame::new(name, workflow_state, self.state.step_count, parent_id);
 
         let frame_id = frame.frame_id;
         self.state.current_context.push_frame(frame);
@@ -1312,7 +1314,10 @@ impl Debugger {
                 })
             }
 
-            DebugCommand::SetBreakpoint { location, condition } => {
+            DebugCommand::SetBreakpoint {
+                location,
+                condition,
+            } => {
                 let bp = if let Some(cond) = condition {
                     Breakpoint::with_condition(location.clone(), cond)
                 } else {
@@ -1339,24 +1344,18 @@ impl Debugger {
                 })
             }
 
-            DebugCommand::ListBreakpoints => {
-                Ok(CommandResult::BreakpointList {
-                    breakpoints: self.state.get_breakpoints().to_vec(),
-                })
-            }
+            DebugCommand::ListBreakpoints => Ok(CommandResult::BreakpointList {
+                breakpoints: self.state.get_breakpoints().to_vec(),
+            }),
 
-            DebugCommand::InspectContext => {
-                Ok(CommandResult::ContextInspection {
-                    context: self.state.current_context.clone(),
-                })
-            }
+            DebugCommand::InspectContext => Ok(CommandResult::ContextInspection {
+                context: self.state.current_context.clone(),
+            }),
 
-            DebugCommand::ShowStack => {
-                Ok(CommandResult::StackTrace {
-                    trace: self.state.current_context.format_stack_trace(),
-                    frames: self.state.current_context.call_stack.clone(),
-                })
-            }
+            DebugCommand::ShowStack => Ok(CommandResult::StackTrace {
+                trace: self.state.current_context.format_stack_trace(),
+                frames: self.state.current_context.call_stack.clone(),
+            }),
 
             DebugCommand::Evaluate { expression } => {
                 // TODO: Implement expression evaluation
@@ -1377,11 +1376,9 @@ impl Debugger {
                 })
             }
 
-            DebugCommand::ShowHistory => {
-                Ok(CommandResult::HistoryList {
-                    history: self.state.get_history().to_vec(),
-                })
-            }
+            DebugCommand::ShowHistory => Ok(CommandResult::HistoryList {
+                history: self.state.get_history().to_vec(),
+            }),
 
             DebugCommand::ClearHistory => {
                 self.state.clear_history();
@@ -1390,11 +1387,9 @@ impl Debugger {
                 })
             }
 
-            DebugCommand::GetStatistics => {
-                Ok(CommandResult::Statistics {
-                    stats: self.state.statistics.clone(),
-                })
-            }
+            DebugCommand::GetStatistics => Ok(CommandResult::Statistics {
+                stats: self.state.statistics.clone(),
+            }),
         }
     }
 
@@ -1745,7 +1740,10 @@ mod tests {
         // Try to resume when not paused
         let result = debugger.resume_agent();
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), DebuggerError::CannotResumeWhileNotPaused));
+        assert!(matches!(
+            result.unwrap_err(),
+            DebuggerError::CannotResumeWhileNotPaused
+        ));
     }
 
     #[test]
@@ -1888,10 +1886,16 @@ mod tests {
         let mut debugger = Debugger::new(agent_id);
 
         debugger.update_workflow_state(WorkflowState::Running);
-        assert_eq!(debugger.state().current_context.workflow_state, WorkflowState::Running);
+        assert_eq!(
+            debugger.state().current_context.workflow_state,
+            WorkflowState::Running
+        );
 
         debugger.update_workflow_state(WorkflowState::Paused);
-        assert_eq!(debugger.state().current_context.workflow_state, WorkflowState::Paused);
+        assert_eq!(
+            debugger.state().current_context.workflow_state,
+            WorkflowState::Paused
+        );
     }
 
     #[test]
@@ -1926,7 +1930,11 @@ mod tests {
 
         debugger.set_context_variable("test_var".to_string(), serde_json::json!(42));
 
-        let var = debugger.state().current_context.local_variables.get("test_var");
+        let var = debugger
+            .state()
+            .current_context
+            .local_variables
+            .get("test_var");
         assert_eq!(var, Some(&serde_json::json!(42)));
     }
 
@@ -2082,8 +2090,12 @@ mod tests {
         let mut debugger = Debugger::new(agent_id);
 
         // Add some breakpoints
-        debugger.state_mut().add_breakpoint(Breakpoint::new(BreakpointLocation::AnyTransition));
-        debugger.state_mut().add_breakpoint(Breakpoint::new(BreakpointLocation::StepCount { step: 5 }));
+        debugger
+            .state_mut()
+            .add_breakpoint(Breakpoint::new(BreakpointLocation::AnyTransition));
+        debugger
+            .state_mut()
+            .add_breakpoint(Breakpoint::new(BreakpointLocation::StepCount { step: 5 }));
 
         let result = debugger.process_command(DebugCommand::ListBreakpoints);
         assert!(result.is_ok());

@@ -6,7 +6,7 @@
 //! Usage:
 //!   cargo run --example unix_socket_server
 
-use descartes_daemon::{UnixSocketRpcServer, DaemonResult};
+use descartes_daemon::{DaemonResult, UnixSocketRpcServer};
 use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber;
@@ -14,9 +14,7 @@ use tracing_subscriber;
 #[tokio::main]
 async fn main() -> DaemonResult<()> {
     // Setup logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("Starting Unix Socket RPC Server Example");
 
@@ -32,7 +30,10 @@ async fn main() -> DaemonResult<()> {
     let handle = server.start().await?;
 
     info!("Server started successfully!");
-    info!("You can now connect to the Unix socket at: {:?}", socket_path);
+    info!(
+        "You can now connect to the Unix socket at: {:?}",
+        socket_path
+    );
     info!("");
     info!("Available RPC methods:");
     info!("  - spawn(name, agent_type, config): Spawn a new agent");

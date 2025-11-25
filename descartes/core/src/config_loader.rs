@@ -1,13 +1,12 @@
 /// Configuration file discovery and loading system for Descartes.
 /// Handles filesystem-based config loading with environment variable overrides,
 /// validation, migrations, and hot-reloading support.
-
-use crate::config::{DescaratesConfig, ConfigManager};
+use crate::config::{ConfigManager, DescaratesConfig};
 use crate::errors::{AgentError, AgentResult};
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
-use std::fs;
-use std::env;
 
 /// Configuration file discovery strategy
 #[derive(Debug, Clone)]
@@ -58,18 +57,16 @@ impl ConfigLoader {
                 debug!("Using explicit config path: {:?}", path);
                 Ok(Some(path.clone()))
             }
-            ConfigDiscoveryStrategy::EnvironmentOnly => {
-                match env::var("DESCARTES_CONFIG") {
-                    Ok(path) => {
-                        debug!("Found DESCARTES_CONFIG environment variable: {}", path);
-                        Ok(Some(PathBuf::from(path)))
-                    }
-                    Err(_) => {
-                        warn!("DESCARTES_CONFIG not set, will use defaults");
-                        Ok(None)
-                    }
+            ConfigDiscoveryStrategy::EnvironmentOnly => match env::var("DESCARTES_CONFIG") {
+                Ok(path) => {
+                    debug!("Found DESCARTES_CONFIG environment variable: {}", path);
+                    Ok(Some(PathBuf::from(path)))
                 }
-            }
+                Err(_) => {
+                    warn!("DESCARTES_CONFIG not set, will use defaults");
+                    Ok(None)
+                }
+            },
             ConfigDiscoveryStrategy::Default => {
                 // Check 1: .descartes/config.toml in current directory
                 let local_config = PathBuf::from(".descartes/config.toml");
@@ -94,7 +91,10 @@ impl ConfigLoader {
                         debug!("Found config via DESCARTES_CONFIG: {:?}", env_path);
                         return Ok(Some(env_path));
                     } else {
-                        warn!("DESCARTES_CONFIG points to non-existent file: {:?}", env_path);
+                        warn!(
+                            "DESCARTES_CONFIG points to non-existent file: {:?}",
+                            env_path
+                        );
                     }
                 }
 
@@ -116,9 +116,10 @@ impl ConfigLoader {
 
             // Verify file is readable
             if !path.exists() {
-                return Err(AgentError::ExecutionError(
-                    format!("Config file not found: {:?}", path)
-                ));
+                return Err(AgentError::ExecutionError(format!(
+                    "Config file not found: {:?}",
+                    path
+                )));
             }
 
             ConfigManager::load(Some(path))?
@@ -231,18 +232,20 @@ pub fn ensure_config_directories(config_manager: &ConfigManager) -> AgentResult<
 
     // Create base storage directory
     fs::create_dir_all(base_path).map_err(|e| {
-        AgentError::ExecutionError(
-            format!("Failed to create storage directory {:?}: {}", base_path, e)
-        )
+        AgentError::ExecutionError(format!(
+            "Failed to create storage directory {:?}: {}",
+            base_path, e
+        ))
     })?;
     debug!("Created/verified storage directory: {:?}", base_path);
 
     // Create database directory
     let db_path = base_path.join("data");
     fs::create_dir_all(&db_path).map_err(|e| {
-        AgentError::ExecutionError(
-            format!("Failed to create database directory {:?}: {}", db_path, e)
-        )
+        AgentError::ExecutionError(format!(
+            "Failed to create database directory {:?}: {}",
+            db_path, e
+        ))
     })?;
     debug!("Created/verified database directory: {:?}", db_path);
 
@@ -250,9 +253,10 @@ pub fn ensure_config_directories(config_manager: &ConfigManager) -> AgentResult<
     if config.storage.state_store.enabled {
         let state_path = base_path.join(&config.storage.state_store.path);
         fs::create_dir_all(&state_path).map_err(|e| {
-            AgentError::ExecutionError(
-                format!("Failed to create state directory {:?}: {}", state_path, e)
-            )
+            AgentError::ExecutionError(format!(
+                "Failed to create state directory {:?}: {}",
+                state_path, e
+            ))
         })?;
         debug!("Created/verified state directory: {:?}", state_path);
     }
@@ -261,9 +265,10 @@ pub fn ensure_config_directories(config_manager: &ConfigManager) -> AgentResult<
     if config.storage.event_store.enabled {
         let event_path = base_path.join(&config.storage.event_store.path);
         fs::create_dir_all(&event_path).map_err(|e| {
-            AgentError::ExecutionError(
-                format!("Failed to create event directory {:?}: {}", event_path, e)
-            )
+            AgentError::ExecutionError(format!(
+                "Failed to create event directory {:?}: {}",
+                event_path, e
+            ))
         })?;
         debug!("Created/verified event directory: {:?}", event_path);
     }
@@ -272,21 +277,26 @@ pub fn ensure_config_directories(config_manager: &ConfigManager) -> AgentResult<
     if config.storage.cache.enabled && config.storage.cache.cache_type == "disk" {
         let cache_path = base_path.join(&config.storage.cache.disk_path);
         fs::create_dir_all(&cache_path).map_err(|e| {
-            AgentError::ExecutionError(
-                format!("Failed to create cache directory {:?}: {}", cache_path, e)
-            )
+            AgentError::ExecutionError(format!(
+                "Failed to create cache directory {:?}: {}",
+                cache_path, e
+            ))
         })?;
         debug!("Created/verified cache directory: {:?}", cache_path);
     }
 
     // Create log directory if file logging is enabled
     if let Some(log_file_config) = &config.logging.targets.file {
-        let log_dir = base_path.join(&log_file_config.path).parent().map(|p| p.to_path_buf());
+        let log_dir = base_path
+            .join(&log_file_config.path)
+            .parent()
+            .map(|p| p.to_path_buf());
         if let Some(log_path) = log_dir {
             fs::create_dir_all(&log_path).map_err(|e| {
-                AgentError::ExecutionError(
-                    format!("Failed to create log directory {:?}: {}", log_path, e)
-                )
+                AgentError::ExecutionError(format!(
+                    "Failed to create log directory {:?}: {}",
+                    log_path, e
+                ))
             })?;
             debug!("Created/verified log directory: {:?}", log_path);
         }
@@ -336,7 +346,10 @@ impl ConfigValidator {
 
         // Check if base path is absolute or relative (acceptable, but warn if relative)
         if base_path.is_relative() {
-            warn!("Storage base path is relative: {}", config.storage.base_path);
+            warn!(
+                "Storage base path is relative: {}",
+                config.storage.base_path
+            );
         }
 
         // Validate database settings
@@ -347,7 +360,10 @@ impl ConfigValidator {
         }
 
         if config.storage.database.pool_size > 100 {
-            warn!("Database pool size is unusually high: {}", config.storage.database.pool_size);
+            warn!(
+                "Database pool size is unusually high: {}",
+                config.storage.database.pool_size
+            );
         }
 
         Ok(())
@@ -372,7 +388,9 @@ impl ConfigValidator {
             ));
         }
 
-        if config.providers.anthropic.temperature < 0.0 || config.providers.anthropic.temperature > 2.0 {
+        if config.providers.anthropic.temperature < 0.0
+            || config.providers.anthropic.temperature > 2.0
+        {
             return Err(AgentError::ExecutionError(
                 "Anthropic temperature must be between 0.0 and 2.0".to_string(),
             ));

@@ -146,7 +146,10 @@ pub enum WorkflowEvent {
     Fail(String),
 
     /// Custom event with arbitrary data
-    Custom { name: String, data: serde_json::Value },
+    Custom {
+        name: String,
+        data: serde_json::Value,
+    },
 
     /// Timeout event
     Timeout,
@@ -226,11 +229,8 @@ pub trait StateHandler: Send + Sync {
     async fn on_exit(&self, state: WorkflowState) -> StateMachineResult<()>;
 
     /// Called when an event is processed
-    async fn on_event(
-        &self,
-        state: WorkflowState,
-        event: &WorkflowEvent,
-    ) -> StateMachineResult<()>;
+    async fn on_event(&self, state: WorkflowState, event: &WorkflowEvent)
+        -> StateMachineResult<()>;
 
     /// Called on transition completion
     async fn on_transition(
@@ -371,7 +371,9 @@ impl WorkflowStateMachine {
         self.handler.on_enter(target_state).await?;
 
         // Call transition handler
-        self.handler.on_transition(current, target_state, &event).await?;
+        self.handler
+            .on_transition(current, target_state, &event)
+            .await?;
 
         // Record transition
         let duration = start_time.elapsed().as_millis() as u64;
@@ -791,9 +793,7 @@ mod tests {
         sm.set_context("key1", serde_json::json!("value1"))
             .await
             .unwrap();
-        sm.set_context("key2", serde_json::json!(42))
-            .await
-            .unwrap();
+        sm.set_context("key2", serde_json::json!(42)).await.unwrap();
 
         assert_eq!(
             sm.get_context("key1").await,
@@ -850,9 +850,7 @@ mod tests {
             Some(&serde_json::json!("data"))
         );
 
-        let restored = WorkflowStateMachine::deserialize(serialized)
-            .await
-            .unwrap();
+        let restored = WorkflowStateMachine::deserialize(serialized).await.unwrap();
         assert_eq!(restored.current_state().await, WorkflowState::Running);
     }
 

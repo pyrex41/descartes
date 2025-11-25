@@ -4,8 +4,8 @@
 //! providing user feedback, confirmations, and progress tracking.
 
 use descartes_core::{
-    AgentHistoryEvent, DefaultRewindManager, RewindConfig, RewindConfirmation, RewindManager,
-    RewindPoint, RewindProgress, RewindResult, ResumeContext, ValidationResult,
+    AgentHistoryEvent, DefaultRewindManager, ResumeContext, RewindConfig, RewindConfirmation,
+    RewindManager, RewindPoint, RewindProgress, RewindResult, ValidationResult,
 };
 use iced::widget::{button, column, container, row, text, Column, Space};
 use iced::{alignment::Horizontal, Element, Length, Theme};
@@ -136,9 +136,7 @@ impl RewindState {
 // ============================================================================
 
 /// Create the rewind confirmation dialog
-pub fn view_rewind_confirmation(
-    confirmation: &RewindConfirmation,
-) -> Element<RewindMessage> {
+pub fn view_rewind_confirmation(confirmation: &RewindConfirmation) -> Element<RewindMessage> {
     let mut warnings = Column::new().spacing(5);
 
     if confirmation.has_uncommitted_changes {
@@ -190,9 +188,9 @@ pub fn view_rewind_confirmation(
                     .padding(10)
                     .style(|theme: &Theme, status| {
                         button::Style {
-                            background: Some(iced::Background::Color(
-                                iced::Color::from_rgb(0.2, 0.6, 1.0),
-                            )),
+                            background: Some(iced::Background::Color(iced::Color::from_rgb(
+                                0.2, 0.6, 1.0,
+                            ))),
                             text_color: iced::Color::WHITE,
                             ..button::primary(theme, status)
                         }
@@ -224,10 +222,9 @@ pub fn view_rewind_progress(progress: &RewindProgress) -> Element<RewindMessage>
             format!("Target: {}", target.description),
         ),
         RewindProgress::CreatingBackup => ("Creating backup...".to_string(), "".to_string()),
-        RewindProgress::BackupCreated { backup_id } => (
-            "Backup created".to_string(),
-            format!("ID: {}", backup_id),
-        ),
+        RewindProgress::BackupCreated { backup_id } => {
+            ("Backup created".to_string(), format!("ID: {}", backup_id))
+        }
         RewindProgress::Validating => ("Validating target state...".to_string(), "".to_string()),
         RewindProgress::RestoringBrain {
             events_processed,
@@ -248,10 +245,9 @@ pub fn view_rewind_progress(progress: &RewindProgress) -> Element<RewindMessage>
             "Body state restored".to_string(),
             format!("Commit: {}", &commit.chars().take(7).collect::<String>()),
         ),
-        RewindProgress::ValidatingConsistency => (
-            "Validating consistency...".to_string(),
-            "".to_string(),
-        ),
+        RewindProgress::ValidatingConsistency => {
+            ("Validating consistency...".to_string(), "".to_string())
+        }
         RewindProgress::Complete { success } => {
             if *success {
                 ("Rewind complete!".to_string(), "✓ Success".to_string())
@@ -322,19 +318,17 @@ pub fn view_rewind_result(result: &RewindResult) -> Element<RewindMessage> {
         details = details.push(
             text(format!(
                 "Body: commit {}",
-                body_result.target_commit.chars().take(7).collect::<String>()
+                body_result
+                    .target_commit
+                    .chars()
+                    .take(7)
+                    .collect::<String>()
             ))
             .size(12),
         );
     }
 
-    details = details.push(
-        text(format!(
-            "Duration: {}ms",
-            result.duration_ms
-        ))
-        .size(12),
-    );
+    details = details.push(text(format!("Duration: {}ms", result.duration_ms)).size(12));
 
     // Validation info
     if !result.validation.errors.is_empty() {
@@ -454,8 +448,12 @@ pub fn view_rewind_controls(state: &RewindState) -> Element<RewindMessage> {
     );
 
     container(
-        column![text("Rewind Controls").size(14), Space::with_height(10), controls,]
-            .spacing(5),
+        column![
+            text("Rewind Controls").size(14),
+            Space::with_height(10),
+            controls,
+        ]
+        .spacing(5),
     )
     .padding(15)
     .style(|theme: &Theme| container::Style {
@@ -496,11 +494,13 @@ pub fn update_rewind(state: &mut RewindState, message: RewindMessage) {
 
         RewindMessage::RewindStarted => {
             state.rewind_in_progress = true;
-            state.current_progress = state.pending_rewind.as_ref().map(|point| {
-                RewindProgress::Starting {
-                    target: point.clone(),
-                }
-            });
+            state.current_progress =
+                state
+                    .pending_rewind
+                    .as_ref()
+                    .map(|point| RewindProgress::Starting {
+                        target: point.clone(),
+                    });
         }
 
         RewindMessage::RewindProgress(progress) => {
@@ -525,7 +525,9 @@ pub fn update_rewind(state: &mut RewindState, message: RewindMessage) {
 
         RewindMessage::RewindFailed(error) => {
             state.rewind_in_progress = false;
-            state.current_progress = Some(RewindProgress::Error { error: error.clone() });
+            state.current_progress = Some(RewindProgress::Error {
+                error: error.clone(),
+            });
             state.error_message = Some(error);
         }
 
@@ -565,8 +567,7 @@ pub fn update_rewind(state: &mut RewindState, message: RewindMessage) {
         }
 
         RewindMessage::SnapshotCreated(snapshot_id) => {
-            state.success_message =
-                Some(format!("Snapshot created: {}", snapshot_id.to_string()));
+            state.success_message = Some(format!("Snapshot created: {}", snapshot_id.to_string()));
         }
     }
 }
@@ -584,10 +585,7 @@ pub fn slider_selection_to_rewind_point(
 }
 
 /// Check if rewind is safe based on current state
-pub fn is_rewind_safe(
-    point: &RewindPoint,
-    current_events: &[AgentHistoryEvent],
-) -> Vec<String> {
+pub fn is_rewind_safe(point: &RewindPoint, current_events: &[AgentHistoryEvent]) -> Vec<String> {
     let mut warnings = Vec::new();
 
     // Check if we're rewinding forward (unusual)

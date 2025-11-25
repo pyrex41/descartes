@@ -2,10 +2,9 @@
 ///
 /// This module provides a client for connecting to the daemon's event stream
 /// and receiving real-time events with automatic reconnection support.
-
 use crate::errors::{DaemonError, DaemonResult};
-use crate::events::{DescartesEvent, EventFilter};
 use crate::event_stream::{ClientMessage, ServerMessage};
+use crate::events::{DescartesEvent, EventFilter};
 use futures::{SinkExt, StreamExt};
 use serde_json;
 use std::sync::Arc;
@@ -13,7 +12,7 @@ use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{Message as WsMessage, Error as WsError},
+    tungstenite::{Error as WsError, Message as WsMessage},
 };
 use tracing::{debug, error, info, warn};
 

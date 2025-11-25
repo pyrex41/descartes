@@ -12,47 +12,45 @@
 // - Query interface for accessing semantic information
 // - Integration with RAG (Retrieval-Augmented Generation) systems
 
-pub mod errors;
-pub mod types;
-pub mod grammar;
-pub mod traversal;
-pub mod semantic;
-pub mod parser;
 pub mod db_schema;
-pub mod rag;
-pub mod knowledge_graph;
+pub mod errors;
 pub mod file_tree_builder;
+pub mod grammar;
+pub mod knowledge_graph;
 pub mod knowledge_graph_overlay;
+pub mod parser;
+pub mod rag;
+pub mod semantic;
+pub mod traversal;
+pub mod types;
 
 // Re-exports for convenient access
-pub use errors::{ParserError, ParserResult};
-pub use types::{Language, SemanticNode, SemanticNodeType, ParserConfig, ParseResult, ParseStatistics};
-pub use grammar::{load_grammar, create_parser, initialize_grammars};
-pub use traversal::{AstTraversal, TraversalStrategy, QueryHelper};
-pub use semantic::{SemanticExtractor, SemanticAnalysis};
-pub use parser::SemanticParser;
 pub use db_schema::DbPool;
+pub use errors::{ParserError, ParserResult};
+pub use grammar::{create_parser, initialize_grammars, load_grammar};
+pub use parser::SemanticParser;
 pub use rag::{
-    RagSystem, RagConfig, RagStats, CodeChunk, SearchResult,
-    EmbeddingProvider, OpenAiEmbeddings, AnthropicEmbeddings,
-    EmbeddingCache, SemanticChunker, VectorStore, FullTextSearch,
+    AnthropicEmbeddings, CodeChunk, EmbeddingCache, EmbeddingProvider, FullTextSearch,
+    OpenAiEmbeddings, RagConfig, RagStats, RagSystem, SearchResult, SemanticChunker, VectorStore,
+};
+pub use semantic::{SemanticAnalysis, SemanticExtractor};
+pub use traversal::{AstTraversal, QueryHelper, TraversalStrategy};
+pub use types::{
+    Language, ParseResult, ParseStatistics, ParserConfig, SemanticNode, SemanticNodeType,
 };
 
 pub use knowledge_graph::{
-    FileTreeNode, FileNodeType, FileMetadata, FileTree, FileTreeStats,
-    KnowledgeNode, KnowledgeNodeType, KnowledgeEdge, RelationshipType,
-    KnowledgeGraph, KnowledgeGraphStats, FileReference, CodeRepository,
-    RepositoryStats,
+    CodeRepository, FileMetadata, FileNodeType, FileReference, FileTree, FileTreeNode,
+    FileTreeStats, KnowledgeEdge, KnowledgeGraph, KnowledgeGraphStats, KnowledgeNode,
+    KnowledgeNodeType, RelationshipType, RepositoryStats,
 };
 
 pub use file_tree_builder::{
-    FileTreeBuilder, FileTreeBuilderConfig, FileTreeUpdater,
-    detect_language, is_binary_file, count_lines, find_git_root,
+    count_lines, detect_language, find_git_root, is_binary_file, FileTreeBuilder,
+    FileTreeBuilderConfig, FileTreeUpdater,
 };
 
-pub use knowledge_graph_overlay::{
-    KnowledgeGraphOverlay, OverlayConfig, CacheStats,
-};
+pub use knowledge_graph_overlay::{CacheStats, KnowledgeGraphOverlay, OverlayConfig};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -70,7 +68,9 @@ mod tests {
     fn test_parse_simple_rust() {
         let code = "fn main() { println!(\"hello\"); }";
         let mut parser = parser::SemanticParser::new().unwrap();
-        let result = parser.parse_source(code, Language::Rust, "test.rs").unwrap();
+        let result = parser
+            .parse_source(code, Language::Rust, "test.rs")
+            .unwrap();
 
         assert_eq!(result.language, Language::Rust);
         assert!(result.error.is_none());

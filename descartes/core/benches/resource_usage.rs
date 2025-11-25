@@ -1,3 +1,4 @@
+use serde_json::{json, Value};
 /// Resource Usage Benchmarks
 /// Measures CPU and memory usage patterns during IPC operations
 ///
@@ -6,9 +7,7 @@
 /// - Memory usage under load
 /// - Memory leaks detection
 /// - Idle agent resource consumption
-
 use std::time::Instant;
-use serde_json::{json, Value};
 
 /// Resource usage snapshot
 #[derive(Debug, Clone)]
@@ -36,7 +35,10 @@ impl ResourceStats {
     pub fn print_summary(&self) {
         println!("Mechanism: {}", self.mechanism);
         println!("  Memory:");
-        println!("    Initial:      {} MB", self.initial_memory / (1024 * 1024));
+        println!(
+            "    Initial:      {} MB",
+            self.initial_memory / (1024 * 1024)
+        );
         println!("    Peak:         {} MB", self.peak_memory / (1024 * 1024));
         println!("    Final:        {} MB", self.final_memory / (1024 * 1024));
         println!("    Leaked:       {} KB", self.memory_leaked / 1024);
@@ -63,7 +65,10 @@ impl ResourceStats {
 }
 
 /// Simulate stdin/stdout resource usage
-pub fn benchmark_stdin_stdout_resources(message_count: usize, message_size: usize) -> ResourceStats {
+pub fn benchmark_stdin_stdout_resources(
+    message_count: usize,
+    message_size: usize,
+) -> ResourceStats {
     let start = Instant::now();
     let mut buffers = Vec::new();
 
@@ -117,7 +122,10 @@ pub fn benchmark_unix_socket_resources(message_count: usize, message_size: usize
 }
 
 /// Simulate shared memory resource usage
-pub fn benchmark_shared_memory_resources(message_count: usize, message_size: usize) -> ResourceStats {
+pub fn benchmark_shared_memory_resources(
+    message_count: usize,
+    message_size: usize,
+) -> ResourceStats {
     let start = Instant::now();
 
     // Shared memory is fixed size
@@ -239,28 +247,58 @@ pub fn run_resource_benchmarks() {
     println!("MEMORY EFFICIENCY SUMMARY");
     println!("─────────────────────────────────────────────────────────────");
     println!("Processing 100K messages:");
-    println!("  stdin/stdout:  {} MB peak", stdin_stdout.peak_memory / (1024 * 1024));
-    println!("  Unix socket:   {} MB peak", unix_socket.peak_memory / (1024 * 1024));
-    println!("  Shared memory: {} MB peak", shared_mem.peak_memory / (1024 * 1024));
+    println!(
+        "  stdin/stdout:  {} MB peak",
+        stdin_stdout.peak_memory / (1024 * 1024)
+    );
+    println!(
+        "  Unix socket:   {} MB peak",
+        unix_socket.peak_memory / (1024 * 1024)
+    );
+    println!(
+        "  Shared memory: {} MB peak",
+        shared_mem.peak_memory / (1024 * 1024)
+    );
     println!();
 
     println!("Idle agent overhead:");
-    println!("  stdin/stdout:  {} MB", idle_stdin_stdout.initial_memory / (1024 * 1024));
-    println!("  Unix socket:   {} MB", idle_unix_socket.initial_memory / (1024 * 1024));
+    println!(
+        "  stdin/stdout:  {} MB",
+        idle_stdin_stdout.initial_memory / (1024 * 1024)
+    );
+    println!(
+        "  Unix socket:   {} MB",
+        idle_unix_socket.initial_memory / (1024 * 1024)
+    );
     println!();
 
     // CPU efficiency
     println!("CPU USAGE SUMMARY");
     println!("─────────────────────────────────────────────────────────────");
     println!("Active processing (avg/peak):");
-    println!("  stdin/stdout:  {:.2}% / {:.2}%", stdin_stdout.avg_cpu_percent, stdin_stdout.peak_cpu_percent);
-    println!("  Unix socket:   {:.2}% / {:.2}%", unix_socket.avg_cpu_percent, unix_socket.peak_cpu_percent);
-    println!("  Shared memory: {:.2}% / {:.2}%", shared_mem.avg_cpu_percent, shared_mem.peak_cpu_percent);
+    println!(
+        "  stdin/stdout:  {:.2}% / {:.2}%",
+        stdin_stdout.avg_cpu_percent, stdin_stdout.peak_cpu_percent
+    );
+    println!(
+        "  Unix socket:   {:.2}% / {:.2}%",
+        unix_socket.avg_cpu_percent, unix_socket.peak_cpu_percent
+    );
+    println!(
+        "  Shared memory: {:.2}% / {:.2}%",
+        shared_mem.avg_cpu_percent, shared_mem.peak_cpu_percent
+    );
     println!();
 
     println!("Idle agent (avg/peak):");
-    println!("  stdin/stdout:  {:.2}% / {:.2}%", idle_stdin_stdout.avg_cpu_percent, idle_stdin_stdout.peak_cpu_percent);
-    println!("  Unix socket:   {:.2}% / {:.2}%", idle_unix_socket.avg_cpu_percent, idle_unix_socket.peak_cpu_percent);
+    println!(
+        "  stdin/stdout:  {:.2}% / {:.2}%",
+        idle_stdin_stdout.avg_cpu_percent, idle_stdin_stdout.peak_cpu_percent
+    );
+    println!(
+        "  Unix socket:   {:.2}% / {:.2}%",
+        idle_unix_socket.avg_cpu_percent, idle_unix_socket.peak_cpu_percent
+    );
     println!();
 }
 
