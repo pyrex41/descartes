@@ -3,7 +3,6 @@
 ///
 /// This module extends the basic StateStore trait with more sophisticated task retrieval
 /// capabilities needed for Kanban views, task lists, and dependency management.
-
 use crate::errors::{StateStoreError, StateStoreResult};
 use crate::traits::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use sqlx::sqlite::SqlitePool;
@@ -220,7 +219,10 @@ impl TaskQueryBuilder {
             } else if !assignees.is_empty() {
                 let placeholders: Vec<_> = assignees.iter().map(|_| "?").collect();
                 let clause = if self.include_unassigned {
-                    format!("(assigned_to IN ({}) OR assigned_to IS NULL)", placeholders.join(", "))
+                    format!(
+                        "(assigned_to IN ({}) OR assigned_to IS NULL)",
+                        placeholders.join(", ")
+                    )
                 } else {
                     format!("assigned_to IN ({})", placeholders.join(", "))
                 };
@@ -278,10 +280,9 @@ impl TaskQueryBuilder {
             query = query.bind(param);
         }
 
-        let rows = query
-            .fetch_all(pool)
-            .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to execute task query: {}", e)))?;
+        let rows = query.fetch_all(pool).await.map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to execute task query: {}", e))
+        })?;
 
         let tasks = rows
             .iter()
@@ -372,7 +373,10 @@ impl TaskQueries {
     }
 
     /// Get tasks by priority
-    pub async fn get_tasks_by_priority(&self, priority: TaskPriority) -> StateStoreResult<Vec<Task>> {
+    pub async fn get_tasks_by_priority(
+        &self,
+        priority: TaskPriority,
+    ) -> StateStoreResult<Vec<Task>> {
         TaskQueryBuilder::new()
             .with_priority(priority)
             .execute(&self.pool)
@@ -380,7 +384,10 @@ impl TaskQueries {
     }
 
     /// Get tasks by complexity
-    pub async fn get_tasks_by_complexity(&self, complexity: TaskComplexity) -> StateStoreResult<Vec<Task>> {
+    pub async fn get_tasks_by_complexity(
+        &self,
+        complexity: TaskComplexity,
+    ) -> StateStoreResult<Vec<Task>> {
         TaskQueryBuilder::new()
             .with_complexity(complexity)
             .execute(&self.pool)
@@ -422,14 +429,11 @@ impl TaskQueries {
                     query = query.bind(dep_id.to_string());
                 }
 
-                let rows = query
-                    .fetch_all(&self.pool)
-                    .await
-                    .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch dependencies: {}", e)))?;
+                let rows = query.fetch_all(&self.pool).await.map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to fetch dependencies: {}", e))
+                })?;
 
-                rows.iter()
-                    .map(|r| parse_task_row(r))
-                    .collect()
+                rows.iter().map(|r| parse_task_row(r)).collect()
             }
             _ => Ok(vec![]),
         }
@@ -446,16 +450,16 @@ impl TaskQueries {
             INNER JOIN task_dependencies td ON t.id = td.task_id
             WHERE td.depends_on_task_id = ?
             ORDER BY t.updated_at DESC
-            "#
+            "#,
         )
         .bind(task_id.to_string())
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch dependent tasks: {}", e)))?;
+        .map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to fetch dependent tasks: {}", e))
+        })?;
 
-        rows.iter()
-            .map(|r| parse_task_row(r))
-            .collect()
+        rows.iter().map(|r| parse_task_row(r)).collect()
     }
 
     /// Check if a task is blocked (has unfinished dependencies)
@@ -463,7 +467,9 @@ impl TaskQueries {
         let dependencies = self.get_task_dependencies(task_id).await?;
 
         // A task is blocked if any of its dependencies are not done
-        Ok(dependencies.iter().any(|dep| dep.status != TaskStatus::Done))
+        Ok(dependencies
+            .iter()
+            .any(|dep| dep.status != TaskStatus::Done))
     }
 
     /// Get all tasks that are currently blocked
@@ -525,22 +531,35 @@ impl TaskQueries {
         let todo = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks WHERE status = 'Todo'")
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to count todo tasks: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to count todo tasks: {}", e))
+            })?;
 
-        let in_progress = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks WHERE status = 'InProgress'")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to count in progress tasks: {}", e)))?;
+        let in_progress =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks WHERE status = 'InProgress'")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!(
+                        "Failed to count in progress tasks: {}",
+                        e
+                    ))
+                })?;
 
         let done = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks WHERE status = 'Done'")
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to count done tasks: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to count done tasks: {}", e))
+            })?;
 
-        let blocked = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks WHERE status = 'Blocked'")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to count blocked tasks: {}", e)))?;
+        let blocked =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tasks WHERE status = 'Blocked'")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to count blocked tasks: {}", e))
+                })?;
 
         Ok(TaskStatistics {
             total: total as usize,
@@ -589,11 +608,17 @@ mod tests {
     use chrono::Utc;
 
     async fn setup_test_db() -> (SqliteStateStore, TaskQueries) {
-        let db_path = format!("/tmp/test_task_queries_{}.db", Utc::now().timestamp_nanos_opt().unwrap_or(0));
+        let db_path = format!(
+            "/tmp/test_task_queries_{}.db",
+            Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        );
         let mut store = SqliteStateStore::new(&db_path, false)
             .await
             .expect("Failed to create state store");
-        store.initialize().await.expect("Failed to initialize store");
+        store
+            .initialize()
+            .await
+            .expect("Failed to initialize store");
 
         let queries = TaskQueries::new(store.pool().clone());
         (store, queries)
@@ -619,7 +644,10 @@ mod tests {
 
         store.save_task(&task).await.expect("Failed to save task");
 
-        let fetched = queries.get_task_by_id(&task.id).await.expect("Failed to get task");
+        let fetched = queries
+            .get_task_by_id(&task.id)
+            .await
+            .expect("Failed to get task");
         assert!(fetched.is_some());
         assert_eq!(fetched.unwrap().title, "Test Task");
     }
@@ -634,7 +662,11 @@ mod tests {
                 id: Uuid::new_v4(),
                 title: format!("Task {}", i),
                 description: None,
-                status: if i < 3 { TaskStatus::Todo } else { TaskStatus::InProgress },
+                status: if i < 3 {
+                    TaskStatus::Todo
+                } else {
+                    TaskStatus::InProgress
+                },
                 priority: TaskPriority::Medium,
                 complexity: TaskComplexity::Moderate,
                 assigned_to: None,
@@ -646,10 +678,16 @@ mod tests {
             store.save_task(&task).await.expect("Failed to save task");
         }
 
-        let todo_tasks = queries.get_tasks_by_status(TaskStatus::Todo).await.expect("Failed to get tasks");
+        let todo_tasks = queries
+            .get_tasks_by_status(TaskStatus::Todo)
+            .await
+            .expect("Failed to get tasks");
         assert_eq!(todo_tasks.len(), 3);
 
-        let in_progress_tasks = queries.get_tasks_by_status(TaskStatus::InProgress).await.expect("Failed to get tasks");
+        let in_progress_tasks = queries
+            .get_tasks_by_status(TaskStatus::InProgress)
+            .await
+            .expect("Failed to get tasks");
         assert_eq!(in_progress_tasks.len(), 2);
     }
 
@@ -658,7 +696,12 @@ mod tests {
         let (store, queries) = setup_test_db().await;
 
         // Create tasks with different priorities
-        for priority in &[TaskPriority::Low, TaskPriority::Medium, TaskPriority::High, TaskPriority::Critical] {
+        for priority in &[
+            TaskPriority::Low,
+            TaskPriority::Medium,
+            TaskPriority::High,
+            TaskPriority::Critical,
+        ] {
             let task = Task {
                 id: Uuid::new_v4(),
                 title: format!("Task {:?}", priority),
@@ -675,7 +718,10 @@ mod tests {
             store.save_task(&task).await.expect("Failed to save task");
         }
 
-        let high_priority_tasks = queries.get_tasks_by_priority(TaskPriority::High).await.expect("Failed to get tasks");
+        let high_priority_tasks = queries
+            .get_tasks_by_priority(TaskPriority::High)
+            .await
+            .expect("Failed to get tasks");
         assert_eq!(high_priority_tasks.len(), 1);
     }
 
@@ -697,7 +743,10 @@ mod tests {
             updated_at: Utc::now().timestamp(),
             metadata: None,
         };
-        store.save_task(&prereq_task).await.expect("Failed to save task");
+        store
+            .save_task(&prereq_task)
+            .await
+            .expect("Failed to save task");
 
         // Create dependent task
         let dependent_task = Task {
@@ -713,20 +762,32 @@ mod tests {
             updated_at: Utc::now().timestamp(),
             metadata: None,
         };
-        store.save_task(&dependent_task).await.expect("Failed to save task");
+        store
+            .save_task(&dependent_task)
+            .await
+            .expect("Failed to save task");
 
         // Test get_task_dependencies
-        let deps = queries.get_task_dependencies(&dependent_task.id).await.expect("Failed to get dependencies");
+        let deps = queries
+            .get_task_dependencies(&dependent_task.id)
+            .await
+            .expect("Failed to get dependencies");
         assert_eq!(deps.len(), 1);
         assert_eq!(deps[0].id, prereq_task.id);
 
         // Test get_dependent_tasks
-        let dependents = queries.get_dependent_tasks(&prereq_task.id).await.expect("Failed to get dependents");
+        let dependents = queries
+            .get_dependent_tasks(&prereq_task.id)
+            .await
+            .expect("Failed to get dependents");
         assert_eq!(dependents.len(), 1);
         assert_eq!(dependents[0].id, dependent_task.id);
 
         // Test check_if_task_is_blocked
-        let is_blocked = queries.check_if_task_is_blocked(&dependent_task.id).await.expect("Failed to check if blocked");
+        let is_blocked = queries
+            .check_if_task_is_blocked(&dependent_task.id)
+            .await
+            .expect("Failed to check if blocked");
         assert!(is_blocked); // Should be blocked because prereq is not done
     }
 
@@ -760,7 +821,8 @@ mod tests {
         }
 
         // Test query builder with multiple filters
-        let results = queries.query()
+        let results = queries
+            .query()
             .with_status(TaskStatus::Todo)
             .with_priority(TaskPriority::High)
             .assigned_to("Alice".to_string())
@@ -792,7 +854,8 @@ mod tests {
         };
         store.save_task(&task).await.expect("Failed to save task");
 
-        let results = queries.query()
+        let results = queries
+            .query()
             .search("authentication".to_string())
             .execute(queries.pool())
             .await
@@ -825,7 +888,8 @@ mod tests {
         }
 
         // Get first page
-        let page1 = queries.query()
+        let page1 = queries
+            .query()
             .limit(5)
             .offset(0)
             .execute(queries.pool())
@@ -834,7 +898,8 @@ mod tests {
         assert_eq!(page1.len(), 5);
 
         // Get second page
-        let page2 = queries.query()
+        let page2 = queries
+            .query()
             .limit(5)
             .offset(5)
             .execute(queries.pool())
@@ -848,7 +913,12 @@ mod tests {
         let (store, queries) = setup_test_db().await;
 
         // Create tasks for each status
-        for status in &[TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done, TaskStatus::Blocked] {
+        for status in &[
+            TaskStatus::Todo,
+            TaskStatus::InProgress,
+            TaskStatus::Done,
+            TaskStatus::Blocked,
+        ] {
             let task = Task {
                 id: Uuid::new_v4(),
                 title: format!("Task {:?}", status),
@@ -865,7 +935,10 @@ mod tests {
             store.save_task(&task).await.expect("Failed to save task");
         }
 
-        let kanban = queries.get_kanban_tasks().await.expect("Failed to get kanban board");
+        let kanban = queries
+            .get_kanban_tasks()
+            .await
+            .expect("Failed to get kanban board");
         assert_eq!(kanban.todo.len(), 1);
         assert_eq!(kanban.in_progress.len(), 1);
         assert_eq!(kanban.done.len(), 1);
@@ -901,7 +974,10 @@ mod tests {
             store.save_task(&task).await.expect("Failed to save task");
         }
 
-        let stats = queries.get_task_statistics().await.expect("Failed to get statistics");
+        let stats = queries
+            .get_task_statistics()
+            .await
+            .expect("Failed to get statistics");
         assert_eq!(stats.total, 10);
         assert!(stats.todo > 0);
         assert!(stats.in_progress > 0);

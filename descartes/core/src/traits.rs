@@ -78,20 +78,11 @@ pub enum FinishReason {
 #[derive(Debug, Clone)]
 pub enum ModelProviderMode {
     /// Direct HTTP API calls to providers like OpenAI, Anthropic
-    Api {
-        endpoint: String,
-        api_key: String,
-    },
+    Api { endpoint: String, api_key: String },
     /// Spawn CLI as child process (e.g., claude, opencode)
-    Headless {
-        command: String,
-        args: Vec<String>,
-    },
+    Headless { command: String, args: Vec<String> },
     /// Connect to local service like Ollama
-    Local {
-        endpoint: String,
-        timeout_secs: u64,
-    },
+    Local { endpoint: String, timeout_secs: u64 },
 }
 
 /// The unified trait for all LLM model backends.
@@ -162,9 +153,9 @@ pub struct AgentConfig {
 /// Signal to send to an agent.
 #[derive(Debug, Clone, Copy)]
 pub enum AgentSignal {
-    Interrupt,  // SIGINT
-    Terminate,  // SIGTERM
-    Kill,       // SIGKILL
+    Interrupt, // SIGINT
+    Terminate, // SIGTERM
+    Kill,      // SIGKILL
 }
 
 /// Information about a running agent.
@@ -302,7 +293,9 @@ pub enum TaskStatus {
 }
 
 /// Priority level of a task.
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskPriority {
     Low,
@@ -343,14 +336,16 @@ impl std::str::FromStr for TaskPriority {
 }
 
 /// Complexity/effort estimate of a task.
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskComplexity {
-    Trivial,   // < 1 hour
-    Simple,    // 1-4 hours
-    Moderate,  // 1-2 days
-    Complex,   // 3-5 days
-    Epic,      // > 1 week
+    Trivial,  // < 1 hour
+    Simple,   // 1-4 hours
+    Moderate, // 1-2 days
+    Complex,  // 3-5 days
+    Epic,     // > 1 week
 }
 
 impl Default for TaskComplexity {
@@ -399,11 +394,7 @@ pub trait ContextSyncer: Send + Sync {
     ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<String>> + Unpin + Send>>;
 
     /// Slice context by patterns or relevance.
-    async fn slice_context(
-        &self,
-        path: &str,
-        patterns: &[String],
-    ) -> AgentResult<String>;
+    async fn slice_context(&self, path: &str, patterns: &[String]) -> AgentResult<String>;
 
     /// Sync context to a specific location.
     async fn sync_to(&self, source: &str, destination: &str) -> AgentResult<()>;

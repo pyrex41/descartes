@@ -1,3 +1,5 @@
+use iced::mouse;
+use iced::widget::canvas::{Cache, Canvas, Cursor, Frame, Geometry, Path, Stroke, Style, Text};
 /// DAG Editor - Visual graph editor for task dependencies
 /// Phase 3.8.3: Basic Iced UI Renderer
 ///
@@ -11,23 +13,22 @@
 /// - Bottom panel for graph statistics
 /// - Grid background with optional snap-to-grid
 /// - Performance optimized for 100+ nodes
-
-use iced::widget::{button, canvas, column, container, row, scrollable, text, Space, Scrollable};
+use iced::widget::{button, canvas, column, container, row, scrollable, text, Scrollable, Space};
 use iced::{
     alignment::{Horizontal, Vertical},
     Color, Element, Length, Point, Rectangle, Renderer, Size, Theme, Vector,
 };
-use iced::mouse;
-use iced::widget::canvas::{Cache, Canvas, Cursor, Frame, Geometry, Path, Stroke, Style, Text};
 
-use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType, Position, DAGStatistics, DAGHistory, DAGOperation};
+use descartes_core::dag::{
+    DAGEdge, DAGHistory, DAGNode, DAGOperation, DAGStatistics, EdgeType, Position, DAG,
+};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::dag_canvas_interactions::{
-    ExtendedInteractionState, EdgeCreation, BoxSelection,
-    handle_mouse_press, handle_mouse_release, handle_mouse_move, handle_mouse_scroll,
-    handle_key_press, handle_key_release, InteractionResult,
+    handle_key_press, handle_key_release, handle_mouse_move, handle_mouse_press,
+    handle_mouse_release, handle_mouse_scroll, BoxSelection, EdgeCreation,
+    ExtendedInteractionState, InteractionResult,
 };
 
 // ============================================================================
@@ -344,19 +345,29 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
 
         // New interaction handlers
         DAGEditorMessage::MousePressed(button, position, modifiers) => {
-            if let Some(result) = handle_mouse_press(state, &mut state.extended_interaction, button, position, modifiers) {
+            if let Some(result) = handle_mouse_press(
+                state,
+                &mut state.extended_interaction,
+                button,
+                position,
+                modifiers,
+            ) {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
 
         DAGEditorMessage::MouseReleased(button, position) => {
-            if let Some(result) = handle_mouse_release(state, &mut state.extended_interaction, button, position) {
+            if let Some(result) =
+                handle_mouse_release(state, &mut state.extended_interaction, button, position)
+            {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
 
         DAGEditorMessage::MouseMoved(position) => {
-            if let Some(result) = handle_mouse_move(state, &mut state.extended_interaction, position) {
+            if let Some(result) =
+                handle_mouse_move(state, &mut state.extended_interaction, position)
+            {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
@@ -368,7 +379,9 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
         }
 
         DAGEditorMessage::KeyPressed(key, modifiers) => {
-            if let Some(result) = handle_key_press(state, &mut state.extended_interaction, key, modifiers) {
+            if let Some(result) =
+                handle_key_press(state, &mut state.extended_interaction, key, modifiers)
+            {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
@@ -439,13 +452,15 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
 
         DAGEditorMessage::DeleteSelected => {
             // Delete selected nodes
-            let nodes_to_delete: Vec<Uuid> = state.interaction.selected_nodes.iter().copied().collect();
+            let nodes_to_delete: Vec<Uuid> =
+                state.interaction.selected_nodes.iter().copied().collect();
             for node_id in nodes_to_delete {
                 let _ = state.dag.remove_node(node_id);
             }
 
             // Delete selected edges
-            let edges_to_delete: Vec<Uuid> = state.interaction.selected_edges.iter().copied().collect();
+            let edges_to_delete: Vec<Uuid> =
+                state.interaction.selected_edges.iter().copied().collect();
             for edge_id in edges_to_delete {
                 let _ = state.dag.remove_edge(edge_id);
             }
@@ -472,7 +487,9 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
         DAGEditorMessage::RemoveNode(node_id) => {
             if let Some(node) = state.dag.get_node(node_id).cloned() {
                 if state.dag.remove_node(node_id).is_ok() {
-                    state.history.record(DAGOperation::RemoveNode(node_id, node));
+                    state
+                        .history
+                        .record(DAGOperation::RemoveNode(node_id, node));
                     state.update_statistics();
                     state.clear_cache();
                 }
@@ -492,7 +509,9 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
         DAGEditorMessage::DeleteEdge(edge_id) => {
             if let Some(edge) = state.dag.get_edge(edge_id).cloned() {
                 if state.dag.remove_edge(edge_id).is_ok() {
-                    state.history.record(DAGOperation::RemoveEdge(edge_id, edge));
+                    state
+                        .history
+                        .record(DAGOperation::RemoveEdge(edge_id, edge));
                     state.update_statistics();
                     state.clear_cache();
                 }
@@ -615,11 +634,7 @@ pub fn view(state: &DAGEditorState) -> Element<DAGEditorMessage> {
 
     // Main content area (canvas + side panel)
     let main_row = if state.ui_state.show_properties {
-        row![
-            view_canvas(state),
-            view_properties_panel(state),
-        ]
-        .spacing(0)
+        row![view_canvas(state), view_properties_panel(state),].spacing(0)
     } else {
         row![view_canvas(state)].spacing(0)
     };
@@ -638,17 +653,14 @@ pub fn view(state: &DAGEditorState) -> Element<DAGEditorMessage> {
 fn view_toolbar(state: &DAGEditorState) -> Element<DAGEditorMessage> {
     let tool_button = |tool: Tool, label: &str, icon: &str| {
         let is_active = state.tool == tool;
-        button(
-            text(format!("{} {}", icon, label))
-                .size(14)
-        )
-        .padding(8)
-        .on_press(DAGEditorMessage::SelectTool(tool))
-        .style(if is_active {
-            button::primary
-        } else {
-            button::secondary
-        })
+        button(text(format!("{} {}", icon, label)).size(14))
+            .padding(8)
+            .on_press(DAGEditorMessage::SelectTool(tool))
+            .style(if is_active {
+                button::primary
+            } else {
+                button::secondary
+            })
     };
 
     let tools = row![
@@ -678,14 +690,22 @@ fn view_toolbar(state: &DAGEditorState) -> Element<DAGEditorMessage> {
 
     let grid_buttons = row![
         button(
-            text(if state.show_grid { "Grid: ON" } else { "Grid: OFF" })
-                .size(14)
+            text(if state.show_grid {
+                "Grid: ON"
+            } else {
+                "Grid: OFF"
+            })
+            .size(14)
         )
         .padding(8)
         .on_press(DAGEditorMessage::ToggleGrid),
         button(
-            text(if state.snap_to_grid { "Snap: ON" } else { "Snap: OFF" })
-                .size(14)
+            text(if state.snap_to_grid {
+                "Snap: ON"
+            } else {
+                "Snap: OFF"
+            })
+            .size(14)
         )
         .padding(8)
         .on_press(DAGEditorMessage::ToggleSnapToGrid),
@@ -709,16 +729,14 @@ fn view_toolbar(state: &DAGEditorState) -> Element<DAGEditorMessage> {
 
     container(toolbar_content)
         .width(Length::Fill)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(theme.palette().background.into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: theme.palette().text.scale_alpha(0.2),
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: iced::Border {
+                width: 1.0,
+                color: theme.palette().text.scale_alpha(0.2),
+                radius: 0.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
@@ -739,9 +757,7 @@ fn view_canvas(state: &DAGEditorState) -> Element<DAGEditorMessage> {
 
 /// Render properties panel
 fn view_properties_panel(state: &DAGEditorState) -> Element<DAGEditorMessage> {
-    let title = text("Properties")
-        .size(18)
-        .width(Length::Fill);
+    let title = text("Properties").size(18).width(Length::Fill);
 
     let content = if state.interaction.selected_nodes.is_empty() {
         column![
@@ -760,47 +776,51 @@ fn view_properties_panel(state: &DAGEditorState) -> Element<DAGEditorMessage> {
                     Space::with_height(5),
                     text(format!("ID: {}", node.node_id)).size(10),
                     Space::with_height(5),
-                    text(format!("Position: ({:.0}, {:.0})", node.position.x, node.position.y)).size(10),
+                    text(format!(
+                        "Position: ({:.0}, {:.0})",
+                        node.position.x, node.position.y
+                    ))
+                    .size(10),
                     Space::with_height(10),
-                    text(format!("Incoming: {}", state.dag.get_incoming_edges(*node_id).len())).size(10),
-                    text(format!("Outgoing: {}", state.dag.get_outgoing_edges(*node_id).len())).size(10),
+                    text(format!(
+                        "Incoming: {}",
+                        state.dag.get_incoming_edges(*node_id).len()
+                    ))
+                    .size(10),
+                    text(format!(
+                        "Outgoing: {}",
+                        state.dag.get_outgoing_edges(*node_id).len()
+                    ))
+                    .size(10),
                 ]
                 .spacing(3)
             } else {
                 column![text("Node not found").size(12)]
             }
         } else {
-            column![
-                text(format!("{} nodes selected", selected_count)).size(14),
-            ]
+            column![text(format!("{} nodes selected", selected_count)).size(14),]
         };
 
         info
     };
 
     let panel_content = scrollable(
-        column![
-            title,
-            Space::with_height(10),
-            content,
-        ]
-        .spacing(5)
-        .padding(15)
+        column![title, Space::with_height(10), content,]
+            .spacing(5)
+            .padding(15),
     );
 
     container(panel_content)
         .width(state.ui_state.properties_width)
         .height(Length::Fill)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(theme.palette().background.into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: theme.palette().text.scale_alpha(0.2),
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: iced::Border {
+                width: 1.0,
+                color: theme.palette().text.scale_alpha(0.2),
+                radius: 0.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
@@ -823,15 +843,10 @@ fn view_statistics_panel(state: &DAGEditorState) -> Element<DAGEditorMessage> {
         "No statistics available".to_string()
     };
 
-    container(
-        text(stats_text)
-            .size(12)
-            .width(Length::Fill)
-    )
-    .padding(8)
-    .width(Length::Fill)
-    .style(|theme: &Theme| {
-        container::Style {
+    container(text(stats_text).size(12).width(Length::Fill))
+        .padding(8)
+        .width(Length::Fill)
+        .style(|theme: &Theme| container::Style {
             background: Some(theme.palette().background.into()),
             border: iced::Border {
                 width: 1.0,
@@ -839,9 +854,8 @@ fn view_statistics_panel(state: &DAGEditorState) -> Element<DAGEditorMessage> {
                 radius: 0.0.into(),
             },
             ..Default::default()
-        }
-    })
-    .into()
+        })
+        .into()
 }
 
 // ============================================================================
@@ -876,7 +890,11 @@ impl<Message> canvas::Program<Message> for DAGCanvas {
                 self.state.dag.get_node(edge.from_node_id),
                 self.state.dag.get_node(edge.to_node_id),
             ) {
-                let is_selected = self.state.interaction.selected_edges.contains(&edge.edge_id);
+                let is_selected = self
+                    .state
+                    .interaction
+                    .selected_edges
+                    .contains(&edge.edge_id);
                 draw_edge(
                     &mut frame,
                     edge,
@@ -890,7 +908,11 @@ impl<Message> canvas::Program<Message> for DAGCanvas {
 
         // Draw nodes
         for node in self.state.dag.nodes.values() {
-            let is_selected = self.state.interaction.selected_nodes.contains(&node.node_id);
+            let is_selected = self
+                .state
+                .interaction
+                .selected_nodes
+                .contains(&node.node_id);
             let is_hover = self.state.interaction.hover_node == Some(node.node_id);
             draw_node(
                 &mut frame,
@@ -917,22 +939,22 @@ fn draw_grid(frame: &mut Frame, canvas_state: &CanvasState, bounds: Rectangle) {
     // Draw vertical lines
     let mut x = start_x;
     while x < bounds.width {
-        let path = Path::line(
-            Point::new(x, 0.0),
-            Point::new(x, bounds.height),
+        let path = Path::line(Point::new(x, 0.0), Point::new(x, bounds.height));
+        frame.stroke(
+            &path,
+            Stroke::default().with_color(grid_color).with_width(1.0),
         );
-        frame.stroke(&path, Stroke::default().with_color(grid_color).with_width(1.0));
         x += grid_size;
     }
 
     // Draw horizontal lines
     let mut y = start_y;
     while y < bounds.height {
-        let path = Path::line(
-            Point::new(0.0, y),
-            Point::new(bounds.width, y),
+        let path = Path::line(Point::new(0.0, y), Point::new(bounds.width, y));
+        frame.stroke(
+            &path,
+            Stroke::default().with_color(grid_color).with_width(1.0),
         );
-        frame.stroke(&path, Stroke::default().with_color(grid_color).with_width(1.0));
         y += grid_size;
     }
 }
@@ -970,11 +992,7 @@ fn draw_node(
 
     frame.fill(&node_rect, node_color);
 
-    let border_width = if is_selected {
-        SELECTION_BORDER
-    } else {
-        1.5
-    };
+    let border_width = if is_selected { SELECTION_BORDER } else { 1.5 };
 
     frame.stroke(
         &node_rect,
@@ -1009,10 +1027,14 @@ fn draw_edge(
     is_selected: bool,
 ) {
     // Calculate node centers in canvas coordinates
-    let from_x = (from_node.position.x as f32 + NODE_WIDTH / 2.0) * canvas_state.zoom + canvas_state.offset.x;
-    let from_y = (from_node.position.y as f32 + NODE_HEIGHT / 2.0) * canvas_state.zoom + canvas_state.offset.y;
-    let to_x = (to_node.position.x as f32 + NODE_WIDTH / 2.0) * canvas_state.zoom + canvas_state.offset.x;
-    let to_y = (to_node.position.y as f32 + NODE_HEIGHT / 2.0) * canvas_state.zoom + canvas_state.offset.y;
+    let from_x = (from_node.position.x as f32 + NODE_WIDTH / 2.0) * canvas_state.zoom
+        + canvas_state.offset.x;
+    let from_y = (from_node.position.y as f32 + NODE_HEIGHT / 2.0) * canvas_state.zoom
+        + canvas_state.offset.y;
+    let to_x =
+        (to_node.position.x as f32 + NODE_WIDTH / 2.0) * canvas_state.zoom + canvas_state.offset.x;
+    let to_y =
+        (to_node.position.y as f32 + NODE_HEIGHT / 2.0) * canvas_state.zoom + canvas_state.offset.y;
 
     // Edge color based on type
     let edge_color = match edge.edge_type {
@@ -1036,10 +1058,7 @@ fn draw_edge(
     };
 
     // Draw line
-    let line = Path::line(
-        Point::new(from_x, from_y),
-        Point::new(to_x, to_y),
-    );
+    let line = Path::line(Point::new(from_x, from_y), Point::new(to_x, to_y));
 
     frame.stroke(
         &line,
@@ -1050,7 +1069,15 @@ fn draw_edge(
 
     // Draw arrow head
     if canvas_state.zoom > 0.3 {
-        draw_arrow_head(frame, from_x, from_y, to_x, to_y, stroke_color, canvas_state.zoom);
+        draw_arrow_head(
+            frame,
+            from_x,
+            from_y,
+            to_x,
+            to_y,
+            stroke_color,
+            canvas_state.zoom,
+        );
     }
 }
 

@@ -8,12 +8,10 @@
 //! - Filter/sort persistence during updates
 //! - Edge cases (connection loss, reconnection, event backlog)
 
+use chrono::Utc;
 use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::{DescartesEvent, TaskEvent, TaskEventType};
-use descartes_gui::task_board::{
-    update, KanbanBoard, TaskBoardMessage, TaskBoardState, TaskSort,
-};
-use chrono::Utc;
+use descartes_gui::task_board::{update, KanbanBoard, TaskBoardMessage, TaskBoardState, TaskSort};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -101,10 +99,7 @@ fn test_task_status_change_moves_column() {
 
     // Create initial task in Todo
     let mut task = create_sample_task(TaskStatus::Todo, TaskPriority::High, TaskComplexity::Simple);
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(task.clone()),
-    );
+    update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
 
     assert_eq!(state.kanban_board.todo.len(), 1);
     assert_eq!(state.kanban_board.in_progress.len(), 0);
@@ -128,19 +123,17 @@ fn test_task_deletion_removes_from_ui() {
     let mut state = TaskBoardState::new();
 
     // Create a task
-    let task = create_sample_task(TaskStatus::Done, TaskPriority::Medium, TaskComplexity::Moderate);
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(task.clone()),
+    let task = create_sample_task(
+        TaskStatus::Done,
+        TaskPriority::Medium,
+        TaskComplexity::Moderate,
     );
+    update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
 
     assert_eq!(state.kanban_board.done.len(), 1);
 
     // Delete task
-    update(
-        &mut state,
-        TaskBoardMessage::TaskDeleted(task.id),
-    );
+    update(&mut state, TaskBoardMessage::TaskDeleted(task.id));
 
     // Verify task is removed
     assert_eq!(state.kanban_board.done.len(), 0);
@@ -166,10 +159,7 @@ fn test_concurrent_task_updates() {
 
     // Apply all tasks
     for task in &tasks {
-        update(
-            &mut state,
-            TaskBoardMessage::TaskCreated(task.clone()),
-        );
+        update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
     }
 
     // Verify all tasks are in correct columns
@@ -199,17 +189,12 @@ fn test_filter_persistence_during_updates() {
     );
 
     // Add tasks with different priorities
-    let high_task = create_sample_task(TaskStatus::Todo, TaskPriority::High, TaskComplexity::Simple);
+    let high_task =
+        create_sample_task(TaskStatus::Todo, TaskPriority::High, TaskComplexity::Simple);
     let low_task = create_sample_task(TaskStatus::Todo, TaskPriority::Low, TaskComplexity::Simple);
 
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(high_task.clone()),
-    );
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(low_task.clone()),
-    );
+    update(&mut state, TaskBoardMessage::TaskCreated(high_task.clone()));
+    update(&mut state, TaskBoardMessage::TaskCreated(low_task.clone()));
 
     // Verify both tasks are in the board (filter applies during rendering, not storage)
     assert_eq!(state.kanban_board.todo.len(), 2);
@@ -247,10 +232,7 @@ fn test_sort_persistence_during_updates() {
         TaskComplexity::Simple,
     );
 
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(low_task.clone()),
-    );
+    update(&mut state, TaskBoardMessage::TaskCreated(low_task.clone()));
     update(
         &mut state,
         TaskBoardMessage::TaskCreated(critical_task.clone()),
@@ -276,11 +258,12 @@ fn test_task_update_with_status_transition() {
     let mut state = TaskBoardState::new();
 
     // Create task in Todo
-    let mut task = create_sample_task(TaskStatus::Todo, TaskPriority::High, TaskComplexity::Complex);
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(task.clone()),
+    let mut task = create_sample_task(
+        TaskStatus::Todo,
+        TaskPriority::High,
+        TaskComplexity::Complex,
     );
+    update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
 
     // Verify initial state
     assert_eq!(state.kanban_board.todo.len(), 1);
@@ -289,10 +272,7 @@ fn test_task_update_with_status_transition() {
 
     // Transition: Todo -> InProgress
     task.status = TaskStatus::InProgress;
-    update(
-        &mut state,
-        TaskBoardMessage::TaskUpdated(task.clone()),
-    );
+    update(&mut state, TaskBoardMessage::TaskUpdated(task.clone()));
 
     assert_eq!(state.kanban_board.todo.len(), 0);
     assert_eq!(state.kanban_board.in_progress.len(), 1);
@@ -300,10 +280,7 @@ fn test_task_update_with_status_transition() {
 
     // Transition: InProgress -> Done
     task.status = TaskStatus::Done;
-    update(
-        &mut state,
-        TaskBoardMessage::TaskUpdated(task.clone()),
-    );
+    update(&mut state, TaskBoardMessage::TaskUpdated(task.clone()));
 
     assert_eq!(state.kanban_board.todo.len(), 0);
     assert_eq!(state.kanban_board.in_progress.len(), 0);
@@ -318,19 +295,13 @@ fn test_connection_status_handling() {
     assert!(state.error.is_none());
 
     // Simulate connection
-    update(
-        &mut state,
-        TaskBoardMessage::ConnectionStatusChanged(true),
-    );
+    update(&mut state, TaskBoardMessage::ConnectionStatusChanged(true));
 
     assert!(state.realtime_state.connected);
     assert!(state.error.is_none());
 
     // Simulate disconnection
-    update(
-        &mut state,
-        TaskBoardMessage::ConnectionStatusChanged(false),
-    );
+    update(&mut state, TaskBoardMessage::ConnectionStatusChanged(false));
 
     assert!(!state.realtime_state.connected);
     assert!(state.error.is_some());
@@ -349,10 +320,7 @@ fn test_realtime_toggle() {
 
     // Try to add a task (should not be applied)
     let task = create_sample_task(TaskStatus::Todo, TaskPriority::High, TaskComplexity::Simple);
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(task.clone()),
-    );
+    update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
 
     // Task should not be added when real-time is disabled
     assert_eq!(state.kanban_board.todo.len(), 0);
@@ -362,10 +330,7 @@ fn test_realtime_toggle() {
     assert!(state.realtime_state.enabled);
 
     // Now adding should work
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(task.clone()),
-    );
+    update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
     assert_eq!(state.kanban_board.todo.len(), 1);
 }
 
@@ -397,20 +362,18 @@ fn test_selected_task_deselection_on_delete() {
     let mut state = TaskBoardState::new();
 
     // Create and select a task
-    let task = create_sample_task(TaskStatus::Done, TaskPriority::Medium, TaskComplexity::Moderate);
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(task.clone()),
+    let task = create_sample_task(
+        TaskStatus::Done,
+        TaskPriority::Medium,
+        TaskComplexity::Moderate,
     );
+    update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
     update(&mut state, TaskBoardMessage::TaskClicked(task.id));
 
     assert_eq!(state.selected_task, Some(task.id));
 
     // Delete the selected task
-    update(
-        &mut state,
-        TaskBoardMessage::TaskDeleted(task.id),
-    );
+    update(&mut state, TaskBoardMessage::TaskDeleted(task.id));
 
     // Verify task is removed and deselected
     assert_eq!(state.kanban_board.done.len(), 0);
@@ -463,11 +426,12 @@ fn test_multiple_column_transitions() {
     let mut state = TaskBoardState::new();
 
     // Create task
-    let mut task = create_sample_task(TaskStatus::Todo, TaskPriority::Critical, TaskComplexity::Epic);
-    update(
-        &mut state,
-        TaskBoardMessage::TaskCreated(task.clone()),
+    let mut task = create_sample_task(
+        TaskStatus::Todo,
+        TaskPriority::Critical,
+        TaskComplexity::Epic,
     );
+    update(&mut state, TaskBoardMessage::TaskCreated(task.clone()));
 
     // Track statistics
     let initial_updates = state.realtime_state.updates_applied;
@@ -483,10 +447,7 @@ fn test_multiple_column_transitions() {
     for new_status in transitions {
         task.status = new_status;
         task.updated_at = Utc::now().timestamp();
-        update(
-            &mut state,
-            TaskBoardMessage::TaskUpdated(task.clone()),
-        );
+        update(&mut state, TaskBoardMessage::TaskUpdated(task.clone()));
     }
 
     // Verify final state
@@ -535,7 +496,11 @@ fn test_event_statistics() {
 
     // Process some events
     for i in 0..5 {
-        let task = create_sample_task(TaskStatus::Todo, TaskPriority::Medium, TaskComplexity::Moderate);
+        let task = create_sample_task(
+            TaskStatus::Todo,
+            TaskPriority::Medium,
+            TaskComplexity::Moderate,
+        );
         let event = create_task_event(&task, TaskEventType::Created, true);
         update(&mut state, TaskBoardMessage::EventReceived(event));
     }
@@ -566,16 +531,10 @@ fn test_complex_filter_and_update_scenario() {
         TaskPriority::High,
         TaskComplexity::Complex,
     );
-    let non_matching_task1 = create_sample_task(
-        TaskStatus::Todo,
-        TaskPriority::Low,
-        TaskComplexity::Complex,
-    );
-    let non_matching_task2 = create_sample_task(
-        TaskStatus::Todo,
-        TaskPriority::High,
-        TaskComplexity::Simple,
-    );
+    let non_matching_task1 =
+        create_sample_task(TaskStatus::Todo, TaskPriority::Low, TaskComplexity::Complex);
+    let non_matching_task2 =
+        create_sample_task(TaskStatus::Todo, TaskPriority::High, TaskComplexity::Simple);
 
     update(
         &mut state,

@@ -1,7 +1,7 @@
 use anyhow::Result;
+use chrono::{DateTime, Local};
 use colored::Colorize;
 use descartes_core::{ActorType, DescaratesConfig, Event};
-use chrono::{DateTime, Local};
 use serde_json::json;
 use std::time::{Duration, SystemTime};
 use tracing::info;
@@ -165,8 +165,8 @@ fn print_logs_json(rows: &[sqlx::sqlite::SqliteRow]) -> Result<()> {
         .iter()
         .map(|row| {
             let metadata: Option<String> = row.get("metadata");
-            let metadata_json = metadata
-                .and_then(|m| serde_json::from_str::<serde_json::Value>(&m).ok());
+            let metadata_json =
+                metadata.and_then(|m| serde_json::from_str::<serde_json::Value>(&m).ok());
 
             json!({
                 "id": row.get::<String, _>("id"),

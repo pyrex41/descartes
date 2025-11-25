@@ -12,15 +12,15 @@ pub mod config_loader;
 pub mod config_migration;
 pub mod config_watcher;
 pub mod dag;
-pub mod dag_toml;
 pub mod dag_swarm_export;
+pub mod dag_toml;
 pub mod debugger;
 pub mod errors;
 pub mod ipc;
 pub mod lease;
 pub mod lease_manager;
-pub mod notifications;
 pub mod notification_router_impl;
+pub mod notifications;
 pub mod providers;
 pub mod secrets;
 pub mod secrets_crypto;
@@ -33,8 +33,8 @@ pub mod thoughts;
 pub mod time_travel_integration;
 pub mod traits;
 pub mod zmq_agent_runner;
-pub mod zmq_communication;
 pub mod zmq_client;
+pub mod zmq_communication;
 pub mod zmq_server;
 
 // Re-export commonly used types
@@ -46,8 +46,8 @@ pub use errors::{
 pub use traits::{
     ActorType, AgentConfig, AgentHandle, AgentInfo, AgentRunner, AgentSignal, AgentStatus,
     ContextSyncer, Event, ExitStatus, FinishReason, Message, MessageRole, ModelBackend,
-    ModelProviderMode, ModelRequest, ModelResponse, StateStore, Task, TaskStatus, Tool,
-    ToolCall, ToolParameters,
+    ModelProviderMode, ModelRequest, ModelResponse, StateStore, Task, TaskStatus, Tool, ToolCall,
+    ToolParameters,
 };
 
 pub use providers::{
@@ -55,127 +55,121 @@ pub use providers::{
     ProviderFactory,
 };
 
-pub use agent_runner::{
-    LocalProcessRunner, ProcessRunnerConfig, GracefulShutdown,
-};
+pub use agent_runner::{GracefulShutdown, LocalProcessRunner, ProcessRunnerConfig};
 
 pub use agent_state::{
-    AgentStatus as RuntimeAgentStatus, AgentRuntimeState, AgentProgress, AgentError as RuntimeAgentError,
-    StatusTransition, AgentStreamMessage, OutputStream, LifecycleEvent,
-    AgentStateCollection, AgentStatistics,
+    AgentError as RuntimeAgentError, AgentProgress, AgentRuntimeState, AgentStateCollection,
+    AgentStatistics, AgentStatus as RuntimeAgentStatus, AgentStreamMessage, LifecycleEvent,
+    OutputStream, StatusTransition,
 };
 
 pub use agent_stream_parser::{
-    AgentStreamParser, StreamHandler, ParserConfig, StreamParseError, StreamResult,
-    ParserStatistics, LoggingHandler,
+    AgentStreamParser, LoggingHandler, ParserConfig, ParserStatistics, StreamHandler,
+    StreamParseError, StreamResult,
 };
 
 pub use zmq_agent_runner::{
-    ZmqAgentRunner, ZmqMessage, ZmqRunnerConfig,
-    SpawnRequest, SpawnResponse,
-    ControlCommand, ControlCommandType, CommandResponse,
-    StatusUpdate, StatusUpdateType,
-    ListAgentsRequest, ListAgentsResponse,
-    HealthCheckRequest, HealthCheckResponse,
-    CustomActionRequest,
-    BatchControlCommand, BatchControlResponse, BatchAgentResult,
-    OutputQueryRequest, OutputQueryResponse, ZmqOutputStream,
-    serialize_zmq_message, deserialize_zmq_message, validate_message_size,
-    ZMQ_PROTOCOL_VERSION, MAX_MESSAGE_SIZE, DEFAULT_TIMEOUT_SECS,
+    deserialize_zmq_message, serialize_zmq_message, validate_message_size, BatchAgentResult,
+    BatchControlCommand, BatchControlResponse, CommandResponse, ControlCommand, ControlCommandType,
+    CustomActionRequest, HealthCheckRequest, HealthCheckResponse, ListAgentsRequest,
+    ListAgentsResponse, OutputQueryRequest, OutputQueryResponse, SpawnRequest, SpawnResponse,
+    StatusUpdate, StatusUpdateType, ZmqAgentRunner, ZmqMessage, ZmqOutputStream, ZmqRunnerConfig,
+    DEFAULT_TIMEOUT_SECS, MAX_MESSAGE_SIZE, ZMQ_PROTOCOL_VERSION,
 };
 
 pub use zmq_communication::{
-    ZmqConnection, ZmqMessageRouter, SocketType, ConnectionState, ConnectionStats,
+    ConnectionState, ConnectionStats, SocketType, ZmqConnection, ZmqMessageRouter,
 };
 
-pub use zmq_client::{
-    ZmqClient,
-};
+pub use zmq_client::ZmqClient;
 
-pub use zmq_server::{
-    ZmqAgentServer, ZmqServerConfig, ServerStats,
-};
+pub use zmq_server::{ServerStats, ZmqAgentServer, ZmqServerConfig};
 
 pub use notifications::{
-    ChannelStats, NotificationAdapter, NotificationChannel, NotificationError,
-    NotificationEventType, NotificationPayload, NotificationPayloadBuilder, NotificationSendResult,
-    NotificationRouter, NotificationStats, RateLimitConfig, RoutingRule, RetryConfig, Severity,
-    TemplateContext, EventTypeStats,
+    ChannelStats, EventTypeStats, NotificationAdapter, NotificationChannel, NotificationError,
+    NotificationEventType, NotificationPayload, NotificationPayloadBuilder, NotificationRouter,
+    NotificationSendResult, NotificationStats, RateLimitConfig, RetryConfig, RoutingRule, Severity,
+    TemplateContext,
 };
 
 pub use notification_router_impl::DefaultNotificationRouter;
 
 pub use ipc::{
-    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MessageBus,
-    MessageBusConfig, MessageBusStats, MessageHandler, MessageRouter, MessageTransport,
-    MessageType, MemoryTransport, RequestResponseTracker, UnixSocketTransport,
+    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MemoryTransport,
+    MessageBus, MessageBusConfig, MessageBusStats, MessageHandler, MessageRouter, MessageTransport,
+    MessageType, RequestResponseTracker, UnixSocketTransport,
 };
 
 pub use lease::{
-    Lease, LeaseStatus, LeaseAcquisitionRequest, LeaseAcquisitionResponse,
-    LeaseRenewalRequest, LeaseRenewalResponse, LeaseReleaseRequest, LeaseReleaseResponse,
-    LeaseManager,
+    Lease, LeaseAcquisitionRequest, LeaseAcquisitionResponse, LeaseManager, LeaseReleaseRequest,
+    LeaseReleaseResponse, LeaseRenewalRequest, LeaseRenewalResponse, LeaseStatus,
 };
 
 pub use lease_manager::SqliteLeaseManager;
 
-pub use state_store::{
-    SqliteStateStore, AgentState, StateTransition, Migration,
-};
+pub use state_store::{AgentState, Migration, SqliteStateStore, StateTransition};
 
 pub use task_queries::{
-    TaskQueries, TaskQueryBuilder, TaskSortField, SortOrder,
-    KanbanBoard, TaskStatistics,
+    KanbanBoard, SortOrder, TaskQueries, TaskQueryBuilder, TaskSortField, TaskStatistics,
 };
 
 pub use config::{
-    ConfigManager, DescaratesConfig, ProvidersConfig, AgentBehaviorConfig, StorageConfig,
-    SecurityConfig, NotificationsConfig, FeaturesConfig, LoggingConfig,
-    OpenAiConfig, AnthropicConfig, OllamaConfig, DeepSeekConfig, GroqConfig,
+    AgentBehaviorConfig, AnthropicConfig, ConfigManager, DeepSeekConfig, DescaratesConfig,
+    FeaturesConfig, GroqConfig, LoggingConfig, NotificationsConfig, OllamaConfig, OpenAiConfig,
+    ProvidersConfig, SecurityConfig, StorageConfig,
 };
 
 pub use config_loader::{
-    ConfigLoader, ConfigDiscoveryStrategy, init_config, ensure_config_directories,
-    ConfigValidator,
+    ensure_config_directories, init_config, ConfigDiscoveryStrategy, ConfigLoader, ConfigValidator,
 };
 
-pub use config_migration::{
-    ConfigMigration,
-};
+pub use config_migration::ConfigMigration;
 
 pub use config_watcher::{
-    ConfigWatcher, HotReloadManager, ConfigChangeEvent, ConfigChangeListener,
+    ConfigChangeEvent, ConfigChangeListener, ConfigWatcher, HotReloadManager,
 };
 
 pub use state_machine::{
-    WorkflowState, WorkflowEvent, WorkflowStateMachine, WorkflowOrchestrator,
-    StateMachineError, StateMachineResult, StateHandler, DefaultStateHandler,
-    TransitionMetadata, StateHistoryEntry, WorkflowMetadata, HierarchicalState,
-    SerializedWorkflow,
+    DefaultStateHandler, HierarchicalState, SerializedWorkflow, StateHandler, StateHistoryEntry,
+    StateMachineError, StateMachineResult, TransitionMetadata, WorkflowEvent, WorkflowMetadata,
+    WorkflowOrchestrator, WorkflowState, WorkflowStateMachine,
 };
 
 pub use state_machine_store::{
-    SqliteWorkflowStore, StateStoreConfig, WorkflowRecord, TransitionRecord,
-    WorkflowRecovery,
+    SqliteWorkflowStore, StateStoreConfig, TransitionRecord, WorkflowRecord, WorkflowRecovery,
 };
 
 pub use swarm_parser::{
-    SwarmConfig, SwarmParser, SwarmParseError, SwarmResult, WorkflowMetadata as SwarmWorkflowMetadata,
-    AgentConfig as SwarmAgentConfig, ResourceConfig, Workflow, State, Handler, Contract,
-    ValidatedWorkflow, ValidatedState,
+    AgentConfig as SwarmAgentConfig, Contract, Handler, ResourceConfig, State, SwarmConfig,
+    SwarmParseError, SwarmParser, SwarmResult, ValidatedState, ValidatedWorkflow, Workflow,
+    WorkflowMetadata as SwarmWorkflowMetadata,
 };
 
 pub use thoughts::{
-    ThoughtsStorage, ThoughtsConfig, ThoughtMetadata, ThoughtsError, ThoughtsResult,
-    StorageStatistics,
+    StorageStatistics, ThoughtMetadata, ThoughtsConfig, ThoughtsError, ThoughtsResult,
+    ThoughtsStorage,
 };
 
 pub use debugger::{
-    DebuggerState, DebuggerError, DebuggerResult, ExecutionState, ThoughtSnapshot,
-    CallFrame, DebugContext, BreakpointLocation, Breakpoint, DebugCommand,
-    DebugEvent, DebugSnapshot, DebugStatistics, DebuggerStateExt,
+    run_with_debugging,
+    Breakpoint,
+    BreakpointLocation,
+    CallFrame,
+    CommandResult,
+    DebugCommand,
+    DebugContext,
+    DebugEvent,
+    DebugSnapshot,
+    DebugStatistics,
+    DebuggableAgent,
     // Core debugger logic (phase3:6.2)
-    Debugger, CommandResult, DebuggableAgent, run_with_debugging,
+    Debugger,
+    DebuggerError,
+    DebuggerResult,
+    DebuggerState,
+    DebuggerStateExt,
+    ExecutionState,
+    ThoughtSnapshot,
 };
 
 pub use agent_history::{
@@ -184,24 +178,20 @@ pub use agent_history::{
 };
 
 pub use body_restore::{
-    BodyRestoreManager, CommitInfo, CoordinatedRestore, GitBodyRestoreManager,
-    RepositoryBackup,
-    RestoreOptions as BodyRestoreOptions,
-    RestoreResult as BodyRestoreResult,
+    BodyRestoreManager, CommitInfo, CoordinatedRestore, GitBodyRestoreManager, RepositoryBackup,
+    RestoreOptions as BodyRestoreOptions, RestoreResult as BodyRestoreResult,
 };
 
 pub use brain_restore::{
-    BrainRestore, BrainState, DefaultBrainRestore,
-    RestoreOptions as BrainRestoreOptions,
-    RestoreResult as BrainRestoreResult,
-    ThoughtEntry, DecisionNode, ConversationState, MessageEntry,
-    create_snapshot_from_state, compare_states,
+    compare_states, create_snapshot_from_state, BrainRestore, BrainState, ConversationState,
+    DecisionNode, DefaultBrainRestore, MessageEntry, RestoreOptions as BrainRestoreOptions,
+    RestoreResult as BrainRestoreResult, ThoughtEntry,
 };
 
 pub use time_travel_integration::{
-    RewindManager, DefaultRewindManager, RewindConfig, RewindPoint, RewindResult,
-    RewindBackup, ValidationResult, ResumeContext, RewindProgress, RewindConfirmation,
-    slider_to_rewind_point, describe_rewind,
+    describe_rewind, slider_to_rewind_point, DefaultRewindManager, ResumeContext, RewindBackup,
+    RewindConfig, RewindConfirmation, RewindManager, RewindPoint, RewindProgress, RewindResult,
+    ValidationResult,
 };
 
 /// Library version
@@ -220,16 +210,14 @@ mod tests {
 #[cfg(test)]
 mod providers_test;
 
-pub use dag::{
-    DAG, DAGNode, DAGEdge, DAGError, DAGResult, DAGStatistics, EdgeType, Position,
-};
+pub use dag::{DAGEdge, DAGError, DAGNode, DAGResult, DAGStatistics, EdgeType, Position, DAG};
 
 pub use dag_toml::{
-    TomlDAG, TomlDAGNode, TomlDAGEdge, TomlTaskDependency, TomlPosition,
-    load_dag_from_toml, save_dag_to_toml,
+    load_dag_from_toml, save_dag_to_toml, TomlDAG, TomlDAGEdge, TomlDAGNode, TomlPosition,
+    TomlTaskDependency,
 };
 
 pub use dag_swarm_export::{
-    SwarmExportConfig, export_dag_to_swarm_toml, import_swarm_toml_to_dag,
-    save_dag_as_swarm_toml, load_dag_from_swarm_toml,
+    export_dag_to_swarm_toml, import_swarm_toml_to_dag, load_dag_from_swarm_toml,
+    save_dag_as_swarm_toml, SwarmExportConfig,
 };

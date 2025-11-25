@@ -1,6 +1,5 @@
 /// SQLite-backed implementation of the LeaseManager trait
 /// Provides persistent, distributed file locking with TTL semantics
-
 use crate::errors::{AgentError, AgentResult};
 use crate::lease::{
     Lease, LeaseAcquisitionRequest, LeaseAcquisitionResponse, LeaseManager, LeaseReleaseRequest,
@@ -178,13 +177,11 @@ impl SqliteLeaseManager {
         let max_renewals: i32 = row.get("max_renewals");
 
         // Parse UUIDs
-        let lease_id = Uuid::parse_str(&id).map_err(|e| {
-            AgentError::ExecutionError(format!("Invalid lease ID: {}", e))
-        })?;
+        let lease_id = Uuid::parse_str(&id)
+            .map_err(|e| AgentError::ExecutionError(format!("Invalid lease ID: {}", e)))?;
 
-        let agent_uuid = Uuid::parse_str(&agent_id).map_err(|e| {
-            AgentError::ExecutionError(format!("Invalid agent ID: {}", e))
-        })?;
+        let agent_uuid = Uuid::parse_str(&agent_id)
+            .map_err(|e| AgentError::ExecutionError(format!("Invalid agent ID: {}", e)))?;
 
         // Parse status
         let status = match status_str.as_str() {
@@ -197,11 +194,15 @@ impl SqliteLeaseManager {
         };
 
         // Convert timestamps to chrono DateTime
-        let created_at_dt = chrono::DateTime::<Utc>::from_timestamp(created_at, 0)
-            .ok_or_else(|| AgentError::ExecutionError("Invalid created_at timestamp".to_string()))?;
+        let created_at_dt =
+            chrono::DateTime::<Utc>::from_timestamp(created_at, 0).ok_or_else(|| {
+                AgentError::ExecutionError("Invalid created_at timestamp".to_string())
+            })?;
 
-        let expires_at_dt = chrono::DateTime::<Utc>::from_timestamp(expires_at, 0)
-            .ok_or_else(|| AgentError::ExecutionError("Invalid expires_at timestamp".to_string()))?;
+        let expires_at_dt =
+            chrono::DateTime::<Utc>::from_timestamp(expires_at, 0).ok_or_else(|| {
+                AgentError::ExecutionError("Invalid expires_at timestamp".to_string())
+            })?;
 
         Ok(Lease {
             id: lease_id,
@@ -268,7 +269,8 @@ impl LeaseManager for SqliteLeaseManager {
         request: LeaseAcquisitionRequest,
     ) -> AgentResult<LeaseAcquisitionResponse> {
         let start_time = Instant::now();
-        let timeout_duration = std::time::Duration::from_millis(request.timeout_ms.unwrap_or(30000));
+        let timeout_duration =
+            std::time::Duration::from_millis(request.timeout_ms.unwrap_or(30000));
 
         loop {
             // Check if file is already locked by another agent
@@ -475,7 +477,10 @@ impl LeaseManager for SqliteLeaseManager {
         })
     }
 
-    async fn release_lease(&self, request: LeaseReleaseRequest) -> AgentResult<LeaseReleaseResponse> {
+    async fn release_lease(
+        &self,
+        request: LeaseReleaseRequest,
+    ) -> AgentResult<LeaseReleaseResponse> {
         // Fetch the lease to verify ownership
         let lease = self.get_lease(&request.lease_id).await?;
 
@@ -573,7 +578,9 @@ impl LeaseManager for SqliteLeaseManager {
         let rows = sqlx::query("SELECT * FROM leases ORDER BY created_at DESC")
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| AgentError::ExecutionError(format!("Failed to fetch all leases: {}", e)))?;
+            .map_err(|e| {
+                AgentError::ExecutionError(format!("Failed to fetch all leases: {}", e))
+            })?;
 
         rows.iter().map(Self::row_to_lease).collect()
     }
@@ -592,11 +599,7 @@ impl LeaseManager for SqliteLeaseManager {
         Ok(count.0 > 0)
     }
 
-    async fn has_agent_lease(
-        &self,
-        agent_id: &Uuid,
-        file_path: &Path,
-    ) -> AgentResult<bool> {
+    async fn has_agent_lease(&self, agent_id: &Uuid, file_path: &Path) -> AgentResult<bool> {
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM leases WHERE agent_id = ? AND file_path = ? AND status = 'active'",
         )

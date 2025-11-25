@@ -122,7 +122,6 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-
     match args.command {
         Commands::Init { name, dir } => {
             init::execute(name.as_deref(), dir.as_deref()).await?;
@@ -166,8 +165,15 @@ async fn main() -> anyhow::Result<()> {
             format,
         } => {
             let config = load_config(args.config.as_deref())?;
-            logs::execute(&config, id.as_deref(), follow, event_type.as_deref(), limit, &format)
-                .await?;
+            logs::execute(
+                &config,
+                id.as_deref(),
+                follow,
+                event_type.as_deref(),
+                limit,
+                &format,
+            )
+            .await?;
         }
 
         Commands::Gui => {

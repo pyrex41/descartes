@@ -1,6 +1,5 @@
 /// Reference implementation of the NotificationRouter trait.
 /// This provides a complete, production-ready notification routing system.
-
 use crate::notifications::*;
 use async_trait::async_trait;
 use std::collections::{HashMap, VecDeque};
@@ -321,9 +320,10 @@ impl NotificationRouter for DefaultNotificationRouter {
         let adapters = self.adapters.read().await;
 
         for (channel, adapter) in adapters.iter() {
-            adapter.validate().await.map_err(|e| {
-                format!("Adapter validation failed for {}: {}", channel, e)
-            })?;
+            adapter
+                .validate()
+                .await
+                .map_err(|e| format!("Adapter validation failed for {}: {}", channel, e))?;
         }
 
         Ok(())

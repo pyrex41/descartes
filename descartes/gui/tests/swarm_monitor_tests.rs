@@ -10,13 +10,12 @@
 //! - WebSocket streaming
 //! - Animation performance (60 FPS)
 
-use descartes_gui::swarm_monitor::{
-    SwarmMonitorState, SwarmMonitorMessage, AgentEvent, ConnectionStatus,
-    PerformanceStats, update, TARGET_FPS, FRAME_TIME_BUDGET_MS,
-};
 use descartes_core::{
-    AgentRuntimeState, AgentStatus, AgentProgress, AgentError, AgentFilter,
-    GroupingMode, SortMode,
+    AgentError, AgentFilter, AgentProgress, AgentRuntimeState, AgentStatus, GroupingMode, SortMode,
+};
+use descartes_gui::swarm_monitor::{
+    update, AgentEvent, ConnectionStatus, PerformanceStats, SwarmMonitorMessage, SwarmMonitorState,
+    FRAME_TIME_BUDGET_MS, TARGET_FPS,
 };
 use std::collections::HashMap;
 use std::time::Instant;
@@ -39,9 +38,7 @@ fn create_test_agent(name: &str, task: &str) -> AgentRuntimeState {
 /// Create multiple test agents
 fn create_test_agents(count: usize) -> Vec<AgentRuntimeState> {
     (0..count)
-        .map(|i| {
-            create_test_agent(&format!("agent-{}", i), &format!("task-{}", i))
-        })
+        .map(|i| create_test_agent(&format!("agent-{}", i), &format!("task-{}", i)))
         .collect()
 }
 
@@ -106,7 +103,9 @@ fn test_agent_spawn_event() {
     let agent = create_test_agent("new-agent", "new-task");
     let agent_id = agent.agent_id;
 
-    let event = AgentEvent::AgentSpawned { agent: agent.clone() };
+    let event = AgentEvent::AgentSpawned {
+        agent: agent.clone(),
+    };
     state.handle_agent_event(event);
 
     assert_eq!(state.agents.len(), 1);
@@ -201,10 +200,7 @@ fn test_failure_event() {
     state.update_agent(agent);
 
     // Send failure event
-    let error = AgentError::new(
-        "TEST_ERROR".to_string(),
-        "Test error message".to_string(),
-    );
+    let error = AgentError::new("TEST_ERROR".to_string(), "Test error message".to_string());
     let event = AgentEvent::AgentFailed {
         agent_id,
         error: error.clone(),
@@ -421,7 +417,10 @@ fn test_performance_with_100_agents() {
     let duration = start.elapsed();
 
     assert_eq!(state.agents.len(), 100);
-    assert!(duration.as_millis() < 1000, "Adding 100 agents took too long");
+    assert!(
+        duration.as_millis() < 1000,
+        "Adding 100 agents took too long"
+    );
 }
 
 #[test]
@@ -439,7 +438,10 @@ fn test_batch_update_performance() {
     let duration = start.elapsed();
 
     assert_eq!(state.agents.len(), 100);
-    assert!(duration.as_millis() < 100, "Batch update of 100 agents took too long");
+    assert!(
+        duration.as_millis() < 100,
+        "Batch update of 100 agents took too long"
+    );
 }
 
 #[test]
@@ -466,7 +468,10 @@ fn test_filtering_performance_with_many_agents() {
     let duration = start.elapsed();
 
     assert_eq!(filtered.len(), 25);
-    assert!(duration.as_micros() < 1000, "Filtering 100 agents took too long");
+    assert!(
+        duration.as_micros() < 1000,
+        "Filtering 100 agents took too long"
+    );
 }
 
 // ============================================================================
@@ -493,7 +498,10 @@ fn test_animation_tick_performance() {
     let duration = start.elapsed();
 
     // Should complete within reasonable time (< 100ms for 60 frames)
-    assert!(duration.as_millis() < 100, "60 animation ticks took too long");
+    assert!(
+        duration.as_millis() < 100,
+        "60 animation ticks took too long"
+    );
 }
 
 #[test]

@@ -373,10 +373,7 @@ fn test_continue_execution() {
 
     debugger.continue_execution().unwrap();
 
-    assert_eq!(
-        debugger.state().execution_state,
-        ExecutionState::Continuing
-    );
+    assert_eq!(debugger.state().execution_state, ExecutionState::Continuing);
 }
 
 #[test]
@@ -416,11 +413,11 @@ fn test_add_multiple_breakpoints() {
     debugger
         .state_mut()
         .add_breakpoint(Breakpoint::new(BreakpointLocation::StepCount { step: 5 }));
-    debugger.state_mut().add_breakpoint(Breakpoint::new(
-        BreakpointLocation::WorkflowState {
+    debugger
+        .state_mut()
+        .add_breakpoint(Breakpoint::new(BreakpointLocation::WorkflowState {
             state: WorkflowState::Running,
-        },
-    ));
+        }));
     debugger
         .state_mut()
         .add_breakpoint(Breakpoint::new(BreakpointLocation::AnyTransition));
@@ -766,12 +763,7 @@ fn test_call_frame_management() {
 
 #[test]
 fn test_call_frame_variables() {
-    let mut frame = CallFrame::new(
-        "test_func".to_string(),
-        WorkflowState::Running,
-        0,
-        None,
-    );
+    let mut frame = CallFrame::new("test_func".to_string(), WorkflowState::Running, 0, None);
 
     frame.set_variable("x".to_string(), serde_json::json!(10));
     frame.set_variable("y".to_string(), serde_json::json!("hello"));
@@ -1128,7 +1120,12 @@ fn test_concurrent_breakpoint_modifications() {
     assert_eq!(debugger.state().breakpoints.len(), 2);
 
     // Remaining should be id1 and id3
-    let ids: Vec<Uuid> = debugger.state().breakpoints.iter().map(|bp| bp.id).collect();
+    let ids: Vec<Uuid> = debugger
+        .state()
+        .breakpoints
+        .iter()
+        .map(|bp| bp.id)
+        .collect();
     assert!(ids.contains(&id1));
     assert!(ids.contains(&id3));
     assert!(!ids.contains(&id2));
@@ -1201,16 +1198,10 @@ fn test_thought_tracking_during_execution() {
     let mut debugger = create_enabled_debugger();
 
     // Capture thoughts at different steps
-    debugger.capture_thought_snapshot(
-        "thought-1".to_string(),
-        "First thought".to_string(),
-    );
+    debugger.capture_thought_snapshot("thought-1".to_string(), "First thought".to_string());
     debugger.step_agent().unwrap();
 
-    debugger.capture_thought_snapshot(
-        "thought-2".to_string(),
-        "Second thought".to_string(),
-    );
+    debugger.capture_thought_snapshot("thought-2".to_string(), "Second thought".to_string());
     debugger.step_agent().unwrap();
 
     // History should contain snapshots with thoughts

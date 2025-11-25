@@ -1,8 +1,6 @@
 /// Comprehensive tests for knowledge graph overlay functionality
-
 use agent_runner::{
-    FileTreeBuilder, KnowledgeGraphOverlay, KnowledgeNodeType, OverlayConfig,
-    RelationshipType,
+    FileTreeBuilder, KnowledgeGraphOverlay, KnowledgeNodeType, OverlayConfig, RelationshipType,
 };
 use std::fs;
 use tempfile::TempDir;
@@ -156,7 +154,10 @@ fn test_overlay_generation_basic() {
     let kg = overlay.generate_knowledge_overlay(&file_tree).unwrap();
 
     // Verify we extracted entities
-    assert!(kg.nodes.len() > 0, "Should extract entities from code files");
+    assert!(
+        kg.nodes.len() > 0,
+        "Should extract entities from code files"
+    );
     println!("Extracted {} knowledge nodes", kg.nodes.len());
 
     // Print statistics
@@ -282,14 +283,22 @@ fn test_find_by_name_pattern() {
     let results = overlay.find_by_name_pattern("process", &kg);
     println!("\nEntities matching 'process': {}", results.len());
     for entity in &results {
-        println!("  - {} ({})", entity.qualified_name, entity.content_type.as_str());
+        println!(
+            "  - {} ({})",
+            entity.qualified_name,
+            entity.content_type.as_str()
+        );
     }
 
     // Search for "Calculator"
     let calc_results = overlay.find_by_name_pattern("Calculator", &kg);
     println!("\nEntities matching 'Calculator': {}", calc_results.len());
     for entity in &calc_results {
-        println!("  - {} ({})", entity.qualified_name, entity.content_type.as_str());
+        println!(
+            "  - {} ({})",
+            entity.qualified_name,
+            entity.content_type.as_str()
+        );
     }
 }
 
@@ -375,7 +384,9 @@ fn another_function() {
     .unwrap();
 
     // Update the knowledge graph
-    overlay.update_file(&main_path, &file_tree, &mut kg).unwrap();
+    overlay
+        .update_file(&main_path, &file_tree, &mut kg)
+        .unwrap();
 
     let updated_count = kg.nodes.len();
     println!("Updated node count: {}", updated_count);
@@ -406,7 +417,10 @@ fn test_cache_functionality() {
     // Clear cache
     overlay.clear_cache();
     let empty_stats = overlay.cache_stats();
-    assert_eq!(empty_stats.total_entries, 0, "Cache should be empty after clear");
+    assert_eq!(
+        empty_stats.total_entries, 0,
+        "Cache should be empty after clear"
+    );
 }
 
 #[test]

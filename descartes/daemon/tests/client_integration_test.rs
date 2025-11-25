@@ -2,7 +2,6 @@
 ///
 /// These tests require a running daemon server.
 /// Run the daemon first: `cargo run --bin descartes-daemon`
-
 use descartes_daemon::{RpcClient, RpcClientBuilder, RpcClientConfig};
 use serde_json::json;
 
@@ -33,18 +32,24 @@ async fn test_client_spawn_and_kill_agent() {
     let client = RpcClient::with_url("http://127.0.0.1:8080").unwrap();
 
     // Spawn agent
-    let spawn_result = client
-        .spawn_agent("test-agent", "basic", json!({}))
-        .await;
+    let spawn_result = client.spawn_agent("test-agent", "basic", json!({})).await;
 
-    assert!(spawn_result.is_ok(), "Spawn should succeed: {:?}", spawn_result);
+    assert!(
+        spawn_result.is_ok(),
+        "Spawn should succeed: {:?}",
+        spawn_result
+    );
 
     let spawn_response = spawn_result.unwrap();
     let agent_id = spawn_response.agent_id;
 
     // Kill agent
     let kill_result = client.kill_agent(&agent_id, false).await;
-    assert!(kill_result.is_ok(), "Kill should succeed: {:?}", kill_result);
+    assert!(
+        kill_result.is_ok(),
+        "Kill should succeed: {:?}",
+        kill_result
+    );
 }
 
 #[tokio::test]
@@ -89,7 +94,11 @@ async fn test_client_connection_test() {
     let client = RpcClient::with_url("http://127.0.0.1:8080").unwrap();
 
     let result = client.test_connection().await;
-    assert!(result.is_ok(), "Connection test should succeed: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Connection test should succeed: {:?}",
+        result
+    );
 }
 
 #[tokio::test]
@@ -113,7 +122,10 @@ async fn test_client_connection_failure() {
     let client = RpcClient::with_url("http://127.0.0.1:19999").unwrap();
 
     let result = client.health().await;
-    assert!(result.is_err(), "Should fail to connect to non-existent server");
+    assert!(
+        result.is_err(),
+        "Should fail to connect to non-existent server"
+    );
 }
 
 #[tokio::test]

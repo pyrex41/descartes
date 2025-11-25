@@ -1,3 +1,5 @@
+use iced::keyboard::{Key, Modifiers};
+use iced::mouse::{Button, ScrollDelta};
 /// DAG Canvas Interaction Handlers
 ///
 /// This module provides comprehensive interaction handling for the DAG editor canvas,
@@ -12,19 +14,16 @@
 /// - Zoom to cursor position
 /// - Smooth 60 FPS animations
 /// - Undo/redo integration
+use iced::{keyboard, mouse, Point, Rectangle, Vector};
 
-use iced::{mouse, keyboard, Point, Rectangle, Vector};
-use iced::mouse::{Button, ScrollDelta};
-use iced::keyboard::{Key, Modifiers};
-
-use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType, Position, DAGOperation};
+use descartes_core::dag::{DAGEdge, DAGNode, DAGOperation, EdgeType, Position, DAG};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::dag_editor::{
-    DAGEditorState, InteractionState, DragState, PanState, CanvasState, Tool,
-    NODE_WIDTH, NODE_HEIGHT, GRID_SIZE, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP,
-    screen_to_world, world_to_screen, point_in_node, snap_to_grid,
+    point_in_node, screen_to_world, snap_to_grid, world_to_screen, CanvasState, DAGEditorState,
+    DragState, InteractionState, PanState, Tool, GRID_SIZE, MAX_ZOOM, MIN_ZOOM, NODE_HEIGHT,
+    NODE_WIDTH, ZOOM_STEP,
 };
 
 // ============================================================================
@@ -158,9 +157,7 @@ fn handle_left_click(
                 let selected_nodes = state.interaction.selected_nodes.clone();
                 let start_positions: HashMap<Uuid, Position> = selected_nodes
                     .iter()
-                    .filter_map(|&id| {
-                        state.dag.get_node(id).map(|n| (id, n.position))
-                    })
+                    .filter_map(|&id| state.dag.get_node(id).map(|n| (id, n.position)))
                     .collect();
 
                 state.interaction.drag_state = Some(DragState {
@@ -351,17 +348,13 @@ fn handle_left_release(
         if let Some(to_node) = find_node_at_position(state, position) {
             // Create edge if not connecting to self
             if to_node != edge_create.from_node {
-                let edge = DAGEdge::new(
-                    edge_create.from_node,
-                    to_node,
-                    edge_create.edge_type,
-                );
+                let edge = DAGEdge::new(edge_create.from_node, to_node, edge_create.edge_type);
 
                 // Validate: check for cycles
                 if would_create_cycle(&state.dag, edge_create.from_node, to_node) {
                     state.clear_cache();
                     return Some(InteractionResult::EdgeCreationFailed(
-                        "Would create cycle".to_string()
+                        "Would create cycle".to_string(),
                     ));
                 }
 
@@ -531,7 +524,8 @@ pub fn handle_key_press(
         Key::Named(iced::keyboard::key::Named::Delete) => {
             // Delete selected nodes
             if !state.interaction.selected_nodes.is_empty() {
-                let nodes_to_delete: Vec<Uuid> = state.interaction.selected_nodes.iter().copied().collect();
+                let nodes_to_delete: Vec<Uuid> =
+                    state.interaction.selected_nodes.iter().copied().collect();
 
                 for node_id in &nodes_to_delete {
                     let _ = state.dag.remove_node(*node_id);
@@ -619,10 +613,7 @@ pub fn find_node_at_position(state: &DAGEditorState, position: Point) -> Option<
 
 /// Check if two rectangles intersect
 pub fn rectangles_intersect(a: &Rectangle, b: &Rectangle) -> bool {
-    a.x < b.x + b.width
-        && a.x + a.width > b.x
-        && a.y < b.y + b.height
-        && a.y + a.height > b.y
+    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
 /// Check if adding an edge would create a cycle

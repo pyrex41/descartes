@@ -1,7 +1,6 @@
 /// Cryptographic operations for secret encryption/decryption
 /// Uses AES-256-GCM for authenticated encryption
 /// Implements PBKDF2 and Argon2id for key derivation
-
 use crate::errors::{StateStoreError, StateStoreResult};
 use crate::secrets::{EncryptedSecretData, EncryptionContext, KeyDerivationParams};
 
@@ -41,11 +40,7 @@ pub mod constants {
 /// Trait for encryption/decryption operations
 pub trait CryptoProvider: Send + Sync {
     /// Encrypt a secret value
-    fn encrypt(
-        &self,
-        key: &[u8],
-        plaintext: &[u8],
-    ) -> StateStoreResult<EncryptedSecretData>;
+    fn encrypt(&self, key: &[u8], plaintext: &[u8]) -> StateStoreResult<EncryptedSecretData>;
 
     /// Decrypt a secret value
     fn decrypt(
@@ -89,11 +84,7 @@ impl Default for Aes256GcmProvider {
 }
 
 impl CryptoProvider for Aes256GcmProvider {
-    fn encrypt(
-        &self,
-        key: &[u8],
-        plaintext: &[u8],
-    ) -> StateStoreResult<EncryptedSecretData> {
+    fn encrypt(&self, key: &[u8], plaintext: &[u8]) -> StateStoreResult<EncryptedSecretData> {
         use aes_gcm::{
             aead::{Aead, KeyInit},
             Aes256Gcm,
@@ -103,13 +94,11 @@ impl CryptoProvider for Aes256GcmProvider {
 
         // Verify key size
         if key.len() != constants::KEY_SIZE {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Invalid key size: expected {}, got {}",
-                    constants::KEY_SIZE,
-                    key.len()
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Invalid key size: expected {}, got {}",
+                constants::KEY_SIZE,
+                key.len()
+            )));
         }
 
         // Generate random nonce
@@ -118,14 +107,15 @@ impl CryptoProvider for Aes256GcmProvider {
         rng.fill_bytes(&mut nonce_bytes);
 
         // Create cipher
-        let cipher = Aes256Gcm::new_from_slice(key)
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create cipher: {}", e)))?;
+        let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to create cipher: {}", e))
+        })?;
 
         // Encrypt - using GenericArray for type safety
         let nonce = GenericArray::from_slice(&nonce_bytes);
-        let ciphertext = cipher.encrypt(nonce, plaintext).map_err(|e| {
-            StateStoreError::DatabaseError(format!("Encryption failed: {}", e))
-        })?;
+        let ciphertext = cipher
+            .encrypt(nonce, plaintext)
+            .map_err(|e| StateStoreError::DatabaseError(format!("Encryption failed: {}", e)))?;
 
         // Extract tag (last 16 bytes) and actual ciphertext
         if ciphertext.len() < constants::TAG_SIZE {
@@ -159,35 +149,29 @@ impl CryptoProvider for Aes256GcmProvider {
 
         // Verify key size
         if key.len() != constants::KEY_SIZE {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Invalid key size: expected {}, got {}",
-                    constants::KEY_SIZE,
-                    key.len()
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Invalid key size: expected {}, got {}",
+                constants::KEY_SIZE,
+                key.len()
+            )));
         }
 
         // Verify nonce size
         if encrypted_data.nonce.len() != constants::NONCE_SIZE {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Invalid nonce size: expected {}, got {}",
-                    constants::NONCE_SIZE,
-                    encrypted_data.nonce.len()
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Invalid nonce size: expected {}, got {}",
+                constants::NONCE_SIZE,
+                encrypted_data.nonce.len()
+            )));
         }
 
         // Verify tag size
         if encrypted_data.tag.len() != constants::TAG_SIZE {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Invalid tag size: expected {}, got {}",
-                    constants::TAG_SIZE,
-                    encrypted_data.tag.len()
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Invalid tag size: expected {}, got {}",
+                constants::TAG_SIZE,
+                encrypted_data.tag.len()
+            )));
         }
 
         // Reconstruct ciphertext with tag
@@ -195,14 +179,20 @@ impl CryptoProvider for Aes256GcmProvider {
         combined_ciphertext.extend_from_slice(&encrypted_data.tag);
 
         // Create cipher
-        let cipher = Aes256Gcm::new_from_slice(key)
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create cipher: {}", e)))?;
+        let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| {
+            StateStoreError::DatabaseError(format!("Failed to create cipher: {}", e))
+        })?;
 
         // Decrypt - using GenericArray for type safety
         let nonce = GenericArray::from_slice(&encrypted_data.nonce);
-        let plaintext = cipher.decrypt(nonce, combined_ciphertext.as_ref()).map_err(|e| {
-            StateStoreError::DatabaseError(format!("Decryption failed (authentication tag mismatch): {}", e))
-        })?;
+        let plaintext = cipher
+            .decrypt(nonce, combined_ciphertext.as_ref())
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!(
+                    "Decryption failed (authentication tag mismatch): {}",
+                    e
+                ))
+            })?;
 
         Ok(plaintext)
     }
@@ -254,9 +244,10 @@ impl CryptoProvider for Aes256GcmProvider {
         match params.algorithm.as_str() {
             "pbkdf2" => Self::pbkdf2_hash(password, salt, params),
             "argon2id" => Self::argon2_hash(password, salt, params),
-            _ => Err(StateStoreError::DatabaseError(
-                format!("Unsupported hash algorithm: {}", params.algorithm),
-            )),
+            _ => Err(StateStoreError::DatabaseError(format!(
+                "Unsupported hash algorithm: {}",
+                params.algorithm
+            ))),
         }
     }
 }
@@ -285,8 +276,8 @@ impl Aes256GcmProvider {
         salt: &[u8],
         params: &KeyDerivationParams,
     ) -> StateStoreResult<Vec<u8>> {
-        use argon2::Argon2;
         use argon2::password_hash::{PasswordHasher, SaltString};
+        use argon2::Argon2;
         use argon2::Params;
 
         let salt_string = SaltString::encode_b64(salt)
@@ -300,7 +291,11 @@ impl Aes256GcmProvider {
         )
         .map_err(|e| StateStoreError::DatabaseError(format!("Invalid parameters: {}", e)))?;
 
-        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params_obj);
+        let argon2 = Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            params_obj,
+        );
 
         let password_hash = argon2
             .hash_password(password.as_bytes(), &salt_string)
@@ -335,21 +330,17 @@ impl KeyManager {
     ) -> StateStoreResult<EncryptionContext> {
         // Validate password
         if password.len() < constants::MIN_PASSWORD_LENGTH {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Password too short: minimum {} characters required",
-                    constants::MIN_PASSWORD_LENGTH
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Password too short: minimum {} characters required",
+                constants::MIN_PASSWORD_LENGTH
+            )));
         }
 
         if password.len() > constants::MAX_PASSWORD_LENGTH {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Password too long: maximum {} characters allowed",
-                    constants::MAX_PASSWORD_LENGTH
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Password too long: maximum {} characters allowed",
+                constants::MAX_PASSWORD_LENGTH
+            )));
         }
 
         // Derive key based on algorithm
@@ -357,21 +348,20 @@ impl KeyManager {
             "pbkdf2" => Self::pbkdf2_derive(password, salt, params)?,
             "argon2id" => Self::argon2_derive(password, salt, params)?,
             _ => {
-                return Err(StateStoreError::DatabaseError(
-                    format!("Unsupported KDF algorithm: {}", params.algorithm),
-                ))
+                return Err(StateStoreError::DatabaseError(format!(
+                    "Unsupported KDF algorithm: {}",
+                    params.algorithm
+                )))
             }
         };
 
         // Ensure key is correct size
         if key.len() != constants::KEY_SIZE {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Derived key has invalid size: expected {}, got {}",
-                    constants::KEY_SIZE,
-                    key.len()
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Derived key has invalid size: expected {}, got {}",
+                constants::KEY_SIZE,
+                key.len()
+            )));
         }
 
         Ok(EncryptionContext {
@@ -403,8 +393,8 @@ impl KeyManager {
         salt: &[u8],
         params: &KeyDerivationParams,
     ) -> StateStoreResult<Vec<u8>> {
-        use argon2::Argon2;
         use argon2::password_hash::{PasswordHasher, SaltString};
+        use argon2::Argon2;
         use argon2::Params;
 
         let salt_string = SaltString::encode_b64(salt)
@@ -418,29 +408,31 @@ impl KeyManager {
         )
         .map_err(|e| StateStoreError::DatabaseError(format!("Invalid params: {}", e)))?;
 
-        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params_obj);
+        let argon2 = Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            params_obj,
+        );
 
         let password_hash = argon2
             .hash_password(password.as_bytes(), &salt_string)
-            .map_err(|e| StateStoreError::DatabaseError(format!("Argon2 derivation failed: {}", e)))?;
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Argon2 derivation failed: {}", e))
+            })?;
 
         // Extract hash bytes from PHC string
         let hash_bytes = password_hash
             .hash
-            .ok_or_else(|| {
-                StateStoreError::DatabaseError("Argon2 hash missing".to_string())
-            })?
+            .ok_or_else(|| StateStoreError::DatabaseError("Argon2 hash missing".to_string()))?
             .as_ref()
             .to_vec();
 
         if hash_bytes.len() != constants::KEY_SIZE {
-            return Err(StateStoreError::DatabaseError(
-                format!(
-                    "Derived key has invalid size: expected {}, got {}",
-                    constants::KEY_SIZE,
-                    hash_bytes.len()
-                ),
-            ));
+            return Err(StateStoreError::DatabaseError(format!(
+                "Derived key has invalid size: expected {}, got {}",
+                constants::KEY_SIZE,
+                hash_bytes.len()
+            )));
         }
 
         Ok(hash_bytes)
@@ -468,7 +460,9 @@ mod tests {
         let key = vec![0u8; 32]; // Test key
 
         let plaintext = b"This is a secret message";
-        let encrypted = provider.encrypt(&key, plaintext).expect("Encryption failed");
+        let encrypted = provider
+            .encrypt(&key, plaintext)
+            .expect("Encryption failed");
 
         assert_eq!(encrypted.nonce.len(), constants::NONCE_SIZE);
         assert_eq!(encrypted.tag.len(), constants::TAG_SIZE);

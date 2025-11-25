@@ -120,14 +120,12 @@ impl UnixSocketRpcClient {
         info!("Testing connection to {:?}", self.socket_path);
 
         // Try to connect to the Unix socket
-        UnixStream::connect(&self.socket_path)
-            .await
-            .map_err(|e| {
-                DaemonError::ConnectionError(format!(
-                    "Failed to connect to Unix socket {:?}: {}",
-                    self.socket_path, e
-                ))
-            })?;
+        UnixStream::connect(&self.socket_path).await.map_err(|e| {
+            DaemonError::ConnectionError(format!(
+                "Failed to connect to Unix socket {:?}: {}",
+                self.socket_path, e
+            ))
+        })?;
 
         info!("Connection test successful");
         Ok(())
@@ -143,14 +141,12 @@ impl UnixSocketRpcClient {
         debug!("RPC call: {} with params: {:?}", method, params);
 
         // Connect to Unix socket
-        let mut stream = UnixStream::connect(&self.socket_path)
-            .await
-            .map_err(|e| {
-                DaemonError::ConnectionError(format!(
-                    "Failed to connect to {:?}: {}",
-                    self.socket_path, e
-                ))
-            })?;
+        let mut stream = UnixStream::connect(&self.socket_path).await.map_err(|e| {
+            DaemonError::ConnectionError(format!(
+                "Failed to connect to {:?}: {}",
+                self.socket_path, e
+            ))
+        })?;
 
         // Build JSON-RPC 2.0 request
         let request = serde_json::json!({
@@ -160,57 +156,65 @@ impl UnixSocketRpcClient {
             "id": 1
         });
 
-        let request_str = serde_json::to_string(&request)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to serialize request: {}", e)))?;
+        let request_str = serde_json::to_string(&request).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to serialize request: {}", e))
+        })?;
 
         debug!("Sending request: {}", request_str);
 
         // Send request (with newline delimiter for framing)
-        stream.write_all(request_str.as_bytes()).await.map_err(|e| {
-            DaemonError::ConnectionError(format!("Failed to send request: {}", e))
-        })?;
-        stream.write_all(b"\n").await.map_err(|e| {
-            DaemonError::ConnectionError(format!("Failed to send request: {}", e))
-        })?;
-        stream.flush().await.map_err(|e| {
-            DaemonError::ConnectionError(format!("Failed to flush: {}", e))
-        })?;
+        stream
+            .write_all(request_str.as_bytes())
+            .await
+            .map_err(|e| DaemonError::ConnectionError(format!("Failed to send request: {}", e)))?;
+        stream
+            .write_all(b"\n")
+            .await
+            .map_err(|e| DaemonError::ConnectionError(format!("Failed to send request: {}", e)))?;
+        stream
+            .flush()
+            .await
+            .map_err(|e| DaemonError::ConnectionError(format!("Failed to flush: {}", e)))?;
 
         // Read response
         let mut response_bytes = Vec::new();
-        let bytes_read = tokio::time::timeout(
-            self.timeout,
-            stream.read_to_end(&mut response_bytes)
-        )
-        .await
-        .map_err(|_| DaemonError::Timeout)?
-        .map_err(|e| {
-            DaemonError::ConnectionError(format!("Failed to read response: {}", e))
-        })?;
+        let bytes_read =
+            tokio::time::timeout(self.timeout, stream.read_to_end(&mut response_bytes))
+                .await
+                .map_err(|_| DaemonError::Timeout)?
+                .map_err(|e| {
+                    DaemonError::ConnectionError(format!("Failed to read response: {}", e))
+                })?;
 
         if bytes_read == 0 {
             return Err(DaemonError::ConnectionError("Empty response".to_string()));
         }
 
-        let response_str = String::from_utf8(response_bytes)
-            .map_err(|e| DaemonError::SerializationError(format!("Invalid UTF-8 in response: {}", e)))?;
+        let response_str = String::from_utf8(response_bytes).map_err(|e| {
+            DaemonError::SerializationError(format!("Invalid UTF-8 in response: {}", e))
+        })?;
 
         debug!("Received response: {}", response_str);
 
         // Parse JSON-RPC response
-        let response: serde_json::Value = serde_json::from_str(&response_str)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse response: {}", e)))?;
+        let response: serde_json::Value = serde_json::from_str(&response_str).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse response: {}", e))
+        })?;
 
         // Check for errors
         if let Some(error) = response.get("error") {
             let code = error.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
-            let message = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown error");
+            let message = error
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Unknown error");
             error!("RPC error: {} (code: {})", message, code);
             return Err(DaemonError::RpcError(code, message.to_string()));
         }
 
         // Extract result
-        response.get("result")
+        response
+            .get("result")
             .cloned()
             .ok_or_else(|| DaemonError::SerializationError("Missing result field".to_string()))
     }
@@ -228,7 +232,8 @@ impl UnixSocketRpcClient {
         let params = serde_json::json!([name, agent_type, config]);
         let result = self.call("spawn", params).await?;
 
-        result.as_str()
+        result
+            .as_str()
             .ok_or_else(|| DaemonError::SerializationError("Expected string result".to_string()))
             .map(|s| s.to_string())
     }
@@ -262,8 +267,9 @@ impl UnixSocketRpcClient {
         let params = serde_json::json!([task_id, approved]);
         let result = self.call("approve", params).await?;
 
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse approval result: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse approval result: {}", e))
+        })
     }
 
     /// Get the current state of the system or a specific entity

@@ -1,3 +1,5 @@
+mod concurrent_patterns;
+mod ipc_latency;
 /// Descartes IPC Layer Benchmark Suite
 ///
 /// Comprehensive performance testing for:
@@ -9,16 +11,13 @@
 ///
 /// Usage: cargo bench --bench main -- [SCENARIO]
 /// Where SCENARIO is one of: throughput, latency, serialization, resources, all
-
 mod ipc_throughput;
-mod ipc_latency;
-mod serialization;
 mod resource_usage;
-mod concurrent_patterns;
+mod serialization;
 mod testing_utilities;
 
-use std::fs;
 use serde_json::{json, Value};
+use std::fs;
 
 /// Benchmark configuration
 #[derive(Debug, Clone)]
@@ -137,7 +136,9 @@ impl BenchmarkSuite {
             }
             _ => {
                 eprintln!("Unknown scenario: {}", scenario);
-                eprintln!("Available: throughput, latency, serialization, resources, concurrent, all");
+                eprintln!(
+                    "Available: throughput, latency, serialization, resources, concurrent, all"
+                );
                 std::process::exit(1);
             }
         }
@@ -336,11 +337,7 @@ Generated: {timestamp}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let scenario = if args.len() > 1 {
-        &args[1]
-    } else {
-        "all"
-    };
+    let scenario = if args.len() > 1 { &args[1] } else { "all" };
 
     let suite = BenchmarkSuite::new();
 

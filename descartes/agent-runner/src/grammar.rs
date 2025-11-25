@@ -25,7 +25,8 @@ impl Default for GrammarCache {
 }
 
 /// Global grammar cache state
-static GRAMMAR_CACHE: Lazy<RwLock<GrammarCache>> = Lazy::new(|| RwLock::new(GrammarCache::default()));
+static GRAMMAR_CACHE: Lazy<RwLock<GrammarCache>> =
+    Lazy::new(|| RwLock::new(GrammarCache::default()));
 
 /// Load the grammar for a specific language
 pub fn load_grammar(language: Language) -> ParserResult<TreeSitterLanguage> {
@@ -193,7 +194,11 @@ mod tests {
 
         for lang in languages {
             let result = load_grammar(lang);
-            assert!(result.is_ok(), "Failed to load grammar for {}", lang.as_str());
+            assert!(
+                result.is_ok(),
+                "Failed to load grammar for {}",
+                lang.as_str()
+            );
             assert!(
                 is_grammar_loaded(lang),
                 "Grammar not marked as loaded for {}",
@@ -213,7 +218,11 @@ mod tests {
 
         for lang in languages {
             let result = create_parser(lang);
-            assert!(result.is_ok(), "Failed to create parser for {}", lang.as_str());
+            assert!(
+                result.is_ok(),
+                "Failed to create parser for {}",
+                lang.as_str()
+            );
         }
     }
 }

@@ -2,7 +2,6 @@
 ///
 /// These tests verify the server-side agent spawning and lifecycle management
 /// functionality by simulating client-server interactions.
-
 use descartes_core::{
     AgentConfig, AgentStatus, ZmqAgentRunner, ZmqAgentServer, ZmqClient, ZmqRunnerConfig,
     ZmqServerConfig,
@@ -12,9 +11,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 /// Helper to start a test server in the background
-async fn start_test_server(
-    endpoint: &str,
-) -> (ZmqAgentServer, tokio::task::JoinHandle<()>) {
+async fn start_test_server(endpoint: &str) -> (ZmqAgentServer, tokio::task::JoinHandle<()>) {
     let config = ZmqServerConfig {
         endpoint: endpoint.to_string(),
         ..Default::default()

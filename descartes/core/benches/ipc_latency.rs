@@ -1,3 +1,4 @@
+use serde_json::{json, Value};
 /// IPC Layer Latency Benchmarks
 /// Measures round-trip latency and event logging performance
 ///
@@ -6,9 +7,7 @@
 /// - P50, P95, P99 latency percentiles
 /// - Event logging latency
 /// - Consistency under varying message sizes
-
 use std::time::Instant;
-use serde_json::{json, Value};
 
 /// Configuration for latency benchmarks
 #[derive(Debug, Clone)]
@@ -58,7 +57,10 @@ impl LatencyStats {
         measurements.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         let min = measurements.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max = measurements.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let max = measurements
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
         let mean = measurements.iter().sum::<f64>() / measurements.len() as f64;
         let median = measurements[measurements.len() / 2];
         let p95_idx = (measurements.len() as f64 * 0.95) as usize;
@@ -67,10 +69,7 @@ impl LatencyStats {
         let p99 = measurements[p99_idx.min(measurements.len() - 1)];
 
         // Calculate standard deviation
-        let variance = measurements
-            .iter()
-            .map(|m| (m - mean).powi(2))
-            .sum::<f64>()
+        let variance = measurements.iter().map(|m| (m - mean).powi(2)).sum::<f64>()
             / measurements.len() as f64;
         let stddev = variance.sqrt();
 
@@ -265,11 +264,15 @@ pub fn benchmark_latency_by_size() {
     println!("TARGET VERIFICATION");
     println!("─────────────────────────────────────────────────────────────");
     if event_latency.mean_us < 10_000.0 {
-        println!("✓ Event logging latency target met: {:.2} µs < 10,000 µs",
-                 event_latency.mean_us);
+        println!(
+            "✓ Event logging latency target met: {:.2} µs < 10,000 µs",
+            event_latency.mean_us
+        );
     } else {
-        println!("✗ Event logging latency exceeds target: {:.2} µs >= 10,000 µs",
-                 event_latency.mean_us);
+        println!(
+            "✗ Event logging latency exceeds target: {:.2} µs >= 10,000 µs",
+            event_latency.mean_us
+        );
     }
     println!();
 }

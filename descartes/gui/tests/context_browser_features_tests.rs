@@ -236,19 +236,14 @@ mod code_preview_tests {
 
 #[cfg(test)]
 mod file_tree_tests {
-    use descartes_agent_runner::knowledge_graph::{FileTree, FileTreeNode, FileNodeType};
+    use descartes_agent_runner::knowledge_graph::{FileNodeType, FileTree, FileTreeNode};
     use descartes_gui::file_tree_view::*;
     use std::path::PathBuf;
 
     fn create_test_tree() -> FileTree {
         let mut tree = FileTree::new(PathBuf::from("/test"));
 
-        let root = FileTreeNode::new(
-            PathBuf::from("/test"),
-            FileNodeType::Directory,
-            None,
-            0,
-        );
+        let root = FileTreeNode::new(PathBuf::from("/test"), FileNodeType::Directory, None, 0);
         let root_id = tree.add_node(root);
 
         let file1 = FileTreeNode::new(
@@ -312,18 +307,9 @@ mod file_tree_tests {
         let mut state = FileTreeState::default();
 
         // Navigate through several nodes
-        update(
-            &mut state,
-            FileTreeMessage::SelectNode("node1".to_string()),
-        );
-        update(
-            &mut state,
-            FileTreeMessage::SelectNode("node2".to_string()),
-        );
-        update(
-            &mut state,
-            FileTreeMessage::SelectNode("node3".to_string()),
-        );
+        update(&mut state, FileTreeMessage::SelectNode("node1".to_string()));
+        update(&mut state, FileTreeMessage::SelectNode("node2".to_string()));
+        update(&mut state, FileTreeMessage::SelectNode("node3".to_string()));
 
         assert_eq!(state.selected_node, Some("node3".to_string()));
 
@@ -519,7 +505,10 @@ mod knowledge_graph_tests {
         let mut state = KnowledgeGraphPanelState::default();
         let graph = create_test_graph();
 
-        update(&mut state, KnowledgeGraphMessage::GraphLoaded(graph.clone()));
+        update(
+            &mut state,
+            KnowledgeGraphMessage::GraphLoaded(graph.clone()),
+        );
 
         assert!(state.graph.is_some());
         assert!(state.node_positions.len() > 0); // Positions computed
@@ -579,7 +568,9 @@ mod knowledge_graph_tests {
             KnowledgeGraphMessage::ToggleRelationshipFilter(RelationshipType::Calls),
         );
 
-        assert!(state.relationship_filters.contains(&RelationshipType::Calls));
+        assert!(state
+            .relationship_filters
+            .contains(&RelationshipType::Calls));
     }
 
     #[test]
@@ -618,15 +609,15 @@ mod knowledge_graph_tests {
     fn test_impact_analysis() {
         let mut state = KnowledgeGraphPanelState::default();
         let graph = create_test_graph();
-        update(&mut state, KnowledgeGraphMessage::GraphLoaded(graph.clone()));
+        update(
+            &mut state,
+            KnowledgeGraphMessage::GraphLoaded(graph.clone()),
+        );
 
         // Get one of the node IDs
         let node_id = graph.nodes.keys().next().unwrap().clone();
 
-        update(
-            &mut state,
-            KnowledgeGraphMessage::AnalyzeImpact(node_id),
-        );
+        update(&mut state, KnowledgeGraphMessage::AnalyzeImpact(node_id));
 
         // Should have computed impact nodes
         // (may be empty if no incoming edges)
@@ -637,14 +628,14 @@ mod knowledge_graph_tests {
     fn test_related_code_suggestions() {
         let mut state = KnowledgeGraphPanelState::default();
         let graph = create_test_graph();
-        update(&mut state, KnowledgeGraphMessage::GraphLoaded(graph.clone()));
+        update(
+            &mut state,
+            KnowledgeGraphMessage::GraphLoaded(graph.clone()),
+        );
 
         let node_id = graph.nodes.keys().next().unwrap().clone();
 
-        update(
-            &mut state,
-            KnowledgeGraphMessage::ShowRelatedCode(node_id),
-        );
+        update(&mut state, KnowledgeGraphMessage::ShowRelatedCode(node_id));
 
         // Should find related nodes (same type)
         assert!(state.related_suggestions.len() >= 0);
@@ -684,9 +675,7 @@ mod knowledge_graph_tests {
 
         // Set some filters
         state.type_filters.insert(KnowledgeNodeType::Function);
-        state
-            .relationship_filters
-            .insert(RelationshipType::Calls);
+        state.relationship_filters.insert(RelationshipType::Calls);
         state.show_only_connected = true;
         state.search_query = "test".to_string();
 
@@ -702,17 +691,17 @@ mod knowledge_graph_tests {
     fn test_dependency_path() {
         let mut state = KnowledgeGraphPanelState::default();
         let graph = create_test_graph();
-        update(&mut state, KnowledgeGraphMessage::GraphLoaded(graph.clone()));
+        update(
+            &mut state,
+            KnowledgeGraphMessage::GraphLoaded(graph.clone()),
+        );
 
         // Get two node IDs
         let node_ids: Vec<_> = graph.nodes.keys().take(2).cloned().collect();
         if node_ids.len() >= 2 {
             update(
                 &mut state,
-                KnowledgeGraphMessage::ShowDependencyPath(
-                    node_ids[0].clone(),
-                    node_ids[1].clone(),
-                ),
+                KnowledgeGraphMessage::ShowDependencyPath(node_ids[0].clone(), node_ids[1].clone()),
             );
 
             // Path may or may not exist

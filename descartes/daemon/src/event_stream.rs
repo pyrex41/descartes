@@ -2,7 +2,6 @@
 ///
 /// This module provides WebSocket endpoint for streaming events from the event bus
 /// to connected clients with filtering and reconnection support.
-
 use crate::errors::{DaemonError, DaemonResult};
 use crate::events::{DescartesEvent, EventBus, EventFilter};
 use futures::{SinkExt, StreamExt};
@@ -11,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_tungstenite::{
     accept_async,
-    tungstenite::{Message as WsMessage, Error as WsError},
+    tungstenite::{Error as WsError, Message as WsMessage},
 };
 use tracing::{debug, error, info, warn};
 
@@ -22,22 +21,15 @@ pub enum ServerMessage {
     /// Event from the event bus
     Event(DescartesEvent),
     /// Subscription confirmed
-    SubscriptionConfirmed {
-        subscription_id: String,
-    },
+    SubscriptionConfirmed { subscription_id: String },
     /// Subscription updated
-    SubscriptionUpdated {
-        subscription_id: String,
-    },
+    SubscriptionUpdated { subscription_id: String },
     /// Heartbeat/ping
     Ping {
         timestamp: chrono::DateTime<chrono::Utc>,
     },
     /// Error message
-    Error {
-        code: String,
-        message: String,
-    },
+    Error { code: String, message: String },
 }
 
 /// Message sent from client to server over WebSocket
@@ -45,13 +37,9 @@ pub enum ServerMessage {
 #[serde(tag = "type", content = "payload")]
 pub enum ClientMessage {
     /// Subscribe to events with filter
-    Subscribe {
-        filter: Option<EventFilter>,
-    },
+    Subscribe { filter: Option<EventFilter> },
     /// Update subscription filter
-    UpdateFilter {
-        filter: EventFilter,
-    },
+    UpdateFilter { filter: EventFilter },
     /// Unsubscribe
     Unsubscribe,
     /// Pong response to ping
@@ -245,7 +233,9 @@ async fn handle_client_message(
                     subscription_id: sub_id.clone(),
                 }))
             } else {
-                Err(DaemonError::Other("No active subscription to update".to_string()))
+                Err(DaemonError::Other(
+                    "No active subscription to update".to_string(),
+                ))
             }
         }
 

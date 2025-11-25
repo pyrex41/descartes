@@ -25,14 +25,12 @@
 ///       ├── Graceful shutdown
 ///       └── Server statistics
 /// ```
-
 use crate::agent_runner::{LocalProcessRunner, ProcessRunnerConfig};
 use crate::errors::{AgentError, AgentResult};
-use crate::traits::{AgentConfig, AgentInfo, AgentRunner, AgentStatus, AgentSignal};
+use crate::traits::{AgentConfig, AgentInfo, AgentRunner, AgentSignal, AgentStatus};
 use crate::zmq_agent_runner::{
-    ZmqMessage, SpawnRequest, SpawnResponse, ControlCommand, ControlCommandType,
-    CommandResponse, ListAgentsRequest,
-    ListAgentsResponse, HealthCheckRequest, HealthCheckResponse,
+    CommandResponse, ControlCommand, ControlCommandType, HealthCheckRequest, HealthCheckResponse,
+    ListAgentsRequest, ListAgentsResponse, SpawnRequest, SpawnResponse, ZmqMessage,
     ZMQ_PROTOCOL_VERSION,
 };
 use crate::zmq_communication::{SocketType, ZmqConnection};
@@ -170,11 +168,7 @@ impl ZmqAgentServer {
             ..Default::default()
         };
 
-        let connection = ZmqConnection::new(
-            SocketType::Rep,
-            &config.endpoint,
-            zmq_config,
-        );
+        let connection = ZmqConnection::new(SocketType::Rep, &config.endpoint, zmq_config);
 
         let runner = LocalProcessRunner::with_config(config.runner_config.clone());
 
@@ -512,7 +506,10 @@ impl ZmqAgentServer {
             }
             ControlCommandType::Stop => {
                 // Graceful stop (SIGTERM)
-                self.runner.signal(&agent_id, AgentSignal::Terminate).await.map(|_| None)
+                self.runner
+                    .signal(&agent_id, AgentSignal::Terminate)
+                    .await
+                    .map(|_| None)
             }
             ControlCommandType::Kill => {
                 // Force kill
@@ -527,7 +524,10 @@ impl ZmqAgentServer {
                         });
                         Ok(Some(status_json))
                     }
-                    Ok(None) => Err(AgentError::NotFound(format!("Agent not found: {}", agent_id))),
+                    Ok(None) => Err(AgentError::NotFound(format!(
+                        "Agent not found: {}",
+                        agent_id
+                    ))),
                     Err(e) => Err(e),
                 }
             }
@@ -577,7 +577,13 @@ impl ZmqAgentServer {
         };
 
         // Get current status
-        let status = self.runner.get_agent(&agent_id).await.ok().flatten().map(|info| info.status);
+        let status = self
+            .runner
+            .get_agent(&agent_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|info| info.status);
 
         match result {
             Ok(data) => CommandResponse {
@@ -641,10 +647,7 @@ impl ZmqAgentServer {
         let mut metadata = HashMap::new();
         metadata.insert("server_id".to_string(), self.config.server_id.clone());
         metadata.insert("endpoint".to_string(), self.config.endpoint.clone());
-        metadata.insert(
-            "max_agents".to_string(),
-            self.config.max_agents.to_string(),
-        );
+        metadata.insert("max_agents".to_string(), self.config.max_agents.to_string());
 
         HealthCheckResponse {
             request_id: request.request_id,
@@ -700,8 +703,7 @@ impl ZmqAgentServer {
         let interval_secs = self.config.status_update_interval_secs;
 
         tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(Duration::from_secs(interval_secs));
+            let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
 
             loop {
                 tokio::select! {
@@ -732,10 +734,7 @@ impl ZmqAgentServer {
     }
 
     /// Spawn background task for monitoring agent lifecycle
-    fn spawn_agent_monitoring_task(
-        &self,
-        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
-    ) {
+    fn spawn_agent_monitoring_task(&self, mut shutdown_rx: tokio::sync::broadcast::Receiver<()>) {
         let agents = self.agents.clone();
         let runner = self.runner.clone();
 

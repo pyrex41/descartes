@@ -1,6 +1,5 @@
 /// Configuration management for Descartes orchestration system.
 /// Handles loading, parsing, validation, and migration of .descartes/config.toml
-
 use crate::errors::{AgentError, AgentResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

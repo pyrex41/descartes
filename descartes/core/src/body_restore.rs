@@ -21,17 +21,12 @@
 /// 4. Automatic stashing of uncommitted changes
 /// 5. Rollback on error
 /// 6. Post-restore verification
-
 use crate::errors::{StateStoreError, StateStoreResult};
 use async_trait::async_trait;
-use gix::{
-    bstr::ByteSlice,
-    prelude::*,
-    objs::Kind,
-    refs::transaction::PreviousValue,
-};
+use gix::{bstr::ByteSlice, objs::Kind, prelude::*, refs::transaction::PreviousValue};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 // ============================================================================
@@ -244,7 +239,11 @@ pub trait BodyRestoreManager: Send + Sync {
     async fn restore_stash(&self, stash_ref: &str) -> StateStoreResult<()>;
 
     /// Checkout a specific commit
-    async fn checkout_commit(&self, commit_hash: &str, options: RestoreOptions) -> StateStoreResult<RestoreResult>;
+    async fn checkout_commit(
+        &self,
+        commit_hash: &str,
+        options: RestoreOptions,
+    ) -> StateStoreResult<RestoreResult>;
 
     /// Rollback to a previous state using backup
     async fn rollback(&self, backup: &RepositoryBackup) -> StateStoreResult<()>;
@@ -278,10 +277,7 @@ impl GitBodyRestoreManager {
 
         // Try to open the repository to validate it
         gix::open(&repo_path).map_err(|e| {
-            StateStoreError::DatabaseError(format!(
-                "Not a valid git repository: {}",
-                e
-            ))
+            StateStoreError::DatabaseError(format!("Not a valid git repository: {}", e))
         })?;
 
         Ok(Self { repo_path })
@@ -317,32 +313,32 @@ impl GitBodyRestoreManager {
     /// Convert a commit object to CommitInfo
     fn commit_to_info(&self, commit: gix::Commit) -> StateStoreResult<CommitInfo> {
         let hash = commit.id.to_string();
-        let message = commit.message_raw()
-            .map_err(|e| StateStoreError::SerializationError(format!("Failed to read commit message: {}", e)))?
+        let message = commit
+            .message_raw()
+            .map_err(|e| {
+                StateStoreError::SerializationError(format!("Failed to read commit message: {}", e))
+            })?
             .to_str()
             .unwrap_or("<invalid UTF-8>")
             .trim()
             .to_string();
 
-        let author = commit.author()
-            .map_err(|e| StateStoreError::SerializationError(format!("Failed to read author: {}", e)))?;
+        let author = commit.author().map_err(|e| {
+            StateStoreError::SerializationError(format!("Failed to read author: {}", e))
+        })?;
 
-        let author_name = author.name.to_str()
-            .unwrap_or("<unknown>")
-            .to_string();
+        let author_name = author.name.to_str().unwrap_or("<unknown>").to_string();
 
-        let author_email = author.email.to_str()
-            .unwrap_or("<unknown>")
-            .to_string();
+        let author_email = author.email.to_str().unwrap_or("<unknown>").to_string();
 
         let timestamp = author.time.seconds;
 
-        let parents: Vec<String> = commit.parent_ids()
-            .map(|id| id.to_string())
-            .collect();
+        let parents: Vec<String> = commit.parent_ids().map(|id| id.to_string()).collect();
 
-        Ok(CommitInfo::new(hash, message, author_name, author_email, timestamp)
-            .with_parents(parents))
+        Ok(
+            CommitInfo::new(hash, message, author_name, author_email, timestamp)
+                .with_parents(parents),
+        )
     }
 }
 
@@ -351,12 +347,18 @@ impl BodyRestoreManager for GitBodyRestoreManager {
     async fn get_current_commit(&self) -> StateStoreResult<String> {
         let repo = self.open_repo()?;
 
-        let mut head = repo.head()
+        let mut head = repo
+            .head()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read HEAD: {}", e)))?;
 
-        let commit_id = head.try_peel_to_id_in_place()
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD commit: {}", e)))?
-            .ok_or_else(|| StateStoreError::DatabaseError("Could not peel HEAD to ID".to_string()))?;
+        let commit_id = head
+            .try_peel_to_id_in_place()
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to resolve HEAD commit: {}", e))
+            })?
+            .ok_or_else(|| {
+                StateStoreError::DatabaseError("Could not peel HEAD to ID".to_string())
+            })?;
 
         Ok(commit_id.to_string())
     }
@@ -365,7 +367,8 @@ impl BodyRestoreManager for GitBodyRestoreManager {
         let repo = self.open_repo()?;
         let oid = self.parse_commit_hash(commit_hash)?;
 
-        let commit = repo.find_object(oid)
+        let commit = repo
+            .find_object(oid)
             .map_err(|e| StateStoreError::NotFound(format!("Commit not found: {}", e)))?
             .try_into_commit()
             .map_err(|e| StateStoreError::DatabaseError(format!("Not a commit object: {}", e)))?;
@@ -380,7 +383,10 @@ impl BodyRestoreManager for GitBodyRestoreManager {
         };
 
         let repo = self.open_repo()?;
-        let exists = repo.find_object(oid).map(|obj| obj.kind == Kind::Commit).unwrap_or(false);
+        let exists = repo
+            .find_object(oid)
+            .map(|obj| obj.kind == Kind::Commit)
+            .unwrap_or(false);
         Ok(exists)
     }
 
@@ -389,24 +395,31 @@ impl BodyRestoreManager for GitBodyRestoreManager {
 
         // Check for changes in the index and working tree
         // This is a simplified check - in production you'd want more thorough status checking
-        let mut index = repo.index()
+        let mut index = repo
+            .index()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read index: {}", e)))?;
 
         // Get the HEAD tree
-        let mut head = repo.head()
+        let mut head = repo
+            .head()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read HEAD: {}", e)))?;
 
-        let head_commit_id = head.try_peel_to_id_in_place()
+        let head_commit_id = head
+            .try_peel_to_id_in_place()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD: {}", e)))?
             .ok_or_else(|| StateStoreError::DatabaseError("Could not peel HEAD to ID".to_string()))?
             .detach();
 
-        let head_commit = repo.find_object(head_commit_id)
-            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to find HEAD commit: {}", e)))?
+        let head_commit = repo
+            .find_object(head_commit_id)
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to find HEAD commit: {}", e))
+            })?
             .try_into_commit()
             .map_err(|e| StateStoreError::DatabaseError(format!("HEAD is not a commit: {}", e)))?;
 
-        let head_tree_id = head_commit.tree_id()
+        let head_tree_id = head_commit
+            .tree_id()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get tree: {}", e)))?;
 
         // Compare index with HEAD tree
@@ -424,21 +437,21 @@ impl BodyRestoreManager for GitBodyRestoreManager {
         let has_changes = self.has_uncommitted_changes().await?;
 
         let repo = self.open_repo()?;
-        let head = repo.head()
+        let head = repo
+            .head()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read HEAD: {}", e)))?;
 
         // Get branch name if on a branch (not detached HEAD)
         let branch_name = if let Some(name) = head.referent_name() {
-            name.as_bstr()
-                .to_str()
-                .ok()
-                .map(|s| s.to_string())
+            name.as_bstr().to_str().ok().map(|s| s.to_string())
         } else {
             None
         };
 
-        debug!("Created backup: HEAD={}, branch={:?}, has_changes={}",
-               head_commit, branch_name, has_changes);
+        debug!(
+            "Created backup: HEAD={}, branch={:?}, has_changes={}",
+            head_commit, branch_name, has_changes
+        );
 
         Ok(RepositoryBackup::new(head_commit, branch_name, has_changes))
     }
@@ -463,12 +476,19 @@ impl BodyRestoreManager for GitBodyRestoreManager {
 
         // Same limitation as stash_changes
         Err(StateStoreError::NotSupported(
-            "Stash restore functionality not yet implemented with gitoxide.".to_string()
+            "Stash restore functionality not yet implemented with gitoxide.".to_string(),
         ))
     }
 
-    async fn checkout_commit(&self, commit_hash: &str, options: RestoreOptions) -> StateStoreResult<RestoreResult> {
-        info!("Starting checkout to commit: {} with options: {:?}", commit_hash, options);
+    async fn checkout_commit(
+        &self,
+        commit_hash: &str,
+        options: RestoreOptions,
+    ) -> StateStoreResult<RestoreResult> {
+        info!(
+            "Starting checkout to commit: {} with options: {:?}",
+            commit_hash, options
+        );
 
         // Step 1: Verify commit exists
         if options.verify_commit {
@@ -494,14 +514,18 @@ impl BodyRestoreManager for GitBodyRestoreManager {
 
         if has_changes && !options.force && !options.stash_changes {
             return Err(StateStoreError::Conflict(
-                "Repository has uncommitted changes. Use stash_changes=true or force=true".to_string()
+                "Repository has uncommitted changes. Use stash_changes=true or force=true"
+                    .to_string(),
             ));
         }
 
         // Step 4: Stash changes if needed
         let mut backup_with_stash = backup.clone();
         if has_changes && options.stash_changes {
-            match self.stash_changes(&format!("Auto-stash before restore to {}", commit_hash)).await {
+            match self
+                .stash_changes(&format!("Auto-stash before restore to {}", commit_hash))
+                .await
+            {
                 Ok(stash_ref) => {
                     backup_with_stash = backup_with_stash.with_stash(stash_ref);
                 }
@@ -518,13 +542,21 @@ impl BodyRestoreManager for GitBodyRestoreManager {
 
         // Update HEAD to point to the target commit (detached HEAD state)
         {
-            let mut head_ref = repo.head_ref()
-                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e)))?
-                .ok_or_else(|| StateStoreError::DatabaseError("HEAD reference not found".to_string()))?;
+            let mut head_ref = repo
+                .head_ref()
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e))
+                })?
+                .ok_or_else(|| {
+                    StateStoreError::DatabaseError("HEAD reference not found".to_string())
+                })?;
 
             // Detach HEAD and point it to the target commit
-            head_ref.set_target_id(target_oid, "restore body")
-                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to update HEAD: {}", e)))?;
+            head_ref
+                .set_target_id(target_oid, "restore body")
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to update HEAD: {}", e))
+                })?;
         }
 
         info!("Successfully checked out commit: {}", commit_hash);
@@ -542,11 +574,14 @@ impl BodyRestoreManager for GitBodyRestoreManager {
                 )));
             }
             return Err(StateStoreError::Conflict(
-                "Checkout verification failed. Rolled back to previous state.".to_string()
+                "Checkout verification failed. Rolled back to previous state.".to_string(),
             ));
         }
 
-        Ok(RestoreResult::success(commit_hash.to_string(), backup_with_stash))
+        Ok(RestoreResult::success(
+            commit_hash.to_string(),
+            backup_with_stash,
+        ))
     }
 
     async fn rollback(&self, backup: &RepositoryBackup) -> StateStoreResult<()> {
@@ -557,12 +592,20 @@ impl BodyRestoreManager for GitBodyRestoreManager {
 
         // Update HEAD back to the backup commit
         {
-            let mut head_ref = repo.head_ref()
-                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e)))?
-                .ok_or_else(|| StateStoreError::DatabaseError("HEAD reference not found".to_string()))?;
+            let mut head_ref = repo
+                .head_ref()
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to get HEAD reference: {}", e))
+                })?
+                .ok_or_else(|| {
+                    StateStoreError::DatabaseError("HEAD reference not found".to_string())
+                })?;
 
-            head_ref.set_target_id(target_oid, "rollback restore")
-                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to rollback HEAD: {}", e)))?;
+            head_ref
+                .set_target_id(target_oid, "rollback restore")
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to rollback HEAD: {}", e))
+                })?;
         }
 
         // Restore stash if it exists
@@ -580,10 +623,12 @@ impl BodyRestoreManager for GitBodyRestoreManager {
     async fn get_recent_commits(&self, limit: usize) -> StateStoreResult<Vec<CommitInfo>> {
         let repo = self.open_repo()?;
 
-        let mut head = repo.head()
+        let mut head = repo
+            .head()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read HEAD: {}", e)))?;
 
-        let head_id = head.try_peel_to_id_in_place()
+        let head_id = head
+            .try_peel_to_id_in_place()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to resolve HEAD: {}", e)))?
             .ok_or_else(|| StateStoreError::DatabaseError("Could not peel HEAD to ID".to_string()))?
             .detach();
@@ -596,22 +641,72 @@ impl BodyRestoreManager for GitBodyRestoreManager {
                 break;
             }
 
-            let commit = repo.find_object(oid)
-                .map_err(|e| StateStoreError::DatabaseError(format!("Failed to find commit: {}", e)))?
+            let commit = repo
+                .find_object(oid)
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to find commit: {}", e))
+                })?
                 .try_into_commit()
                 .map_err(|e| StateStoreError::DatabaseError(format!("Not a commit: {}", e)))?;
 
             let commit_info = self.commit_to_info(commit.clone())?;
 
             // Get first parent for linear history traversal
-            current_id = commit.parent_ids()
-                .next()
-                .map(|id| id.detach());
+            current_id = commit.parent_ids().next().map(|id| id.detach());
 
             commits.push(commit_info);
         }
 
         Ok(commits)
+    }
+}
+
+// Blanket implementation for Arc<T> where T: BodyRestoreManager
+// This allows Arc-wrapped managers to be used directly without dereferencing
+#[async_trait]
+impl<T: BodyRestoreManager> BodyRestoreManager for Arc<T> {
+    async fn get_current_commit(&self) -> StateStoreResult<String> {
+        (**self).get_current_commit().await
+    }
+
+    async fn get_commit_info(&self, commit_hash: &str) -> StateStoreResult<CommitInfo> {
+        (**self).get_commit_info(commit_hash).await
+    }
+
+    async fn verify_commit_exists(&self, commit_hash: &str) -> StateStoreResult<bool> {
+        (**self).verify_commit_exists(commit_hash).await
+    }
+
+    async fn has_uncommitted_changes(&self) -> StateStoreResult<bool> {
+        (**self).has_uncommitted_changes().await
+    }
+
+    async fn create_backup(&self) -> StateStoreResult<RepositoryBackup> {
+        (**self).create_backup().await
+    }
+
+    async fn stash_changes(&self, message: &str) -> StateStoreResult<String> {
+        (**self).stash_changes(message).await
+    }
+
+    async fn restore_stash(&self, stash_ref: &str) -> StateStoreResult<()> {
+        (**self).restore_stash(stash_ref).await
+    }
+
+    async fn checkout_commit(
+        &self,
+        commit_hash: &str,
+        options: RestoreOptions,
+    ) -> StateStoreResult<RestoreResult> {
+        (**self).checkout_commit(commit_hash, options).await
+    }
+
+    async fn rollback(&self, backup: &RepositoryBackup) -> StateStoreResult<()> {
+        (**self).rollback(backup).await
+    }
+
+    async fn get_recent_commits(&self, limit: usize) -> StateStoreResult<Vec<CommitInfo>> {
+        (**self).get_recent_commits(limit).await
     }
 }
 
@@ -644,7 +739,10 @@ impl CoordinatedRestore {
         info!("Starting coordinated restore to commit: {}", commit_hash);
 
         // First, restore the body (code state)
-        let body_result = self.body_manager.checkout_commit(commit_hash, options).await?;
+        let body_result = self
+            .body_manager
+            .checkout_commit(commit_hash, options)
+            .await?;
 
         // TODO: In phase3:7.4, integrate with brain restore (load events from history)
         // For now, we only handle body restore
@@ -688,6 +786,13 @@ mod tests {
             .current_dir(&repo_path)
             .output()
             .expect("Failed to configure git user.email");
+
+        // Disable commit signing for tests
+        Command::new("git")
+            .args(["config", "commit.gpgsign", "false"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("Failed to disable commit signing");
 
         // Create initial commit
         std::fs::write(repo_path.join("test.txt"), "initial content").unwrap();
@@ -751,7 +856,10 @@ mod tests {
         assert!(exists);
 
         // Non-existent commit should return false
-        let exists = manager.verify_commit_exists("0000000000000000000000000000000000000000").await.unwrap();
+        let exists = manager
+            .verify_commit_exists("0000000000000000000000000000000000000000")
+            .await
+            .unwrap();
         assert!(!exists);
     }
 

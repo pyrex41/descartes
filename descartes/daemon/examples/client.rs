@@ -1,5 +1,4 @@
 /// Example RPC client for Descartes daemon
-
 use serde_json::{json, Value};
 
 /// Simple RPC client
@@ -16,7 +15,11 @@ impl RpcClient {
     }
 
     /// Call a JSON-RPC 2.0 method
-    pub async fn call(&self, method: &str, params: Option<Value>) -> Result<Value, Box<dyn std::error::Error>> {
+    pub async fn call(
+        &self,
+        method: &str,
+        params: Option<Value>,
+    ) -> Result<Value, Box<dyn std::error::Error>> {
         let request = json!({
             "jsonrpc": "2.0",
             "method": method,

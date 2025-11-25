@@ -9,10 +9,9 @@
 /// - Metadata management
 /// - History and undo/redo
 /// - Statistics and analysis
-
 use descartes_core::dag::{
-    DAG, DAGNode, DAGEdge, DAGWithHistory, DAGError, DAGHistory, DAGOperation,
-    EdgeType, Position, DAGStatistics,
+    DAGEdge, DAGError, DAGHistory, DAGNode, DAGOperation, DAGStatistics, DAGWithHistory, EdgeType,
+    Position, DAG,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -74,14 +73,16 @@ fn test_add_duplicate_node() {
     let node_id = node.node_id;
 
     assert!(dag.add_node(node.clone()).is_ok());
-    assert!(matches!(dag.add_node(node), Err(DAGError::DuplicateNode(_))));
+    assert!(matches!(
+        dag.add_node(node),
+        Err(DAGError::DuplicateNode(_))
+    ));
 }
 
 #[test]
 fn test_add_node_with_position() {
     let mut dag = DAG::new("Test");
-    let node = DAGNode::new_auto("Task")
-        .with_position(100.0, 200.0);
+    let node = DAGNode::new_auto("Task").with_position(100.0, 200.0);
     let node_id = node.node_id;
 
     dag.add_node(node).unwrap();
@@ -102,8 +103,19 @@ fn test_add_node_with_metadata() {
     dag.add_node(node).unwrap();
 
     let retrieved = dag.get_node(node_id).unwrap();
-    assert_eq!(retrieved.metadata.get("priority").unwrap().as_str().unwrap(), "high");
-    assert_eq!(retrieved.metadata.get("owner").unwrap().as_str().unwrap(), "team-a");
+    assert_eq!(
+        retrieved
+            .metadata
+            .get("priority")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "high"
+    );
+    assert_eq!(
+        retrieved.metadata.get("owner").unwrap().as_str().unwrap(),
+        "team-a"
+    );
 }
 
 #[test]
@@ -141,7 +153,10 @@ fn test_remove_nonexistent_node() {
     let mut dag = DAG::new("Test");
     let fake_id = Uuid::new_v4();
 
-    assert!(matches!(dag.remove_node(fake_id), Err(DAGError::NodeNotFound(_))));
+    assert!(matches!(
+        dag.remove_node(fake_id),
+        Err(DAGError::NodeNotFound(_))
+    ));
 }
 
 #[test]
@@ -199,7 +214,10 @@ fn test_update_nonexistent_node() {
     let fake_id = Uuid::new_v4();
     let node = DAGNode::new(fake_id, "Fake");
 
-    assert!(matches!(dag.update_node(fake_id, node), Err(DAGError::NodeNotFound(_))));
+    assert!(matches!(
+        dag.update_node(fake_id, node),
+        Err(DAGError::NodeNotFound(_))
+    ));
 }
 
 #[test]
@@ -252,37 +270,55 @@ fn test_add_edge_with_metadata() {
     dag.add_node(node1).unwrap();
     dag.add_node(node2).unwrap();
 
-    let edge = DAGEdge::dependency(id1, id2)
-        .with_metadata("condition", "x > 0");
+    let edge = DAGEdge::dependency(id1, id2).with_metadata("condition", "x > 0");
     let edge_id = edge.edge_id;
 
     dag.add_edge(edge).unwrap();
 
     let retrieved = dag.get_edge(edge_id).unwrap();
-    assert_eq!(retrieved.metadata.get("condition").unwrap().as_str().unwrap(), "x > 0");
+    assert_eq!(
+        retrieved
+            .metadata
+            .get("condition")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "x > 0"
+    );
 }
 
 #[test]
 fn test_add_multiple_edge_types() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (0..4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (0..4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
         dag.add_node(node).unwrap();
     }
 
-    dag.add_edge(DAGEdge::new(ids[0], ids[1], EdgeType::Dependency)).unwrap();
-    dag.add_edge(DAGEdge::new(ids[1], ids[2], EdgeType::SoftDependency)).unwrap();
-    dag.add_edge(DAGEdge::new(ids[2], ids[3], EdgeType::DataFlow)).unwrap();
+    dag.add_edge(DAGEdge::new(ids[0], ids[1], EdgeType::Dependency))
+        .unwrap();
+    dag.add_edge(DAGEdge::new(ids[1], ids[2], EdgeType::SoftDependency))
+        .unwrap();
+    dag.add_edge(DAGEdge::new(ids[2], ids[3], EdgeType::DataFlow))
+        .unwrap();
 
     assert_eq!(dag.edges.len(), 3);
 
     let edges: Vec<_> = dag.edges.values().collect();
-    assert!(edges.iter().any(|e| matches!(e.edge_type, EdgeType::Dependency)));
-    assert!(edges.iter().any(|e| matches!(e.edge_type, EdgeType::SoftDependency)));
-    assert!(edges.iter().any(|e| matches!(e.edge_type, EdgeType::DataFlow)));
+    assert!(edges
+        .iter()
+        .any(|e| matches!(e.edge_type, EdgeType::Dependency)));
+    assert!(edges
+        .iter()
+        .any(|e| matches!(e.edge_type, EdgeType::SoftDependency)));
+    assert!(edges
+        .iter()
+        .any(|e| matches!(e.edge_type, EdgeType::DataFlow)));
 }
 
 #[test]
@@ -364,7 +400,9 @@ fn test_get_edges_between() {
 fn test_topological_sort_linear_chain() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=5).map(|i| DAGNode::new_auto(format!("T{}", i))).collect();
+    let nodes: Vec<_> = (1..=5)
+        .map(|i| DAGNode::new_auto(format!("T{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -373,7 +411,8 @@ fn test_topological_sort_linear_chain() {
 
     // Create chain: 1 -> 2 -> 3 -> 4 -> 5
     for i in 0..4 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     let sorted = dag.topological_sort().unwrap();
@@ -396,7 +435,9 @@ fn test_topological_sort_diamond() {
     //   2   3
     //    \ /
     //     4
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -430,7 +471,9 @@ fn test_topological_sort_multiple_roots() {
     //   1   2
     //    \ /
     //     3
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -476,7 +519,9 @@ fn test_topological_sort_single_node() {
 fn test_get_execution_order() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("T{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("T{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -498,7 +543,9 @@ fn test_get_execution_order() {
 fn test_validate_acyclic_dag() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -515,7 +562,9 @@ fn test_validate_acyclic_dag() {
 fn test_detect_simple_cycle() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -550,7 +599,9 @@ fn test_detect_self_cycle() {
 fn test_detect_complex_cycle() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=6).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=6)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -572,7 +623,9 @@ fn test_detect_complex_cycle() {
 fn test_detect_cycles_method() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (0..6).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (0..6)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -602,7 +655,9 @@ fn test_detect_cycles_method() {
 fn test_has_path_direct() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=2).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=2)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -619,7 +674,9 @@ fn test_has_path_direct() {
 fn test_has_path_indirect() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=5).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=5)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -628,7 +685,8 @@ fn test_has_path_indirect() {
 
     // Chain: 1 -> 2 -> 3 -> 4 -> 5
     for i in 0..4 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     // Path from 1 to 5 exists
@@ -657,7 +715,9 @@ fn test_has_path_self() {
 fn test_find_all_paths_single() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -682,7 +742,9 @@ fn test_find_all_paths_multiple() {
     //   2   3
     //    \ /
     //     4
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -707,7 +769,9 @@ fn test_find_dependencies() {
     let mut dag = DAG::new("Test");
 
     // Chain: 1 -> 2 -> 3 -> 4
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -715,7 +779,8 @@ fn test_find_dependencies() {
     }
 
     for i in 0..3 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     // Node 4 depends on 3, 2, and 1
@@ -735,7 +800,9 @@ fn test_find_dependents() {
     let mut dag = DAG::new("Test");
 
     // Chain: 1 -> 2 -> 3 -> 4
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -743,7 +810,8 @@ fn test_find_dependents() {
     }
 
     for i in 0..3 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     // Node 1 has 3 dependents: 2, 3, 4
@@ -767,7 +835,9 @@ fn test_find_critical_path() {
     //   2   3
     //    \ /
     //     4
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -794,7 +864,9 @@ fn test_find_critical_path() {
 fn test_get_start_nodes() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -820,7 +892,9 @@ fn test_get_start_nodes() {
 fn test_get_end_nodes() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -846,7 +920,9 @@ fn test_get_end_nodes() {
 fn test_find_roots_and_leaves() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -869,7 +945,9 @@ fn test_find_roots_and_leaves() {
 fn test_get_successors() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -894,7 +972,9 @@ fn test_get_successors() {
 fn test_get_predecessors() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -919,7 +999,9 @@ fn test_get_predecessors() {
 fn test_get_incoming_edges() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -937,7 +1019,9 @@ fn test_get_incoming_edges() {
 fn test_get_outgoing_edges() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -959,7 +1043,9 @@ fn test_get_outgoing_edges() {
 fn test_max_depth_linear() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=5).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=5)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -968,7 +1054,8 @@ fn test_max_depth_linear() {
 
     // Chain of depth 4 (5 nodes, 4 edges)
     for i in 0..4 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     assert_eq!(dag.max_depth(), 4);
@@ -983,7 +1070,9 @@ fn test_max_depth_diamond() {
     //   2   3
     //    \ /
     //     4
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1002,7 +1091,9 @@ fn test_max_depth_diamond() {
 fn test_is_connected_true() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1019,7 +1110,9 @@ fn test_is_connected_true() {
 fn test_is_connected_false() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1051,14 +1144,19 @@ fn test_validate_connectivity() {
     let node3 = DAGNode::new_auto("C");
     dag.add_node(node3).unwrap();
 
-    assert!(matches!(dag.validate_connectivity(), Err(DAGError::UnreachableNodes(_))));
+    assert!(matches!(
+        dag.validate_connectivity(),
+        Err(DAGError::UnreachableNodes(_))
+    ));
 }
 
 #[test]
 fn test_statistics() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1083,7 +1181,9 @@ fn test_statistics() {
 fn test_get_subgraph() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1092,7 +1192,8 @@ fn test_get_subgraph() {
 
     // 1 -> 2 -> 3 -> 4
     for i in 0..3 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     // Extract subgraph with nodes 2 and 3
@@ -1114,8 +1215,7 @@ fn test_json_serialization() {
     let node1 = DAGNode::new_auto("Task 1")
         .with_position(100.0, 200.0)
         .with_metadata("priority", "high");
-    let node2 = DAGNode::new_auto("Task 2")
-        .with_position(300.0, 200.0);
+    let node2 = DAGNode::new_auto("Task 2").with_position(300.0, 200.0);
 
     let id1 = node1.node_id;
     let id2 = node2.node_id;
@@ -1142,7 +1242,9 @@ fn test_json_serialization() {
 fn test_adjacency_rebuild() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1304,7 +1406,9 @@ fn test_history_max_size() {
 fn test_bfs_traversal() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=4)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1323,7 +1427,8 @@ fn test_bfs_traversal() {
     let mut visited = Vec::new();
     dag.bfs_from(ids[0], |node_id, _depth| {
         visited.push(node_id);
-    }).unwrap();
+    })
+    .unwrap();
 
     assert_eq!(visited.len(), 4);
     assert_eq!(visited[0], ids[0]); // Start node visited first
@@ -1333,7 +1438,9 @@ fn test_bfs_traversal() {
 fn test_dfs_traversal() {
     let mut dag = DAG::new("Test");
 
-    let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("N{}", i))).collect();
+    let nodes: Vec<_> = (1..=3)
+        .map(|i| DAGNode::new_auto(format!("N{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -1346,7 +1453,8 @@ fn test_dfs_traversal() {
     let mut visited = Vec::new();
     dag.dfs_from(ids[0], |node_id, _depth| {
         visited.push(node_id);
-    }).unwrap();
+    })
+    .unwrap();
 
     assert_eq!(visited.len(), 3);
     assert_eq!(visited[0], ids[0]); // Start node visited first
@@ -1398,7 +1506,8 @@ fn test_large_dag() {
 
     // Create linear chain
     for i in 0..99 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     assert_eq!(dag.nodes.len(), 100);

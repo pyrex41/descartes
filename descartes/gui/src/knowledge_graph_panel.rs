@@ -11,13 +11,12 @@
 /// - Relationship type filtering
 /// - Visual node clustering
 /// - Export capabilities
-
 use descartes_agent_runner::knowledge_graph::{
     KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, RelationshipType,
 };
 use iced::widget::{
     button, canvas, checkbox, column, container, horizontal_space, pick_list, row, scrollable,
-    text, text_input, Space, Canvas, Column, Row,
+    text, text_input, Canvas, Column, Row, Space,
 };
 use iced::{mouse, Color, Element, Length, Point, Rectangle, Renderer, Size, Theme, Vector};
 use std::collections::{HashMap, HashSet};
@@ -490,7 +489,10 @@ pub fn update(state: &mut KnowledgeGraphPanelState, message: KnowledgeGraphMessa
             if let Some(ref graph) = state.graph {
                 state.dependency_path = graph.find_path(&from_id, &to_id);
                 if state.dependency_path.is_some() {
-                    tracing::info!("Path found with {} nodes", state.dependency_path.as_ref().unwrap().len());
+                    tracing::info!(
+                        "Path found with {} nodes",
+                        state.dependency_path.as_ref().unwrap().len()
+                    );
                 }
             }
             state.canvas_cache.clear();
@@ -516,7 +518,10 @@ pub fn update(state: &mut KnowledgeGraphPanelState, message: KnowledgeGraphMessa
                 }
 
                 state.impact_nodes = affected;
-                tracing::info!("Impact analysis found {} affected nodes", state.impact_nodes.len());
+                tracing::info!(
+                    "Impact analysis found {} affected nodes",
+                    state.impact_nodes.len()
+                );
             }
             state.canvas_cache.clear();
         }
@@ -539,13 +544,19 @@ pub fn update(state: &mut KnowledgeGraphPanelState, message: KnowledgeGraphMessa
                 }
 
                 state.related_suggestions = suggestions;
-                tracing::info!("Found {} related suggestions", state.related_suggestions.len());
+                tracing::info!(
+                    "Found {} related suggestions",
+                    state.related_suggestions.len()
+                );
             }
         }
         KnowledgeGraphMessage::AddToComparison(node_id) => {
             if !state.comparison_nodes.contains(&node_id) {
                 state.comparison_nodes.push(node_id);
-                tracing::info!("Added to comparison: {} nodes total", state.comparison_nodes.len());
+                tracing::info!(
+                    "Added to comparison: {} nodes total",
+                    state.comparison_nodes.len()
+                );
             }
         }
         KnowledgeGraphMessage::ClearComparison => {
@@ -629,13 +640,7 @@ pub fn view(state: &KnowledgeGraphPanelState) -> Element<KnowledgeGraphMessage> 
     // Footer with stats
     let footer = view_footer(state, graph);
 
-    column![
-        header,
-        main_content,
-        footer,
-    ]
-    .spacing(0)
-    .into()
+    column![header, main_content, footer,].spacing(0).into()
 }
 
 /// Render empty state
@@ -648,7 +653,7 @@ fn view_empty_state() -> Element<'static, KnowledgeGraphMessage> {
         ]
         .spacing(10)
         .padding(20)
-        .align_x(iced::alignment::Horizontal::Center)
+        .align_x(iced::alignment::Horizontal::Center),
     )
     .width(Length::Fill)
     .height(Length::Fill)
@@ -674,10 +679,18 @@ fn view_header(state: &KnowledgeGraphPanelState) -> Element<KnowledgeGraphMessag
     .placeholder("Layout");
 
     let control_buttons = row![
-        button(text("Reset View")).on_press(KnowledgeGraphMessage::ResetViewport).padding(6),
-        button(text("Relayout")).on_press(KnowledgeGraphMessage::RelayoutGraph).padding(6),
-        button(text("Zoom +")).on_press(KnowledgeGraphMessage::ZoomIn).padding(6),
-        button(text("Zoom -")).on_press(KnowledgeGraphMessage::ZoomOut).padding(6),
+        button(text("Reset View"))
+            .on_press(KnowledgeGraphMessage::ResetViewport)
+            .padding(6),
+        button(text("Relayout"))
+            .on_press(KnowledgeGraphMessage::RelayoutGraph)
+            .padding(6),
+        button(text("Zoom +"))
+            .on_press(KnowledgeGraphMessage::ZoomIn)
+            .padding(6),
+        button(text("Zoom -"))
+            .on_press(KnowledgeGraphMessage::ZoomOut)
+            .padding(6),
     ]
     .spacing(5);
 
@@ -705,19 +718,17 @@ fn view_header(state: &KnowledgeGraphPanelState) -> Element<KnowledgeGraphMessag
             .spacing(5)
         ]
         .spacing(5)
-        .padding(10)
+        .padding(10),
     )
     .width(Length::Fill)
-    .style(|theme: &Theme| {
-        container::Style {
-            background: Some(theme.palette().background.into()),
-            border: iced::Border {
-                width: 0.0,
-                color: Color::TRANSPARENT,
-                radius: 0.0.into(),
-            },
-            ..Default::default()
-        }
+    .style(|theme: &Theme| container::Style {
+        background: Some(theme.palette().background.into()),
+        border: iced::Border {
+            width: 0.0,
+            color: Color::TRANSPARENT,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
     })
     .into()
 }
@@ -746,11 +757,8 @@ fn view_side_panel<'a>(
         let count = graph.get_nodes_by_type(node_type).len();
         let is_filtered = state.type_filters.contains(&node_type);
 
-        let filter_checkbox = checkbox(
-            format!("{} ({})", node_type.as_str(), count),
-            is_filtered
-        )
-        .on_toggle(move |_| KnowledgeGraphMessage::ToggleTypeFilter(node_type));
+        let filter_checkbox = checkbox(format!("{} ({})", node_type.as_str(), count), is_filtered)
+            .on_toggle(move |_| KnowledgeGraphMessage::ToggleTypeFilter(node_type));
 
         panel_content = panel_content.push(filter_checkbox);
     }
@@ -770,11 +778,8 @@ fn view_side_panel<'a>(
     for rel_type in rel_types {
         let is_filtered = state.relationship_filters.contains(&rel_type);
 
-        let filter_checkbox = checkbox(
-            rel_type.as_str(),
-            is_filtered
-        )
-        .on_toggle(move |_| KnowledgeGraphMessage::ToggleRelationshipFilter(rel_type));
+        let filter_checkbox = checkbox(rel_type.as_str(), is_filtered)
+            .on_toggle(move |_| KnowledgeGraphMessage::ToggleRelationshipFilter(rel_type));
 
         panel_content = panel_content.push(filter_checkbox);
     }
@@ -806,14 +811,11 @@ fn view_side_panel<'a>(
             .filter_map(|node_id| graph.get_node(node_id))
             .map(|node| {
                 let node_id = node.node_id.clone();
-                button(
-                    text(format!("{}: {}", node.content_type.as_str(), node.name))
-                        .size(12)
-                )
-                .on_press(KnowledgeGraphMessage::FocusNode(node_id))
-                .padding(5)
-                .width(Length::Fill)
-                .into()
+                button(text(format!("{}: {}", node.content_type.as_str(), node.name)).size(12))
+                    .on_press(KnowledgeGraphMessage::FocusNode(node_id))
+                    .padding(5)
+                    .width(Length::Fill)
+                    .into()
             })
             .collect();
 
@@ -827,7 +829,8 @@ fn view_side_panel<'a>(
             panel_content = panel_content.push(Space::with_height(15));
             panel_content = panel_content.push(text("Selected Node").size(16));
             panel_content = panel_content.push(text(format!("Name: {}", node.name)).size(12));
-            panel_content = panel_content.push(text(format!("Type: {}", node.content_type.as_str())).size(12));
+            panel_content =
+                panel_content.push(text(format!("Type: {}", node.content_type.as_str())).size(12));
 
             if let Some(ref sig) = node.signature {
                 panel_content = panel_content.push(text(format!("Signature: {}", sig)).size(11));
@@ -835,9 +838,8 @@ fn view_side_panel<'a>(
 
             let outgoing = graph.get_outgoing_edges(node_id).len();
             let incoming = graph.get_incoming_edges(node_id).len();
-            panel_content = panel_content.push(
-                text(format!("Connections: {} out, {} in", outgoing, incoming)).size(12)
-            );
+            panel_content = panel_content
+                .push(text(format!("Connections: {} out, {} in", outgoing, incoming)).size(12));
 
             let jump_button = button(text("Jump to Code"))
                 .on_press(KnowledgeGraphMessage::JumpToNode(node_id.clone()))
@@ -850,16 +852,14 @@ fn view_side_panel<'a>(
     container(scrollable(panel_content))
         .width(300)
         .height(Length::Fill)
-        .style(|theme: &Theme| {
-            container::Style {
-                background: Some(theme.palette().background.into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: theme.palette().text.scale_alpha(0.2),
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            }
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: iced::Border {
+                width: 1.0,
+                color: theme.palette().text.scale_alpha(0.2),
+                radius: 0.0.into(),
+            },
+            ..Default::default()
         })
         .into()
 }
@@ -885,15 +885,11 @@ fn view_graph_canvas<'a>(
         state.viewport.scale * 100.0
     );
 
-    container(
-        text(graph_text)
-            .size(14)
-    )
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .center(Length::Fill)
-    .style(|theme: &Theme| {
-        container::Style {
+    container(text(graph_text).size(14))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center(Length::Fill)
+        .style(|theme: &Theme| container::Style {
             background: Some(Color::from_rgb8(20, 20, 30).into()),
             border: iced::Border {
                 width: 1.0,
@@ -901,9 +897,8 @@ fn view_graph_canvas<'a>(
                 radius: 0.0.into(),
             },
             ..Default::default()
-        }
-    })
-    .into()
+        })
+        .into()
 }
 
 /// Render footer with statistics
@@ -916,7 +911,9 @@ fn view_footer(
     let visible_nodes = if state.type_filters.is_empty() {
         graph.nodes.len()
     } else {
-        graph.nodes.values()
+        graph
+            .nodes
+            .values()
             .filter(|n| state.type_filters.contains(&n.content_type))
             .count()
     };
@@ -927,16 +924,17 @@ fn view_footer(
         visible_nodes,
         stats.total_edges,
         stats.avg_degree,
-        if state.selected_node.is_some() { "Yes" } else { "No" }
+        if state.selected_node.is_some() {
+            "Yes"
+        } else {
+            "No"
+        }
     );
 
-    container(
-        text(stats_text).size(12)
-    )
-    .padding(10)
-    .width(Length::Fill)
-    .style(|theme: &Theme| {
-        container::Style {
+    container(text(stats_text).size(12))
+        .padding(10)
+        .width(Length::Fill)
+        .style(|theme: &Theme| container::Style {
             background: Some(theme.palette().background.into()),
             border: iced::Border {
                 width: 1.0,
@@ -944,9 +942,8 @@ fn view_footer(
                 radius: 0.0.into(),
             },
             ..Default::default()
-        }
-    })
-    .into()
+        })
+        .into()
 }
 
 /// ============================================================================
@@ -965,7 +962,8 @@ fn perform_search(state: &KnowledgeGraphPanelState) -> Vec<String> {
 
     let query = state.search_query.to_lowercase();
 
-    graph.nodes
+    graph
+        .nodes
         .values()
         .filter(|node| {
             if state.fuzzy_search {
@@ -1030,10 +1028,7 @@ fn force_directed_layout(graph: &KnowledgeGraph) -> HashMap<String, Point> {
 
         positions.insert(
             node_id.clone(),
-            Point::new(
-                100.0 + col as f32 * 150.0,
-                100.0 + row as f32 * 100.0,
-            ),
+            Point::new(100.0 + col as f32 * 150.0, 100.0 + row as f32 * 100.0),
         );
     }
 
@@ -1045,7 +1040,9 @@ fn hierarchical_layout(graph: &KnowledgeGraph) -> HashMap<String, Point> {
     let mut positions = HashMap::new();
 
     // Find root nodes (nodes with no incoming edges)
-    let root_nodes: Vec<_> = graph.nodes.keys()
+    let root_nodes: Vec<_> = graph
+        .nodes
+        .keys()
         .filter(|id| graph.get_incoming_edges(id).is_empty())
         .cloned()
         .collect();
@@ -1058,9 +1055,7 @@ fn hierarchical_layout(graph: &KnowledgeGraph) -> HashMap<String, Point> {
     let mut levels: Vec<Vec<String>> = Vec::new();
 
     // BFS to assign levels
-    let mut queue: Vec<(String, usize)> = root_nodes.iter()
-        .map(|id| (id.clone(), 0))
-        .collect();
+    let mut queue: Vec<(String, usize)> = root_nodes.iter().map(|id| (id.clone(), 0)).collect();
 
     let mut visited = HashSet::new();
 
@@ -1092,10 +1087,7 @@ fn hierarchical_layout(graph: &KnowledgeGraph) -> HashMap<String, Point> {
         let start_x = 400.0 - total_width / 2.0;
 
         for (idx, node_id) in nodes.iter().enumerate() {
-            positions.insert(
-                node_id.clone(),
-                Point::new(start_x + idx as f32 * 200.0, y),
-            );
+            positions.insert(node_id.clone(), Point::new(start_x + idx as f32 * 200.0, y));
         }
     }
 
@@ -1138,10 +1130,7 @@ fn grid_layout(graph: &KnowledgeGraph) -> HashMap<String, Point> {
 
         positions.insert(
             node_id.clone(),
-            Point::new(
-                100.0 + col as f32 * 200.0,
-                100.0 + row as f32 * 120.0,
-            ),
+            Point::new(100.0 + col as f32 * 200.0, 100.0 + row as f32 * 120.0),
         );
     }
 

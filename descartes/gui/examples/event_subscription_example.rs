@@ -6,7 +6,6 @@
 /// Usage:
 ///   1. Start the daemon: cargo run --bin descartes-daemon
 ///   2. Run this example: cargo run --example event_subscription_example
-
 use descartes_daemon::DescartesEvent;
 use descartes_gui::EventHandler;
 use iced::widget::{button, column, container, row, scrollable, text, Space};
@@ -51,31 +50,46 @@ impl EventDisplay {
                 timestamp: e.timestamp.format("%H:%M:%S").to_string(),
                 event_type: format!("Agent: {:?}", e.event_type),
                 summary: format!("Agent {} - {:?}", e.agent_id, e.event_type),
-                details: format!("{}", serde_json::to_string_pretty(&e.data).unwrap_or_default()),
+                details: format!(
+                    "{}",
+                    serde_json::to_string_pretty(&e.data).unwrap_or_default()
+                ),
             },
             DescartesEvent::TaskEvent(e) => Self {
                 timestamp: e.timestamp.format("%H:%M:%S").to_string(),
                 event_type: format!("Task: {:?}", e.event_type),
                 summary: format!("Task {} - {:?}", e.task_id, e.event_type),
-                details: format!("{}", serde_json::to_string_pretty(&e.data).unwrap_or_default()),
+                details: format!(
+                    "{}",
+                    serde_json::to_string_pretty(&e.data).unwrap_or_default()
+                ),
             },
             DescartesEvent::WorkflowEvent(e) => Self {
                 timestamp: e.timestamp.format("%H:%M:%S").to_string(),
                 event_type: format!("Workflow: {:?}", e.event_type),
                 summary: format!("Workflow {} - {:?}", e.workflow_id, e.event_type),
-                details: format!("{}", serde_json::to_string_pretty(&e.data).unwrap_or_default()),
+                details: format!(
+                    "{}",
+                    serde_json::to_string_pretty(&e.data).unwrap_or_default()
+                ),
             },
             DescartesEvent::SystemEvent(e) => Self {
                 timestamp: e.timestamp.format("%H:%M:%S").to_string(),
                 event_type: format!("System: {:?}", e.event_type),
                 summary: format!("System - {:?}", e.event_type),
-                details: format!("{}", serde_json::to_string_pretty(&e.data).unwrap_or_default()),
+                details: format!(
+                    "{}",
+                    serde_json::to_string_pretty(&e.data).unwrap_or_default()
+                ),
             },
             DescartesEvent::StateEvent(e) => Self {
                 timestamp: e.timestamp.format("%H:%M:%S").to_string(),
                 event_type: format!("State: {:?}", e.event_type),
                 summary: format!("State {} - {:?}", e.key, e.event_type),
-                details: format!("{}", serde_json::to_string_pretty(&e.data).unwrap_or_default()),
+                details: format!(
+                    "{}",
+                    serde_json::to_string_pretty(&e.data).unwrap_or_default()
+                ),
             },
         }
     }

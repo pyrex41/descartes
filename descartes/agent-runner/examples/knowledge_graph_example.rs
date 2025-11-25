@@ -5,7 +5,6 @@
 /// - Building a knowledge graph from code
 /// - Linking file tree nodes to knowledge graph nodes
 /// - Querying and traversing the structures
-
 use agent_runner::{
     CodeRepository, FileMetadata, FileNodeType, FileReference, FileTree, FileTreeNode,
     KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, Language, RelationshipType,
@@ -88,7 +87,10 @@ fn main() {
         src_node.add_child(main_file_id.clone());
     }
 
-    println!("  Created file tree with {} nodes", repo.file_tree.nodes.len());
+    println!(
+        "  Created file tree with {} nodes",
+        repo.file_tree.nodes.len()
+    );
     println!("  Files: {}", repo.file_tree.file_count);
     println!("  Directories: {}\n", repo.file_tree.directory_count);
 
@@ -166,7 +168,10 @@ fn main() {
     ));
     let main_id = repo.knowledge_graph.add_node(main_func);
 
-    println!("  Created knowledge graph with {} nodes", repo.knowledge_graph.nodes.len());
+    println!(
+        "  Created knowledge graph with {} nodes",
+        repo.knowledge_graph.nodes.len()
+    );
 
     // ========================================================================
     // Part 3: Create Relationships (Edges)
@@ -190,19 +195,11 @@ fn main() {
     repo.knowledge_graph.add_edge(edge2);
 
     // Function uses struct
-    let edge3 = KnowledgeEdge::new(
-        func_id.clone(),
-        struct_id.clone(),
-        RelationshipType::Uses,
-    );
+    let edge3 = KnowledgeEdge::new(func_id.clone(), struct_id.clone(), RelationshipType::Uses);
     repo.knowledge_graph.add_edge(edge3);
 
     // Main calls load_config
-    let edge4 = KnowledgeEdge::new(
-        main_id.clone(),
-        func_id.clone(),
-        RelationshipType::Calls,
-    );
+    let edge4 = KnowledgeEdge::new(main_id.clone(), func_id.clone(), RelationshipType::Calls);
     repo.knowledge_graph.add_edge(edge4);
 
     println!("  Created {} edges", repo.knowledge_graph.edges.len());
@@ -243,17 +240,22 @@ fn main() {
 
     // Find all Rust files
     println!("\n  Rust files:");
-    let rust_files = repo.file_tree.find_nodes(|node| {
-        node.metadata.language == Some(Language::Rust)
-    });
+    let rust_files = repo
+        .file_tree
+        .find_nodes(|node| node.metadata.language == Some(Language::Rust));
     for file in rust_files {
-        println!("    - {} ({} lines)", file.path.display(),
-                 file.metadata.line_count.unwrap_or(0));
+        println!(
+            "    - {} ({} lines)",
+            file.path.display(),
+            file.metadata.line_count.unwrap_or(0)
+        );
     }
 
     // Get all functions in the knowledge graph
     println!("\n  Functions in knowledge graph:");
-    let functions = repo.knowledge_graph.get_nodes_by_type(KnowledgeNodeType::Function);
+    let functions = repo
+        .knowledge_graph
+        .get_nodes_by_type(KnowledgeNodeType::Function);
     for func in functions {
         println!("    - {}", func.qualified_name);
         if let Some(sig) = &func.signature {
@@ -263,10 +265,9 @@ fn main() {
 
     // Find what the main function calls
     println!("\n  Dependencies of main():");
-    let called_by_main = repo.knowledge_graph.get_neighbors_by_relationship(
-        &main_id,
-        RelationshipType::Calls,
-    );
+    let called_by_main = repo
+        .knowledge_graph
+        .get_neighbors_by_relationship(&main_id, RelationshipType::Calls);
     for dep in called_by_main {
         println!("    - calls: {}", dep.name);
     }
@@ -276,7 +277,11 @@ fn main() {
     let users_of_config = repo.knowledge_graph.get_incoming_edges(&struct_id);
     for edge in users_of_config {
         if let Some(from_node) = repo.knowledge_graph.get_node(&edge.from_node_id) {
-            println!("    - {} {} it", from_node.name, edge.relationship_type.as_str());
+            println!(
+                "    - {} {} it",
+                from_node.name,
+                edge.relationship_type.as_str()
+            );
         }
     }
 
@@ -310,9 +315,18 @@ fn main() {
     println!("    Max depth: {}", stats.file_tree_stats.max_depth);
 
     println!("\n  Knowledge Graph:");
-    println!("    Total nodes: {}", stats.knowledge_graph_stats.total_nodes);
-    println!("    Total edges: {}", stats.knowledge_graph_stats.total_edges);
-    println!("    Average degree: {:.2}", stats.knowledge_graph_stats.avg_degree);
+    println!(
+        "    Total nodes: {}",
+        stats.knowledge_graph_stats.total_nodes
+    );
+    println!(
+        "    Total edges: {}",
+        stats.knowledge_graph_stats.total_edges
+    );
+    println!(
+        "    Average degree: {:.2}",
+        stats.knowledge_graph_stats.avg_degree
+    );
     println!("    Node types:");
     for (node_type, count) in &stats.knowledge_graph_stats.node_type_counts {
         println!("      - {}: {}", node_type, count);

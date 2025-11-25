@@ -7,11 +7,10 @@
 /// - Search and filtering operations
 /// - Performance with large graphs
 /// - Edge case handling
-
 use descartes_agent_runner::file_tree_builder::FileTreeBuilder;
 use descartes_agent_runner::knowledge_graph::{
-    FileTree, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, RelationshipType,
-    FileReference,
+    FileReference, FileTree, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType,
+    RelationshipType,
 };
 use descartes_agent_runner::knowledge_graph_overlay::KnowledgeGraphOverlay;
 use std::fs;
@@ -346,13 +345,13 @@ fn test_find_entity_definition() {
     if let Some(node) = results.first() {
         let definition = overlay.find_definition(&node.qualified_name, &knowledge_graph);
 
-        assert!(
-            definition.is_some(),
-            "Should find definition for entity"
-        );
+        assert!(definition.is_some(), "Should find definition for entity");
 
         let def_ref = definition.unwrap();
-        assert!(def_ref.is_definition, "Reference should be marked as definition");
+        assert!(
+            def_ref.is_definition,
+            "Reference should be marked as definition"
+        );
     }
 }
 
@@ -381,7 +380,11 @@ fn test_large_file_tree_performance() {
     let kg_duration = start.elapsed();
 
     println!("Knowledge graph generation took: {:?}", kg_duration);
-    println!("Nodes: {}, Edges: {}", knowledge_graph.nodes.len(), knowledge_graph.edges.len());
+    println!(
+        "Nodes: {}, Edges: {}",
+        knowledge_graph.nodes.len(),
+        knowledge_graph.edges.len()
+    );
 
     // Should complete in reasonable time (< 10 seconds for 100 files)
     assert!(
@@ -414,10 +417,7 @@ fn test_search_performance() {
     println!("10 searches took: {:?}", duration);
 
     // Should be fast (< 100ms for 10 searches)
-    assert!(
-        duration.as_millis() < 100,
-        "Searches should be fast"
-    );
+    assert!(duration.as_millis() < 100, "Searches should be fast");
 }
 
 /// ============================================================================
@@ -436,8 +436,16 @@ fn test_empty_file_tree() {
     let knowledge_graph = overlay.generate_knowledge_overlay(&file_tree).unwrap();
 
     // Should handle empty tree gracefully
-    assert_eq!(knowledge_graph.nodes.len(), 0, "Empty tree should have no nodes");
-    assert_eq!(knowledge_graph.edges.len(), 0, "Empty tree should have no edges");
+    assert_eq!(
+        knowledge_graph.nodes.len(),
+        0,
+        "Empty tree should have no nodes"
+    );
+    assert_eq!(
+        knowledge_graph.edges.len(),
+        0,
+        "Empty tree should have no edges"
+    );
 }
 
 #[test]
@@ -499,7 +507,10 @@ fn test_circular_references() {
 
     // Verify circular reference doesn't break path finding
     let path = graph.find_path(&id1, &id2);
-    assert!(path.is_some(), "Should find path despite circular reference");
+    assert!(
+        path.is_some(),
+        "Should find path despite circular reference"
+    );
 
     let path = path.unwrap();
     assert_eq!(path.len(), 2, "Path should have 2 nodes");
@@ -553,7 +564,10 @@ fn test_large_knowledge_graph_1000_nodes() {
     println!("Path finding in 1000 nodes took: {:?}", duration);
     assert!(path.is_some(), "Should find path");
     assert_eq!(path.unwrap().len(), 1000, "Path should span all nodes");
-    assert!(duration.as_millis() < 100, "Path finding should be reasonably fast");
+    assert!(
+        duration.as_millis() < 100,
+        "Path finding should be reasonably fast"
+    );
 }
 
 /// ============================================================================
@@ -676,7 +690,9 @@ fn test_fuzzy_search() {
     ));
 
     // Test that we can find nodes
-    let results: Vec<_> = graph.nodes.values()
+    let results: Vec<_> = graph
+        .nodes
+        .values()
         .filter(|n| n.name.contains("process"))
         .collect();
 

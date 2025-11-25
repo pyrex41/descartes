@@ -20,9 +20,7 @@ use tracing::{info, Level};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Setup logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("Starting Unix Socket RPC Client Example");
 

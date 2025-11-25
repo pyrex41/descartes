@@ -8,18 +8,18 @@
 //! - Event filtering
 //! - Performance under load
 
+use chrono::Utc;
+use descartes_core::state_store::SqliteStateStore;
+use descartes_core::traits::{StateStore, Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::events::{
     DescartesEvent, EventBus, EventCategory, EventFilter, TaskEvent, TaskEventType,
 };
 use descartes_daemon::task_event_emitter::{TaskEventEmitter, TaskEventEmitterConfig};
-use descartes_core::state_store::SqliteStateStore;
-use descartes_core::traits::{StateStore, Task, TaskComplexity, TaskPriority, TaskStatus};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::time::sleep;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// Helper to create a test system
 async fn setup_test_system() -> (Arc<TaskEventEmitter>, Arc<EventBus>) {
@@ -44,7 +44,11 @@ async fn setup_test_system() -> (Arc<TaskEventEmitter>, Arc<EventBus>) {
         ..Default::default()
     };
 
-    let emitter = Arc::new(TaskEventEmitter::new(state_store, event_bus.clone(), config));
+    let emitter = Arc::new(TaskEventEmitter::new(
+        state_store,
+        event_bus.clone(),
+        config,
+    ));
     emitter
         .initialize_cache()
         .await
@@ -132,8 +136,14 @@ async fn test_event_filtering_by_task_id() {
     let (_sub_id, mut rx) = event_bus.subscribe(Some(filter)).await;
 
     // Save both tasks
-    emitter.save_task(&task1).await.expect("Failed to save task1");
-    emitter.save_task(&task2).await.expect("Failed to save task2");
+    emitter
+        .save_task(&task1)
+        .await
+        .expect("Failed to save task1");
+    emitter
+        .save_task(&task2)
+        .await
+        .expect("Failed to save task2");
 
     // Should only receive event for task1
     let event = tokio::time::timeout(Duration::from_millis(500), rx.recv())
@@ -462,10 +472,7 @@ async fn test_debouncing_reduces_events() {
         "Expected debouncing to reduce events, got {}",
         event_count
     );
-    println!(
-        "Debouncing reduced 21 operations to {} events",
-        event_count
-    );
+    println!("Debouncing reduced 21 operations to {} events", event_count);
 }
 
 #[tokio::test]
@@ -511,7 +518,10 @@ async fn test_subscriber_late_join() {
 
     // Create a task
     let task1 = create_sample_task(TaskStatus::Todo);
-    emitter.save_task(&task1).await.expect("Failed to save task");
+    emitter
+        .save_task(&task1)
+        .await
+        .expect("Failed to save task");
 
     // First subscriber receives event
     let _ = rx1.recv().await.expect("Failed to receive");
@@ -521,7 +531,10 @@ async fn test_subscriber_late_join() {
 
     // Create another task
     let task2 = create_sample_task(TaskStatus::InProgress);
-    emitter.save_task(&task2).await.expect("Failed to save task");
+    emitter
+        .save_task(&task2)
+        .await
+        .expect("Failed to save task");
 
     // Both subscribers should receive the new event
     let event1 = tokio::time::timeout(Duration::from_millis(500), rx1.recv())

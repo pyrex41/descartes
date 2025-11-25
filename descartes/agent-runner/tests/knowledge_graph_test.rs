@@ -106,12 +106,7 @@ fn test_file_tree_traversal() {
 fn test_file_tree_query() {
     let mut tree = FileTree::new(PathBuf::from("/test"));
 
-    let mut file1 = FileTreeNode::new(
-        PathBuf::from("/test/main.rs"),
-        FileNodeType::File,
-        None,
-        0,
-    );
+    let mut file1 = FileTreeNode::new(PathBuf::from("/test/main.rs"), FileNodeType::File, None, 0);
     file1.metadata.language = Some(Language::Rust);
     tree.add_node(file1);
 
@@ -367,12 +362,7 @@ fn test_statistics() {
     let root = FileTreeNode::new(PathBuf::from("/test"), FileNodeType::Directory, None, 0);
     repo.file_tree.add_node(root);
 
-    let file = FileTreeNode::new(
-        PathBuf::from("/test/main.rs"),
-        FileNodeType::File,
-        None,
-        1,
-    );
+    let file = FileTreeNode::new(PathBuf::from("/test/main.rs"), FileNodeType::File, None, 1);
     repo.file_tree.add_node(file);
 
     let func = KnowledgeNode::new(

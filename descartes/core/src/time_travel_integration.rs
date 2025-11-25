@@ -25,10 +25,18 @@
 //! 5. Rollback capability on failure
 //! 6. Undo rewind functionality
 
-use crate::agent_history::{AgentHistoryEvent, AgentHistoryStore, HistoryEventType, HistorySnapshot};
-use crate::body_restore::{BodyRestoreManager, CoordinatedRestore, GitBodyRestoreManager, RepositoryBackup, RestoreOptions as BodyRestoreOptions, RestoreResult as BodyRestoreResult};
-use crate::brain_restore::{BrainRestore, BrainState, DefaultBrainRestore, RestoreOptions as BrainRestoreOptions, RestoreResult as BrainRestoreResult, compare_states};
-use crate::debugger::{Debugger, DebuggerState, DebugCommand, BreakpointLocation};
+use crate::agent_history::{
+    AgentHistoryEvent, AgentHistoryStore, HistoryEventType, HistorySnapshot,
+};
+use crate::body_restore::{
+    BodyRestoreManager, CoordinatedRestore, GitBodyRestoreManager, RepositoryBackup,
+    RestoreOptions as BodyRestoreOptions, RestoreResult as BodyRestoreResult,
+};
+use crate::brain_restore::{
+    compare_states, BrainRestore, BrainState, DefaultBrainRestore,
+    RestoreOptions as BrainRestoreOptions, RestoreResult as BrainRestoreResult,
+};
+use crate::debugger::{BreakpointLocation, DebugCommand, Debugger, DebuggerState};
 use crate::errors::{StateStoreError, StateStoreResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -151,7 +159,10 @@ impl RewindPoint {
             event_id: None,
             git_commit: snapshot.git_commit.clone(),
             snapshot_id: Some(snapshot.snapshot_id),
-            description: format!("Snapshot: {}", snapshot.git_commit.as_deref().unwrap_or("unknown")),
+            description: format!(
+                "Snapshot: {}",
+                snapshot.git_commit.as_deref().unwrap_or("unknown")
+            ),
             event_index: None,
         }
     }
@@ -163,7 +174,9 @@ impl RewindPoint {
         }
 
         let index = (position * (events.len() - 1) as f32) as usize;
-        events.get(index).map(|event| Self::from_event(event, Some(index)))
+        events
+            .get(index)
+            .map(|event| Self::from_event(event, Some(index)))
     }
 }
 
@@ -378,10 +391,7 @@ impl ResumeContext {
             .map(|r| r.target_commit.clone())
             .ok_or_else(|| StateStoreError::NotFound("Git commit not available".to_string()))?;
 
-        let resume_event_index = result
-            .target_point
-            .event_index
-            .unwrap_or(0);
+        let resume_event_index = result.target_point.event_index.unwrap_or(0);
 
         Ok(Self {
             agent_id,
@@ -423,7 +433,10 @@ pub enum RewindProgress {
     Validating,
 
     /// Restoring brain state
-    RestoringBrain { events_processed: usize, total_events: usize },
+    RestoringBrain {
+        events_processed: usize,
+        total_events: usize,
+    },
 
     /// Brain restored
     BrainRestored { events_processed: usize },
@@ -512,10 +525,7 @@ pub trait RewindManager: Send + Sync {
     ) -> StateStoreResult<RewindResult>;
 
     /// Resume execution from a rewound state
-    async fn resume_from(
-        &self,
-        context: ResumeContext,
-    ) -> StateStoreResult<()>;
+    async fn resume_from(&self, context: ResumeContext) -> StateStoreResult<()>;
 
     /// Undo the last rewind operation
     async fn undo_rewind(&self, backup_id: Uuid) -> StateStoreResult<RewindResult>;
@@ -595,11 +605,13 @@ impl<S: AgentHistoryStore> DefaultRewindManager<S> {
         info!("Creating backup: {}", description);
 
         // Get current brain state
-        let events = self.brain_restore
+        let events = self
+            .brain_restore
             .load_events_until(agent_id, i64::MAX)
             .await?;
 
-        let brain_result = self.brain_restore
+        let brain_result = self
+            .brain_restore
             .replay_events(events.clone(), BrainRestoreOptions::default())
             .await?;
 
@@ -608,12 +620,7 @@ impl<S: AgentHistoryStore> DefaultRewindManager<S> {
         // Get current repository state
         let repo_backup = self.body_restore.create_backup().await?;
 
-        let backup = RewindBackup::new(
-            brain_state,
-            repo_backup,
-            events.len(),
-            description,
-        );
+        let backup = RewindBackup::new(brain_state, repo_backup, events.len(), description);
 
         // Add to undo history
         let mut undo_history = self.undo_history.write().await;
@@ -678,10 +685,8 @@ impl<S: AgentHistoryStore> DefaultRewindManager<S> {
 #[async_trait]
 impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
     async fn can_rewind_to(&self, point: &RewindPoint) -> StateStoreResult<RewindConfirmation> {
-        let mut confirmation = RewindConfirmation::new(
-            "Rewind to point".to_string(),
-            point.clone(),
-        );
+        let mut confirmation =
+            RewindConfirmation::new("Rewind to point".to_string(), point.clone());
 
         // Check for uncommitted changes
         let has_changes = self.body_restore.has_uncommitted_changes().await?;
@@ -734,14 +739,19 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         // Step 3: Create backup
         let backup = if config.auto_backup {
             // Get agent_id from point or use a default
-            let agent_id = point.event_id
+            let agent_id = point
+                .event_id
                 .map(|_| "agent".to_string())
                 .unwrap_or_else(|| "unknown".to_string());
 
             self.create_backup(
                 &agent_id,
-                format!("Pre-rewind backup at {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
-            ).await?
+                format!(
+                    "Pre-rewind backup at {}",
+                    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
+                ),
+            )
+            .await?
         } else {
             // Create minimal backup
             let repo_backup = self.body_restore.create_backup().await?;
@@ -757,7 +767,8 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
 
         let events = self.load_events_for_point(&agent_id, &point).await?;
 
-        let brain_result = self.brain_restore
+        let brain_result = self
+            .brain_restore
             .replay_events(
                 events,
                 BrainRestoreOptions {
@@ -776,7 +787,10 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
             ));
         }
 
-        info!("Brain state restored: {} events processed", brain_result.events_processed);
+        info!(
+            "Brain state restored: {} events processed",
+            brain_result.events_processed
+        );
 
         // Step 5: Restore body (git checkout)
         info!("Restoring body state...");
@@ -796,7 +810,10 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
             preserve_untracked: true,
         };
 
-        let body_result = self.body_restore.checkout_commit(&target_commit, body_options).await?;
+        let body_result = self
+            .body_restore
+            .checkout_commit(&target_commit, body_options)
+            .await?;
 
         if !body_result.success {
             error!("Body restore failed");
@@ -818,7 +835,8 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         let validation = if config.validate_state {
             if let Some(ref brain_state) = brain_result.brain_state {
                 let current_commit = self.body_restore.get_current_commit().await?;
-                self.validate_brain_body_consistency(brain_state, &current_commit).await?
+                self.validate_brain_body_consistency(brain_state, &current_commit)
+                    .await?
             } else {
                 ValidationResult::failed(vec!["Brain state not available".to_string()])
             }
@@ -833,21 +851,18 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
             warn!("Rewind completed with warnings: {:?}", validation.warnings);
         }
 
-        let result = RewindResult::success(
-            point,
-            brain_result,
-            body_result,
-            backup,
-            validation,
-        )
-        .with_duration(duration_ms)
-        .with_message(format!("Successfully rewound in {}ms", duration_ms));
+        let result = RewindResult::success(point, brain_result, body_result, backup, validation)
+            .with_duration(duration_ms)
+            .with_message(format!("Successfully rewound in {}ms", duration_ms));
 
         Ok(result)
     }
 
     async fn resume_from(&self, context: ResumeContext) -> StateStoreResult<()> {
-        info!("Resuming execution from event index: {}", context.resume_event_index);
+        info!(
+            "Resuming execution from event index: {}",
+            context.resume_event_index
+        );
 
         // Step 1: Verify brain state matches current git commit
         let current_commit = self.body_restore.get_current_commit().await?;
@@ -860,7 +875,8 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         }
 
         // Step 2: Load agent history from resume point
-        let all_events = self.brain_restore
+        let all_events = self
+            .brain_restore
             .load_events_until(&context.agent_id, i64::MAX)
             .await?;
 
@@ -869,11 +885,17 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
             .skip(context.resume_event_index)
             .collect::<Vec<_>>();
 
-        info!("Loaded {} remaining events to process", remaining_events.len());
+        info!(
+            "Loaded {} remaining events to process",
+            remaining_events.len()
+        );
 
         // Step 3: Set up debugging if requested
         if context.enable_debugging {
-            info!("Debugging enabled, setting {} breakpoints", context.breakpoints.len());
+            info!(
+                "Debugging enabled, setting {} breakpoints",
+                context.breakpoints.len()
+            );
             // TODO: Integrate with debugger
             // This would involve:
             // 1. Creating a Debugger instance
@@ -944,21 +966,18 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
 
         let validation = ValidationResult::success();
 
-        Ok(RewindResult::success(
-            point,
-            brain_result,
-            body_result,
-            backup.clone(),
-            validation,
+        Ok(
+            RewindResult::success(point, brain_result, body_result, backup.clone(), validation)
+                .with_message("Undo rewind successful".to_string()),
         )
-        .with_message("Undo rewind successful".to_string()))
     }
 
     async fn get_rewind_points(&self, agent_id: &str) -> StateStoreResult<Vec<RewindPoint>> {
         let mut points = Vec::new();
 
         // Get all events
-        let events = self.brain_restore
+        let events = self
+            .brain_restore
             .load_events_until(agent_id, i64::MAX)
             .await?;
 
@@ -979,9 +998,7 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         }
 
         // Get snapshots
-        let snapshots = self.brain_restore.store()
-            .list_snapshots(agent_id)
-            .await?;
+        let snapshots = self.brain_restore.store().list_snapshots(agent_id).await?;
 
         for snapshot in snapshots {
             points.push(RewindPoint::from_snapshot(&snapshot));
@@ -998,14 +1015,16 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         brain_state: &BrainState,
         current_commit: &str,
     ) -> StateStoreResult<ValidationResult> {
-        self.validate_brain_body_consistency(brain_state, current_commit).await
+        self.validate_brain_body_consistency(brain_state, current_commit)
+            .await
     }
 
     async fn create_snapshot(&self, agent_id: &str, description: String) -> StateStoreResult<Uuid> {
         info!("Creating snapshot for agent {}: {}", agent_id, description);
 
         // Get current events
-        let events = self.brain_restore
+        let events = self
+            .brain_restore
             .load_events_until(agent_id, i64::MAX)
             .await?;
 
@@ -1019,7 +1038,10 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         let snapshot_id = snapshot.snapshot_id;
 
         // Save snapshot
-        self.brain_restore.store().create_snapshot(&snapshot).await?;
+        self.brain_restore
+            .store()
+            .create_snapshot(&snapshot)
+            .await?;
 
         info!("Snapshot created: {}", snapshot_id);
         Ok(snapshot_id)
@@ -1031,10 +1053,7 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
 // ============================================================================
 
 /// Convert slider position (0.0 to 1.0) to rewind point
-pub fn slider_to_rewind_point(
-    position: f32,
-    events: &[AgentHistoryEvent],
-) -> Option<RewindPoint> {
+pub fn slider_to_rewind_point(position: f32, events: &[AgentHistoryEvent]) -> Option<RewindPoint> {
     RewindPoint::from_slider_position(position, events)
 }
 

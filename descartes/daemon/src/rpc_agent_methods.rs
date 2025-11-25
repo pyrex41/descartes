@@ -227,7 +227,10 @@ impl AgentMonitoringRpcServer for AgentMonitoringRpcImpl {
 
         let stats = self.monitor.get_monitor_stats().await;
 
-        info!("RPC: get_monitor_stats - {} total messages", stats.total_messages);
+        info!(
+            "RPC: get_monitor_stats - {} total messages",
+            stats.total_messages
+        );
         Ok(stats)
     }
 

@@ -2,16 +2,16 @@
 //!
 //! Tests the real-time event emission system with concurrent operations
 
-use descartes_daemon::task_event_emitter::{TaskEventEmitter, TaskEventEmitterConfig};
-use descartes_daemon::events::{EventBus, DescartesEvent, TaskEventType};
+use chrono::Utc;
 use descartes_core::state_store::SqliteStateStore;
-use descartes_core::traits::{StateStore, Task, TaskStatus, TaskPriority, TaskComplexity};
+use descartes_core::traits::{StateStore, Task, TaskComplexity, TaskPriority, TaskStatus};
+use descartes_daemon::events::{DescartesEvent, EventBus, TaskEventType};
+use descartes_daemon::task_event_emitter::{TaskEventEmitter, TaskEventEmitterConfig};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::time::sleep;
 use uuid::Uuid;
-use chrono::Utc;
 
 async fn setup_test_system() -> (TaskEventEmitter, Arc<EventBus>) {
     let temp_file = NamedTempFile::new().expect("Failed to create temp file");
@@ -20,7 +20,10 @@ async fn setup_test_system() -> (TaskEventEmitter, Arc<EventBus>) {
     let mut state_store = SqliteStateStore::new(db_path, false)
         .await
         .expect("Failed to create state store");
-    state_store.initialize().await.expect("Failed to initialize");
+    state_store
+        .initialize()
+        .await
+        .expect("Failed to initialize");
 
     let state_store = Arc::new(state_store) as Arc<dyn StateStore>;
     let event_bus = Arc::new(EventBus::new());
@@ -33,7 +36,10 @@ async fn setup_test_system() -> (TaskEventEmitter, Arc<EventBus>) {
     };
 
     let emitter = TaskEventEmitter::new(state_store, event_bus.clone(), config);
-    emitter.initialize_cache().await.expect("Failed to initialize cache");
+    emitter
+        .initialize_cache()
+        .await
+        .expect("Failed to initialize cache");
 
     (emitter, event_bus)
 }
@@ -128,10 +134,14 @@ async fn test_task_lifecycle_events() {
     let event = rx.recv().await.expect("Failed to receive event");
     match event {
         DescartesEvent::TaskEvent(task_event) => {
-            let previous_status = task_event.data.get("previous_status")
+            let previous_status = task_event
+                .data
+                .get("previous_status")
                 .and_then(|v| v.as_str())
                 .unwrap();
-            let new_status = task_event.data.get("new_status")
+            let new_status = task_event
+                .data
+                .get("new_status")
                 .and_then(|v| v.as_str())
                 .unwrap();
 
@@ -150,7 +160,9 @@ async fn test_task_lifecycle_events() {
     let event = rx.recv().await.expect("Failed to receive event");
     match event {
         DescartesEvent::TaskEvent(task_event) => {
-            let new_status = task_event.data.get("new_status")
+            let new_status = task_event
+                .data
+                .get("new_status")
                 .and_then(|v| v.as_str())
                 .unwrap();
             assert_eq!(new_status, "Done");
@@ -243,7 +255,10 @@ async fn test_rapid_updates_with_debouncing() {
     let mut state_store = SqliteStateStore::new(db_path, false)
         .await
         .expect("Failed to create state store");
-    state_store.initialize().await.expect("Failed to initialize");
+    state_store
+        .initialize()
+        .await
+        .expect("Failed to initialize");
 
     let state_store = Arc::new(state_store) as Arc<dyn StateStore>;
     let event_bus = Arc::new(EventBus::new());
@@ -256,7 +271,10 @@ async fn test_rapid_updates_with_debouncing() {
     };
 
     let emitter = TaskEventEmitter::new(state_store, event_bus.clone(), config);
-    emitter.initialize_cache().await.expect("Failed to initialize cache");
+    emitter
+        .initialize_cache()
+        .await
+        .expect("Failed to initialize cache");
 
     // Subscribe to events
     let (_sub_id, mut rx) = event_bus.subscribe(None).await;
@@ -297,7 +315,11 @@ async fn test_rapid_updates_with_debouncing() {
     }
 
     // Should be significantly less than 21 (1 create + 20 updates)
-    assert!(event_count < 21, "Expected debouncing to reduce events, got {}", event_count);
+    assert!(
+        event_count < 21,
+        "Expected debouncing to reduce events, got {}",
+        event_count
+    );
     println!("Debouncing reduced 21 operations to {} events", event_count);
 }
 

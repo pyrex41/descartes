@@ -1,5 +1,4 @@
 /// Connection pool management
-
 use crate::config::PoolConfig;
 use crate::errors::{DaemonError, DaemonResult};
 use crate::types::ConnectionInfo;
@@ -30,7 +29,9 @@ impl ConnectionPool {
     pub fn register(&self, client_addr: String) -> DaemonResult<String> {
         let active = self.active_count.load(Ordering::SeqCst);
         if active >= self.config.max_size {
-            return Err(DaemonError::PoolError("Connection pool is full".to_string()));
+            return Err(DaemonError::PoolError(
+                "Connection pool is full".to_string(),
+            ));
         }
 
         let conn_id = Uuid::new_v4().to_string();
@@ -74,9 +75,7 @@ impl ConnectionPool {
         self.connections
             .get(conn_id)
             .map(|r| r.clone())
-            .ok_or_else(|| {
-                DaemonError::PoolError(format!("Connection not found: {}", conn_id))
-            })
+            .ok_or_else(|| DaemonError::PoolError(format!("Connection not found: {}", conn_id)))
     }
 
     /// Get all active connections
@@ -96,9 +95,7 @@ impl ConnectionPool {
         let mut removed = 0;
 
         self.connections.retain(|_, conn| {
-            let elapsed = now
-                .signed_duration_since(conn.last_activity)
-                .num_seconds();
+            let elapsed = now.signed_duration_since(conn.last_activity).num_seconds();
             if elapsed > timeout_secs {
                 removed += 1;
                 self.active_count.fetch_sub(1, Ordering::SeqCst);

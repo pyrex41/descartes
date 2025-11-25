@@ -2,10 +2,8 @@
 ///
 /// This example demonstrates how to use the file tree builder
 /// to scan directories, build trees, and perform operations.
-
 use agent_runner::{
-    FileTree, FileTreeBuilder, FileTreeBuilderConfig, FileTreeUpdater,
-    FileNodeType, Language,
+    FileNodeType, FileTree, FileTreeBuilder, FileTreeBuilderConfig, FileTreeUpdater, Language,
 };
 use std::path::PathBuf;
 
@@ -110,9 +108,8 @@ fn example_3_queries() -> std::io::Result<()> {
     }
 
     // Custom predicate
-    let large_files = tree.find_nodes(|node| {
-        node.is_file() && node.metadata.size.unwrap_or(0) > 10000
-    });
+    let large_files =
+        tree.find_nodes(|node| node.is_file() && node.metadata.size.unwrap_or(0) > 10000);
     println!("Found {} files larger than 10KB", large_files.len());
     println!();
 
@@ -198,12 +195,10 @@ fn print_tree_structure(tree: &FileTree) {
 /// Find all files with a specific extension
 #[allow(dead_code)]
 fn find_by_extension(tree: &FileTree, ext: &str) -> Vec<PathBuf> {
-    tree.find_nodes(|node| {
-        node.is_file() && node.extension().as_deref() == Some(ext)
-    })
-    .iter()
-    .map(|n| n.path.clone())
-    .collect()
+    tree.find_nodes(|node| node.is_file() && node.extension().as_deref() == Some(ext))
+        .iter()
+        .map(|n| n.path.clone())
+        .collect()
 }
 
 /// Get statistics by language
@@ -220,10 +215,7 @@ fn language_statistics(tree: &FileTree) {
     for lang in languages {
         let files = tree.filter_by_language(lang);
         if !files.is_empty() {
-            let lines: usize = files
-                .iter()
-                .filter_map(|f| f.metadata.line_count)
-                .sum();
+            let lines: usize = files.iter().filter_map(|f| f.metadata.line_count).sum();
             println!("  {:?}: {} files, {} lines", lang, files.len(), lines);
         }
     }

@@ -8,15 +8,14 @@
 /// - Edge cases (empty DAGs, complex hierarchies, etc.)
 /// - Metadata preservation
 /// - Agent and resource mapping
-
-use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType, Position};
+use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, Position, DAG};
 use descartes_core::dag_swarm_export::{
-    export_dag_to_swarm_toml, import_swarm_toml_to_dag, SwarmExportConfig,
-    save_dag_as_swarm_toml, load_dag_from_swarm_toml,
+    export_dag_to_swarm_toml, import_swarm_toml_to_dag, load_dag_from_swarm_toml,
+    save_dag_as_swarm_toml, SwarmExportConfig,
 };
 use descartes_core::swarm_parser::{
-    AgentConfig, ResourceConfig, SwarmConfig, Workflow, State, Handler,
-    WorkflowMetadata, WorkflowMetadataDetails,
+    AgentConfig, Handler, ResourceConfig, State, SwarmConfig, Workflow, WorkflowMetadata,
+    WorkflowMetadataDetails,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -171,16 +170,22 @@ fn test_export_with_metadata() {
     dag.add_node(node).unwrap();
 
     let config = default_export_config()
-        .with_resource("database", ResourceConfig {
-            resource_type: "Database".to_string(),
-            connection_string: Some("db://localhost".to_string()),
-            config: HashMap::new(),
-        })
-        .with_resource("api", ResourceConfig {
-            resource_type: "API".to_string(),
-            connection_string: Some("https://api.example.com".to_string()),
-            config: HashMap::new(),
-        });
+        .with_resource(
+            "database",
+            ResourceConfig {
+                resource_type: "Database".to_string(),
+                connection_string: Some("db://localhost".to_string()),
+                config: HashMap::new(),
+            },
+        )
+        .with_resource(
+            "api",
+            ResourceConfig {
+                resource_type: "API".to_string(),
+                connection_string: Some("https://api.example.com".to_string()),
+                config: HashMap::new(),
+            },
+        );
 
     let toml = export_dag_to_swarm_toml(&dag, &config).unwrap();
 
@@ -211,7 +216,7 @@ fn test_export_with_guards() {
     let mut edge = DAGEdge::dependency(id1, id2).with_label("conditional");
     edge.metadata.insert(
         "guards".to_string(),
-        serde_json::json!(["is_ready", "has_permission"])
+        serde_json::json!(["is_ready", "has_permission"]),
     );
 
     dag.add_edge(edge).unwrap();
@@ -231,7 +236,9 @@ fn test_export_with_guards() {
 fn test_export_edge_types() {
     let mut dag = DAG::new("Edge Types Test");
 
-    let nodes: Vec<_> = (0..5).map(|i| DAGNode::new_auto(format!("Node{}", i))).collect();
+    let nodes: Vec<_> = (0..5)
+        .map(|i| DAGNode::new_auto(format!("Node{}", i)))
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -239,10 +246,14 @@ fn test_export_edge_types() {
     }
 
     // Different edge types
-    dag.add_edge(DAGEdge::new(ids[0], ids[1], EdgeType::Dependency)).unwrap();
-    dag.add_edge(DAGEdge::new(ids[1], ids[2], EdgeType::SoftDependency)).unwrap();
-    dag.add_edge(DAGEdge::new(ids[2], ids[3], EdgeType::DataFlow)).unwrap();
-    dag.add_edge(DAGEdge::new(ids[3], ids[4], EdgeType::Trigger)).unwrap();
+    dag.add_edge(DAGEdge::new(ids[0], ids[1], EdgeType::Dependency))
+        .unwrap();
+    dag.add_edge(DAGEdge::new(ids[1], ids[2], EdgeType::SoftDependency))
+        .unwrap();
+    dag.add_edge(DAGEdge::new(ids[2], ids[3], EdgeType::DataFlow))
+        .unwrap();
+    dag.add_edge(DAGEdge::new(ids[3], ids[4], EdgeType::Trigger))
+        .unwrap();
 
     let config = default_export_config();
     let toml = export_dag_to_swarm_toml(&dag, &config).unwrap();
@@ -462,23 +473,51 @@ fn test_import_with_metadata() {
 
     // Verify metadata
     assert_eq!(
-        task_node.metadata.get("agents").unwrap().as_array().unwrap().len(),
+        task_node
+            .metadata
+            .get("agents")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
         1
     );
     assert_eq!(
-        task_node.metadata.get("entry_actions").unwrap().as_array().unwrap().len(),
+        task_node
+            .metadata
+            .get("entry_actions")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
         2
     );
     assert_eq!(
-        task_node.metadata.get("exit_actions").unwrap().as_array().unwrap().len(),
+        task_node
+            .metadata
+            .get("exit_actions")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
         1
     );
     assert_eq!(
-        task_node.metadata.get("parallel_execution").unwrap().as_bool().unwrap(),
+        task_node
+            .metadata
+            .get("parallel_execution")
+            .unwrap()
+            .as_bool()
+            .unwrap(),
         true
     );
     assert_eq!(
-        task_node.metadata.get("timeout_seconds").unwrap().as_u64().unwrap(),
+        task_node
+            .metadata
+            .get("timeout_seconds")
+            .unwrap()
+            .as_u64()
+            .unwrap(),
         300
     );
 }
@@ -507,19 +546,22 @@ fn test_import_multiple_workflows() {
                 },
                 states: {
                     let mut s = HashMap::new();
-                    s.insert("Start".to_string(), State {
-                        description: "Start".to_string(),
-                        agents: vec![],
-                        entry_actions: vec![],
-                        exit_actions: vec![],
-                        terminal: true,
-                        parent: None,
-                        parallel_execution: false,
-                        handlers: vec![],
-                        timeout_seconds: None,
-                        timeout_target: None,
-                        required_resources: vec![],
-                    });
+                    s.insert(
+                        "Start".to_string(),
+                        State {
+                            description: "Start".to_string(),
+                            agents: vec![],
+                            entry_actions: vec![],
+                            exit_actions: vec![],
+                            terminal: true,
+                            parent: None,
+                            parallel_execution: false,
+                            handlers: vec![],
+                            timeout_seconds: None,
+                            timeout_target: None,
+                            required_resources: vec![],
+                        },
+                    );
                     s
                 },
                 guards: HashMap::new(),
@@ -536,19 +578,22 @@ fn test_import_multiple_workflows() {
                 },
                 states: {
                     let mut s = HashMap::new();
-                    s.insert("Begin".to_string(), State {
-                        description: "Begin".to_string(),
-                        agents: vec![],
-                        entry_actions: vec![],
-                        exit_actions: vec![],
-                        terminal: true,
-                        parent: None,
-                        parallel_execution: false,
-                        handlers: vec![],
-                        timeout_seconds: None,
-                        timeout_target: None,
-                        required_resources: vec![],
-                    });
+                    s.insert(
+                        "Begin".to_string(),
+                        State {
+                            description: "Begin".to_string(),
+                            agents: vec![],
+                            entry_actions: vec![],
+                            exit_actions: vec![],
+                            terminal: true,
+                            parent: None,
+                            parallel_execution: false,
+                            handlers: vec![],
+                            timeout_seconds: None,
+                            timeout_target: None,
+                            required_resources: vec![],
+                        },
+                    );
                     s
                 },
                 guards: HashMap::new(),
@@ -756,10 +801,12 @@ fn test_export_disconnected_dag() {
 fn test_export_dag_with_cycle() {
     let mut dag = DAG::new("Cycle Test");
 
-    let nodes: Vec<_> = (0..3).map(|i| {
-        DAGNode::new_auto(format!("N{}", i))
-            .with_metadata("agents", serde_json::json!(["agent1"]))
-    }).collect();
+    let nodes: Vec<_> = (0..3)
+        .map(|i| {
+            DAGNode::new_auto(format!("N{}", i))
+                .with_metadata("agents", serde_json::json!(["agent1"]))
+        })
+        .collect();
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
     for node in nodes {
@@ -792,12 +839,14 @@ fn test_export_large_workflow() {
     let mut dag = DAG::new("Large Workflow");
 
     // Create 50 nodes in a linear chain
-    let nodes: Vec<_> = (0..50).map(|i| {
-        DAGNode::new_auto(format!("Task{}", i))
-            .with_description(format!("Task number {}", i))
-            .with_position((i % 10) as f64 * 100.0, (i / 10) as f64 * 100.0)
-            .with_metadata("agents", serde_json::json!(["agent1"]))
-    }).collect();
+    let nodes: Vec<_> = (0..50)
+        .map(|i| {
+            DAGNode::new_auto(format!("Task{}", i))
+                .with_description(format!("Task number {}", i))
+                .with_position((i % 10) as f64 * 100.0, (i / 10) as f64 * 100.0)
+                .with_metadata("agents", serde_json::json!(["agent1"]))
+        })
+        .collect();
 
     let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
@@ -806,7 +855,8 @@ fn test_export_large_workflow() {
     }
 
     for i in 0..49 {
-        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+        dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+            .unwrap();
     }
 
     let config = default_export_config();
@@ -853,8 +903,7 @@ fn test_export_use_node_ids_vs_labels() {
     let config_labels = default_export_config().use_labels(true);
     let toml_labels = export_dag_to_swarm_toml(&dag, &config_labels).unwrap();
 
-    assert!(toml_labels.contains("[workflows.test.states.Start]") ||
-            toml_labels.contains("Start"));
+    assert!(toml_labels.contains("[workflows.test.states.Start]") || toml_labels.contains("Start"));
 
     // Export with UUIDs
     let config_uuids = default_export_config().use_labels(false);
@@ -869,10 +918,12 @@ fn test_roundtrip_preserves_node_count() {
     for node_count in [1, 5, 10, 20] {
         let mut dag = DAG::new(format!("Test_{}", node_count));
 
-        let nodes: Vec<_> = (0..node_count).map(|i| {
-            DAGNode::new_auto(format!("Node{}", i))
-                .with_metadata("agents", serde_json::json!(["agent1"]))
-        }).collect();
+        let nodes: Vec<_> = (0..node_count)
+            .map(|i| {
+                DAGNode::new_auto(format!("Node{}", i))
+                    .with_metadata("agents", serde_json::json!(["agent1"]))
+            })
+            .collect();
 
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
@@ -882,7 +933,8 @@ fn test_roundtrip_preserves_node_count() {
 
         // Create linear chain
         for i in 0..(node_count - 1) {
-            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+                .unwrap();
         }
 
         let config = default_export_config();

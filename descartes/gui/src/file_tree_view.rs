@@ -7,12 +7,13 @@
 /// - Allows file selection and interaction
 /// - Provides filtering and search capabilities
 /// - Integrates with the FileTree data model
-
-use descartes_agent_runner::knowledge_graph::{FileTree, FileTreeNode, FileNodeType};
+use descartes_agent_runner::knowledge_graph::{FileNodeType, FileTree, FileTreeNode};
 use descartes_agent_runner::types::Language;
-use iced::widget::{button, column, container, row, scrollable, text, text_input, Space, Column, Row};
-use iced::{Element, Length, Color, Theme};
 use iced::alignment::{Horizontal, Vertical};
+use iced::widget::{
+    button, column, container, row, scrollable, text, text_input, Column, Row, Space,
+};
+use iced::{Color, Element, Length, Theme};
 use std::collections::{HashMap, HashSet};
 
 /// ============================================================================
@@ -235,7 +236,9 @@ pub fn update(state: &mut FileTreeState, message: FileTreeMessage) {
             // Add to navigation history
             if state.selected_node.is_some() && state.selected_node.as_ref() != Some(&node_id) {
                 // Remove any forward history
-                state.navigation_history.truncate(state.history_position + 1);
+                state
+                    .navigation_history
+                    .truncate(state.history_position + 1);
 
                 // Add current to history
                 if let Some(current) = &state.selected_node {
@@ -307,7 +310,10 @@ pub fn update(state: &mut FileTreeState, message: FileTreeMessage) {
         }
         FileTreeMessage::HighlightRelatedFiles(file_node_ids) => {
             state.highlighted_files = file_node_ids.into_iter().collect();
-            tracing::info!("Highlighted {} related files", state.highlighted_files.len());
+            tracing::info!(
+                "Highlighted {} related files",
+                state.highlighted_files.len()
+            );
         }
         FileTreeMessage::ClearHighlights => {
             state.highlighted_files.clear();
@@ -393,7 +399,9 @@ pub fn update(state: &mut FileTreeState, message: FileTreeMessage) {
         FileTreeMessage::CopyRelativePath(node_id) => {
             if let Some(tree) = &state.tree {
                 if let Some(node) = tree.get_node(&node_id) {
-                    let relative_path = node.path.strip_prefix(&tree.base_path)
+                    let relative_path = node
+                        .path
+                        .strip_prefix(&tree.base_path)
                         .unwrap_or(&node.path);
                     tracing::info!("Copying relative path: {:?}", relative_path);
                     // This would copy the relative path to clipboard
@@ -443,7 +451,7 @@ fn view_empty_state() -> Element<'static, FileTreeMessage> {
         ]
         .spacing(10)
         .padding(20)
-        .align_x(Horizontal::Center)
+        .align_x(Horizontal::Center),
     )
     .width(Length::Fill)
     .height(Length::Fill)
@@ -465,41 +473,50 @@ fn view_header(state: &FileTreeState) -> Element<FileTreeMessage> {
         button(text("►"))
             .on_press(FileTreeMessage::NavigateForward)
             .padding(6),
-        button(if state.regex_search { text(".*") } else { text("Ab") })
-            .on_press(FileTreeMessage::ToggleRegexSearch)
-            .padding(6),
+        button(if state.regex_search {
+            text(".*")
+        } else {
+            text("Ab")
+        })
+        .on_press(FileTreeMessage::ToggleRegexSearch)
+        .padding(6),
     ]
     .spacing(3);
 
     let filter_buttons = row![
-        button(text("Hidden")).on_press(FileTreeMessage::ToggleShowHidden).padding(6),
-        button(text("Linked")).on_press(FileTreeMessage::ToggleShowOnlyLinked).padding(6),
-        button(text("Clear")).on_press(FileTreeMessage::ClearFilters).padding(6),
+        button(text("Hidden"))
+            .on_press(FileTreeMessage::ToggleShowHidden)
+            .padding(6),
+        button(text("Linked"))
+            .on_press(FileTreeMessage::ToggleShowOnlyLinked)
+            .padding(6),
+        button(text("Clear"))
+            .on_press(FileTreeMessage::ClearFilters)
+            .padding(6),
     ]
     .spacing(5);
 
     let expand_buttons = row![
-        button(text("Expand All")).on_press(FileTreeMessage::ExpandAll).padding(6),
-        button(text("Collapse All")).on_press(FileTreeMessage::CollapseAll).padding(6),
+        button(text("Expand All"))
+            .on_press(FileTreeMessage::ExpandAll)
+            .padding(6),
+        button(text("Collapse All"))
+            .on_press(FileTreeMessage::CollapseAll)
+            .padding(6),
     ]
     .spacing(5);
 
     let bookmark_info = if !state.bookmarked_nodes.is_empty() {
-        text(format!("🔖 {}", state.bookmarked_nodes.len()))
-            .size(12)
+        text(format!("🔖 {}", state.bookmarked_nodes.len())).size(12)
     } else {
         text("")
     };
 
     container(
         column![
-            row![
-                search_input,
-                Space::with_width(10),
-                nav_buttons,
-            ]
-            .spacing(5)
-            .align_y(Vertical::Center),
+            row![search_input, Space::with_width(10), nav_buttons,]
+                .spacing(5)
+                .align_y(Vertical::Center),
             Space::with_height(5),
             row![
                 filter_buttons,
@@ -511,25 +528,26 @@ fn view_header(state: &FileTreeState) -> Element<FileTreeMessage> {
             .spacing(5)
         ]
         .spacing(5)
-        .padding(10)
+        .padding(10),
     )
     .width(Length::Fill)
-    .style(|theme: &Theme| {
-        container::Style {
-            background: Some(theme.palette().background.into()),
-            border: iced::Border {
-                width: 0.0,
-                color: Color::TRANSPARENT,
-                radius: 0.0.into(),
-            },
-            ..Default::default()
-        }
+    .style(|theme: &Theme| container::Style {
+        background: Some(theme.palette().background.into()),
+        border: iced::Border {
+            width: 0.0,
+            color: Color::TRANSPARENT,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
     })
     .into()
 }
 
 /// Render the tree content
-fn view_tree_content<'a>(state: &'a FileTreeState, tree: &'a FileTree) -> Element<'a, FileTreeMessage> {
+fn view_tree_content<'a>(
+    state: &'a FileTreeState,
+    tree: &'a FileTree,
+) -> Element<'a, FileTreeMessage> {
     if let Some(root_id) = &tree.root_id {
         if let Some(root_node) = tree.get_node(root_id) {
             let filtered_nodes = filter_nodes(state, tree);
@@ -616,21 +634,23 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
             format!(" 🔗 {}", node.knowledge_links.len())
         };
 
-        button(text(badge_text).size(11).style(Color::from_rgb8(120, 200, 255)))
-            .padding(2)
-            .style(|theme: &Theme| {
-                button::Style {
-                    background: Some(Color::from_rgba8(120, 200, 255, 0.2).into()),
-                    border: iced::Border {
-                        width: 1.0,
-                        color: Color::from_rgb8(120, 200, 255),
-                        radius: 3.0.into(),
-                    },
-                    ..button::Style::default()
-                }
-            })
-            .on_press(FileTreeMessage::ShowKnowledgeNodes(node.node_id.clone()))
-            .into()
+        button(
+            text(badge_text)
+                .size(11)
+                .style(Color::from_rgb8(120, 200, 255)),
+        )
+        .padding(2)
+        .style(|theme: &Theme| button::Style {
+            background: Some(Color::from_rgba8(120, 200, 255, 0.2).into()),
+            border: iced::Border {
+                width: 1.0,
+                color: Color::from_rgb8(120, 200, 255),
+                radius: 3.0.into(),
+            },
+            ..button::Style::default()
+        })
+        .on_press(FileTreeMessage::ShowKnowledgeNodes(node.node_id.clone()))
+        .into()
     } else {
         Space::with_width(0).into()
     };
@@ -694,31 +714,27 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
     if is_selected {
         container(node_button)
             .width(Length::Fill)
-            .style(|theme: &Theme| {
-                container::Style {
-                    background: Some(theme.palette().primary.into()),
-                    border: iced::Border {
-                        width: 0.0,
-                        color: Color::TRANSPARENT,
-                        radius: 0.0.into(),
-                    },
-                    ..Default::default()
-                }
+            .style(|theme: &Theme| container::Style {
+                background: Some(theme.palette().primary.into()),
+                border: iced::Border {
+                    width: 0.0,
+                    color: Color::TRANSPARENT,
+                    radius: 0.0.into(),
+                },
+                ..Default::default()
             })
             .into()
     } else if is_highlighted {
         container(node_button)
             .width(Length::Fill)
-            .style(|_theme: &Theme| {
-                container::Style {
-                    background: Some(Color::from_rgba8(255, 200, 100, 0.2).into()),
-                    border: iced::Border {
-                        width: 1.0,
-                        color: Color::from_rgb8(255, 200, 100),
-                        radius: 0.0.into(),
-                    },
-                    ..Default::default()
-                }
+            .style(|_theme: &Theme| container::Style {
+                background: Some(Color::from_rgba8(255, 200, 100, 0.2).into()),
+                border: iced::Border {
+                    width: 1.0,
+                    color: Color::from_rgb8(255, 200, 100),
+                    radius: 0.0.into(),
+                },
+                ..Default::default()
             })
             .into()
     } else {
@@ -736,16 +752,17 @@ fn view_footer(state: &FileTreeState, tree: &FileTree) -> Element<FileTreeMessag
         tree.file_count,
         tree.directory_count,
         visible_count,
-        if state.selected_node.is_some() { "Yes" } else { "No" }
+        if state.selected_node.is_some() {
+            "Yes"
+        } else {
+            "No"
+        }
     );
 
-    container(
-        text(stats_text).size(12)
-    )
-    .padding(10)
-    .width(Length::Fill)
-    .style(|theme: &Theme| {
-        container::Style {
+    container(text(stats_text).size(12))
+        .padding(10)
+        .width(Length::Fill)
+        .style(|theme: &Theme| container::Style {
             background: Some(theme.palette().background.into()),
             border: iced::Border {
                 width: 1.0,
@@ -753,9 +770,8 @@ fn view_footer(state: &FileTreeState, tree: &FileTree) -> Element<FileTreeMessag
                 radius: 0.0.into(),
             },
             ..Default::default()
-        }
-    })
-    .into()
+        })
+        .into()
 }
 
 /// ============================================================================
@@ -808,10 +824,10 @@ fn get_git_status_color(status: &str) -> Color {
     match status.trim() {
         "M" | "MM" => Color::from_rgb8(255, 200, 100), // Modified - orange
         "A" | "AM" => Color::from_rgb8(100, 255, 100), // Added - green
-        "D" => Color::from_rgb8(255, 100, 100), // Deleted - red
-        "R" => Color::from_rgb8(100, 200, 255), // Renamed - blue
-        "??" => Color::from_rgb8(200, 200, 200), // Untracked - gray
-        _ => Color::from_rgb8(150, 150, 150), // Other - light gray
+        "D" => Color::from_rgb8(255, 100, 100),        // Deleted - red
+        "R" => Color::from_rgb8(100, 200, 255),        // Renamed - blue
+        "??" => Color::from_rgb8(200, 200, 200),       // Untracked - gray
+        _ => Color::from_rgb8(150, 150, 150),          // Other - light gray
     }
 }
 
@@ -881,32 +897,42 @@ fn sort_nodes(nodes: &mut Vec<&FileTreeNode>, sort_order: SortOrder) {
             });
         }
         SortOrder::NameDesc => {
-            nodes.sort_by(|a, b| {
-                match (a.is_directory(), b.is_directory()) {
-                    (true, false) => std::cmp::Ordering::Less,
-                    (false, true) => std::cmp::Ordering::Greater,
-                    _ => b.name.cmp(&a.name),
-                }
+            nodes.sort_by(|a, b| match (a.is_directory(), b.is_directory()) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => b.name.cmp(&a.name),
             });
         }
         SortOrder::SizeAsc => {
             nodes.sort_by(|a, b| {
-                a.metadata.size.unwrap_or(0).cmp(&b.metadata.size.unwrap_or(0))
+                a.metadata
+                    .size
+                    .unwrap_or(0)
+                    .cmp(&b.metadata.size.unwrap_or(0))
             });
         }
         SortOrder::SizeDesc => {
             nodes.sort_by(|a, b| {
-                b.metadata.size.unwrap_or(0).cmp(&a.metadata.size.unwrap_or(0))
+                b.metadata
+                    .size
+                    .unwrap_or(0)
+                    .cmp(&a.metadata.size.unwrap_or(0))
             });
         }
         SortOrder::ModifiedAsc => {
             nodes.sort_by(|a, b| {
-                a.metadata.modified.unwrap_or(0).cmp(&b.metadata.modified.unwrap_or(0))
+                a.metadata
+                    .modified
+                    .unwrap_or(0)
+                    .cmp(&b.metadata.modified.unwrap_or(0))
             });
         }
         SortOrder::ModifiedDesc => {
             nodes.sort_by(|a, b| {
-                b.metadata.modified.unwrap_or(0).cmp(&a.metadata.modified.unwrap_or(0))
+                b.metadata
+                    .modified
+                    .unwrap_or(0)
+                    .cmp(&a.metadata.modified.unwrap_or(0))
             });
         }
     }

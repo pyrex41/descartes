@@ -2,10 +2,9 @@
 ///
 /// Tests process spawning, lifecycle management, stdio streaming,
 /// signal handling, and graceful shutdown.
-
 use descartes_core::{
-    AgentConfig, AgentRunner, AgentSignal, AgentStatus, LocalProcessRunner, ProcessRunnerConfig,
-    GracefulShutdown,
+    AgentConfig, AgentRunner, AgentSignal, AgentStatus, GracefulShutdown, LocalProcessRunner,
+    ProcessRunnerConfig,
 };
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};

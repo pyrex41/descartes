@@ -6,7 +6,6 @@
 ///
 /// Then run this example:
 ///   cargo run --example client_usage
-
 use descartes_daemon::{RpcClient, RpcClientBuilder};
 use serde_json::json;
 
@@ -84,7 +83,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let logs_response = client.get_agent_logs(&agent_id, Some(10), None).await?;
     println!("   Total logs: {}", logs_response.total);
     for (i, log) in logs_response.logs.iter().enumerate() {
-        println!("   [{}] {} - {}: {}", i + 1, log.timestamp, log.level, log.message);
+        println!(
+            "   [{}] {} - {}: {}",
+            i + 1,
+            log.timestamp,
+            log.level,
+            log.message
+        );
     }
     println!();
 
@@ -133,7 +138,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let batch_results = client.batch_call(batch_requests).await?;
-    println!("   ✓ Batch completed with {} responses\n", batch_results.len());
+    println!(
+        "   ✓ Batch completed with {} responses\n",
+        batch_results.len()
+    );
 
     // Kill the agent
     println!("13. Killing test agent...");

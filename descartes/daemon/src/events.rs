@@ -5,7 +5,6 @@
 /// - Event bus for publishing and subscribing to events
 /// - WebSocket-based event streaming
 /// - Event filtering and routing
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -328,7 +327,10 @@ impl EventBus {
     }
 
     /// Subscribe to events with optional filter
-    pub async fn subscribe(&self, filter: Option<EventFilter>) -> (String, broadcast::Receiver<DescartesEvent>) {
+    pub async fn subscribe(
+        &self,
+        filter: Option<EventFilter>,
+    ) -> (String, broadcast::Receiver<DescartesEvent>) {
         let subscription_id = Uuid::new_v4().to_string();
         let filter = filter.unwrap_or_default();
 
@@ -338,7 +340,10 @@ impl EventBus {
             created_at: Utc::now(),
         };
 
-        self.subscriptions.write().await.insert(subscription_id.clone(), subscription);
+        self.subscriptions
+            .write()
+            .await
+            .insert(subscription_id.clone(), subscription);
 
         // Update stats
         let mut stats = self.stats.write().await;
@@ -485,16 +490,10 @@ mod tests {
     fn test_event_filter_matches() {
         let filter = EventFilter::for_agent("agent-1".to_string());
 
-        let event1 = AgentEvent::spawned(
-            "agent-1".to_string(),
-            serde_json::json!({}),
-        );
+        let event1 = AgentEvent::spawned("agent-1".to_string(), serde_json::json!({}));
         assert!(filter.matches(&event1));
 
-        let event2 = AgentEvent::spawned(
-            "agent-2".to_string(),
-            serde_json::json!({}),
-        );
+        let event2 = AgentEvent::spawned("agent-2".to_string(), serde_json::json!({}));
         assert!(!filter.matches(&event2));
     }
 
@@ -505,10 +504,7 @@ mod tests {
             ..Default::default()
         };
 
-        let agent_event = AgentEvent::spawned(
-            "agent-1".to_string(),
-            serde_json::json!({}),
-        );
+        let agent_event = AgentEvent::spawned("agent-1".to_string(), serde_json::json!({}));
         assert!(filter.matches(&agent_event));
 
         let system_event = SystemEvent::daemon_started();
@@ -521,10 +517,7 @@ mod tests {
 
         let (_sub_id, mut rx) = bus.subscribe(None).await;
 
-        let event = AgentEvent::spawned(
-            "test-agent".to_string(),
-            serde_json::json!({}),
-        );
+        let event = AgentEvent::spawned("test-agent".to_string(), serde_json::json!({}));
 
         bus.publish(event.clone()).await;
 
@@ -544,7 +537,8 @@ mod tests {
         bus.publish(AgentEvent::spawned(
             "agent-1".to_string(),
             serde_json::json!({}),
-        )).await;
+        ))
+        .await;
 
         bus.publish(SystemEvent::daemon_started()).await;
 

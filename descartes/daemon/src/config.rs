@@ -1,5 +1,4 @@
 /// Daemon configuration
-
 use crate::errors::{DaemonError, DaemonResult};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

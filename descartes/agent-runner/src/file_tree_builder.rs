@@ -6,8 +6,7 @@
 /// - Collecting file metadata (size, timestamps, language detection)
 /// - Git status integration
 /// - Incremental tree updates
-
-use crate::knowledge_graph::{FileTree, FileTreeNode, FileNodeType, FileMetadata};
+use crate::knowledge_graph::{FileMetadata, FileNodeType, FileTree, FileTreeNode};
 use crate::types::Language;
 use std::collections::HashMap;
 use std::fs;
@@ -266,7 +265,11 @@ impl FileTreeBuilder {
     }
 
     /// Collect file metadata
-    fn collect_metadata(&self, path: &Path, fs_metadata: &fs::Metadata) -> io::Result<FileMetadata> {
+    fn collect_metadata(
+        &self,
+        path: &Path,
+        fs_metadata: &fs::Metadata,
+    ) -> io::Result<FileMetadata> {
         let mut metadata = FileMetadata::default();
 
         // Basic metadata
@@ -536,7 +539,8 @@ impl FileTreeUpdater {
         // Find parent
         let parent_path = path.parent();
         let parent_id = parent_path.and_then(|p| {
-            tree.get_node_by_path(&p.to_path_buf()).map(|n| n.node_id.clone())
+            tree.get_node_by_path(&p.to_path_buf())
+                .map(|n| n.node_id.clone())
         });
 
         // Calculate depth
@@ -555,7 +559,8 @@ impl FileTreeUpdater {
 
         // If it's a directory, scan it
         if path.is_dir() {
-            self.builder.scan_directory_recursive(path, &node_id, depth, tree)?;
+            self.builder
+                .scan_directory_recursive(path, &node_id, depth, tree)?;
         }
 
         Ok(node_id)
@@ -597,7 +602,9 @@ impl FileTreeUpdater {
             // Update counts
             match node.node_type {
                 FileNodeType::File => tree.file_count = tree.file_count.saturating_sub(1),
-                FileNodeType::Directory => tree.directory_count = tree.directory_count.saturating_sub(1),
+                FileNodeType::Directory => {
+                    tree.directory_count = tree.directory_count.saturating_sub(1)
+                }
                 _ => {}
             }
 
@@ -653,7 +660,8 @@ impl FileTreeUpdater {
                 .to_string();
 
             // Add new path to index
-            tree.path_index.insert(new_path.to_path_buf(), node_id.clone());
+            tree.path_index
+                .insert(new_path.to_path_buf(), node_id.clone());
 
             // Update metadata
             if let Ok(fs_metadata) = fs::symlink_metadata(new_path) {
@@ -668,7 +676,8 @@ impl FileTreeUpdater {
         if old_parent != new_parent {
             // Remove from old parent
             if let Some(old_parent_path) = old_parent {
-                if let Some(old_parent_node) = tree.get_node_by_path(&old_parent_path.to_path_buf()) {
+                if let Some(old_parent_node) = tree.get_node_by_path(&old_parent_path.to_path_buf())
+                {
                     let old_parent_id = old_parent_node.node_id.clone();
                     if let Some(parent) = tree.get_node_mut(&old_parent_id) {
                         parent.children.retain(|id| id != &node_id);
@@ -678,7 +687,8 @@ impl FileTreeUpdater {
 
             // Add to new parent
             if let Some(new_parent_path) = new_parent {
-                if let Some(new_parent_node) = tree.get_node_by_path(&new_parent_path.to_path_buf()) {
+                if let Some(new_parent_node) = tree.get_node_by_path(&new_parent_path.to_path_buf())
+                {
                     let new_parent_id = new_parent_node.node_id.clone();
                     if let Some(parent) = tree.get_node_mut(&new_parent_id) {
                         parent.add_child(node_id.clone());
@@ -733,9 +743,18 @@ mod tests {
     #[test]
     fn test_detect_language() {
         assert_eq!(detect_language(Path::new("test.rs")), Some(Language::Rust));
-        assert_eq!(detect_language(Path::new("test.py")), Some(Language::Python));
-        assert_eq!(detect_language(Path::new("test.js")), Some(Language::JavaScript));
-        assert_eq!(detect_language(Path::new("test.ts")), Some(Language::TypeScript));
+        assert_eq!(
+            detect_language(Path::new("test.py")),
+            Some(Language::Python)
+        );
+        assert_eq!(
+            detect_language(Path::new("test.js")),
+            Some(Language::JavaScript)
+        );
+        assert_eq!(
+            detect_language(Path::new("test.ts")),
+            Some(Language::TypeScript)
+        );
         assert_eq!(detect_language(Path::new("test.txt")), None);
     }
 

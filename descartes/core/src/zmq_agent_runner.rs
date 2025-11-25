@@ -29,7 +29,6 @@
 ///   |                               |
 ///   |<-- StatusUpdate --------------|  (async push)
 /// ```
-
 use crate::errors::{AgentError, AgentResult};
 use crate::traits::{AgentConfig, AgentInfo, AgentStatus};
 use async_trait::async_trait;
@@ -785,9 +784,8 @@ pub trait ZmqAgentRunner: Send + Sync {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn serialize_zmq_message(msg: &ZmqMessage) -> AgentResult<Vec<u8>> {
-    rmp_serde::to_vec(msg).map_err(|e| {
-        AgentError::ExecutionError(format!("Failed to serialize ZMQ message: {}", e))
-    })
+    rmp_serde::to_vec(msg)
+        .map_err(|e| AgentError::ExecutionError(format!("Failed to serialize ZMQ message: {}", e)))
 }
 
 /// Deserialize a ZmqMessage from MessagePack bytes.

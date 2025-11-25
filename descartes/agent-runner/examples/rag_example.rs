@@ -6,7 +6,6 @@
 /// 3. Perform vector, full-text, and hybrid searches
 /// 4. Use embedding caching
 /// 5. Access search results and statistics
-
 use agent_runner::{RagConfig, RagSystem};
 
 #[tokio::main]
@@ -55,11 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // In a real scenario, you would index actual code files
     // For this example, we'll show the API usage
 
-    let example_files = vec![
-        "../src/rag.rs",
-        "../src/parser.rs",
-        "../src/semantic.rs",
-    ];
+    let example_files = vec!["../src/rag.rs", "../src/parser.rs", "../src/semantic.rs"];
 
     for file_path in &example_files {
         match rag.index_file(file_path).await {
@@ -77,7 +72,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stats = rag.stats();
     println!("RAG System Statistics:");
     println!("  Total Chunks: {}", stats.total_chunks);
-    println!("  Cache Size: {}/{}", stats.cache_size, stats.cache_capacity);
+    println!(
+        "  Cache Size: {}/{}",
+        stats.cache_size, stats.cache_capacity
+    );
     println!("  Embedding Dimension: {}\n", stats.embedding_dimension);
 
     // 5. Perform searches
@@ -94,13 +92,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(results) => {
                 println!("   Found {} results", results.len());
                 for (i, result) in results.iter().enumerate() {
-                    println!("   [{}] Score: {:.4} | Type: {} | File: {}",
+                    println!(
+                        "   [{}] Score: {:.4} | Type: {} | File: {}",
                         i + 1,
                         result.score,
                         result.chunk.chunk_type,
                         result.chunk.file_path
                     );
-                    println!("       Preview: {}...",
+                    println!(
+                        "       Preview: {}...",
                         result.chunk.content.chars().take(60).collect::<String>()
                     );
                 }
@@ -116,7 +116,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(results) => {
                 println!("   Found {} results", results.len());
                 for (i, result) in results.iter().enumerate() {
-                    println!("   [{}] Score: {:.4} | Type: {} | File: {}",
+                    println!(
+                        "   [{}] Score: {:.4} | Type: {} | File: {}",
                         i + 1,
                         result.score,
                         result.chunk.chunk_type,
@@ -135,7 +136,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(results) => {
                 println!("   Found {} results", results.len());
                 for (i, result) in results.iter().enumerate() {
-                    println!("   [{}] Combined Score: {:.4} | Type: {} | File: {}",
+                    println!(
+                        "   [{}] Combined Score: {:.4} | Type: {} | File: {}",
                         i + 1,
                         result.score,
                         result.chunk.chunk_type,
@@ -147,7 +149,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Some(fs) = result.fulltext_score {
                         println!("       Full-Text Score: {:.4}", fs);
                     }
-                    println!("       Lines: {}-{}", result.chunk.line_range.0, result.chunk.line_range.1);
+                    println!(
+                        "       Lines: {}-{}",
+                        result.chunk.line_range.0, result.chunk.line_range.1
+                    );
                 }
             }
             Err(e) => println!("   Error: {}", e),
@@ -171,7 +176,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("  First query (no cache): {:?}", first_duration);
     println!("  Second query (cached): {:?}", second_duration);
-    println!("  Speedup: {:.2}x\n", first_duration.as_secs_f64() / second_duration.as_secs_f64());
+    println!(
+        "  Speedup: {:.2}x\n",
+        first_duration.as_secs_f64() / second_duration.as_secs_f64()
+    );
 
     // 7. Advanced features
     println!("=== Advanced Features ===\n");

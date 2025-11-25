@@ -9,7 +9,6 @@
 /// - Agent handle/ID tracking
 /// - Health checks and monitoring
 /// - Graceful shutdown mechanisms
-
 use crate::errors::{AgentError, AgentResult};
 use crate::traits::{
     AgentConfig, AgentHandle, AgentInfo, AgentRunner, AgentSignal, AgentStatus, ExitStatus,
@@ -21,7 +20,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin, ChildStdout, ChildStderr, Command};
+use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, Mutex};
 use uuid::Uuid;
 
@@ -172,9 +171,8 @@ impl LocalProcessRunner {
         let interval_secs = self.config.health_check_interval_secs;
 
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(
-                tokio::time::Duration::from_secs(interval_secs)
-            );
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
 
             loop {
                 interval.tick().await;
@@ -238,15 +236,18 @@ impl AgentRunner for LocalProcessRunner {
         })?;
 
         // Extract stdio handles
-        let stdin = child.stdin.take().ok_or_else(|| {
-            AgentError::SpawnFailed("Failed to capture stdin".to_string())
-        })?;
-        let stdout = child.stdout.take().ok_or_else(|| {
-            AgentError::SpawnFailed("Failed to capture stdout".to_string())
-        })?;
-        let stderr = child.stderr.take().ok_or_else(|| {
-            AgentError::SpawnFailed("Failed to capture stderr".to_string())
-        })?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| AgentError::SpawnFailed("Failed to capture stdin".to_string()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| AgentError::SpawnFailed("Failed to capture stdout".to_string()))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| AgentError::SpawnFailed("Failed to capture stderr".to_string()))?;
 
         // Create agent handle
         let agent_id = Uuid::new_v4();
@@ -344,14 +345,15 @@ impl AgentRunner for LocalProcessRunner {
                         use nix::unistd::Pid;
 
                         if let Some(pid) = child_guard.id() {
-                            kill(Pid::from_raw(pid as i32), Signal::SIGINT)
-                                .map_err(|e| AgentError::ExecutionError(format!("Failed to send SIGINT: {}", e)))?;
+                            kill(Pid::from_raw(pid as i32), Signal::SIGINT).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGINT: {}", e))
+                            })?;
                         }
                     }
                     #[cfg(not(unix))]
                     {
                         return Err(AgentError::UnsupportedOperation(
-                            "SIGINT not supported on this platform".into()
+                            "SIGINT not supported on this platform".into(),
                         ));
                     }
                 }
@@ -363,8 +365,9 @@ impl AgentRunner for LocalProcessRunner {
                         use nix::unistd::Pid;
 
                         if let Some(pid) = child_guard.id() {
-                            kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
-                                .map_err(|e| AgentError::ExecutionError(format!("Failed to send SIGTERM: {}", e)))?;
+                            kill(Pid::from_raw(pid as i32), Signal::SIGTERM).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGTERM: {}", e))
+                            })?;
                         }
                     }
                     #[cfg(not(unix))]
@@ -450,10 +453,7 @@ impl LocalAgentHandle {
     }
 
     /// Spawn a background task to read stdout lines into a channel.
-    fn spawn_stdout_reader(
-        mut reader: BufReader<ChildStdout>,
-        tx: mpsc::UnboundedSender<Vec<u8>>,
-    ) {
+    fn spawn_stdout_reader(mut reader: BufReader<ChildStdout>, tx: mpsc::UnboundedSender<Vec<u8>>) {
         tokio::spawn(async move {
             let mut line = String::new();
             loop {
@@ -472,10 +472,7 @@ impl LocalAgentHandle {
     }
 
     /// Spawn a background task to read stderr lines into a channel.
-    fn spawn_stderr_reader(
-        mut reader: BufReader<ChildStderr>,
-        tx: mpsc::UnboundedSender<Vec<u8>>,
-    ) {
+    fn spawn_stderr_reader(mut reader: BufReader<ChildStderr>, tx: mpsc::UnboundedSender<Vec<u8>>) {
         tokio::spawn(async move {
             let mut line = String::new();
             loop {
@@ -521,8 +518,9 @@ impl LocalAgentHandle {
                     use nix::unistd::Pid;
 
                     if let Some(pid) = child.id() {
-                        kill(Pid::from_raw(pid as i32), Signal::SIGINT)
-                            .map_err(|e| AgentError::ExecutionError(format!("Failed to send SIGINT: {}", e)))?;
+                        kill(Pid::from_raw(pid as i32), Signal::SIGINT).map_err(|e| {
+                            AgentError::ExecutionError(format!("Failed to send SIGINT: {}", e))
+                        })?;
                     }
                 }
 
@@ -542,8 +540,9 @@ impl LocalAgentHandle {
                     use nix::unistd::Pid;
 
                     if let Some(pid) = child.id() {
-                        kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
-                            .map_err(|e| AgentError::ExecutionError(format!("Failed to send SIGTERM: {}", e)))?;
+                        kill(Pid::from_raw(pid as i32), Signal::SIGTERM).map_err(|e| {
+                            AgentError::ExecutionError(format!("Failed to send SIGTERM: {}", e))
+                        })?;
                     }
                 }
 
@@ -814,6 +813,9 @@ mod tests {
         let config = ProcessRunnerConfig::default();
         assert!(config.enable_json_streaming);
         assert!(config.enable_health_checks);
-        assert_eq!(config.health_check_interval_secs, HEALTH_CHECK_INTERVAL_SECS);
+        assert_eq!(
+            config.health_check_interval_secs,
+            HEALTH_CHECK_INTERVAL_SECS
+        );
     }
 }

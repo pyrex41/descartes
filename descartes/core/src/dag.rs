@@ -33,7 +33,6 @@
 /// assert!(dag.validate().is_ok());
 /// let sorted = dag.topological_sort().unwrap();
 /// ```
-
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use thiserror::Error;
@@ -212,7 +211,11 @@ impl DAGNode {
     }
 
     /// Add metadata key-value pair
-    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
+    pub fn with_metadata(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<serde_json::Value>,
+    ) -> Self {
         self.metadata.insert(key.into(), value.into());
         self
     }
@@ -289,7 +292,11 @@ impl DAGEdge {
     }
 
     /// Add metadata
-    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
+    pub fn with_metadata(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<serde_json::Value>,
+    ) -> Self {
         self.metadata.insert(key.into(), value.into());
         self
     }
@@ -391,7 +398,11 @@ impl DAG {
 
         // Remove all edges connected to this node
         let incoming = self.adjacency_in.get(&node_id).cloned().unwrap_or_default();
-        let outgoing = self.adjacency_out.get(&node_id).cloned().unwrap_or_default();
+        let outgoing = self
+            .adjacency_out
+            .get(&node_id)
+            .cloned()
+            .unwrap_or_default();
 
         for edge_id in incoming.iter().chain(outgoing.iter()) {
             if let Some(edge) = self.edges.get(edge_id) {
@@ -460,7 +471,9 @@ impl DAG {
 
     /// Remove an edge from the DAG
     pub fn remove_edge(&mut self, edge_id: Uuid) -> DAGResult<()> {
-        let edge = self.edges.remove(&edge_id)
+        let edge = self
+            .edges
+            .remove(&edge_id)
             .ok_or(DAGError::EdgeNotFound(edge_id))?;
 
         if let Some(out_edges) = self.adjacency_out.get_mut(&edge.from_node_id) {
@@ -518,7 +531,8 @@ impl DAG {
         self.adjacency_out
             .get(&node_id)
             .map(|edge_ids| {
-                edge_ids.iter()
+                edge_ids
+                    .iter()
                     .filter_map(|eid| self.edges.get(eid))
                     .collect()
             })
@@ -530,7 +544,8 @@ impl DAG {
         self.adjacency_in
             .get(&node_id)
             .map(|edge_ids| {
-                edge_ids.iter()
+                edge_ids
+                    .iter()
                     .filter_map(|eid| self.edges.get(eid))
                     .collect()
             })
@@ -829,7 +844,8 @@ impl DAG {
 
                 for successor in self.get_successors(node_id) {
                     let new_depth = current_depth + 1;
-                    depths.entry(successor)
+                    depths
+                        .entry(successor)
                         .and_modify(|d| *d = (*d).max(new_depth))
                         .or_insert(new_depth);
                 }
@@ -1139,7 +1155,7 @@ impl DAG {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DAGOperation {
     AddNode(DAGNode),
-    RemoveNode(Uuid, DAGNode), // ID and node data
+    RemoveNode(Uuid, DAGNode),          // ID and node data
     UpdateNode(Uuid, DAGNode, DAGNode), // ID, old node, new node
     AddEdge(DAGEdge),
     RemoveEdge(Uuid, DAGEdge), // ID and edge data
@@ -1267,7 +1283,9 @@ impl DAGWithHistory {
 
     /// Remove a node and record the operation
     pub fn remove_node(&mut self, node_id: Uuid) -> DAGResult<()> {
-        let node = self.dag.get_node(node_id)
+        let node = self
+            .dag
+            .get_node(node_id)
             .ok_or(DAGError::NodeNotFound(node_id))?
             .clone();
         self.dag.remove_node(node_id)?;
@@ -1277,11 +1295,14 @@ impl DAGWithHistory {
 
     /// Update a node and record the operation
     pub fn update_node(&mut self, node_id: Uuid, new_node: DAGNode) -> DAGResult<()> {
-        let old_node = self.dag.get_node(node_id)
+        let old_node = self
+            .dag
+            .get_node(node_id)
             .ok_or(DAGError::NodeNotFound(node_id))?
             .clone();
         self.dag.update_node(node_id, new_node.clone())?;
-        self.history.record(DAGOperation::UpdateNode(node_id, old_node, new_node));
+        self.history
+            .record(DAGOperation::UpdateNode(node_id, old_node, new_node));
         Ok(())
     }
 
@@ -1294,7 +1315,9 @@ impl DAGWithHistory {
 
     /// Remove an edge and record the operation
     pub fn remove_edge(&mut self, edge_id: Uuid) -> DAGResult<()> {
-        let edge = self.dag.get_edge(edge_id)
+        let edge = self
+            .dag
+            .get_edge(edge_id)
             .ok_or(DAGError::EdgeNotFound(edge_id))?
             .clone();
         self.dag.remove_edge(edge_id)?;
@@ -1411,7 +1434,10 @@ mod tests {
         let node = DAGNode::new_auto("Task");
 
         assert!(dag.add_node(node.clone()).is_ok());
-        assert!(matches!(dag.add_node(node), Err(DAGError::DuplicateNode(_))));
+        assert!(matches!(
+            dag.add_node(node),
+            Err(DAGError::DuplicateNode(_))
+        ));
     }
 
     #[test]
@@ -1585,7 +1611,9 @@ mod tests {
     fn test_max_depth() {
         let mut dag = DAG::new("Test");
 
-        let nodes: Vec<_> = (0..5).map(|i| DAGNode::new_auto(format!("Task {}", i))).collect();
+        let nodes: Vec<_> = (0..5)
+            .map(|i| DAGNode::new_auto(format!("Task {}", i)))
+            .collect();
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
         for node in nodes {
@@ -1594,7 +1622,8 @@ mod tests {
 
         // Create a chain: 0 -> 1 -> 2 -> 3 -> 4 (depth = 4)
         for i in 0..4 {
-            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+                .unwrap();
         }
 
         assert_eq!(dag.max_depth(), 4);
@@ -1635,8 +1664,7 @@ mod tests {
         let node1 = DAGNode::new_auto("Task 1")
             .with_position(100.0, 200.0)
             .with_metadata("priority", "high");
-        let node2 = DAGNode::new_auto("Task 2")
-            .with_position(300.0, 200.0);
+        let node2 = DAGNode::new_auto("Task 2").with_position(300.0, 200.0);
 
         let id1 = node1.node_id;
         let id2 = node2.node_id;
@@ -1669,8 +1697,7 @@ mod tests {
         dag.add_node(node).unwrap();
 
         // Update the node
-        let updated = DAGNode::new(node_id, "Updated")
-            .with_description("New description");
+        let updated = DAGNode::new(node_id, "Updated").with_description("New description");
         assert!(dag.update_node(node_id, updated).is_ok());
 
         let retrieved = dag.get_node(node_id).unwrap();
@@ -1715,7 +1742,9 @@ mod tests {
         let mut dag = DAG::new("Test");
 
         // Create chain: 1 -> 2 -> 3 -> 4
-        let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("{}", i))).collect();
+        let nodes: Vec<_> = (1..=4)
+            .map(|i| DAGNode::new_auto(format!("{}", i)))
+            .collect();
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
         for node in nodes {
@@ -1723,7 +1752,8 @@ mod tests {
         }
 
         for i in 0..3 {
-            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+                .unwrap();
         }
 
         // Node 4 depends on 3, 2, and 1
@@ -1743,7 +1773,9 @@ mod tests {
         let mut dag = DAG::new("Test");
 
         // Create chain: 1 -> 2 -> 3 -> 4
-        let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("{}", i))).collect();
+        let nodes: Vec<_> = (1..=4)
+            .map(|i| DAGNode::new_auto(format!("{}", i)))
+            .collect();
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
         for node in nodes {
@@ -1751,7 +1783,8 @@ mod tests {
         }
 
         for i in 0..3 {
-            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+                .unwrap();
         }
 
         // Node 1 has 3 dependents
@@ -1799,7 +1832,9 @@ mod tests {
         let mut dag = DAG::new("Test");
 
         // Create two separate cycles
-        let nodes: Vec<_> = (0..6).map(|i| DAGNode::new_auto(format!("Node {}", i))).collect();
+        let nodes: Vec<_> = (0..6)
+            .map(|i| DAGNode::new_auto(format!("Node {}", i)))
+            .collect();
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
         for node in nodes {
@@ -1851,7 +1886,9 @@ mod tests {
         let mut dag = DAG::new("Test");
 
         // Create DAG: 1 -> 2 -> 3 -> 4
-        let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("{}", i))).collect();
+        let nodes: Vec<_> = (1..=4)
+            .map(|i| DAGNode::new_auto(format!("{}", i)))
+            .collect();
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
         for node in nodes {
@@ -1859,7 +1896,8 @@ mod tests {
         }
 
         for i in 0..3 {
-            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1])).unwrap();
+            dag.add_edge(DAGEdge::dependency(ids[i], ids[i + 1]))
+                .unwrap();
         }
 
         // Extract subgraph with nodes 2 and 3
@@ -1886,7 +1924,9 @@ mod tests {
         //   2   3
         //    \ /
         //     4
-        let nodes: Vec<_> = (1..=4).map(|i| DAGNode::new_auto(format!("{}", i))).collect();
+        let nodes: Vec<_> = (1..=4)
+            .map(|i| DAGNode::new_auto(format!("{}", i)))
+            .collect();
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
         for node in nodes {
@@ -1910,7 +1950,9 @@ mod tests {
     fn test_get_execution_order() {
         let mut dag = DAG::new("Test");
 
-        let nodes: Vec<_> = (1..=3).map(|i| DAGNode::new_auto(format!("{}", i))).collect();
+        let nodes: Vec<_> = (1..=3)
+            .map(|i| DAGNode::new_auto(format!("{}", i)))
+            .collect();
         let ids: Vec<_> = nodes.iter().map(|n| n.node_id).collect();
 
         for node in nodes {

@@ -99,7 +99,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     handles.push(tokio::spawn(async move {
         let client = UnixSocketRpcClient::new(socket_path_clone)?;
         let tasks = client.list_tasks(None).await?;
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(("list_tasks", format!("{} tasks", tasks.len())))
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>((
+            "list_tasks",
+            format!("{} tasks", tasks.len()),
+        ))
     }));
 
     // Client 3: List tasks with filter
@@ -108,7 +111,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let client = UnixSocketRpcClient::new(socket_path_clone)?;
         let filter = json!({ "status": "todo" });
         let tasks = client.list_tasks(Some(filter)).await?;
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(("list_tasks_filtered", format!("{} TODO tasks", tasks.len())))
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>((
+            "list_tasks_filtered",
+            format!("{} TODO tasks", tasks.len()),
+        ))
     }));
 
     // Client 4: Spawn agent

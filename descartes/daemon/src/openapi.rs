@@ -1,5 +1,4 @@
 /// OpenAPI 3.0 schema generation for RPC API
-
 use serde_json::{json, Value};
 
 /// Generate OpenAPI schema

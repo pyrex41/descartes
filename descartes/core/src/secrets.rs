@@ -1,7 +1,6 @@
 /// Secure secret management module for encrypted storage.
 /// Implements AES-256-GCM encryption with key derivation from master password.
 /// Supports multiple secret types, versioning, and audit logging.
-
 use crate::errors::{StateStoreError, StateStoreResult};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -301,7 +300,10 @@ pub trait SecretStore: Send + Sync {
     async fn get_secret(&self, secret_id: &Uuid) -> StateStoreResult<Option<Secret>>;
 
     /// Get secret metadata without decrypting value
-    async fn get_secret_metadata(&self, secret_id: &Uuid) -> StateStoreResult<Option<SecretMetadata>>;
+    async fn get_secret_metadata(
+        &self,
+        secret_id: &Uuid,
+    ) -> StateStoreResult<Option<SecretMetadata>>;
 
     /// List all secrets (metadata only)
     async fn list_secrets(&self) -> StateStoreResult<Vec<SecretMetadata>>;

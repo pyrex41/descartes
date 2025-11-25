@@ -175,12 +175,8 @@ async fn test_rpc_filter_by_status() {
     agent2
         .transition_to(AgentStatus::Initializing, None)
         .unwrap();
-    agent2
-        .transition_to(AgentStatus::Running, None)
-        .unwrap();
-    agent2
-        .transition_to(AgentStatus::Completed, None)
-        .unwrap();
+    agent2.transition_to(AgentStatus::Running, None).unwrap();
+    agent2.transition_to(AgentStatus::Completed, None).unwrap();
 
     rpc.register_agent(agent1).await.unwrap();
     rpc.register_agent(agent2).await.unwrap();

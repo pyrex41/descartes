@@ -1,5 +1,4 @@
 /// Error types for the RPC daemon
-
 use serde_json::json;
 use std::fmt;
 use thiserror::Error;
@@ -89,7 +88,9 @@ impl DaemonError {
         let (code, message) = match self {
             DaemonError::ConfigError(msg) => (-32600, format!("Invalid configuration: {}", msg)),
             DaemonError::AuthError(msg) => (-32001, format!("Authentication failed: {}", msg)),
-            DaemonError::MethodNotFound(method) => (-32601, format!("Method not found: {}", method)),
+            DaemonError::MethodNotFound(method) => {
+                (-32601, format!("Method not found: {}", method))
+            }
             DaemonError::InvalidRequest(msg) => (-32700, format!("Parse error: {}", msg)),
             DaemonError::ServerError(msg) => (-32603, format!("Internal server error: {}", msg)),
             DaemonError::AgentNotFound(id) => (-32002, format!("Agent not found: {}", id)),
@@ -98,7 +99,9 @@ impl DaemonError {
             DaemonError::WorkflowError(msg) => (-32005, format!("Workflow error: {}", msg)),
             DaemonError::StateError(msg) => (-32006, format!("State error: {}", msg)),
             DaemonError::PoolError(msg) => (-32007, format!("Pool error: {}", msg)),
-            DaemonError::SerializationError(msg) => (-32700, format!("Serialization error: {}", msg)),
+            DaemonError::SerializationError(msg) => {
+                (-32700, format!("Serialization error: {}", msg))
+            }
             DaemonError::MetricsError(msg) => (-32008, format!("Metrics error: {}", msg)),
             DaemonError::IoError(e) => (-32603, format!("IO error: {}", e)),
             DaemonError::Timeout => (-32009, "Operation timed out".to_string()),

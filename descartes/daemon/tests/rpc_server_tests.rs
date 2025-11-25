@@ -25,11 +25,7 @@ use tokio::time::timeout;
 use uuid::Uuid;
 
 /// Test helper to create a test RPC server
-async fn setup_test_server() -> (
-    UnixSocketRpcServer,
-    PathBuf,
-    Arc<SqliteStateStore>,
-) {
+async fn setup_test_server() -> (UnixSocketRpcServer, PathBuf, Arc<SqliteStateStore>) {
     let temp_dir = tempdir().unwrap();
     let socket_path = temp_dir.path().join("test-rpc.sock");
 
@@ -240,11 +236,7 @@ async fn test_list_tasks_filter_by_status() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Filter by Todo status
-    let request = create_rpc_request(
-        "list_tasks",
-        json!([{"status": "todo"}]),
-        1,
-    );
+    let request = create_rpc_request("list_tasks", json!([{"status": "todo"}]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert_eq!(response["result"].as_array().unwrap().len(), 1);
@@ -271,11 +263,7 @@ async fn test_list_tasks_filter_by_assigned_to() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Filter by assigned_to
-    let request = create_rpc_request(
-        "list_tasks",
-        json!([{"assigned_to": "agent-1"}]),
-        1,
-    );
+    let request = create_rpc_request("list_tasks", json!([{"assigned_to": "agent-1"}]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert_eq!(response["result"].as_array().unwrap().len(), 1);
@@ -330,11 +318,7 @@ async fn test_approve_task_success() {
     let handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let request = create_rpc_request(
-        "approve",
-        json!([task_id.clone(), true]),
-        1,
-    );
+    let request = create_rpc_request("approve", json!([task_id.clone(), true]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert_eq!(response["jsonrpc"], "2.0");
@@ -361,11 +345,7 @@ async fn test_approve_task_rejection() {
     let handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let request = create_rpc_request(
-        "approve",
-        json!([task_id.clone(), false]),
-        1,
-    );
+    let request = create_rpc_request("approve", json!([task_id.clone(), false]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert_eq!(response["result"]["task_id"], task_id);
@@ -386,17 +366,16 @@ async fn test_approve_nonexistent_task() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let fake_task_id = Uuid::new_v4().to_string();
-    let request = create_rpc_request(
-        "approve",
-        json!([fake_task_id, true]),
-        1,
-    );
+    let request = create_rpc_request("approve", json!([fake_task_id, true]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert_eq!(response["jsonrpc"], "2.0");
     assert!(response["error"].is_object());
     assert_eq!(response["error"]["code"], -32602);
-    assert!(response["error"]["message"].as_str().unwrap().contains("not found"));
+    assert!(response["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("not found"));
 
     handle.stop().unwrap();
     handle.stopped().await;
@@ -408,16 +387,15 @@ async fn test_approve_invalid_task_id() {
     let handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let request = create_rpc_request(
-        "approve",
-        json!(["not-a-valid-uuid", true]),
-        1,
-    );
+    let request = create_rpc_request("approve", json!(["not-a-valid-uuid", true]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert!(response["error"].is_object());
     assert_eq!(response["error"]["code"], -32602);
-    assert!(response["error"]["message"].as_str().unwrap().contains("Invalid task ID"));
+    assert!(response["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Invalid task ID"));
 
     handle.stop().unwrap();
     handle.stopped().await;
@@ -494,11 +472,7 @@ async fn test_get_state_invalid_entity_id() {
     let handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let request = create_rpc_request(
-        "get_state",
-        json!(["not-a-valid-id"]),
-        1,
-    );
+    let request = create_rpc_request("get_state", json!(["not-a-valid-id"]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert!(response["error"].is_object());
@@ -515,15 +489,14 @@ async fn test_get_state_nonexistent_agent() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let fake_agent_id = Uuid::new_v4().to_string();
-    let request = create_rpc_request(
-        "get_state",
-        json!([fake_agent_id]),
-        1,
-    );
+    let request = create_rpc_request("get_state", json!([fake_agent_id]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert!(response["error"].is_object());
-    assert!(response["error"]["message"].as_str().unwrap().contains("not found"));
+    assert!(response["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("not found"));
 
     handle.stop().unwrap();
     handle.stopped().await;
@@ -591,11 +564,7 @@ async fn test_spawn_agent_minimal_config() {
     let handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let request = create_rpc_request(
-        "spawn",
-        json!(["minimal-agent", "basic", {}]),
-        1,
-    );
+    let request = create_rpc_request("spawn", json!(["minimal-agent", "basic", {}]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     assert_eq!(response["jsonrpc"], "2.0");
@@ -793,11 +762,7 @@ async fn test_concurrent_task_approvals() {
         let socket_path = socket_path.clone();
         let task_id = task_id.to_string();
         let handle = tokio::spawn(async move {
-            let request = create_rpc_request(
-                "approve",
-                json!([task_id, true]),
-                i as u64,
-            );
+            let request = create_rpc_request("approve", json!([task_id, true]), i as u64);
             send_rpc_request(&socket_path, &request).await
         });
         handles.push(handle);
@@ -831,12 +796,8 @@ async fn test_request_with_timeout() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
-    let result = send_rpc_request_with_timeout(
-        &socket_path,
-        &request,
-        Duration::from_secs(5),
-    )
-    .await;
+    let result =
+        send_rpc_request_with_timeout(&socket_path, &request, Duration::from_secs(5)).await;
 
     assert!(result.is_ok(), "Request should complete within timeout");
 
@@ -990,11 +951,7 @@ async fn test_approval_result_structure() {
     let handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let request = create_rpc_request(
-        "approve",
-        json!([task.id.to_string(), true]),
-        1,
-    );
+    let request = create_rpc_request("approve", json!([task.id.to_string(), true]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     // Verify all required fields
@@ -1044,11 +1001,7 @@ async fn test_filter_with_nonexistent_field() {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Filter with non-existent field should be ignored
-    let request = create_rpc_request(
-        "list_tasks",
-        json!([{"nonexistent_field": "value"}]),
-        1,
-    );
+    let request = create_rpc_request("list_tasks", json!([{"nonexistent_field": "value"}]), 1);
     let response = send_rpc_request(&socket_path, &request).await.unwrap();
 
     // Should return all tasks since filter doesn't match any known field

@@ -197,8 +197,7 @@ impl SimpleStateStore {
         };
 
         let metadata_str: Option<String> = row.get("metadata");
-        let metadata = metadata_str
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let metadata = metadata_str.and_then(|s| serde_json::from_str(&s).ok());
 
         Ok(Event {
             id,
@@ -230,8 +229,7 @@ impl SimpleStateStore {
         };
 
         let metadata_str: Option<String> = row.get("metadata");
-        let metadata = metadata_str
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let metadata = metadata_str.and_then(|s| serde_json::from_str(&s).ok());
 
         Ok(Task {
             id,

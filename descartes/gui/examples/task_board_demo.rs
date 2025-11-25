@@ -7,23 +7,26 @@
 /// - Display tasks in a Kanban layout
 /// - Filter and sort tasks
 /// - Handle task interactions
-
 use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_gui::task_board::{KanbanBoard, TaskBoardMessage, TaskBoardState};
 use iced::widget::{button, column, container, text, Space};
-use iced::{Element, Length, Size, Theme, window};
+use iced::{window, Element, Length, Size, Theme};
 use uuid::Uuid;
 
 fn main() -> iced::Result {
-    iced::application("Task Board Demo", TaskBoardDemo::update, TaskBoardDemo::view)
-        .window(window::Settings {
-            size: Size::new(1400.0, 900.0),
-            position: window::Position::Centered,
-            min_size: Some(Size::new(1000.0, 700.0)),
-            ..Default::default()
-        })
-        .theme(|_| Theme::TokyoNight)
-        .run_with(|| (TaskBoardDemo::new(), iced::Task::none()))
+    iced::application(
+        "Task Board Demo",
+        TaskBoardDemo::update,
+        TaskBoardDemo::view,
+    )
+    .window(window::Settings {
+        size: Size::new(1400.0, 900.0),
+        position: window::Position::Centered,
+        min_size: Some(Size::new(1000.0, 700.0)),
+        ..Default::default()
+    })
+    .theme(|_| Theme::TokyoNight)
+    .run_with(|| (TaskBoardDemo::new(), iced::Task::none()))
 }
 
 struct TaskBoardDemo {
@@ -101,7 +104,10 @@ impl TaskBoardDemo {
         todo_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Fix critical security vulnerability".to_string(),
-            description: Some("SQL injection vulnerability in user input validation. Needs immediate attention.".to_string()),
+            description: Some(
+                "SQL injection vulnerability in user input validation. Needs immediate attention."
+                    .to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::Critical,
             complexity: TaskComplexity::Complex,
@@ -116,7 +122,10 @@ impl TaskBoardDemo {
         todo_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Implement user authentication".to_string(),
-            description: Some("Add JWT-based authentication with refresh tokens and proper session management.".to_string()),
+            description: Some(
+                "Add JWT-based authentication with refresh tokens and proper session management."
+                    .to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Complex,
@@ -130,7 +139,10 @@ impl TaskBoardDemo {
         todo_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Optimize database queries".to_string(),
-            description: Some("Add indexes and optimize slow queries identified in production monitoring.".to_string()),
+            description: Some(
+                "Add indexes and optimize slow queries identified in production monitoring."
+                    .to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Moderate,
@@ -145,7 +157,9 @@ impl TaskBoardDemo {
         todo_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Write unit tests for parser".to_string(),
-            description: Some("Achieve 90% code coverage for the expression parser module.".to_string()),
+            description: Some(
+                "Achieve 90% code coverage for the expression parser module.".to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::Medium,
             complexity: TaskComplexity::Moderate,
@@ -159,7 +173,9 @@ impl TaskBoardDemo {
         todo_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Update API documentation".to_string(),
-            description: Some("Refresh OpenAPI specs with new endpoints and deprecation notices.".to_string()),
+            description: Some(
+                "Refresh OpenAPI specs with new endpoints and deprecation notices.".to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::Medium,
             complexity: TaskComplexity::Simple,
@@ -174,7 +190,9 @@ impl TaskBoardDemo {
         todo_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Refactor legacy code".to_string(),
-            description: Some("Clean up old code patterns and improve maintainability.".to_string()),
+            description: Some(
+                "Clean up old code patterns and improve maintainability.".to_string(),
+            ),
             status: TaskStatus::Todo,
             priority: TaskPriority::Low,
             complexity: TaskComplexity::Epic,
@@ -190,7 +208,10 @@ impl TaskBoardDemo {
         in_progress_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Migrate to microservices architecture".to_string(),
-            description: Some("Break down monolith into independent services. Currently extracting user service.".to_string()),
+            description: Some(
+                "Break down monolith into independent services. Currently extracting user service."
+                    .to_string(),
+            ),
             status: TaskStatus::InProgress,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Epic,
@@ -218,7 +239,10 @@ impl TaskBoardDemo {
         in_progress_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Design new UI mockups".to_string(),
-            description: Some("Create Figma designs for dashboard redesign with user feedback incorporated.".to_string()),
+            description: Some(
+                "Create Figma designs for dashboard redesign with user feedback incorporated."
+                    .to_string(),
+            ),
             status: TaskStatus::InProgress,
             priority: TaskPriority::Medium,
             complexity: TaskComplexity::Moderate,
@@ -248,7 +272,10 @@ impl TaskBoardDemo {
         done_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Setup CI/CD pipeline".to_string(),
-            description: Some("Configured GitHub Actions for automated testing and deployment to staging.".to_string()),
+            description: Some(
+                "Configured GitHub Actions for automated testing and deployment to staging."
+                    .to_string(),
+            ),
             status: TaskStatus::Done,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Complex,
@@ -262,7 +289,9 @@ impl TaskBoardDemo {
         done_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Fix login timeout bug".to_string(),
-            description: Some("Resolved issue where sessions were expiring prematurely.".to_string()),
+            description: Some(
+                "Resolved issue where sessions were expiring prematurely.".to_string(),
+            ),
             status: TaskStatus::Done,
             priority: TaskPriority::Critical,
             complexity: TaskComplexity::Simple,
@@ -290,7 +319,9 @@ impl TaskBoardDemo {
         done_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Write deployment guide".to_string(),
-            description: Some("Comprehensive documentation for production deployment procedures.".to_string()),
+            description: Some(
+                "Comprehensive documentation for production deployment procedures.".to_string(),
+            ),
             status: TaskStatus::Done,
             priority: TaskPriority::Low,
             complexity: TaskComplexity::Simple,
@@ -307,7 +338,9 @@ impl TaskBoardDemo {
         blocked_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Deploy to production".to_string(),
-            description: Some("Waiting for security audit completion before production deployment.".to_string()),
+            description: Some(
+                "Waiting for security audit completion before production deployment.".to_string(),
+            ),
             status: TaskStatus::Blocked,
             priority: TaskPriority::Critical,
             complexity: TaskComplexity::Moderate,
@@ -321,7 +354,9 @@ impl TaskBoardDemo {
         blocked_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Integrate payment gateway".to_string(),
-            description: Some("Blocked pending legal approval for payment processor contract.".to_string()),
+            description: Some(
+                "Blocked pending legal approval for payment processor contract.".to_string(),
+            ),
             status: TaskStatus::Blocked,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Complex,
@@ -335,7 +370,9 @@ impl TaskBoardDemo {
         blocked_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Optimize image loading".to_string(),
-            description: Some("Blocked on infrastructure team to set up CDN and configure caching.".to_string()),
+            description: Some(
+                "Blocked on infrastructure team to set up CDN and configure caching.".to_string(),
+            ),
             status: TaskStatus::Blocked,
             priority: TaskPriority::Low,
             complexity: TaskComplexity::Simple,

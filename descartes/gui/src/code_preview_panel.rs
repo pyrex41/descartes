@@ -10,7 +10,6 @@
 /// - Quick navigation to definitions and references
 /// - Hover tooltips with type information
 /// - Code annotations and bookmarks
-
 use iced::widget::{
     button, column, container, horizontal_space, row, scrollable, text, text_input, Column, Row,
     Space,
@@ -370,9 +369,7 @@ pub fn view(state: &CodePreviewState) -> Element<CodePreviewMessage> {
     let content = view_content(state);
     let footer = view_footer(state);
 
-    column![header, toolbar, content, footer]
-        .spacing(0)
-        .into()
+    column![header, toolbar, content, footer].spacing(0).into()
 }
 
 /// Render empty state
@@ -429,7 +426,9 @@ fn view_header(state: &CodePreviewState) -> Element<CodePreviewMessage> {
             ]
             .spacing(5)
             .align_y(iced::alignment::Vertical::Center),
-            text(file_path).size(11).style(Color::from_rgb8(150, 150, 150)),
+            text(file_path)
+                .size(11)
+                .style(Color::from_rgb8(150, 150, 150)),
         ]
         .spacing(5)
         .padding(10),
@@ -639,16 +638,13 @@ fn view_line<'a>(
         Color::from_rgba8(30, 30, 40, 1.0)
     };
 
-    let mut col = Column::new().push(
-        container(line_row)
-            .width(Length::Fill)
-            .padding(2)
-            .style(move |_theme: &Theme| container::Style {
-                background: Some(bg_color.into()),
-                border: iced::Border::default(),
-                ..Default::default()
-            }),
-    );
+    let mut col = Column::new().push(container(line_row).width(Length::Fill).padding(2).style(
+        move |_theme: &Theme| container::Style {
+            background: Some(bg_color.into()),
+            border: iced::Border::default(),
+            ..Default::default()
+        },
+    ));
 
     // Add annotation if present
     if has_annotation {
@@ -713,23 +709,20 @@ fn view_file_column<'a>(
             .size(12)
             .font(iced::Font::MONOSPACE);
 
-        content = content.push(
-            container(line_view)
-                .padding(2)
-                .width(Length::Fill)
-                .style(|_theme: &Theme| {
-                    let bg = if idx % 2 == 0 {
-                        Color::from_rgb8(35, 35, 45)
-                    } else {
-                        Color::from_rgb8(30, 30, 40)
-                    };
-                    container::Style {
-                        background: Some(bg.into()),
-                        border: iced::Border::default(),
-                        ..Default::default()
-                    }
-                }),
-        );
+        content = content.push(container(line_view).padding(2).width(Length::Fill).style(
+            |_theme: &Theme| {
+                let bg = if idx % 2 == 0 {
+                    Color::from_rgb8(35, 35, 45)
+                } else {
+                    Color::from_rgb8(30, 30, 40)
+                };
+                container::Style {
+                    background: Some(bg.into()),
+                    border: iced::Border::default(),
+                    ..Default::default()
+                }
+            },
+        ));
     }
 
     container(scrollable(content))

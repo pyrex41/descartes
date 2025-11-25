@@ -6,7 +6,6 @@
 /// - Statistics calculation
 /// - Data generation
 /// - Report formatting
-
 use std::time::Instant;
 
 /// High-precision timer for benchmarking

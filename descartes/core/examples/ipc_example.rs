@@ -7,10 +7,9 @@
 /// 4. Message routing
 /// 5. Backpressure handling
 /// 6. Dead letter queue management
-
 use descartes_core::{
-    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MessageBus,
-    MessageBusConfig, MessageHandler, MessageRouter, MessageType, MemoryTransport,
+    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MemoryTransport,
+    MessageBus, MessageBusConfig, MessageHandler, MessageRouter, MessageType,
     RequestResponseTracker, RoutingRule,
 };
 use std::sync::Arc;
@@ -88,7 +87,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     bus.subscribe("events".to_string(), "agent1".to_string())?;
     bus.subscribe("events".to_string(), "agent2".to_string())?;
 
-    println!("Subscribers for 'events': {:?}\n", bus.get_subscribers("events"));
+    println!(
+        "Subscribers for 'events': {:?}\n",
+        bus.get_subscribers("events")
+    );
 
     // 5. Example: Send a direct message
     println!("--- Sending Direct Messages ---");
@@ -197,10 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let history = bus.get_history().await;
     println!("History size: {}", history.len());
     for msg in history.iter().take(3) {
-        println!(
-            "  - {}: {} (from: {})",
-            msg.id, msg.msg_type, msg.sender
-        );
+        println!("  - {}: {} (from: {})", msg.id, msg.msg_type, msg.sender);
     }
     println!();
 
@@ -234,7 +233,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(marked_msg) = req_resp_tracker.mark_responded(&request_id) {
         println!("Marked as responded: {}", marked_msg.id);
     }
-    println!("Pending after response: {}\n", req_resp_tracker.pending_count());
+    println!(
+        "Pending after response: {}\n",
+        req_resp_tracker.pending_count()
+    );
 
     // 14. Message builder pattern examples
     println!("--- Message Builder Examples ---");

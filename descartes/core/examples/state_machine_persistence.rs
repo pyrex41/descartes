@@ -6,8 +6,8 @@
 //! - Loading and recovering workflows
 //! - History management and cleanup
 
-use descartes_core::state_machine_store::*;
 use descartes_core::state_machine::*;
+use descartes_core::state_machine_store::*;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 
@@ -25,8 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize store
     println!("Example 1: Store Initialization");
     println!("==============================\n");
-    let store = SqliteWorkflowStore::new(&database_url, StateStoreConfig::default())
-        .await?;
+    let store = SqliteWorkflowStore::new(&database_url, StateStoreConfig::default()).await?;
     println!("SQLite store initialized successfully\n");
 
     // Example 2: Save workflow
@@ -129,9 +128,7 @@ async fn load_workflow_example(
     Ok(())
 }
 
-async fn history_example(
-    store: &SqliteWorkflowStore,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn history_example(store: &SqliteWorkflowStore) -> Result<(), Box<dyn std::error::Error>> {
     // Get history for the workflow
     let history = store.get_workflow_history("demo-workflow-1").await?;
 
@@ -159,9 +156,7 @@ async fn history_example(
     Ok(())
 }
 
-async fn recovery_example(
-    store: &SqliteWorkflowStore,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn recovery_example(store: &SqliteWorkflowStore) -> Result<(), Box<dyn std::error::Error>> {
     // Recover a workflow from storage
     let recovered = WorkflowRecovery::recover_workflow(store, "demo-workflow-1").await?;
 
@@ -191,8 +186,7 @@ async fn multiple_workflows_example(
 
         // Do some work
         sm.process_event(WorkflowEvent::Start).await?;
-        sm.set_context("sequence", serde_json::json!(i))
-            .await?;
+        sm.set_context("sequence", serde_json::json!(i)).await?;
 
         // Random transitions
         match i % 3 {

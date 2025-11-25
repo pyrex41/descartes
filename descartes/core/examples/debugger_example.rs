@@ -9,8 +9,8 @@
 //! - Serialize/deserialize debugger state
 
 use descartes_core::{
-    DebuggerState, Breakpoint, BreakpointLocation, DebugCommand, ExecutionState,
-    ThoughtSnapshot, CallFrame, WorkflowState,
+    Breakpoint, BreakpointLocation, CallFrame, DebugCommand, DebuggerState, ExecutionState,
+    ThoughtSnapshot, WorkflowState,
 };
 use uuid::Uuid;
 
@@ -68,9 +68,9 @@ fn main() {
                 Some(agent_id),
             );
             debugger.current_thought = Some(thought);
-            debugger.current_context.update_thought(
-                debugger.current_thought.clone().unwrap()
-            );
+            debugger
+                .current_context
+                .update_thought(debugger.current_thought.clone().unwrap());
         }
 
         // Simulate call stack growth
@@ -100,17 +100,20 @@ fn main() {
             debugger.execution_state = ExecutionState::Paused;
         }
 
-        println!("   Step {}: count={}, stack_depth={}, state={}",
-            i, debugger.step_count, debugger.current_context.stack_depth,
-            debugger.execution_state);
+        println!(
+            "   Step {}: count={}, stack_depth={}, state={}",
+            i, debugger.step_count, debugger.current_context.stack_depth, debugger.execution_state
+        );
     }
     println!();
 
     // Display breakpoint statistics
     println!("5. Breakpoint Statistics:");
     for bp in debugger.get_breakpoints() {
-        println!("   - {} (hits: {}, enabled: {})",
-            bp.location, bp.hit_count, bp.enabled);
+        println!(
+            "   - {} (hits: {}, enabled: {})",
+            bp.location, bp.hit_count, bp.enabled
+        );
     }
     println!();
 
@@ -122,9 +125,10 @@ fn main() {
     println!("7. Execution History (last 3 entries):");
     let history = debugger.get_history();
     for (i, snapshot) in history.iter().rev().take(3).enumerate() {
-        println!("   #{}: Step {}, State: {}, Workflow: {}",
-            i, snapshot.step_number, snapshot.execution_state,
-            snapshot.workflow_state);
+        println!(
+            "   #{}: Step {}, State: {}, Workflow: {}",
+            i, snapshot.step_number, snapshot.execution_state, snapshot.workflow_state
+        );
         if let Some(ref thought) = snapshot.thought {
             println!("      Thought: {}", thought.summary());
         }

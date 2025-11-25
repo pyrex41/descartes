@@ -285,7 +285,11 @@ impl AgentRuntimeState {
     }
 
     /// Transition to a new status
-    pub fn transition_to(&mut self, new_status: AgentStatus, reason: Option<String>) -> Result<(), String> {
+    pub fn transition_to(
+        &mut self,
+        new_status: AgentStatus,
+        reason: Option<String>,
+    ) -> Result<(), String> {
         if !self.status.can_transition_to(new_status) {
             return Err(format!(
                 "Invalid transition from {} to {}",
@@ -750,9 +754,7 @@ mod tests {
         assert_eq!(agent.timeline.len(), 2);
 
         // Invalid transition
-        assert!(agent
-            .transition_to(AgentStatus::Completed, None)
-            .is_err());
+        assert!(agent.transition_to(AgentStatus::Completed, None).is_err());
     }
 
     #[test]

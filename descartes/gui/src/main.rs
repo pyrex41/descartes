@@ -1,28 +1,28 @@
-use iced::widget::{column, container, text, row, button, Space};
-use iced::{Element, Length, Theme, Size, window, Event};
 use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::{self, Key};
+use iced::widget::{button, column, container, row, text, Space};
+use iced::{window, Element, Event, Length, Size, Theme};
 use std::sync::Arc;
 
-mod time_travel;
-mod rpc_client;
-mod event_handler;
-mod task_board;
 mod dag_editor;
+mod event_handler;
 mod file_tree_view;
 mod knowledge_graph_panel;
+mod rpc_client;
+mod task_board;
+mod time_travel;
 
-use time_travel::{TimeTravelState, TimeTravelMessage};
-use rpc_client::GuiRpcClient;
-use event_handler::EventHandler;
-use task_board::{TaskBoardState, TaskBoardMessage, KanbanBoard};
-use dag_editor::{DAGEditorState, DAGEditorMessage};
-use file_tree_view::{FileTreeState, FileTreeMessage};
-use knowledge_graph_panel::{KnowledgeGraphPanelState, KnowledgeGraphMessage};
-use descartes_daemon::DescartesEvent;
-use descartes_core::{Task, TaskStatus, TaskPriority, TaskComplexity};
-use uuid::Uuid;
 use chrono::Utc;
+use dag_editor::{DAGEditorMessage, DAGEditorState};
+use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
+use descartes_daemon::DescartesEvent;
+use event_handler::EventHandler;
+use file_tree_view::{FileTreeMessage, FileTreeState};
+use knowledge_graph_panel::{KnowledgeGraphMessage, KnowledgeGraphPanelState};
+use rpc_client::GuiRpcClient;
+use task_board::{KanbanBoard, TaskBoardMessage, TaskBoardState};
+use time_travel::{TimeTravelMessage, TimeTravelState};
+use uuid::Uuid;
 
 fn main() -> iced::Result {
     tracing_subscriber::fmt()
@@ -140,7 +140,9 @@ impl DescartesGui {
             rpc_client: None,
             event_handler: None,
             recent_events: Vec::new(),
-            status_message: Some("Welcome to Descartes GUI! Click 'Connect' to connect to the daemon.".to_string()),
+            status_message: Some(
+                "Welcome to Descartes GUI! Click 'Connect' to connect to the daemon.".to_string(),
+            ),
         }
     }
 }
@@ -166,7 +168,8 @@ impl DescartesGui {
 
                         // Create event handler
                         let mut event_handler = EventHandler::default();
-                        self.event_handler = Some(Arc::new(tokio::sync::RwLock::new(event_handler)));
+                        self.event_handler =
+                            Some(Arc::new(tokio::sync::RwLock::new(event_handler)));
 
                         // Perform async connection
                         iced::Task::perform(
@@ -485,7 +488,9 @@ impl DescartesGui {
         in_progress_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Refactor database layer".to_string(),
-            description: Some("Migrate from SQLite to PostgreSQL for better performance".to_string()),
+            description: Some(
+                "Migrate from SQLite to PostgreSQL for better performance".to_string(),
+            ),
             status: TaskStatus::InProgress,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Epic,
@@ -514,7 +519,9 @@ impl DescartesGui {
         done_tasks.push(Task {
             id: Uuid::new_v4(),
             title: "Setup CI/CD pipeline".to_string(),
-            description: Some("Configure GitHub Actions for automated testing and deployment".to_string()),
+            description: Some(
+                "Configure GitHub Actions for automated testing and deployment".to_string(),
+            ),
             status: TaskStatus::Done,
             priority: TaskPriority::High,
             complexity: TaskComplexity::Complex,
@@ -585,10 +592,11 @@ impl DescartesGui {
 
     /// Load sample DAG for demonstration
     fn load_sample_dag(&mut self) {
-        use descartes_core::dag::{DAG, DAGNode, DAGEdge, EdgeType};
+        use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, DAG};
 
         let mut dag = DAG::new("Sample Workflow");
-        dag.description = Some("A sample workflow demonstrating DAG editor capabilities".to_string());
+        dag.description =
+            Some("A sample workflow demonstrating DAG editor capabilities".to_string());
 
         // Create nodes in a workflow pattern
         // Layer 1: Start node
@@ -661,29 +669,37 @@ impl DescartesGui {
 
         // Create edges (dependencies)
         // Start to Layer 2
-        dag.add_edge(DAGEdge::dependency(start_id, task1_id)).unwrap();
-        dag.add_edge(DAGEdge::dependency(start_id, task2_id)).unwrap();
-        dag.add_edge(DAGEdge::dependency(start_id, task3_id)).unwrap();
+        dag.add_edge(DAGEdge::dependency(start_id, task1_id))
+            .unwrap();
+        dag.add_edge(DAGEdge::dependency(start_id, task2_id))
+            .unwrap();
+        dag.add_edge(DAGEdge::dependency(start_id, task3_id))
+            .unwrap();
 
         // Layer 2 to Layer 3
-        dag.add_edge(DAGEdge::dependency(task1_id, process1_id)).unwrap();
-        dag.add_edge(DAGEdge::new(task1_id, process2_id, EdgeType::DataFlow)).unwrap();
-        dag.add_edge(DAGEdge::dependency(task2_id, process2_id)).unwrap();
-        dag.add_edge(DAGEdge::soft_dependency(task3_id, process3_id)).unwrap();
+        dag.add_edge(DAGEdge::dependency(task1_id, process1_id))
+            .unwrap();
+        dag.add_edge(DAGEdge::new(task1_id, process2_id, EdgeType::DataFlow))
+            .unwrap();
+        dag.add_edge(DAGEdge::dependency(task2_id, process2_id))
+            .unwrap();
+        dag.add_edge(DAGEdge::soft_dependency(task3_id, process3_id))
+            .unwrap();
 
         // Layer 3 to Layer 4
-        dag.add_edge(DAGEdge::dependency(process1_id, aggregate_id)).unwrap();
-        dag.add_edge(DAGEdge::new(process2_id, aggregate_id, EdgeType::DataFlow)).unwrap();
-        dag.add_edge(DAGEdge::dependency(process3_id, aggregate_id)).unwrap();
+        dag.add_edge(DAGEdge::dependency(process1_id, aggregate_id))
+            .unwrap();
+        dag.add_edge(DAGEdge::new(process2_id, aggregate_id, EdgeType::DataFlow))
+            .unwrap();
+        dag.add_edge(DAGEdge::dependency(process3_id, aggregate_id))
+            .unwrap();
 
         // Layer 4 to End
-        dag.add_edge(DAGEdge::new(aggregate_id, end_id, EdgeType::Trigger)).unwrap();
+        dag.add_edge(DAGEdge::new(aggregate_id, end_id, EdgeType::Trigger))
+            .unwrap();
 
         // Update the DAG editor state
-        dag_editor::update(
-            &mut self.dag_editor_state,
-            DAGEditorMessage::LoadDAG(dag),
-        );
+        dag_editor::update(&mut self.dag_editor_state, DAGEditorMessage::LoadDAG(dag));
     }
 
     fn view(&self) -> Element<Message> {
@@ -691,15 +707,7 @@ impl DescartesGui {
         let nav = self.view_navigation();
         let content = self.view_content();
 
-        let main_layout = column![
-            header,
-            row![
-                nav,
-                content,
-            ]
-            .spacing(0)
-        ]
-        .spacing(0);
+        let main_layout = column![header, row![nav, content,].spacing(0)].spacing(0);
 
         container(main_layout)
             .width(Length::Fill)
@@ -711,12 +719,7 @@ impl DescartesGui {
     fn subscription(&self) -> iced::Subscription<Message> {
         // Keyboard event subscription
         let keyboard_sub = iced::event::listen_with(|event, _status, _window| {
-            if let Event::Keyboard(keyboard::Event::KeyPressed {
-                key,
-                modifiers,
-                ..
-            }) = event
-            {
+            if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
                 // Only handle keyboard shortcuts in Debugger view
                 match key {
                     // Arrow keys for navigation
@@ -739,16 +742,24 @@ impl DescartesGui {
                     }
                     // Number keys for speed control
                     Key::Character(ref c) if c == "1" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(0.5)));
+                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
+                            0.5,
+                        )));
                     }
                     Key::Character(ref c) if c == "2" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(1.0)));
+                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
+                            1.0,
+                        )));
                     }
                     Key::Character(ref c) if c == "3" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(2.0)));
+                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
+                            2.0,
+                        )));
                     }
                     Key::Character(ref c) if c == "4" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(5.0)));
+                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
+                            5.0,
+                        )));
                     }
                     // L for loop toggle
                     Key::Character(ref c) if c == "l" && !modifiers.shift() => {
@@ -765,23 +776,19 @@ impl DescartesGui {
             // Create event subscription using the event handler
             let event_handler_arc = self.event_handler.as_ref().unwrap().clone();
 
-            iced::subscription::channel(
-                "daemon_events",
-                100,
-                move |mut output| {
-                    let event_handler_arc = event_handler_arc.clone();
-                    async move {
-                        // This is a simplified subscription - in a real implementation,
-                        // we would properly integrate with the EventHandler's subscription system
-                        tracing::info!("Event subscription active");
+            iced::subscription::channel("daemon_events", 100, move |mut output| {
+                let event_handler_arc = event_handler_arc.clone();
+                async move {
+                    // This is a simplified subscription - in a real implementation,
+                    // we would properly integrate with the EventHandler's subscription system
+                    tracing::info!("Event subscription active");
 
-                        // Keep the subscription alive
-                        loop {
-                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        }
+                    // Keep the subscription alive
+                    loop {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     }
-                },
-            )
+                }
+            })
         } else {
             iced::Subscription::none()
         };
@@ -791,9 +798,7 @@ impl DescartesGui {
 
     /// Render the header bar
     fn view_header(&self) -> Element<Message> {
-        let title = text("Descartes GUI")
-            .size(24)
-            .width(Length::Shrink);
+        let title = text("Descartes GUI").size(24).width(Length::Shrink);
 
         let status_color = if self.daemon_connected {
             iced::Color::from_rgb8(100, 255, 100) // Green
@@ -858,16 +863,14 @@ impl DescartesGui {
         container(header_content)
             .width(Length::Fill)
             .padding(15)
-            .style(|theme: &Theme| {
-                container::Style {
-                    background: Some(theme.palette().background.into()),
-                    border: iced::Border {
-                        width: 0.0,
-                        color: iced::Color::TRANSPARENT,
-                        radius: 0.0.into(),
-                    },
-                    ..Default::default()
-                }
+            .style(|theme: &Theme| container::Style {
+                background: Some(theme.palette().background.into()),
+                border: iced::Border {
+                    width: 0.0,
+                    color: iced::Color::TRANSPARENT,
+                    radius: 0.0.into(),
+                },
+                ..Default::default()
             })
             .into()
     }
@@ -893,7 +896,7 @@ impl DescartesGui {
                     text(label)
                         .size(16)
                         .width(Length::Fill)
-                        .align_x(Horizontal::Center)
+                        .align_x(Horizontal::Center),
                 )
                 .width(Length::Fill)
                 .padding(15)
@@ -901,11 +904,9 @@ impl DescartesGui {
 
                 if is_active {
                     container(btn)
-                        .style(|theme: &Theme| {
-                            container::Style {
-                                background: Some(theme.palette().primary.into()),
-                                ..Default::default()
-                            }
+                        .style(|theme: &Theme| container::Style {
+                            background: Some(theme.palette().primary.into()),
+                            ..Default::default()
                         })
                         .into()
                 } else {
@@ -914,23 +915,19 @@ impl DescartesGui {
             })
             .collect();
 
-        let nav_column = column(buttons)
-            .spacing(5)
-            .padding(10);
+        let nav_column = column(buttons).spacing(5).padding(10);
 
         container(nav_column)
             .width(200)
             .height(Length::Fill)
-            .style(|theme: &Theme| {
-                container::Style {
-                    background: Some(theme.palette().background.into()),
-                    border: iced::Border {
-                        width: 1.0,
-                        color: theme.palette().text.scale_alpha(0.2),
-                        radius: 0.0.into(),
-                    },
-                    ..Default::default()
-                }
+            .style(|theme: &Theme| container::Style {
+                background: Some(theme.palette().background.into()),
+                border: iced::Border {
+                    width: 1.0,
+                    color: theme.palette().text.scale_alpha(0.2),
+                    radius: 0.0.into(),
+                },
+                ..Default::default()
             })
             .into()
     }
@@ -957,25 +954,25 @@ impl DescartesGui {
 
     /// Dashboard view
     fn view_dashboard(&self) -> Element<Message> {
-        let title = text("Dashboard")
-            .size(32)
-            .width(Length::Fill);
+        let title = text("Dashboard").size(32).width(Length::Fill);
 
-        let welcome = text("Welcome to Descartes!")
-            .size(18)
-            .width(Length::Fill);
+        let welcome = text("Welcome to Descartes!").size(18).width(Length::Fill);
 
         // Connection status section
         let connection_status = if self.daemon_connected {
             column![
-                text("Status: Connected to daemon").size(14).style(iced::Color::from_rgb8(100, 255, 100)),
+                text("Status: Connected to daemon")
+                    .size(14)
+                    .style(iced::Color::from_rgb8(100, 255, 100)),
                 Space::with_height(5),
                 text(format!("Recent events: {}", self.recent_events.len())).size(12),
             ]
             .spacing(5)
         } else {
             column![
-                text("Status: Not connected").size(14).style(iced::Color::from_rgb8(255, 150, 150)),
+                text("Status: Not connected")
+                    .size(14)
+                    .style(iced::Color::from_rgb8(255, 150, 150)),
                 Space::with_height(5),
                 text("Click 'Connect' in the top right to connect to the daemon").size(12),
             ]
@@ -984,17 +981,23 @@ impl DescartesGui {
 
         // Recent events section
         let recent_events_section = if !self.recent_events.is_empty() {
-            let event_list: Vec<Element<Message>> = self.recent_events
+            let event_list: Vec<Element<Message>> = self
+                .recent_events
                 .iter()
                 .rev()
                 .take(5)
                 .map(|event| {
-                    text(format!("• {:?}: {}",  event.event_type,
-                        event.data.get("message")
+                    text(format!(
+                        "• {:?}: {}",
+                        event.event_type,
+                        event
+                            .data
+                            .get("message")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("No message")))
-                        .size(12)
-                        .into()
+                            .unwrap_or("No message")
+                    ))
+                    .size(12)
+                    .into()
                 })
                 .collect();
 
@@ -1046,13 +1049,12 @@ impl DescartesGui {
             + self.task_board_state.kanban_board.blocked.len();
 
         if total_tasks == 0 {
-            let title = text("Task Board")
-                .size(32)
-                .width(Length::Fill);
+            let title = text("Task Board").size(32).width(Length::Fill);
 
-            let description = text("No tasks loaded. Load sample tasks to see the Task Board in action.")
-                .size(16)
-                .width(Length::Fill);
+            let description =
+                text("No tasks loaded. Load sample tasks to see the Task Board in action.")
+                    .size(16)
+                    .width(Length::Fill);
 
             let load_sample_btn = button(text("Load Sample Tasks"))
                 .on_press(Message::LoadSampleTasks)
@@ -1075,28 +1077,20 @@ impl DescartesGui {
 
     /// Swarm Monitor view (placeholder)
     fn view_swarm_monitor(&self) -> Element<Message> {
-        let title = text("Swarm Monitor")
-            .size(32)
-            .width(Length::Fill);
+        let title = text("Swarm Monitor").size(32).width(Length::Fill);
 
         let placeholder = text("Swarm Monitor will visualize active agents and their status.")
             .size(16)
             .width(Length::Fill);
 
-        column![
-            title,
-            Space::with_height(20),
-            placeholder,
-        ]
-        .spacing(10)
-        .into()
+        column![title, Space::with_height(20), placeholder,]
+            .spacing(10)
+            .into()
     }
 
     /// Debugger view with time travel UI
     fn view_debugger(&self) -> Element<Message> {
-        let title = text("Time Travel Debugger")
-            .size(32)
-            .width(Length::Fill);
+        let title = text("Time Travel Debugger").size(32).width(Length::Fill);
 
         // Add a button to load sample history if no events are loaded
         let load_sample_btn = if self.time_travel_state.events.is_empty() {
@@ -1125,9 +1119,7 @@ impl DescartesGui {
     fn view_dag_editor(&self) -> Element<Message> {
         // Check if DAG is empty
         if self.dag_editor_state.dag.nodes.is_empty() {
-            let title = text("DAG Editor")
-                .size(32)
-                .width(Length::Fill);
+            let title = text("DAG Editor").size(32).width(Length::Fill);
 
             let description = text("No DAG loaded. Load a sample DAG to see the editor in action.")
                 .size(16)
@@ -1154,9 +1146,7 @@ impl DescartesGui {
 
     /// Context Browser view (placeholder)
     fn view_context_browser(&self) -> Element<Message> {
-        let title = text("Context Browser")
-            .size(32)
-            .width(Length::Fill);
+        let title = text("Context Browser").size(32).width(Length::Fill);
 
         let placeholder = text(
             "Browse and manage agent execution context.\n\n\
@@ -1165,31 +1155,27 @@ impl DescartesGui {
              - Browse variable bindings\n\
              - Inspect memory contents\n\
              - Search through context history\n\
-             - Export context snapshots"
+             - Export context snapshots",
         )
         .size(16)
         .width(Length::Fill);
 
-        column![
-            title,
-            Space::with_height(20),
-            placeholder,
-        ]
-        .spacing(10)
-        .into()
+        column![title, Space::with_height(20), placeholder,]
+            .spacing(10)
+            .into()
     }
 
     /// File Browser view
     fn view_file_browser(&self) -> Element<Message> {
         // Check if file tree is loaded
         if self.file_tree_state.tree.is_none() {
-            let title = text("File Browser")
-                .size(32)
-                .width(Length::Fill);
+            let title = text("File Browser").size(32).width(Length::Fill);
 
-            let description = text("No file tree loaded. Load a sample file tree to browse the project structure.")
-                .size(16)
-                .width(Length::Fill);
+            let description = text(
+                "No file tree loaded. Load a sample file tree to browse the project structure.",
+            )
+            .size(16)
+            .width(Length::Fill);
 
             let load_sample_btn = button(text("Load Sample File Tree"))
                 .on_press(Message::LoadSampleFileTree)
@@ -1252,7 +1238,10 @@ impl DescartesGui {
     }
 
     /// Add sample knowledge links to the tree for demonstration
-    fn add_sample_knowledge_links_to_tree(&mut self, tree: &descartes_agent_runner::knowledge_graph::FileTree) {
+    fn add_sample_knowledge_links_to_tree(
+        &mut self,
+        tree: &descartes_agent_runner::knowledge_graph::FileTree,
+    ) {
         // This is a demonstration function that adds sample knowledge links
         // In a real application, these would come from actual code analysis
 
@@ -1281,16 +1270,14 @@ impl DescartesGui {
     fn view_knowledge_graph(&self) -> Element<Message> {
         // Check if knowledge graph is loaded
         if self.knowledge_graph_panel_state.graph.is_none() {
-            let title = text("Knowledge Graph")
-                .size(32)
-                .width(Length::Fill);
+            let title = text("Knowledge Graph").size(32).width(Length::Fill);
 
             let description = text(
                 "No knowledge graph loaded. Generate one from the file tree or load a sample.\n\n\
                 Steps:\n\
                 1. Go to File Browser and load a file tree\n\
                 2. Come back here and click 'Generate from File Tree'\n\n\
-                Or click 'Load Sample' to see a demo knowledge graph."
+                Or click 'Load Sample' to see a demo knowledge graph.",
             )
             .size(16)
             .width(Length::Fill);
@@ -1308,26 +1295,22 @@ impl DescartesGui {
                 Space::with_height(20),
                 description,
                 Space::with_height(20),
-                row![
-                    load_sample_btn,
-                    Space::with_width(10),
-                    generate_btn,
-                ]
-                .spacing(10),
+                row![load_sample_btn, Space::with_width(10), generate_btn,].spacing(10),
             ]
             .spacing(10)
             .into()
         } else {
             // Map knowledge graph messages to main messages
-            knowledge_graph_panel::view(&self.knowledge_graph_panel_state).map(Message::KnowledgeGraph)
+            knowledge_graph_panel::view(&self.knowledge_graph_panel_state)
+                .map(Message::KnowledgeGraph)
         }
     }
 
     /// Load sample knowledge graph for demonstration
     fn load_sample_knowledge_graph(&mut self) {
         use descartes_agent_runner::knowledge_graph::{
-            KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, KnowledgeEdge, RelationshipType,
-            FileReference,
+            FileReference, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType,
+            RelationshipType,
         };
         use std::path::PathBuf;
 
@@ -1538,12 +1521,18 @@ impl DescartesGui {
 
                         self.status_message = Some(format!(
                             "Knowledge graph generated successfully! {} entities extracted.",
-                            self.knowledge_graph_panel_state.graph.as_ref().unwrap().nodes.len()
+                            self.knowledge_graph_panel_state
+                                .graph
+                                .as_ref()
+                                .unwrap()
+                                .nodes
+                                .len()
                         ));
                     }
                     Err(e) => {
                         tracing::error!("Failed to generate knowledge graph: {}", e);
-                        self.status_message = Some(format!("Failed to generate knowledge graph: {}", e));
+                        self.status_message =
+                            Some(format!("Failed to generate knowledge graph: {}", e));
                     }
                 }
             }

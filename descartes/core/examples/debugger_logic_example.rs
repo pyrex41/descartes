@@ -8,9 +8,8 @@
 // - Agent runtime integration
 
 use descartes_core::{
-    Debugger, DebugCommand, CommandResult, DebuggerResult,
-    Breakpoint, BreakpointLocation, WorkflowState,
-    DebuggableAgent, run_with_debugging,
+    run_with_debugging, Breakpoint, BreakpointLocation, CommandResult, DebugCommand,
+    DebuggableAgent, Debugger, DebuggerResult, WorkflowState,
 };
 use uuid::Uuid;
 
@@ -43,15 +42,13 @@ impl ExampleAgent {
 
             // Simulate capturing a thought
             let thought_content = format!("Thinking about step {}", self.step_count + 1);
-            debugger.capture_thought_snapshot(
-                format!("thought-{}", self.step_count),
-                thought_content,
-            );
+            debugger
+                .capture_thought_snapshot(format!("thought-{}", self.step_count), thought_content);
 
             // Simulate setting a variable
             debugger.set_context_variable(
                 format!("step_{}", self.step_count),
-                serde_json::json!({"completed": true, "value": self.step_count})
+                serde_json::json!({"completed": true, "value": self.step_count}),
             );
         }
     }
@@ -110,7 +107,10 @@ fn demo_basic_control() {
     println!("\n4. Executing single step...");
     debugger.step_agent().unwrap();
     assert_eq!(debugger.state().step_count, 1);
-    println!("   ✓ Step completed (step count: {})", debugger.state().step_count);
+    println!(
+        "   ✓ Step completed (step count: {})",
+        debugger.state().step_count
+    );
 
     // Disable
     println!("\n5. Disabling debug mode...");
@@ -129,24 +129,36 @@ fn demo_stepping_modes() {
     // Step into
     println!("1. Step into (enters nested calls)...");
     debugger.step_into().unwrap();
-    println!("   ✓ Step into completed (step: {})", debugger.state().step_count);
+    println!(
+        "   ✓ Step into completed (step: {})",
+        debugger.state().step_count
+    );
 
     // Step over
     println!("\n2. Step over (skips nested calls)...");
     debugger.resume_agent().unwrap();
     debugger.step_over().unwrap();
-    println!("   ✓ Step over completed (step: {})", debugger.state().step_count);
+    println!(
+        "   ✓ Step over completed (step: {})",
+        debugger.state().step_count
+    );
 
     // Push a call frame to demonstrate step out
     println!("\n3. Pushing call frame...");
     debugger.push_call_frame("nested_function".to_string(), WorkflowState::Running);
-    println!("   ✓ Call frame pushed (depth: {})", debugger.state().current_context.stack_depth);
+    println!(
+        "   ✓ Call frame pushed (depth: {})",
+        debugger.state().current_context.stack_depth
+    );
 
     // Step out
     println!("\n4. Step out (exits current frame)...");
     debugger.resume_agent().unwrap();
     debugger.step_out().unwrap();
-    println!("   ✓ Step out completed (depth: {})", debugger.state().current_context.stack_depth);
+    println!(
+        "   ✓ Step out completed (depth: {})",
+        debugger.state().current_context.stack_depth
+    );
 }
 
 fn demo_breakpoints() {
@@ -188,7 +200,10 @@ fn demo_breakpoints() {
     debugger.state_mut().remove_breakpoint(&bp2_id).unwrap();
     println!("   ✓ Breakpoint removed");
 
-    println!("\n   Final breakpoint count: {}", debugger.state().get_breakpoints().len());
+    println!(
+        "\n   Final breakpoint count: {}",
+        debugger.state().get_breakpoints().len()
+    );
 }
 
 fn demo_state_capture() {
@@ -212,14 +227,23 @@ fn demo_state_capture() {
     // Update workflow state
     println!("\n2. Updating workflow state...");
     debugger.update_workflow_state(WorkflowState::Running);
-    println!("   ✓ State updated to: {}", debugger.state().current_context.workflow_state);
+    println!(
+        "   ✓ State updated to: {}",
+        debugger.state().current_context.workflow_state
+    );
 
     // Set context variables
     println!("\n3. Setting context variables...");
     debugger.set_context_variable("task_id".to_string(), serde_json::json!("task-123"));
     debugger.set_context_variable("priority".to_string(), serde_json::json!(5));
-    debugger.set_context_variable("tags".to_string(), serde_json::json!(["important", "urgent"]));
-    println!("   ✓ Variables set: {}", debugger.state().current_context.local_variables.len());
+    debugger.set_context_variable(
+        "tags".to_string(),
+        serde_json::json!(["important", "urgent"]),
+    );
+    println!(
+        "   ✓ Variables set: {}",
+        debugger.state().current_context.local_variables.len()
+    );
 
     // Capture context snapshot
     println!("\n4. Capturing context snapshot...");
@@ -232,7 +256,10 @@ fn demo_state_capture() {
     // Save to history
     println!("\n5. Saving to history...");
     debugger.save_to_history();
-    println!("   ✓ Saved (history size: {})", debugger.state().history.len());
+    println!(
+        "   ✓ Saved (history size: {})",
+        debugger.state().history.len()
+    );
 }
 
 fn demo_call_stack() {
@@ -245,13 +272,22 @@ fn demo_call_stack() {
     // Push multiple frames
     println!("1. Building call stack...");
     let frame1_id = debugger.push_call_frame("main".to_string(), WorkflowState::Running);
-    println!("   ✓ Pushed 'main' (depth: {})", debugger.state().current_context.stack_depth);
+    println!(
+        "   ✓ Pushed 'main' (depth: {})",
+        debugger.state().current_context.stack_depth
+    );
 
     let frame2_id = debugger.push_call_frame("process_task".to_string(), WorkflowState::Running);
-    println!("   ✓ Pushed 'process_task' (depth: {})", debugger.state().current_context.stack_depth);
+    println!(
+        "   ✓ Pushed 'process_task' (depth: {})",
+        debugger.state().current_context.stack_depth
+    );
 
     let frame3_id = debugger.push_call_frame("validate_input".to_string(), WorkflowState::Running);
-    println!("   ✓ Pushed 'validate_input' (depth: {})", debugger.state().current_context.stack_depth);
+    println!(
+        "   ✓ Pushed 'validate_input' (depth: {})",
+        debugger.state().current_context.stack_depth
+    );
 
     // Show stack trace
     println!("\n2. Current stack trace:");
@@ -260,10 +296,18 @@ fn demo_call_stack() {
     // Pop frames
     println!("3. Popping frames...");
     if let Some(frame) = debugger.pop_call_frame() {
-        println!("   ✓ Popped '{}' (depth: {})", frame.name, debugger.state().current_context.stack_depth);
+        println!(
+            "   ✓ Popped '{}' (depth: {})",
+            frame.name,
+            debugger.state().current_context.stack_depth
+        );
     }
     if let Some(frame) = debugger.pop_call_frame() {
-        println!("   ✓ Popped '{}' (depth: {})", frame.name, debugger.state().current_context.stack_depth);
+        println!(
+            "   ✓ Popped '{}' (depth: {})",
+            frame.name,
+            debugger.state().current_context.stack_depth
+        );
     }
 
     println!("\n4. Final stack trace:");
@@ -291,7 +335,10 @@ fn demo_command_processing() {
         condition: None,
     });
     match result {
-        Ok(CommandResult::BreakpointSet { breakpoint_id, location }) => {
+        Ok(CommandResult::BreakpointSet {
+            breakpoint_id,
+            location,
+        }) => {
             println!("   ✓ Breakpoint set at {}", location);
             println!("     ID: {}", breakpoint_id);
         }
@@ -362,7 +409,10 @@ fn demo_callbacks() {
     let bp_count_clone = bp_count.clone();
     debugger.on_breakpoint(move |bp, ctx| {
         *bp_count_clone.lock().unwrap() += 1;
-        println!("   [Callback] Breakpoint hit: {} at step {}", bp.location, ctx.current_step);
+        println!(
+            "   [Callback] Breakpoint hit: {} at step {}",
+            bp.location, ctx.current_step
+        );
     });
 
     // Trigger callbacks
@@ -416,7 +466,10 @@ async fn demo_agent_integration() {
 
             if let Some(debugger) = agent.debugger() {
                 if debugger.should_pause() {
-                    println!("\n  [Debug] Agent paused at step {}", debugger.state().step_count);
+                    println!(
+                        "\n  [Debug] Agent paused at step {}",
+                        debugger.state().step_count
+                    );
                     break;
                 }
             }

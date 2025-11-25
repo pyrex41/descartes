@@ -3,12 +3,11 @@
 /// These tests verify the functionality of the ZMQ communication layer,
 /// including socket setup, message serialization/deserialization, connection
 /// management, and request/response correlation.
-
 use descartes_core::{
-    AgentConfig, AgentInfo, AgentStatus, ControlCommandType, HealthCheckRequest,
-    HealthCheckResponse, ListAgentsRequest, ListAgentsResponse, SocketType, SpawnRequest,
-    SpawnResponse, ZmqClient, ZmqConnection, ZmqMessage, ZmqMessageRouter, ZmqRunnerConfig,
-    deserialize_zmq_message, serialize_zmq_message, validate_message_size,
+    deserialize_zmq_message, serialize_zmq_message, validate_message_size, AgentConfig, AgentInfo,
+    AgentStatus, ControlCommandType, HealthCheckRequest, HealthCheckResponse, ListAgentsRequest,
+    ListAgentsResponse, SocketType, SpawnRequest, SpawnResponse, ZmqClient, ZmqConnection,
+    ZmqMessage, ZmqMessageRouter, ZmqRunnerConfig,
 };
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -224,7 +223,10 @@ async fn test_message_router_operations() {
         metadata: None,
     });
 
-    router.route_response(&req1_id, Ok(response1)).await.unwrap();
+    router
+        .route_response(&req1_id, Ok(response1))
+        .await
+        .unwrap();
 
     // Should have one pending now
     assert_eq!(router.pending_count().await, 1);
@@ -248,7 +250,10 @@ async fn test_message_router_operations() {
         metadata: None,
     });
 
-    router.route_response(&req2_id, Ok(response2)).await.unwrap();
+    router
+        .route_response(&req2_id, Ok(response2))
+        .await
+        .unwrap();
 
     // Should have zero pending now
     assert_eq!(router.pending_count().await, 0);
@@ -331,8 +336,8 @@ fn test_serialization_efficiency() {
         config: AgentConfig {
             name: "test-agent".to_string(),
             model_backend: "claude".to_string(),
-            task: "A".repeat(1000), // 1KB task
-            context: Some("B".repeat(1000)), // 1KB context
+            task: "A".repeat(1000),                // 1KB task
+            context: Some("B".repeat(1000)),       // 1KB context
             system_prompt: Some("C".repeat(1000)), // 1KB system prompt
             environment: {
                 let mut env = HashMap::new();
@@ -466,7 +471,7 @@ fn test_batch_control_command_serialization() {
 
 #[test]
 fn test_batch_control_response_serialization() {
-    use descartes_core::{BatchControlResponse, BatchAgentResult};
+    use descartes_core::{BatchAgentResult, BatchControlResponse};
 
     let agent_id_1 = Uuid::new_v4();
     let agent_id_2 = Uuid::new_v4();

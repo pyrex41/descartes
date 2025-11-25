@@ -187,7 +187,10 @@ impl DbPool {
             .execute(&self.pool)
             .await
             .map_err(|e| {
-                crate::errors::ParserError::DatabaseError(format!("Schema initialization failed: {}", e))
+                crate::errors::ParserError::DatabaseError(format!(
+                    "Schema initialization failed: {}",
+                    e
+                ))
             })?;
 
         Ok(())
@@ -232,7 +235,10 @@ impl DbPool {
     }
 
     /// Query nodes by type
-    pub async fn query_nodes_by_type(&self, node_type: &str) -> ParserResult<Vec<(String, String)>> {
+    pub async fn query_nodes_by_type(
+        &self,
+        node_type: &str,
+    ) -> ParserResult<Vec<(String, String)>> {
         let rows = sqlx::query("SELECT id, name FROM semantic_nodes WHERE node_type = ?")
             .bind(node_type)
             .fetch_all(&self.pool)
@@ -243,17 +249,15 @@ impl DbPool {
 
         Ok(rows
             .iter()
-            .map(|row| {
-                (
-                    row.get::<String, _>("id"),
-                    row.get::<String, _>("name"),
-                )
-            })
+            .map(|row| (row.get::<String, _>("id"), row.get::<String, _>("name")))
             .collect())
     }
 
     /// Query nodes by file
-    pub async fn query_nodes_by_file(&self, file_path: &str) -> ParserResult<Vec<(String, String, String)>> {
+    pub async fn query_nodes_by_file(
+        &self,
+        file_path: &str,
+    ) -> ParserResult<Vec<(String, String, String)>> {
         let rows = sqlx::query(
             "SELECT id, name, node_type FROM semantic_nodes WHERE file_path = ? ORDER BY line_start"
         )
@@ -306,7 +310,10 @@ impl DbPool {
     }
 
     /// Get parse history for a file
-    pub async fn get_parse_history(&self, file_path: &str) -> ParserResult<Vec<(String, i32, i32)>> {
+    pub async fn get_parse_history(
+        &self,
+        file_path: &str,
+    ) -> ParserResult<Vec<(String, i32, i32)>> {
         let rows = sqlx::query(
             "SELECT language, parse_duration_ms, total_nodes FROM parse_history WHERE file_path = ? ORDER BY parsed_at DESC LIMIT 10"
         )

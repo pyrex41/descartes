@@ -8,7 +8,6 @@
 /// - Comprehensive error handling
 /// - Batch requests
 /// - Async/await with tokio
-
 use crate::errors::{DaemonError, DaemonResult};
 use crate::types::*;
 use serde_json::{json, Value};
@@ -96,7 +95,9 @@ impl RpcClient {
             .pool_idle_timeout(Duration::from_secs(60))
             .tcp_keepalive(Duration::from_secs(60))
             .build()
-            .map_err(|e| DaemonError::ConnectionError(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                DaemonError::ConnectionError(format!("Failed to create HTTP client: {}", e))
+            })?;
 
         info!("RPC client created for {}", config.url);
 
@@ -149,7 +150,10 @@ impl RpcClient {
                 Ok(response) => {
                     // Check for RPC errors
                     if let Some(error) = response.error {
-                        error!("RPC error for {}: {} (code: {})", method, error.message, error.code);
+                        error!(
+                            "RPC error for {}: {} (code: {})",
+                            method, error.message, error.code
+                        );
                         return Err(DaemonError::RpcError(error.code, error.message));
                     }
 
@@ -162,8 +166,10 @@ impl RpcClient {
                         return Err(e);
                     }
 
-                    warn!("RPC call failed (attempt {}/{}): {}. Retrying in {:?}...",
-                          attempts, self.config.max_retries, e, delay);
+                    warn!(
+                        "RPC call failed (attempt {}/{}): {}. Retrying in {:?}...",
+                        attempts, self.config.max_retries, e, delay
+                    );
 
                     tokio::time::sleep(delay).await;
                     delay *= 2; // Exponential backoff
@@ -174,7 +180,8 @@ impl RpcClient {
 
     /// Send a single RPC request
     async fn send_request(&self, request: &RpcRequest) -> DaemonResult<RpcResponse> {
-        let mut req = self.http_client
+        let mut req = self
+            .http_client
             .post(&self.config.url)
             .header("Content-Type", "application/json")
             .json(request);
@@ -193,22 +200,25 @@ impl RpcClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(DaemonError::ConnectionError(
-                format!("HTTP error {}: {}", status, body)
-            ));
+            return Err(DaemonError::ConnectionError(format!(
+                "HTTP error {}: {}",
+                status, body
+            )));
         }
 
         // Parse JSON-RPC response
-        let rpc_response: RpcResponse = response
-            .json()
-            .await
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse response: {}", e)))?;
+        let rpc_response: RpcResponse = response.json().await.map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse response: {}", e))
+        })?;
 
         Ok(rpc_response)
     }
 
     /// Send a batch of RPC requests
-    pub async fn batch_call(&self, requests: Vec<(&str, Option<Value>)>) -> DaemonResult<Vec<Value>> {
+    pub async fn batch_call(
+        &self,
+        requests: Vec<(&str, Option<Value>)>,
+    ) -> DaemonResult<Vec<Value>> {
         let mut rpc_requests = Vec::new();
 
         for (method, params) in requests {
@@ -223,7 +233,8 @@ impl RpcClient {
 
         debug!("Batch RPC call with {} requests", rpc_requests.len());
 
-        let mut req = self.http_client
+        let mut req = self
+            .http_client
             .post(&self.config.url)
             .header("Content-Type", "application/json")
             .json(&rpc_requests);
@@ -237,10 +248,9 @@ impl RpcClient {
             .await
             .map_err(|e| DaemonError::ConnectionError(format!("Batch request failed: {}", e)))?;
 
-        let rpc_responses: Vec<RpcResponse> = response
-            .json()
-            .await
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse batch response: {}", e)))?;
+        let rpc_responses: Vec<RpcResponse> = response.json().await.map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse batch response: {}", e))
+        })?;
 
         let results = rpc_responses
             .into_iter()
@@ -269,7 +279,12 @@ impl RpcClient {
     // ============================================================
 
     /// Spawn a new agent
-    pub async fn spawn_agent(&self, name: &str, agent_type: &str, config: Value) -> DaemonResult<AgentSpawnResponse> {
+    pub async fn spawn_agent(
+        &self,
+        name: &str,
+        agent_type: &str,
+        config: Value,
+    ) -> DaemonResult<AgentSpawnResponse> {
         let params = json!({
             "name": name,
             "agent_type": agent_type,
@@ -277,15 +292,17 @@ impl RpcClient {
         });
 
         let result = self.call("agent.spawn", Some(params)).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse spawn response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse spawn response: {}", e))
+        })
     }
 
     /// List all agents
     pub async fn list_agents(&self) -> DaemonResult<AgentListResponse> {
         let result = self.call("agent.list", Some(json!({}))).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse list response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse list response: {}", e))
+        })
     }
 
     /// Kill an agent
@@ -296,12 +313,18 @@ impl RpcClient {
         });
 
         let result = self.call("agent.kill", Some(params)).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse kill response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse kill response: {}", e))
+        })
     }
 
     /// Get agent logs
-    pub async fn get_agent_logs(&self, agent_id: &str, limit: Option<usize>, offset: Option<usize>) -> DaemonResult<AgentLogsResponse> {
+    pub async fn get_agent_logs(
+        &self,
+        agent_id: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> DaemonResult<AgentLogsResponse> {
         let params = json!({
             "agent_id": agent_id,
             "limit": limit.unwrap_or(100),
@@ -309,12 +332,18 @@ impl RpcClient {
         });
 
         let result = self.call("agent.logs", Some(params)).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse logs response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse logs response: {}", e))
+        })
     }
 
     /// Execute a workflow
-    pub async fn execute_workflow(&self, workflow_id: &str, agents: Vec<String>, config: Value) -> DaemonResult<WorkflowExecuteResponse> {
+    pub async fn execute_workflow(
+        &self,
+        workflow_id: &str,
+        agents: Vec<String>,
+        config: Value,
+    ) -> DaemonResult<WorkflowExecuteResponse> {
         let params = json!({
             "workflow_id": workflow_id,
             "agents": agents,
@@ -322,12 +351,17 @@ impl RpcClient {
         });
 
         let result = self.call("workflow.execute", Some(params)).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse workflow response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse workflow response: {}", e))
+        })
     }
 
     /// Query state
-    pub async fn query_state(&self, agent_id: Option<&str>, key: Option<&str>) -> DaemonResult<StateQueryResponse> {
+    pub async fn query_state(
+        &self,
+        agent_id: Option<&str>,
+        key: Option<&str>,
+    ) -> DaemonResult<StateQueryResponse> {
         let mut params = json!({});
 
         if let Some(id) = agent_id {
@@ -338,22 +372,25 @@ impl RpcClient {
         }
 
         let result = self.call("state.query", Some(params)).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse state response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse state response: {}", e))
+        })
     }
 
     /// Get system health
     pub async fn health(&self) -> DaemonResult<HealthCheckResponse> {
         let result = self.call("system.health", None).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse health response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse health response: {}", e))
+        })
     }
 
     /// Get system metrics
     pub async fn metrics(&self) -> DaemonResult<MetricsResponse> {
         let result = self.call("system.metrics", None).await?;
-        serde_json::from_value(result)
-            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse metrics response: {}", e)))
+        serde_json::from_value(result).map_err(|e| {
+            DaemonError::SerializationError(format!("Failed to parse metrics response: {}", e))
+        })
     }
 
     /// Get the server URL

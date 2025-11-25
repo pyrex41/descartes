@@ -1,3 +1,4 @@
+use serde_json::{json, Value};
 /// Concurrent Agent Communication Patterns
 /// Benchmarks for multi-agent scenarios
 ///
@@ -6,9 +7,7 @@
 /// - Fan-in (many agents to one)
 /// - Pipeline (sequential processing)
 /// - Broadcast (one to all)
-
 use std::time::Instant;
-use serde_json::{json, Value};
 
 /// Configuration for concurrency benchmarks
 #[derive(Debug, Clone)]
@@ -196,7 +195,8 @@ pub fn benchmark_all_to_all(config: ConcurrencyConfig) -> ConcurrencyResults {
     for _ in 0..messages_per_pair {
         for _ in 0..config.agent_count {
             for _ in 0..config.agent_count {
-                if _ != 0 { // Don't send to self
+                if _ != 0 {
+                    // Don't send to self
                     let _ = payload.clone();
                 }
             }

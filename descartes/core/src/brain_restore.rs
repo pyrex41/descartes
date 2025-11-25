@@ -12,7 +12,6 @@
 /// - State recovery from snapshots
 /// - Audit trail analysis
 /// - Disaster recovery
-
 use crate::agent_history::{
     AgentHistoryEvent, AgentHistoryStore, HistoryEventType, HistoryQuery, HistorySnapshot,
 };
@@ -308,10 +307,7 @@ pub trait BrainRestore: Send + Sync {
     fn validate_state(&self, state: &BrainState) -> StateStoreResult<Vec<String>>;
 
     /// Check event dependencies
-    fn check_dependencies(
-        &self,
-        events: &[AgentHistoryEvent],
-    ) -> StateStoreResult<Vec<String>>;
+    fn check_dependencies(&self, events: &[AgentHistoryEvent]) -> StateStoreResult<Vec<String>>;
 }
 
 // ============================================================================
@@ -343,7 +339,10 @@ impl<S: AgentHistoryStore> DefaultBrainRestore<S> {
         for event in events.iter() {
             event_map.insert(event.event_id, event.clone());
             if let Some(parent_id) = event.parent_event_id {
-                parent_map.entry(parent_id).or_default().push(event.event_id);
+                parent_map
+                    .entry(parent_id)
+                    .or_default()
+                    .push(event.event_id);
             }
         }
 
@@ -641,13 +640,9 @@ impl<S: AgentHistoryStore> BrainRestore for DefaultBrainRestore<S> {
         options: RestoreOptions,
     ) -> StateStoreResult<RestoreResult> {
         // Load snapshot
-        let snapshot = self
-            .store
-            .get_snapshot(snapshot_id)
-            .await?
-            .ok_or_else(|| {
-                StateStoreError::NotFound(format!("Snapshot {} not found", snapshot_id))
-            })?;
+        let snapshot = self.store.get_snapshot(snapshot_id).await?.ok_or_else(|| {
+            StateStoreError::NotFound(format!("Snapshot {} not found", snapshot_id))
+        })?;
 
         // Replay events from snapshot
         self.replay_events(snapshot.events, options).await
@@ -709,11 +704,8 @@ impl<S: AgentHistoryStore> BrainRestore for DefaultBrainRestore<S> {
         let mut errors = Vec::new();
 
         // Check for orphaned thoughts
-        let thought_ids: HashSet<Uuid> = state
-            .thought_history
-            .iter()
-            .map(|t| t.thought_id)
-            .collect();
+        let thought_ids: HashSet<Uuid> =
+            state.thought_history.iter().map(|t| t.thought_id).collect();
 
         for thought in &state.thought_history {
             if let Some(parent_id) = thought.parent_thought_id {
@@ -727,11 +719,8 @@ impl<S: AgentHistoryStore> BrainRestore for DefaultBrainRestore<S> {
         }
 
         // Check for orphaned decisions
-        let decision_ids: HashSet<Uuid> = state
-            .decision_tree
-            .iter()
-            .map(|d| d.decision_id)
-            .collect();
+        let decision_ids: HashSet<Uuid> =
+            state.decision_tree.iter().map(|d| d.decision_id).collect();
 
         for decision in &state.decision_tree {
             if let Some(parent_id) = decision.parent_decision_id {
@@ -745,8 +734,7 @@ impl<S: AgentHistoryStore> BrainRestore for DefaultBrainRestore<S> {
         }
 
         // Check conversation state consistency
-        if state.conversation_state.current_turn as usize
-            != state.conversation_state.messages.len()
+        if state.conversation_state.current_turn as usize != state.conversation_state.messages.len()
         {
             errors.push(format!(
                 "Conversation turn count mismatch: {} turns but {} messages",
@@ -758,10 +746,7 @@ impl<S: AgentHistoryStore> BrainRestore for DefaultBrainRestore<S> {
         Ok(errors)
     }
 
-    fn check_dependencies(
-        &self,
-        events: &[AgentHistoryEvent],
-    ) -> StateStoreResult<Vec<String>> {
+    fn check_dependencies(&self, events: &[AgentHistoryEvent]) -> StateStoreResult<Vec<String>> {
         let mut warnings = Vec::new();
         let event_ids: HashSet<Uuid> = events.iter().map(|e| e.event_id).collect();
 
@@ -943,7 +928,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(filtered.len(), 2);
-        assert!(filtered.iter().all(|e| e.event_type == HistoryEventType::Thought));
+        assert!(filtered
+            .iter()
+            .all(|e| e.event_type == HistoryEventType::Thought));
     }
 
     #[tokio::test]

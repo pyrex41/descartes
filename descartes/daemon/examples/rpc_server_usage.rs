@@ -6,13 +6,12 @@
 /// 3. Connect to it and make RPC calls
 ///
 /// Run with: cargo run --example rpc_server_usage
-
 use descartes_core::agent_runner::LocalProcessRunner;
 use descartes_core::state_store::SqliteStateStore;
 use descartes_core::traits::StateStore;
 use descartes_daemon::UnixSocketRpcServer;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,8 +22,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Step 1: Create the agent runner
     println!("1. Creating agent runner...");
-    let agent_runner = Arc::new(LocalProcessRunner::new())
-        as Arc<dyn descartes_core::traits::AgentRunner>;
+    let agent_runner =
+        Arc::new(LocalProcessRunner::new()) as Arc<dyn descartes_core::traits::AgentRunner>;
     println!("   ✓ Agent runner created\n");
 
     // Step 2: Create and initialize the state store
@@ -38,11 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 3: Create the RPC server
     println!("3. Creating RPC server...");
     let socket_path = PathBuf::from("/tmp/descartes_rpc.sock");
-    let server = UnixSocketRpcServer::new(
-        socket_path.clone(),
-        agent_runner,
-        state_store,
-    );
+    let server = UnixSocketRpcServer::new(socket_path.clone(), agent_runner, state_store);
     println!("   ✓ RPC server created\n");
 
     // Step 4: Start the server
@@ -59,7 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Example JSON-RPC Calls ===\n");
 
     println!("Spawn an agent:");
-    println!(r#"{{
+    println!(
+        r#"{{
   "jsonrpc": "2.0",
   "method": "spawn",
   "params": [
@@ -72,22 +68,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }}
   ],
   "id": 1
-}}"#);
+}}"#
+    );
     println!();
 
     println!("List tasks:");
-    println!(r#"{{
+    println!(
+        r#"{{
   "jsonrpc": "2.0",
   "method": "list_tasks",
   "params": [
     {{ "status": "todo" }}
   ],
   "id": 2
-}}"#);
+}}"#
+    );
     println!();
 
     println!("Approve a task:");
-    println!(r#"{{
+    println!(
+        r#"{{
   "jsonrpc": "2.0",
   "method": "approve",
   "params": [
@@ -95,16 +95,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     true
   ],
   "id": 3
-}}"#);
+}}"#
+    );
     println!();
 
     println!("Get system state:");
-    println!(r#"{{
+    println!(
+        r#"{{
   "jsonrpc": "2.0",
   "method": "get_state",
   "params": [null],
   "id": 4
-}}"#);
+}}"#
+    );
     println!();
 
     println!("Server is running. Press Ctrl+C to stop.");
