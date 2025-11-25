@@ -295,10 +295,10 @@ fn view_disconnected() -> Element<'static, DebuggerMessage> {
 // ============================================================================
 
 /// View the control bar with debugger controls
-fn view_control_bar(
-    debugger_state: &DebuggerState,
-    settings: &DebuggerUiSettings,
-) -> Element<DebuggerMessage> {
+fn view_control_bar<'a>(
+    debugger_state: &'a DebuggerState,
+    settings: &'a DebuggerUiSettings,
+) -> Element<'a, DebuggerMessage> {
     let execution_state = &debugger_state.execution_state;
     let is_paused = execution_state.is_paused();
     let is_running = execution_state.is_running();
@@ -357,7 +357,7 @@ fn view_control_bar(
         Color::from_rgb8(200, 200, 200)
     };
 
-    let status_indicator = container(text(status_text).size(14).style(status_color))
+    let status_indicator = container(text(status_text).size(14).color(status_color))
         .padding(10)
         .style(move |theme: &Theme| container::Style {
             background: Some(theme.palette().background.into()),
@@ -368,7 +368,7 @@ fn view_control_bar(
     // Step counter
     let step_counter = text(format!("Step: {}", debugger_state.step_count))
         .size(14)
-        .style(Color::from_rgb8(200, 200, 200));
+        .color(Color::from_rgb8(200, 200, 200));
 
     let controls_row = row![
         pause_resume_btn,
@@ -399,12 +399,12 @@ fn view_control_bar(
 }
 
 /// Helper to create a control button
-fn create_control_button(
-    label: &str,
-    icon: &str,
+fn create_control_button<'a>(
+    label: &'a str,
+    icon: &'a str,
     enabled: bool,
     message: DebuggerMessage,
-) -> Element<DebuggerMessage> {
+) -> Element<'a, DebuggerMessage> {
     let btn_content = row![
         text(icon).size(14),
         Space::with_width(5),
@@ -427,10 +427,10 @@ fn create_control_button(
 // ============================================================================
 
 /// View the main content area with thought and context views
-fn view_main_content(
-    state: &DebuggerUiState,
-    debugger_state: &DebuggerState,
-) -> Element<DebuggerMessage> {
+fn view_main_content<'a>(
+    state: &'a DebuggerUiState,
+    debugger_state: &'a DebuggerState,
+) -> Element<'a, DebuggerMessage> {
     // Split view: Thought on left, Context on right
     let thought_view = if state.show_thought_view {
         view_thought_panel(debugger_state, &state.ui_settings)
@@ -465,10 +465,10 @@ fn view_main_content(
 // ============================================================================
 
 /// View the current thought panel
-fn view_thought_panel(
-    debugger_state: &DebuggerState,
-    settings: &DebuggerUiSettings,
-) -> Element<DebuggerMessage> {
+fn view_thought_panel<'a>(
+    debugger_state: &'a DebuggerState,
+    settings: &'a DebuggerUiSettings,
+) -> Element<'a, DebuggerMessage> {
     let title = text("Current Thought").size(18);
 
     let content = if let Some(ref thought) = debugger_state.current_thought {
@@ -477,7 +477,7 @@ fn view_thought_panel(
         container(
             text("No thought currently active")
                 .size(14)
-                .style(Color::from_rgb8(150, 150, 150)),
+                .color(Color::from_rgb8(150, 150, 150)),
         )
         .padding(20)
         .center(Length::Fill)
@@ -497,28 +497,28 @@ fn view_thought_panel(
 }
 
 /// View thought content with metadata
-fn view_thought_content(
-    thought: &ThoughtSnapshot,
-    settings: &DebuggerUiSettings,
-) -> Element<DebuggerMessage> {
+fn view_thought_content<'a>(
+    thought: &'a ThoughtSnapshot,
+    settings: &'a DebuggerUiSettings,
+) -> Element<'a, DebuggerMessage> {
     // Metadata section
     let metadata = column![
         row![
-            text("ID:").size(11).style(Color::from_rgb8(150, 150, 150)),
+            text("ID:").size(11).color(Color::from_rgb8(150, 150, 150)),
             Space::with_width(10),
             text(&thought.thought_id).size(11),
         ],
         row![
             text("Step:")
                 .size(11)
-                .style(Color::from_rgb8(150, 150, 150)),
+                .color(Color::from_rgb8(150, 150, 150)),
             Space::with_width(10),
             text(format!("{}", thought.step_number)).size(11),
         ],
         row![
             text("Timestamp:")
                 .size(11)
-                .style(Color::from_rgb8(150, 150, 150)),
+                .color(Color::from_rgb8(150, 150, 150)),
             Space::with_width(10),
             text(&thought.timestamp).size(11),
         ],
@@ -526,11 +526,11 @@ fn view_thought_content(
             row![
                 text("Tags:")
                     .size(11)
-                    .style(Color::from_rgb8(150, 150, 150)),
+                    .color(Color::from_rgb8(150, 150, 150)),
                 Space::with_width(10),
                 text(thought.tags.join(", "))
                     .size(11)
-                    .style(Color::from_rgb8(100, 200, 255)),
+                    .color(Color::from_rgb8(100, 200, 255)),
             ]
         } else {
             row![]
@@ -543,7 +543,7 @@ fn view_thought_content(
         // Basic syntax highlighting (simplified)
         text(&thought.content)
             .size(13)
-            .style(Color::from_rgb8(220, 220, 220))
+            .color(Color::from_rgb8(220, 220, 220))
     } else {
         text(&thought.content).size(13)
     };
@@ -561,7 +561,7 @@ fn view_thought_content(
         Space::with_height(10),
         text("Content:")
             .size(12)
-            .style(Color::from_rgb8(150, 150, 150)),
+            .color(Color::from_rgb8(150, 150, 150)),
         Space::with_height(5),
         content_box,
     ]
@@ -574,10 +574,10 @@ fn view_thought_content(
 // ============================================================================
 
 /// View the context panel with tabs
-fn view_context_panel(
-    state: &DebuggerUiState,
-    debugger_state: &DebuggerState,
-) -> Element<DebuggerMessage> {
+fn view_context_panel<'a>(
+    state: &'a DebuggerUiState,
+    debugger_state: &'a DebuggerState,
+) -> Element<'a, DebuggerMessage> {
     let title = text("Debug Context").size(18);
 
     // Tab buttons
@@ -643,7 +643,7 @@ fn view_variables_tab(context: &DebugContext) -> Element<DebuggerMessage> {
         return container(
             text("No variables in current scope")
                 .size(14)
-                .style(Color::from_rgb8(150, 150, 150)),
+                .color(Color::from_rgb8(150, 150, 150)),
         )
         .padding(20)
         .center(Length::Fill)
@@ -656,7 +656,7 @@ fn view_variables_tab(context: &DebugContext) -> Element<DebuggerMessage> {
         .map(|(name, value)| {
             let value_str = format_json_value(value);
             row![
-                text(name).size(13).style(Color::from_rgb8(100, 200, 255)),
+                text(name).size(13).color(Color::from_rgb8(100, 200, 255)),
                 text(": ").size(13),
                 text(value_str).size(13),
             ]
@@ -674,7 +674,7 @@ fn view_call_stack_tab(context: &DebugContext) -> Element<DebuggerMessage> {
         return container(
             text("Call stack is empty")
                 .size(14)
-                .style(Color::from_rgb8(150, 150, 150)),
+                .color(Color::from_rgb8(150, 150, 150)),
         )
         .padding(20)
         .center(Length::Fill)
@@ -697,11 +697,11 @@ fn view_call_frame(index: usize, frame: &CallFrame) -> Element<DebuggerMessage> 
     let frame_header = row![
         text(format!("#{}", index))
             .size(12)
-            .style(Color::from_rgb8(150, 150, 150)),
+            .color(Color::from_rgb8(150, 150, 150)),
         Space::with_width(10),
         text(&frame.name)
             .size(13)
-            .style(Color::from_rgb8(255, 200, 100)),
+            .color(Color::from_rgb8(255, 200, 100)),
     ]
     .align_y(Vertical::Center);
 
@@ -715,7 +715,7 @@ fn view_call_frame(index: usize, frame: &CallFrame) -> Element<DebuggerMessage> 
         },
     ]
     .spacing(2)
-    .padding([0, 0, 0, 25]);
+    .padding(iced::Padding::default().left(25.0));
 
     container(column![frame_header, Space::with_height(5), frame_info].spacing(5))
         .padding(8)
@@ -738,7 +738,7 @@ fn view_workflow_state_tab(context: &DebugContext) -> Element<DebuggerMessage> {
             Space::with_width(10),
             text(format!("{}", current_state))
                 .size(16)
-                .style(state_color),
+                .color(state_color),
         ]
         .align_y(Vertical::Center),
         Space::with_height(15),
@@ -772,20 +772,6 @@ fn view_workflow_diagram(current_state: &WorkflowState) -> Element<DebuggerMessa
             let is_current = state == current_state;
             let state_color = workflow_state_color(state);
 
-            let style = if is_current {
-                move |theme: &Theme| container::Style {
-                    background: Some(state_color.into()),
-                    border: border::rounded(4).width(2.0).color(Color::WHITE),
-                    ..Default::default()
-                }
-            } else {
-                move |theme: &Theme| container::Style {
-                    background: Some(Color::from_rgb8(40, 40, 50).into()),
-                    border: border::rounded(4),
-                    ..Default::default()
-                }
-            };
-
             container(
                 text(format!("{}", state))
                     .size(11)
@@ -793,7 +779,21 @@ fn view_workflow_diagram(current_state: &WorkflowState) -> Element<DebuggerMessa
             )
             .padding(6)
             .width(Length::Fill)
-            .style(style)
+            .style(move |_theme: &Theme| {
+                if is_current {
+                    container::Style {
+                        background: Some(state_color.into()),
+                        border: border::rounded(4).width(2.0).color(Color::WHITE),
+                        ..Default::default()
+                    }
+                } else {
+                    container::Style {
+                        background: Some(Color::from_rgb8(40, 40, 50).into()),
+                        border: border::rounded(4),
+                        ..Default::default()
+                    }
+                }
+            })
             .into()
         })
         .collect();
@@ -823,10 +823,10 @@ fn view_metadata_tab(context: &DebugContext) -> Element<DebuggerMessage> {
 // ============================================================================
 
 /// View the breakpoint management panel
-fn view_breakpoint_panel(
-    state: &DebuggerUiState,
-    debugger_state: &DebuggerState,
-) -> Element<DebuggerMessage> {
+fn view_breakpoint_panel<'a>(
+    state: &'a DebuggerUiState,
+    debugger_state: &'a DebuggerState,
+) -> Element<'a, DebuggerMessage> {
     let title = row![
         text("Breakpoints").size(18),
         Space::with_width(Length::Fill),
@@ -836,11 +836,11 @@ fn view_breakpoint_panel(
     ]
     .align_y(Vertical::Center);
 
-    let breakpoints_list = if debugger_state.breakpoints.is_empty() {
+    let breakpoints_list: Element<'_, DebuggerMessage> = if debugger_state.breakpoints.is_empty() {
         container(
             text("No breakpoints set")
                 .size(14)
-                .style(Color::from_rgb8(150, 150, 150)),
+                .color(Color::from_rgb8(150, 150, 150)),
         )
         .padding(20)
         .center(Length::Fill)
@@ -881,10 +881,10 @@ fn view_breakpoint_panel(
 }
 
 /// View a single breakpoint item
-fn view_breakpoint_item(
-    breakpoint: &Breakpoint,
-    hovered: Option<&Uuid>,
-) -> Element<DebuggerMessage> {
+fn view_breakpoint_item<'a>(
+    breakpoint: &'a Breakpoint,
+    hovered: Option<&'a Uuid>,
+) -> Element<'a, DebuggerMessage> {
     let is_hovered = hovered == Some(&breakpoint.id);
     let enabled_color = if breakpoint.enabled {
         Color::from_rgb8(100, 255, 100)
@@ -898,14 +898,14 @@ fn view_breakpoint_item(
 
     let location_text = text(format!("{}", breakpoint.location))
         .size(13)
-        .style(enabled_color);
+        .color(enabled_color);
 
     let hit_count = text(format!("Hits: {}", breakpoint.hit_count))
         .size(11)
-        .style(Color::from_rgb8(150, 150, 150));
+        .color(Color::from_rgb8(150, 150, 150));
 
     let description = if let Some(ref desc) = breakpoint.description {
-        text(desc).size(11).style(Color::from_rgb8(200, 200, 200))
+        text(desc).size(11).color(Color::from_rgb8(200, 200, 200))
     } else {
         text("").size(11)
     };
@@ -957,7 +957,7 @@ fn view_breakpoint_form(form_state: &BreakpointFormState) -> Element<DebuggerMes
         text("Break at step:").size(12),
         text("(Enter step number)")
             .size(10)
-            .style(Color::from_rgb8(150, 150, 150)),
+            .color(Color::from_rgb8(150, 150, 150)),
         Space::with_height(5),
         row![
             button(text("Add").size(12))
@@ -1171,7 +1171,6 @@ fn workflow_state_color(state: &WorkflowState) -> Color {
         WorkflowState::Completed => Color::from_rgb8(100, 200, 255),
         WorkflowState::Failed => Color::from_rgb8(255, 100, 100),
         WorkflowState::Cancelled => Color::from_rgb8(200, 100, 200),
-        _ => Color::from_rgb8(150, 150, 150),
     }
 }
 

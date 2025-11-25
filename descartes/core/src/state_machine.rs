@@ -80,6 +80,9 @@ pub enum WorkflowState {
 
     /// Workflow failed with errors
     Failed,
+
+    /// Workflow was cancelled by user
+    Cancelled,
 }
 
 impl fmt::Display for WorkflowState {
@@ -90,6 +93,7 @@ impl fmt::Display for WorkflowState {
             WorkflowState::Paused => write!(f, "Paused"),
             WorkflowState::Completed => write!(f, "Completed"),
             WorkflowState::Failed => write!(f, "Failed"),
+            WorkflowState::Cancelled => write!(f, "Cancelled"),
         }
     }
 }
@@ -110,9 +114,14 @@ impl WorkflowState {
             (WorkflowState::Paused, WorkflowState::Running) => true,
             (WorkflowState::Paused, WorkflowState::Failed) => true,
 
+            // Cancelled can happen from Running or Paused
+            (WorkflowState::Running, WorkflowState::Cancelled) => true,
+            (WorkflowState::Paused, WorkflowState::Cancelled) => true,
+
             // Terminal states - no transitions
             (WorkflowState::Completed, _) => false,
             (WorkflowState::Failed, _) => false,
+            (WorkflowState::Cancelled, _) => false,
 
             // Self transitions allowed
             (a, b) if a == b => true,
@@ -123,7 +132,7 @@ impl WorkflowState {
 
     /// Check if this is a terminal state
     pub fn is_terminal(&self) -> bool {
-        matches!(self, WorkflowState::Completed | WorkflowState::Failed)
+        matches!(self, WorkflowState::Completed | WorkflowState::Failed | WorkflowState::Cancelled)
     }
 }
 

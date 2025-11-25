@@ -3,7 +3,9 @@ pub mod dag_canvas_interactions;
 pub mod dag_editor;
 pub mod debugger_ui;
 pub mod event_handler;
+#[cfg(feature = "agent-runner")]
 pub mod file_tree_view;
+#[cfg(feature = "agent-runner")]
 pub mod knowledge_graph_panel;
 /// Descartes GUI - Native cross-platform interface using Iced
 /// Phase 3 implementation
@@ -24,10 +26,12 @@ pub use dag_editor::{
     update as dag_editor_update, view as dag_editor_view, DAGEditorMessage, DAGEditorState, Tool,
 };
 pub use event_handler::EventHandler;
+#[cfg(feature = "agent-runner")]
 pub use file_tree_view::{
     get_selected_node, get_selected_path, is_node_visible, update as file_tree_update,
     view as file_tree_view, FileTreeMessage, FileTreeState, SortOrder,
 };
+#[cfg(feature = "agent-runner")]
 pub use knowledge_graph_panel::{
     get_node_color, get_node_icon, update as knowledge_graph_panel_update,
     view as knowledge_graph_panel_view, KnowledgeGraphMessage, KnowledgeGraphPanelState,

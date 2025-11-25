@@ -130,7 +130,7 @@ async fn execute_non_streaming(
     Ok(())
 }
 
-fn create_backend(
+pub fn create_backend(
     config: &DescaratesConfig,
     provider: &str,
     _model: &str,
@@ -178,7 +178,7 @@ fn create_backend(
     Ok(backend)
 }
 
-fn get_model_for_provider(
+pub fn get_model_for_provider(
     config: &DescaratesConfig,
     provider: &str,
     model: Option<&str>,

@@ -143,7 +143,7 @@ pub fn view_rewind_confirmation(confirmation: &RewindConfirmation) -> Element<Re
         warnings = warnings.push(
             text("⚠ Uncommitted changes will be stashed")
                 .size(12)
-                .style(iced::Color::from_rgb(1.0, 0.7, 0.0)),
+                .color(iced::Color::from_rgb(1.0, 0.7, 0.0)),
         );
     }
 
@@ -154,7 +154,7 @@ pub fn view_rewind_confirmation(confirmation: &RewindConfirmation) -> Element<Re
                 confirmation.events_will_be_lost
             ))
             .size(12)
-            .style(iced::Color::from_rgb(1.0, 0.7, 0.0)),
+            .color(iced::Color::from_rgb(1.0, 0.7, 0.0)),
         );
     }
 
@@ -162,7 +162,7 @@ pub fn view_rewind_confirmation(confirmation: &RewindConfirmation) -> Element<Re
         warnings = warnings.push(
             text(format!("⚠ {}", warning))
                 .size(12)
-                .style(iced::Color::from_rgb(1.0, 0.7, 0.0)),
+                .color(iced::Color::from_rgb(1.0, 0.7, 0.0)),
         );
     }
 
@@ -170,7 +170,7 @@ pub fn view_rewind_confirmation(confirmation: &RewindConfirmation) -> Element<Re
         column![
             text("Confirm Rewind Operation")
                 .size(20)
-                .style(iced::Color::WHITE),
+                .color(iced::Color::WHITE),
             Space::with_height(15),
             text(&confirmation.operation).size(14),
             Space::with_height(10),
@@ -333,12 +333,12 @@ pub fn view_rewind_result(result: &RewindResult) -> Element<RewindMessage> {
     // Validation info
     if !result.validation.errors.is_empty() {
         details = details.push(Space::with_height(10));
-        details = details.push(text("Validation Errors:").size(12).style(status_color));
+        details = details.push(text("Validation Errors:").size(12).color(status_color));
         for error in &result.validation.errors {
             details = details.push(
                 text(format!("  • {}", error))
                     .size(11)
-                    .style(iced::Color::from_rgb(0.8, 0.2, 0.2)),
+                    .color(iced::Color::from_rgb(0.8, 0.2, 0.2)),
             );
         }
     }
@@ -350,7 +350,7 @@ pub fn view_rewind_result(result: &RewindResult) -> Element<RewindMessage> {
             details = details.push(
                 text(format!("  • {}", warning))
                     .size(11)
-                    .style(iced::Color::from_rgb(1.0, 0.7, 0.0)),
+                    .color(iced::Color::from_rgb(1.0, 0.7, 0.0)),
             );
         }
     }
@@ -366,7 +366,7 @@ pub fn view_rewind_result(result: &RewindResult) -> Element<RewindMessage> {
     container(
         column![
             row![
-                text(status_icon).size(24).style(status_color),
+                text(status_icon).size(24).color(status_color),
                 Space::with_width(10),
                 text(if result.success {
                     "Rewind Successful"
@@ -374,7 +374,7 @@ pub fn view_rewind_result(result: &RewindResult) -> Element<RewindMessage> {
                     "Rewind Failed"
                 })
                 .size(18)
-                .style(status_color),
+                .color(status_color),
             ]
             .align_y(iced::alignment::Vertical::Center),
             Space::with_height(15),

@@ -9,7 +9,8 @@
 /// - Git commit integration
 use chrono::{DateTime, Utc};
 use descartes_core::{AgentHistoryEvent, HistoryEventType, HistorySnapshot};
-use iced::widget::canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke, Text};
+use iced::mouse::Cursor;
+use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path, Stroke, Text};
 use iced::widget::{button, column, container, row, text, Column, Row, Space};
 use iced::{
     alignment::{Horizontal, Vertical},
@@ -442,7 +443,7 @@ fn view_event_details(state: &TimeTravelState) -> Element<TimeTravelMessage> {
         let git_commit_display = if let Some(ref commit) = event.git_commit_hash {
             column![
                 text("Git Commit:").size(12),
-                text(commit).size(12).style(Color::from_rgb8(100, 200, 255)),
+                text(commit).size(12).color(Color::from_rgb8(100, 200, 255)),
             ]
             .spacing(2)
         } else {
@@ -452,7 +453,7 @@ fn view_event_details(state: &TimeTravelState) -> Element<TimeTravelMessage> {
         container(
             column![
                 row![
-                    text(event_type_icon).size(24).style(event_type_color),
+                    text(event_type_icon).size(24).color(event_type_color),
                     Space::with_width(10),
                     column![
                         text(format!("{:?}", event.event_type)).size(18),
@@ -552,8 +553,14 @@ fn view_statistics(state: &TimeTravelState) -> Element<TimeTravelMessage> {
             .or_insert(0) += 1;
     }
 
-    let type_counts_display: Vec<Element<TimeTravelMessage>> = type_counts
+    // Convert type_counts to owned data for the view
+    let type_counts_data: Vec<(String, usize)> = type_counts
         .iter()
+        .map(|(event_type, count)| (event_type.clone(), *count))
+        .collect();
+
+    let type_counts_display: Vec<Element<TimeTravelMessage>> = type_counts_data
+        .into_iter()
         .map(|(event_type, count)| {
             row![
                 text(event_type).size(11),

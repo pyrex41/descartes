@@ -5,9 +5,14 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = []
+agent-runner = ["dep:descartes_agent_runner"]
+
 [dependencies]
 descartes-core = { path = "../core" }
 descartes-daemon = { path = "../daemon" }
+descartes_agent_runner = { package = "agent-runner", path = "../agent-runner", optional = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -17,7 +22,8 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 
 # GUI framework
-iced = { version = "0.13", features = ["debug", "tokio", "advanced"] }
+iced = { version = "0.13", features = ["debug", "tokio", "advanced", "canvas"] }
+futures = "0.3"
 
 [[bin]]
 name = "descartes-gui"
@@ -25,6 +31,7 @@ path = "src/main.rs"
 
 [dev-dependencies]
 criterion = "0.5"
+futures = "0.3"
 
 [[bench]]
 name = "swarm_monitor_bench"

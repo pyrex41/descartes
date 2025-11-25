@@ -637,7 +637,7 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
         button(
             text(badge_text)
                 .size(11)
-                .style(Color::from_rgb8(120, 200, 255)),
+                .color(Color::from_rgb8(120, 200, 255)),
         )
         .padding(2)
         .style(|theme: &Theme| button::Style {
@@ -680,7 +680,7 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
 
     // Recent file indicator
     let recent_icon = if is_recent && !is_selected {
-        text(" ⏱").size(11).style(Color::from_rgb8(150, 150, 150))
+        text(" ⏱").size(11).color(Color::from_rgb8(150, 150, 150))
     } else {
         text("")
     };
