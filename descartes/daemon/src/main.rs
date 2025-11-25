@@ -134,7 +134,7 @@ async fn main() -> anyhow::Result<()> {
     let server = RpcServer::new(config)?;
 
     // Setup signal handling for graceful shutdown
-    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
 
     let signal_handler = tokio::spawn(async move {
         let ctrl_c = async {
