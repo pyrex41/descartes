@@ -408,7 +408,7 @@ fn view_header(state: &CodePreviewState) -> Element<CodePreviewMessage> {
     let lang_badge = if let Some(ref lang) = state.language {
         text(format!("[{}]", lang))
             .size(12)
-            .style(Color::from_rgb8(100, 200, 255))
+            .color(Color::from_rgb8(100, 200, 255))
     } else {
         text("")
     };
@@ -428,7 +428,7 @@ fn view_header(state: &CodePreviewState) -> Element<CodePreviewMessage> {
             .align_y(iced::alignment::Vertical::Center),
             text(file_path)
                 .size(11)
-                .style(Color::from_rgb8(150, 150, 150)),
+                .color(Color::from_rgb8(150, 150, 150)),
         ]
         .spacing(5)
         .padding(10),
@@ -600,7 +600,7 @@ fn view_line<'a>(
     let line_num_text = if state.show_line_numbers {
         text(format!("{:4} ", line_num))
             .size(12)
-            .style(Color::from_rgb8(100, 100, 120))
+            .color(Color::from_rgb8(100, 100, 120))
     } else {
         text("")
     };
@@ -652,9 +652,9 @@ fn view_line<'a>(
             let annotation_view = container(
                 text(format!("💬 {}", annotation))
                     .size(11)
-                    .style(Color::from_rgb8(200, 200, 100)),
+                    .color(Color::from_rgb8(200, 200, 100)),
             )
-            .padding([2, 2, 2, 30])
+            .padding(iced::Padding::default().top(2.0).right(2.0).bottom(2.0).left(30.0))
             .style(|_theme: &Theme| container::Style {
                 background: Some(Color::from_rgba8(100, 100, 50, 0.3).into()),
                 border: iced::Border::default(),
@@ -710,7 +710,7 @@ fn view_file_column<'a>(
             .font(iced::Font::MONOSPACE);
 
         content = content.push(container(line_view).padding(2).width(Length::Fill).style(
-            |_theme: &Theme| {
+            move |_theme: &Theme| {
                 let bg = if idx % 2 == 0 {
                     Color::from_rgb8(35, 35, 45)
                 } else {

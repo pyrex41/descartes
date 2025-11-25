@@ -1,5 +1,5 @@
-use iced::mouse;
-use iced::widget::canvas::{Cache, Canvas, Cursor, Frame, Geometry, Path, Stroke, Style, Text};
+use iced::mouse::{self, Cursor};
+use iced::widget::canvas::{Cache, Canvas, Frame, Geometry, Path, Stroke, Style, Text};
 /// DAG Editor - Visual graph editor for task dependencies
 /// Phase 3.8.3: Basic Iced UI Renderer
 ///
@@ -16,7 +16,7 @@ use iced::widget::canvas::{Cache, Canvas, Cursor, Frame, Geometry, Path, Stroke,
 use iced::widget::{button, canvas, column, container, row, scrollable, text, Scrollable, Space};
 use iced::{
     alignment::{Horizontal, Vertical},
-    Color, Element, Length, Point, Rectangle, Renderer, Size, Theme, Vector,
+    keyboard, Color, Element, Length, Point, Rectangle, Renderer, Size, Theme, Vector,
 };
 
 use descartes_core::dag::{
@@ -35,24 +35,24 @@ use crate::dag_canvas_interactions::{
 // Constants
 // ============================================================================
 
-const GRID_SIZE: f32 = 20.0;
-const NODE_WIDTH: f32 = 160.0;
-const NODE_HEIGHT: f32 = 60.0;
-const NODE_RADIUS: f32 = 8.0;
-const NODE_PADDING: f32 = 10.0;
-const EDGE_WIDTH: f32 = 2.0;
-const ARROW_SIZE: f32 = 10.0;
-const SELECTION_BORDER: f32 = 3.0;
-const MIN_ZOOM: f32 = 0.1;
-const MAX_ZOOM: f32 = 5.0;
-const ZOOM_STEP: f32 = 0.1;
+pub const GRID_SIZE: f32 = 20.0;
+pub const NODE_WIDTH: f32 = 160.0;
+pub const NODE_HEIGHT: f32 = 60.0;
+pub const NODE_RADIUS: f32 = 8.0;
+pub const NODE_PADDING: f32 = 10.0;
+pub const EDGE_WIDTH: f32 = 2.0;
+pub const ARROW_SIZE: f32 = 10.0;
+pub const SELECTION_BORDER: f32 = 3.0;
+pub const MIN_ZOOM: f32 = 0.1;
+pub const MAX_ZOOM: f32 = 5.0;
+pub const ZOOM_STEP: f32 = 0.1;
 
 // ============================================================================
 // State Management
 // ============================================================================
 
 /// Main DAG Editor State
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DAGEditorState {
     /// The DAG being edited
     pub dag: DAG,
@@ -86,6 +86,24 @@ pub struct DAGEditorState {
 
     /// Canvas cache for performance
     canvas_cache: Cache,
+}
+
+impl Clone for DAGEditorState {
+    fn clone(&self) -> Self {
+        Self {
+            dag: self.dag.clone(),
+            canvas_state: self.canvas_state.clone(),
+            ui_state: self.ui_state.clone(),
+            interaction: self.interaction.clone(),
+            extended_interaction: self.extended_interaction.clone(),
+            history: self.history.clone(),
+            tool: self.tool,
+            show_grid: self.show_grid,
+            snap_to_grid: self.snap_to_grid,
+            statistics: self.statistics.clone(),
+            canvas_cache: Cache::new(), // Create new cache on clone
+        }
+    }
 }
 
 /// Canvas view state (pan, zoom)
@@ -345,29 +363,19 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
 
         // New interaction handlers
         DAGEditorMessage::MousePressed(button, position, modifiers) => {
-            if let Some(result) = handle_mouse_press(
-                state,
-                &mut state.extended_interaction,
-                button,
-                position,
-                modifiers,
-            ) {
+            if let Some(result) = handle_mouse_press(state, button, position, modifiers) {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
 
         DAGEditorMessage::MouseReleased(button, position) => {
-            if let Some(result) =
-                handle_mouse_release(state, &mut state.extended_interaction, button, position)
-            {
+            if let Some(result) = handle_mouse_release(state, button, position) {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
 
         DAGEditorMessage::MouseMoved(position) => {
-            if let Some(result) =
-                handle_mouse_move(state, &mut state.extended_interaction, position)
-            {
+            if let Some(result) = handle_mouse_move(state, position) {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
@@ -379,15 +387,13 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
         }
 
         DAGEditorMessage::KeyPressed(key, modifiers) => {
-            if let Some(result) =
-                handle_key_press(state, &mut state.extended_interaction, key, modifiers)
-            {
+            if let Some(result) = handle_key_press(state, key, modifiers) {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
 
         DAGEditorMessage::KeyReleased(key) => {
-            if let Some(result) = handle_key_release(state, &mut state.extended_interaction, key) {
+            if let Some(result) = handle_key_release(state, key) {
                 update(state, DAGEditorMessage::InteractionResult(result));
             }
         }
@@ -987,7 +993,7 @@ fn draw_node(
     let node_rect = Path::rounded_rectangle(
         Point::new(x, y),
         Size::new(width, height),
-        NODE_RADIUS * canvas_state.zoom,
+        (NODE_RADIUS * canvas_state.zoom).into(),
     );
 
     frame.fill(&node_rect, node_color);
@@ -1103,7 +1109,7 @@ fn draw_arrow_head(
     let uy = dy / length;
 
     let arrow_size = ARROW_SIZE * zoom;
-    let arrow_angle = 0.5; // radians
+    let arrow_angle: f32 = 0.5; // radians
 
     // Calculate arrow points
     let p1_x = to_x - arrow_size * (ux * arrow_angle.cos() - uy * arrow_angle.sin());

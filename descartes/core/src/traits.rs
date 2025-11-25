@@ -170,14 +170,40 @@ pub struct AgentInfo {
 }
 
 /// Status of an agent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum AgentStatus {
+    /// Agent has been created but not yet started
     Idle,
+    /// Agent is initializing (loading context, setting up environment)
+    Initializing,
+    /// Agent is actively executing tasks
     Running,
+    /// Agent is actively thinking/reasoning (visible to monitoring UI)
+    Thinking,
+    /// Agent has been paused and can be resumed
     Paused,
+    /// Agent has completed its task successfully
     Completed,
+    /// Agent encountered an error and stopped
     Failed,
+    /// Agent was externally terminated (killed)
     Terminated,
+}
+
+impl std::fmt::Display for AgentStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AgentStatus::Idle => write!(f, "idle"),
+            AgentStatus::Initializing => write!(f, "initializing"),
+            AgentStatus::Running => write!(f, "running"),
+            AgentStatus::Thinking => write!(f, "thinking"),
+            AgentStatus::Paused => write!(f, "paused"),
+            AgentStatus::Completed => write!(f, "completed"),
+            AgentStatus::Failed => write!(f, "failed"),
+            AgentStatus::Terminated => write!(f, "terminated"),
+        }
+    }
 }
 
 /// Handle to control a running agent.

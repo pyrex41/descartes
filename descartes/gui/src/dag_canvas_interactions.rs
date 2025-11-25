@@ -109,15 +109,14 @@ impl Default for ExtendedInteractionState {
 /// Handle mouse button press
 pub fn handle_mouse_press(
     state: &mut DAGEditorState,
-    extended: &mut ExtendedInteractionState,
     button: Button,
     position: Point,
     modifiers: Modifiers,
 ) -> Option<InteractionResult> {
     match button {
-        Button::Left => handle_left_click(state, extended, position, modifiers),
-        Button::Right => handle_right_click(state, extended, position, modifiers),
-        Button::Middle => handle_middle_press(state, extended, position),
+        Button::Left => handle_left_click(state, position, modifiers),
+        Button::Right => handle_right_click(state, position, modifiers),
+        Button::Middle => handle_middle_press(state, position),
         _ => None,
     }
 }
@@ -125,7 +124,6 @@ pub fn handle_mouse_press(
 /// Handle left mouse button press
 fn handle_left_click(
     state: &mut DAGEditorState,
-    extended: &mut ExtendedInteractionState,
     position: Point,
     modifiers: Modifiers,
 ) -> Option<InteractionResult> {
@@ -166,14 +164,14 @@ fn handle_left_click(
                     start_cursor: position,
                 });
 
-                extended.pre_drag_positions = start_positions;
+                state.extended_interaction.pre_drag_positions = start_positions;
                 state.clear_cache();
 
                 Some(InteractionResult::NodeDragStarted)
             } else {
                 // Start box selection
                 state.interaction.selected_nodes.clear();
-                extended.box_selection = Some(BoxSelection::new(position));
+                state.extended_interaction.box_selection = Some(BoxSelection::new(position));
                 state.clear_cache();
 
                 Some(InteractionResult::BoxSelectionStarted)
@@ -206,7 +204,7 @@ fn handle_left_click(
         Tool::AddEdge => {
             // Start edge creation from this node
             if let Some(from_node) = find_node_at_position(state, position) {
-                extended.edge_creation = Some(EdgeCreation {
+                state.extended_interaction.edge_creation = Some(EdgeCreation {
                     from_node,
                     current_pos: position,
                     hover_target: None,
@@ -252,7 +250,6 @@ fn handle_left_click(
 /// Handle right mouse button press
 fn handle_right_click(
     state: &mut DAGEditorState,
-    _extended: &mut ExtendedInteractionState,
     position: Point,
     _modifiers: Modifiers,
 ) -> Option<InteractionResult> {
@@ -267,7 +264,6 @@ fn handle_right_click(
 /// Handle middle mouse button press (start panning)
 fn handle_middle_press(
     state: &mut DAGEditorState,
-    _extended: &mut ExtendedInteractionState,
     position: Point,
 ) -> Option<InteractionResult> {
     state.interaction.pan_state = Some(PanState {
@@ -281,12 +277,11 @@ fn handle_middle_press(
 /// Handle mouse button release
 pub fn handle_mouse_release(
     state: &mut DAGEditorState,
-    extended: &mut ExtendedInteractionState,
     button: Button,
     position: Point,
 ) -> Option<InteractionResult> {
     match button {
-        Button::Left => handle_left_release(state, extended, position),
+        Button::Left => handle_left_release(state, position),
         Button::Middle => handle_middle_release(state),
         _ => None,
     }
@@ -295,7 +290,6 @@ pub fn handle_mouse_release(
 /// Handle left mouse button release
 fn handle_left_release(
     state: &mut DAGEditorState,
-    extended: &mut ExtendedInteractionState,
     position: Point,
 ) -> Option<InteractionResult> {
     // Handle drag end
@@ -309,13 +303,13 @@ fn handle_left_release(
         }
 
         state.clear_cache();
-        extended.pre_drag_positions.clear();
+        state.extended_interaction.pre_drag_positions.clear();
 
         return Some(InteractionResult::NodeDragEnded(new_positions));
     }
 
     // Handle box selection end
-    if let Some(box_sel) = extended.box_selection.take() {
+    if let Some(box_sel) = state.extended_interaction.box_selection.take() {
         let rect = box_sel.rectangle();
 
         // Find all nodes within the box
@@ -344,7 +338,7 @@ fn handle_left_release(
     }
 
     // Handle edge creation end
-    if let Some(edge_create) = extended.edge_creation.take() {
+    if let Some(edge_create) = state.extended_interaction.edge_creation.take() {
         if let Some(to_node) = find_node_at_position(state, position) {
             // Create edge if not connecting to self
             if to_node != edge_create.from_node {
@@ -387,7 +381,6 @@ fn handle_middle_release(state: &mut DAGEditorState) -> Option<InteractionResult
 /// Handle mouse move
 pub fn handle_mouse_move(
     state: &mut DAGEditorState,
-    extended: &mut ExtendedInteractionState,
     position: Point,
 ) -> Option<InteractionResult> {
     // Update hover state
@@ -425,16 +418,21 @@ pub fn handle_mouse_move(
     }
 
     // Handle box selection
-    if let Some(ref mut box_sel) = extended.box_selection {
+    if let Some(ref mut box_sel) = state.extended_interaction.box_selection {
         box_sel.current = position;
         state.clear_cache();
         return Some(InteractionResult::BoxSelectionUpdated);
     }
 
     // Handle edge creation preview
-    if let Some(ref mut edge_create) = extended.edge_creation {
-        edge_create.current_pos = position;
-        edge_create.hover_target = find_node_at_position(state, position);
+    if state.extended_interaction.edge_creation.is_some() {
+        // Calculate hover_target first while state is only borrowed immutably
+        let hover_target = find_node_at_position(state, position);
+        // Now mutate
+        if let Some(ref mut edge_create) = state.extended_interaction.edge_creation {
+            edge_create.current_pos = position;
+            edge_create.hover_target = hover_target;
+        }
         state.clear_cache();
         return Some(InteractionResult::EdgeCreationUpdated);
     }
@@ -456,7 +454,7 @@ pub fn handle_mouse_move(
     }
 
     // Handle space+drag panning
-    if extended.space_held && state.tool == Tool::Select {
+    if state.extended_interaction.space_held && state.tool == Tool::Select {
         // Similar to middle mouse panning
         // This would be initiated when space is pressed
     }
@@ -511,13 +509,12 @@ pub fn handle_mouse_scroll(
 /// Handle keyboard press
 pub fn handle_key_press(
     state: &mut DAGEditorState,
-    extended: &mut ExtendedInteractionState,
     key: Key,
     modifiers: Modifiers,
 ) -> Option<InteractionResult> {
     match key {
         Key::Named(iced::keyboard::key::Named::Space) => {
-            extended.space_held = true;
+            state.extended_interaction.space_held = true;
             None
         }
 
@@ -566,8 +563,8 @@ pub fn handle_key_press(
             // Cancel current operation
             state.interaction.drag_state = None;
             state.interaction.pan_state = None;
-            extended.box_selection = None;
-            extended.edge_creation = None;
+            state.extended_interaction.box_selection = None;
+            state.extended_interaction.edge_creation = None;
             state.clear_cache();
 
             Some(InteractionResult::OperationCancelled)
@@ -579,13 +576,12 @@ pub fn handle_key_press(
 
 /// Handle keyboard release
 pub fn handle_key_release(
-    _state: &mut DAGEditorState,
-    extended: &mut ExtendedInteractionState,
+    state: &mut DAGEditorState,
     key: Key,
 ) -> Option<InteractionResult> {
     match key {
         Key::Named(iced::keyboard::key::Named::Space) => {
-            extended.space_held = false;
+            state.extended_interaction.space_held = false;
             None
         }
         _ => None,

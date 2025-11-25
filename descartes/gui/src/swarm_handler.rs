@@ -6,7 +6,7 @@
 use chrono::{DateTime, Utc};
 use descartes_core::agent_stream_parser::StreamHandler;
 use descartes_core::AgentRuntimeState;
-use descartes_core::{AgentError, AgentProgress, AgentStatus, LifecycleEvent, OutputStream, RuntimeAgentError, RuntimeAgentStatus};
+use descartes_core::{AgentProgress, LifecycleEvent, OutputStream, RuntimeAgentError, RuntimeAgentStatus};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
@@ -107,7 +107,7 @@ impl StreamHandler for GuiStreamHandler {
                 .ok();
 
             // Clear thought if transitioning out of Thinking state
-            if agent.status != AgentStatus::Thinking {
+            if agent.status != RuntimeAgentStatus::Thinking {
                 agent.clear_thought();
             }
         });
@@ -118,9 +118,9 @@ impl StreamHandler for GuiStreamHandler {
             agent.update_thought(thought);
 
             // Auto-transition to Thinking state if not already
-            if agent.status != AgentStatus::Thinking {
+            if agent.status != RuntimeAgentStatus::Thinking {
                 agent
-                    .transition_to(AgentStatus::Thinking, Some("Thought detected".to_string()))
+                    .transition_to(RuntimeAgentStatus::Thinking, Some("Thought detected".to_string()))
                     .ok();
             }
         });
@@ -152,20 +152,20 @@ impl StreamHandler for GuiStreamHandler {
         self.update_agent(agent_id, |agent| {
             agent.set_error(error.clone());
             agent
-                .transition_to(AgentStatus::Failed, Some(error.message.clone()))
+                .transition_to(RuntimeAgentStatus::Failed, Some(error.message.clone()))
                 .ok();
         });
     }
 
     fn on_lifecycle(&mut self, agent_id: Uuid, event: LifecycleEvent, _timestamp: DateTime<Utc>) {
         let status = match event {
-            LifecycleEvent::Spawned => AgentStatus::Idle,
-            LifecycleEvent::Started => AgentStatus::Initializing,
-            LifecycleEvent::Paused => AgentStatus::Paused,
-            LifecycleEvent::Resumed => AgentStatus::Running,
-            LifecycleEvent::Completed => AgentStatus::Completed,
-            LifecycleEvent::Failed => AgentStatus::Failed,
-            LifecycleEvent::Terminated => AgentStatus::Terminated,
+            LifecycleEvent::Spawned => RuntimeAgentStatus::Idle,
+            LifecycleEvent::Started => RuntimeAgentStatus::Initializing,
+            LifecycleEvent::Paused => RuntimeAgentStatus::Paused,
+            LifecycleEvent::Resumed => RuntimeAgentStatus::Running,
+            LifecycleEvent::Completed => RuntimeAgentStatus::Completed,
+            LifecycleEvent::Failed => RuntimeAgentStatus::Failed,
+            LifecycleEvent::Terminated => RuntimeAgentStatus::Terminated,
         };
 
         self.update_agent(agent_id, |agent| {
@@ -202,7 +202,7 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "anthropic".to_string(),
     );
     agent1
-        .transition_to(AgentStatus::Running, Some("Analyzing files".to_string()))
+        .transition_to(RuntimeAgentStatus::Running, Some("Analyzing files".to_string()))
         .ok();
     agent1.update_progress(AgentProgress::with_steps(15, 30));
     agents.insert(agent1_id, agent1);
@@ -216,7 +216,7 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "anthropic".to_string(),
     );
     agent2
-        .transition_to(AgentStatus::Thinking, Some("Processing".to_string()))
+        .transition_to(RuntimeAgentStatus::Thinking, Some("Processing".to_string()))
         .ok();
     agent2.update_thought(
         "Evaluating different approaches to optimize the sorting algorithm...".to_string(),
@@ -233,7 +233,7 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "openai".to_string(),
     );
     agent3
-        .transition_to(AgentStatus::Thinking, Some("Planning".to_string()))
+        .transition_to(RuntimeAgentStatus::Thinking, Some("Planning".to_string()))
         .ok();
     agent3.update_thought(
         "Considering RESTful design patterns and best practices for the API structure..."
@@ -249,11 +249,11 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Run integration tests".to_string(),
         "anthropic".to_string(),
     );
-    agent4.transition_to(AgentStatus::Initializing, None).ok();
-    agent4.transition_to(AgentStatus::Running, None).ok();
+    agent4.transition_to(RuntimeAgentStatus::Initializing, None).ok();
+    agent4.transition_to(RuntimeAgentStatus::Running, None).ok();
     agent4
         .transition_to(
-            AgentStatus::Paused,
+            RuntimeAgentStatus::Paused,
             Some("User requested pause".to_string()),
         )
         .ok();
@@ -268,10 +268,10 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Generate documentation".to_string(),
         "anthropic".to_string(),
     );
-    agent5.transition_to(AgentStatus::Running, None).ok();
+    agent5.transition_to(RuntimeAgentStatus::Running, None).ok();
     agent5
         .transition_to(
-            AgentStatus::Completed,
+            RuntimeAgentStatus::Completed,
             Some("Documentation complete".to_string()),
         )
         .ok();
@@ -286,13 +286,13 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Migrate database schema".to_string(),
         "anthropic".to_string(),
     );
-    agent6.transition_to(AgentStatus::Running, None).ok();
-    agent6.set_error(AgentError::new(
+    agent6.transition_to(RuntimeAgentStatus::Running, None).ok();
+    agent6.set_error(RuntimeAgentError::new(
         "CONNECTION_FAILED".to_string(),
         "Failed to connect to database: connection timeout".to_string(),
     ));
     agent6
-        .transition_to(AgentStatus::Failed, Some("Connection error".to_string()))
+        .transition_to(RuntimeAgentStatus::Failed, Some("Connection error".to_string()))
         .ok();
     agents.insert(agent6_id, agent6);
 
@@ -315,7 +315,7 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "anthropic".to_string(),
     );
     agent8
-        .transition_to(AgentStatus::Initializing, Some("Loading data".to_string()))
+        .transition_to(RuntimeAgentStatus::Initializing, Some("Loading data".to_string()))
         .ok();
     agents.insert(agent8_id, agent8);
 
@@ -327,7 +327,7 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Refactor legacy code".to_string(),
         "openai".to_string(),
     );
-    agent9.transition_to(AgentStatus::Running, None).ok();
+    agent9.transition_to(RuntimeAgentStatus::Running, None).ok();
     agent9.update_progress(AgentProgress::with_steps(8, 12));
     agents.insert(agent9_id, agent9);
 
@@ -339,7 +339,7 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Audit security vulnerabilities".to_string(),
         "anthropic".to_string(),
     );
-    agent10.transition_to(AgentStatus::Thinking, None).ok();
+    agent10.transition_to(RuntimeAgentStatus::Thinking, None).ok();
     agent10.update_thought("Analyzing authentication flows for potential security vulnerabilities, checking for SQL injection, XSS, and CSRF attack vectors...".to_string());
     agent10.update_progress(AgentProgress::new(62.5));
     agents.insert(agent10_id, agent10);

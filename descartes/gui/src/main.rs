@@ -776,7 +776,7 @@ impl DescartesGui {
             // Create event subscription using the event handler
             let event_handler_arc = self.event_handler.as_ref().unwrap().clone();
 
-            iced::subscription::channel("daemon_events", 100, move |mut output| {
+            iced::Subscription::run_with_id("daemon_events", iced::stream::channel(100, move |mut output| {
                 let event_handler_arc = event_handler_arc.clone();
                 async move {
                     // This is a simplified subscription - in a real implementation,
@@ -788,7 +788,7 @@ impl DescartesGui {
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     }
                 }
-            })
+            }))
         } else {
             iced::Subscription::none()
         };
@@ -813,7 +813,7 @@ impl DescartesGui {
         };
 
         let status_indicator = row![
-            text("●").size(16).style(status_color),
+            text("●").size(16).color(status_color),
             Space::with_width(5),
             text(format!("Daemon: {}", status_text)).size(14),
         ]

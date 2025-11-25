@@ -7,6 +7,7 @@ use descartes_daemon::{
     DescartesEvent, EventClient, EventClientBuilder, EventClientConfig, EventClientState,
     EventFilter,
 };
+use futures::SinkExt;
 use iced::Task;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -71,10 +72,7 @@ impl EventHandler {
     /// Connect to the daemon event stream
     ///
     /// Returns an Iced Task that connects and starts listening for events
-    pub fn connect<Message>(&mut self) -> Task<Message>
-    where
-        Message: 'static + Send,
-    {
+    pub fn connect(&mut self) -> Task<()> {
         let (client, rx) = EventClient::new(self.config.clone());
         let client = Arc::new(client);
 
@@ -107,7 +105,7 @@ impl EventHandler {
         let event_rx = Arc::clone(&self.event_rx);
         let state = Arc::clone(&self.state);
 
-        iced::subscription::channel("event_stream", 100, move |mut output| {
+        iced::Subscription::run_with_id("event_stream", iced::stream::channel(100, move |mut output| {
             let event_rx = Arc::clone(&event_rx);
             let state = Arc::clone(&state);
             let f = f.clone();
@@ -143,7 +141,7 @@ impl EventHandler {
                 std::future::pending::<()>().await;
                 unreachable!()
             }
-        })
+        }))
     }
 
     /// Disconnect from the event stream

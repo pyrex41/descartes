@@ -520,21 +520,22 @@ fn view_kanban_board(state: &TaskBoardState) -> Element<TaskBoardMessage> {
 }
 
 /// Render a single Kanban column
-fn view_kanban_column<'a>(
+fn view_kanban_column(
     title: &str,
     tasks: &[Task],
     state: &TaskBoardState,
     color: Color,
-) -> Element<'a, TaskBoardMessage> {
-    let header = container(text(title).size(18))
+) -> Element<'static, TaskBoardMessage> {
+    let title_owned = title.to_string();
+    let header = container(text(title_owned).size(18))
         .width(Length::Fill)
         .padding(10)
-        .style(move |theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(color.into()),
             border: iced::Border {
                 width: 0.0,
                 color: Color::TRANSPARENT,
-                radius: [4.0, 4.0, 0.0, 0.0].into(),
+                radius: 4.0.into(),
             },
             ..Default::default()
         });
@@ -550,7 +551,7 @@ fn view_kanban_column<'a>(
     // Create task cards
     let mut card_column = Column::new().spacing(8).padding(10);
 
-    for task in sorted_tasks.iter() {
+    for task in sorted_tasks.into_iter() {
         card_column = card_column.push(view_task_card(task, state));
     }
 
@@ -566,7 +567,7 @@ fn view_kanban_column<'a>(
     container(column_content)
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(color!(0x1e1e1e).into()),
             border: iced::Border {
                 width: 1.0,
@@ -579,11 +580,11 @@ fn view_kanban_column<'a>(
 }
 
 /// Render a task card
-fn view_task_card<'a>(task: &Task, state: &TaskBoardState) -> Element<'a, TaskBoardMessage> {
+fn view_task_card(task: Task, state: &TaskBoardState) -> Element<'static, TaskBoardMessage> {
     let is_selected = state.selected_task.as_ref() == Some(&task.id);
 
     // Title
-    let title = text(&task.title).size(14).color(if is_selected {
+    let title = text(task.title.clone()).size(14).color(if is_selected {
         color!(0xffffff)
     } else {
         color!(0xdddddd)

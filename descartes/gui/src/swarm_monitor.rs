@@ -15,7 +15,7 @@
 //! - **Error Display**: Clear error messages for failed agents
 //! - **Timeline View**: Status transition history
 
-use descartes_core::{AgentError, AgentProgress, AgentRuntimeState, AgentStatus, StatusTransition};
+use descartes_core::{AgentProgress, AgentRuntimeState, RuntimeAgentError, RuntimeAgentStatus, StatusTransition};
 use iced::widget::rule;
 use iced::widget::{
     button, column, container, progress_bar, row, scrollable, text, text_input, Space,
@@ -194,7 +194,7 @@ impl SwarmMonitorState {
                 vec![("All Agents".to_string(), filtered)]
             }
             GroupingMode::ByStatus => {
-                let mut groups: HashMap<AgentStatus, Vec<&AgentRuntimeState>> = HashMap::new();
+                let mut groups: HashMap<RuntimeAgentStatus, Vec<&AgentRuntimeState>> = HashMap::new();
                 for agent in filtered {
                     groups
                         .entry(agent.status)
@@ -246,8 +246,8 @@ impl SwarmMonitorState {
             }
 
             match agent.status {
-                AgentStatus::Completed => total_completed += 1,
-                AgentStatus::Failed => total_failed += 1,
+                RuntimeAgentStatus::Completed => total_completed += 1,
+                RuntimeAgentStatus::Failed => total_failed += 1,
                 _ => {}
             }
 
@@ -384,7 +384,7 @@ impl SwarmMonitorState {
             AgentEvent::AgentCompleted { agent_id } => {
                 if let Some(agent) = self.agents.get_mut(&agent_id) {
                     agent
-                        .transition_to(AgentStatus::Completed, Some("Agent completed".to_string()))
+                        .transition_to(RuntimeAgentStatus::Completed, Some("Agent completed".to_string()))
                         .ok();
                 }
             }
@@ -392,7 +392,7 @@ impl SwarmMonitorState {
                 if let Some(agent) = self.agents.get_mut(&agent_id) {
                     agent.set_error(error);
                     agent
-                        .transition_to(AgentStatus::Failed, Some("Agent failed".to_string()))
+                        .transition_to(RuntimeAgentStatus::Failed, Some("Agent failed".to_string()))
                         .ok();
                 }
             }
@@ -427,7 +427,7 @@ pub enum AgentEvent {
     },
     AgentStatusChanged {
         agent_id: Uuid,
-        status: AgentStatus,
+        status: RuntimeAgentStatus,
     },
     AgentThoughtUpdate {
         agent_id: Uuid,
@@ -442,7 +442,7 @@ pub enum AgentEvent {
     },
     AgentFailed {
         agent_id: Uuid,
-        error: AgentError,
+        error: RuntimeAgentError,
     },
     AgentTerminated {
         agent_id: Uuid,
@@ -483,7 +483,7 @@ pub struct PerformanceStats {
 #[derive(Debug, Clone)]
 pub struct SwarmStatistics {
     pub total_agents: usize,
-    pub status_counts: HashMap<AgentStatus, usize>,
+    pub status_counts: HashMap<RuntimeAgentStatus, usize>,
     pub total_active: usize,
     pub total_completed: usize,
     pub total_failed: usize,
@@ -513,13 +513,13 @@ impl AgentFilter {
         match self {
             AgentFilter::All => true,
             AgentFilter::Active => agent.is_active(),
-            AgentFilter::Idle => agent.status == AgentStatus::Idle,
-            AgentFilter::Running => agent.status == AgentStatus::Running,
-            AgentFilter::Thinking => agent.status == AgentStatus::Thinking,
-            AgentFilter::Paused => agent.status == AgentStatus::Paused,
-            AgentFilter::Completed => agent.status == AgentStatus::Completed,
-            AgentFilter::Failed => agent.status == AgentStatus::Failed,
-            AgentFilter::Terminated => agent.status == AgentStatus::Terminated,
+            AgentFilter::Idle => agent.status == RuntimeAgentStatus::Idle,
+            AgentFilter::Running => agent.status == RuntimeAgentStatus::Running,
+            AgentFilter::Thinking => agent.status == RuntimeAgentStatus::Thinking,
+            AgentFilter::Paused => agent.status == RuntimeAgentStatus::Paused,
+            AgentFilter::Completed => agent.status == RuntimeAgentStatus::Completed,
+            AgentFilter::Failed => agent.status == RuntimeAgentStatus::Failed,
+            AgentFilter::Terminated => agent.status == RuntimeAgentStatus::Terminated,
         }
     }
 
@@ -810,7 +810,7 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
     let fps_text =
         text(format!("FPS: {:.1}", perf_stats.fps))
             .size(12)
-            .style(if perf_stats.is_acceptable {
+            .color(if perf_stats.is_acceptable {
                 Color::from_rgb(0.3, 0.8, 0.3)
             } else {
                 Color::from_rgb(0.9, 0.5, 0.3)
@@ -821,14 +821,14 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
         perf_stats.avg_frame_time_ms, perf_stats.max_frame_time_ms
     ))
     .size(11)
-    .style(Color::from_rgb(0.7, 0.7, 0.8));
+    .color(Color::from_rgb(0.7, 0.7, 0.8));
 
     let agent_count_text = text(format!(
         "Agents: {} ({} active)",
         perf_stats.total_agents, perf_stats.active_agents
     ))
     .size(11)
-    .style(Color::from_rgb(0.7, 0.7, 0.8));
+    .color(Color::from_rgb(0.7, 0.7, 0.8));
 
     let perf_col = column![fps_text, frame_time_text, agent_count_text]
         .spacing(3)
@@ -867,22 +867,22 @@ fn view_statistics_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessa
 
     let total = stat_box(
         "Total",
-        &stats.total_agents.to_string(),
+        stats.total_agents.to_string(),
         Color::from_rgb(0.4, 0.4, 0.9),
     );
     let active = stat_box(
         "Active",
-        &stats.total_active.to_string(),
+        stats.total_active.to_string(),
         Color::from_rgb(0.3, 0.8, 0.3),
     );
     let completed = stat_box(
         "Completed",
-        &stats.total_completed.to_string(),
+        stats.total_completed.to_string(),
         Color::from_rgb(0.5, 0.5, 0.5),
     );
     let failed = stat_box(
         "Failed",
-        &stats.total_failed.to_string(),
+        stats.total_failed.to_string(),
         Color::from_rgb(0.9, 0.3, 0.3),
     );
 
@@ -891,7 +891,7 @@ fn view_statistics_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessa
     } else {
         "N/A".to_string()
     };
-    let avg_time_box = stat_box("Avg Time", &avg_time, Color::from_rgb(0.7, 0.5, 0.9));
+    let avg_time_box = stat_box("Avg Time", avg_time, Color::from_rgb(0.7, 0.5, 0.9));
 
     let stats_row = row![total, active, completed, failed, avg_time_box]
         .spacing(15)
@@ -912,9 +912,9 @@ fn view_statistics_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessa
 }
 
 /// Create a stat box widget
-fn stat_box(label: &str, value: &str, color: Color) -> Element<SwarmMonitorMessage> {
-    let label_text = text(label).size(12);
-    let value_text = text(value).size(24).style(color);
+fn stat_box(label: impl Into<String>, value: impl Into<String>, color: Color) -> Element<'static, SwarmMonitorMessage> {
+    let label_text = text(label.into()).size(12);
+    let value_text = text(value.into()).size(24).color(color);
 
     let content = column![label_text, value_text]
         .spacing(5)
@@ -923,7 +923,7 @@ fn stat_box(label: &str, value: &str, color: Color) -> Element<SwarmMonitorMessa
     container(content)
         .padding(10)
         .width(Length::Fill)
-        .style(|theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.8).into()),
             border: iced::Border {
                 width: 1.0,
@@ -1093,7 +1093,7 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
         return container(
             text("No agents found")
                 .size(18)
-                .style(Color::from_rgb(0.6, 0.6, 0.6)),
+                .color(Color::from_rgb(0.6, 0.6, 0.6)),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -1109,9 +1109,9 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
         }
 
         // Group header
-        let header = text(&group_name)
+        let header = text(group_name)
             .size(20)
-            .style(Color::from_rgb(0.8, 0.8, 0.9));
+            .color(Color::from_rgb(0.8, 0.8, 0.9));
 
         content = content.push(header);
 
@@ -1129,10 +1129,9 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
                     current_row.push(Space::with_width(Length::FillPortion(1)).into());
                 }
 
-                let grid_row = row(current_row.clone()).spacing(15).width(Length::Fill);
+                let grid_row = row(std::mem::take(&mut current_row)).spacing(15).width(Length::Fill);
 
                 agent_elements.push(grid_row.into());
-                current_row.clear();
             }
         }
 
@@ -1150,11 +1149,11 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
 fn view_agent_card(
     agent: &AgentRuntimeState,
     state: &SwarmMonitorState,
-) -> Element<SwarmMonitorMessage> {
+) -> Element<'static, SwarmMonitorMessage> {
     let status_color = get_status_color(agent.status);
     let status_badge = container(text(agent.status.to_string().to_uppercase()).size(10))
         .padding(4)
-        .style(move |theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(status_color.into()),
             border: iced::Border {
                 width: 1.0,
@@ -1166,10 +1165,11 @@ fn view_agent_card(
         });
 
     // Agent name and ID
-    let name_text = text(&agent.name).size(16).style(Color::WHITE);
-    let id_text = text(format!("ID: {}", &agent.agent_id.to_string()[..8]))
+    let name_text = text(agent.name.clone()).size(16).color(Color::WHITE);
+    let agent_id_str = agent.agent_id.to_string();
+    let id_text = text(format!("ID: {}", &agent_id_str[..8.min(agent_id_str.len())]))
         .size(10)
-        .style(Color::from_rgb(0.6, 0.6, 0.7));
+        .color(Color::from_rgb(0.6, 0.6, 0.7));
 
     let header = row![name_text, Space::with_width(Length::Fill), status_badge]
         .spacing(10)
@@ -1178,27 +1178,28 @@ fn view_agent_card(
     let mut card_content = column![header, id_text].spacing(8);
 
     // Task
-    let task_text = text(&agent.task)
+    let task_text = text(agent.task.clone())
         .size(12)
-        .style(Color::from_rgb(0.8, 0.8, 0.85));
+        .color(Color::from_rgb(0.8, 0.8, 0.85));
     card_content = card_content.push(Space::with_height(5)).push(task_text);
 
     // Thinking state with animated bubble
-    if agent.status == AgentStatus::Thinking {
+    if agent.status == RuntimeAgentStatus::Thinking {
         if let Some(thought) = &agent.current_thought {
             let thinking_icon = text("💭").size(16);
-            let thought_text = text(thought).size(12).style(Color::from_rgb(0.5, 0.8, 1.0));
+            let thought_text = text(thought.clone()).size(12).color(Color::from_rgb(0.5, 0.8, 1.0));
 
             let thinking_row = row![thinking_icon, thought_text]
                 .spacing(8)
                 .align_y(alignment::Vertical::Center);
 
+            let animation_phase = state.animation_phase;
             let thinking_container = container(thinking_row)
                 .padding(8)
                 .width(Length::Fill)
-                .style(|theme: &Theme| {
+                .style(move |_theme: &Theme| {
                     // Animated pulsing effect
-                    let alpha = 0.3 + (state.animation_phase * 0.4);
+                    let alpha = 0.3 + (animation_phase * 0.4);
                     container::Style {
                         background: Some(Color::from_rgba(0.3, 0.6, 0.9, alpha).into()),
                         border: iced::Border {
@@ -1223,7 +1224,7 @@ fn view_agent_card(
 
         let progress_label = text(format!("{:.1}%", progress.percentage))
             .size(10)
-            .style(Color::from_rgb(0.7, 0.7, 0.8));
+            .color(Color::from_rgb(0.7, 0.7, 0.8));
 
         card_content = card_content
             .push(Space::with_height(8))
@@ -1235,9 +1236,9 @@ fn view_agent_card(
     // Error display
     if let Some(error) = &agent.error {
         let error_icon = text("⚠️").size(14);
-        let error_text = text(&error.message)
+        let error_text = text(error.message.clone())
             .size(11)
-            .style(Color::from_rgb(1.0, 0.3, 0.3));
+            .color(Color::from_rgb(1.0, 0.3, 0.3));
 
         let error_row = row![error_icon, error_text]
             .spacing(6)
@@ -1247,7 +1248,7 @@ fn view_agent_card(
             container(error_row)
                 .padding(6)
                 .width(Length::Fill)
-                .style(|theme: &Theme| container::Style {
+                .style(|_theme: &Theme| container::Style {
                     background: Some(Color::from_rgba(0.9, 0.2, 0.2, 0.2).into()),
                     border: iced::Border {
                         width: 1.0,
@@ -1271,19 +1272,20 @@ fn view_agent_card(
 
     let time_text = text(time_info)
         .size(10)
-        .style(Color::from_rgb(0.5, 0.5, 0.6));
+        .color(Color::from_rgb(0.5, 0.5, 0.6));
 
     card_content = card_content.push(Space::with_height(8)).push(time_text);
 
     // Make card clickable
+    let agent_id = agent.agent_id;
     let card_button = button(card_content)
         .width(Length::FillPortion(1))
         .padding(15)
-        .on_press(SwarmMonitorMessage::SelectAgent(agent.agent_id));
+        .on_press(SwarmMonitorMessage::SelectAgent(agent_id));
 
     container(card_button)
         .width(Length::FillPortion(1))
-        .style(|theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.8).into()),
             border: iced::Border {
                 width: 2.0,
@@ -1298,8 +1300,8 @@ fn view_agent_card(
 /// Render detailed view for a single agent
 fn view_agent_detail(
     agent: &AgentRuntimeState,
-    state: &SwarmMonitorState,
-) -> Element<SwarmMonitorMessage> {
+    _state: &SwarmMonitorState,
+) -> Element<'static, SwarmMonitorMessage> {
     let back_button = button(text("← Back to Grid").size(14))
         .padding(10)
         .on_press(SwarmMonitorMessage::DeselectAgent);
@@ -1307,10 +1309,10 @@ fn view_agent_detail(
     let status_color = get_status_color(agent.status);
 
     // Header
-    let name_text = text(&agent.name).size(24).style(Color::WHITE);
+    let name_text = text(agent.name.clone()).size(24).color(Color::WHITE);
     let status_badge = container(text(agent.status.to_string().to_uppercase()).size(12))
         .padding(8)
-        .style(move |theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(status_color.into()),
             border: iced::Border {
                 width: 1.0,
@@ -1328,55 +1330,55 @@ fn view_agent_detail(
     // Details section
     let mut details = column![]
         .spacing(10)
-        .push(detail_row("Agent ID", &agent.agent_id.to_string()))
-        .push(detail_row("Task", &agent.task))
-        .push(detail_row("Model", &agent.model_backend))
+        .push(detail_row("Agent ID", agent.agent_id.to_string()))
+        .push(detail_row("Task", agent.task.clone()))
+        .push(detail_row("Model", agent.model_backend.clone()))
         .push(detail_row(
             "Created",
-            &agent.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            agent.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
         ))
         .push(detail_row(
             "Updated",
-            &agent.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            agent.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
         ));
 
     if let Some(started) = agent.started_at {
         details = details.push(detail_row(
             "Started",
-            &started.format("%Y-%m-%d %H:%M:%S").to_string(),
+            started.format("%Y-%m-%d %H:%M:%S").to_string(),
         ));
     }
 
     if let Some(completed) = agent.completed_at {
         details = details.push(detail_row(
             "Completed",
-            &completed.format("%Y-%m-%d %H:%M:%S").to_string(),
+            completed.format("%Y-%m-%d %H:%M:%S").to_string(),
         ));
     }
 
     if let Some(exec_time) = agent.execution_time() {
         details = details.push(detail_row(
             "Execution Time",
-            &format!("{:.2}s", exec_time.num_seconds()),
+            format!("{:.2}s", exec_time.num_seconds()),
         ));
     }
 
     if let Some(pid) = agent.pid {
-        details = details.push(detail_row("PID", &pid.to_string()));
+        details = details.push(detail_row("PID", pid.to_string()));
     }
 
     // Current thought
     if let Some(thought) = &agent.current_thought {
         let thought_header = text("Current Thought:")
             .size(16)
-            .style(Color::from_rgb(0.8, 0.8, 0.9));
-        let thought_content = text(thought).size(14).style(Color::from_rgb(0.6, 0.8, 1.0));
+            .color(Color::from_rgb(0.8, 0.8, 0.9));
+        let thought_content = text(thought.clone()).size(14).color(Color::from_rgb(0.6, 0.8, 1.0));
 
         let thought_box =
             container(column![thought_header, Space::with_height(8), thought_content].spacing(5))
                 .padding(15)
                 .width(Length::Fill)
-                .style(|theme: &Theme| container::Style {
+                .style(|_theme: &Theme| container::Style {
                     background: Some(Color::from_rgba(0.2, 0.4, 0.6, 0.3).into()),
                     border: iced::Border {
                         width: 1.0,
@@ -1393,7 +1395,7 @@ fn view_agent_detail(
     if let Some(progress) = &agent.progress {
         let progress_header = text("Progress:")
             .size(16)
-            .style(Color::from_rgb(0.8, 0.8, 0.9));
+            .color(Color::from_rgb(0.8, 0.8, 0.9));
         let progress_value = progress.percentage / 100.0;
         let progress_bar_widget = progress_bar(0.0..=1.0, progress_value);
         let progress_label = text(format!("{:.1}%", progress.percentage)).size(14);
@@ -1413,7 +1415,7 @@ fn view_agent_detail(
 
         if let Some(msg) = &progress.message {
             progress_col =
-                progress_col.push(text(msg).size(12).style(Color::from_rgb(0.7, 0.7, 0.8)));
+                progress_col.push(text(msg.clone()).size(12).color(Color::from_rgb(0.7, 0.7, 0.8)));
         }
 
         details = details.push(Space::with_height(10)).push(progress_col);
@@ -1423,11 +1425,11 @@ fn view_agent_detail(
     if let Some(error) = &agent.error {
         let error_header = text("Error:")
             .size(16)
-            .style(Color::from_rgb(1.0, 0.4, 0.4));
+            .color(Color::from_rgb(1.0, 0.4, 0.4));
         let error_code = text(format!("Code: {}", error.code)).size(12);
-        let error_message = text(&error.message)
+        let error_message = text(error.message.clone())
             .size(14)
-            .style(Color::from_rgb(1.0, 0.5, 0.5));
+            .color(Color::from_rgb(1.0, 0.5, 0.5));
 
         let mut error_col = column![
             error_header,
@@ -1439,9 +1441,9 @@ fn view_agent_detail(
 
         if let Some(details_str) = &error.details {
             error_col = error_col.push(Space::with_height(5)).push(
-                text(details_str)
+                text(details_str.clone())
                     .size(11)
-                    .style(Color::from_rgb(0.8, 0.4, 0.4)),
+                    .color(Color::from_rgb(0.8, 0.4, 0.4)),
             );
         }
 
@@ -1449,7 +1451,7 @@ fn view_agent_detail(
             container(error_col)
                 .padding(15)
                 .width(Length::Fill)
-                .style(|theme: &Theme| container::Style {
+                .style(|_theme: &Theme| container::Style {
                     background: Some(Color::from_rgba(0.6, 0.2, 0.2, 0.3).into()),
                     border: iced::Border {
                         width: 1.0,
@@ -1465,7 +1467,7 @@ fn view_agent_detail(
     // Timeline
     let timeline_header = text("Status Timeline:")
         .size(16)
-        .style(Color::from_rgb(0.8, 0.8, 0.9));
+        .color(Color::from_rgb(0.8, 0.8, 0.9));
     let timeline = view_timeline(&agent.timeline);
 
     let content = column![
@@ -1488,9 +1490,9 @@ fn view_agent_detail(
 }
 
 /// Helper to create a detail row
-fn detail_row(label: &str, value: &str) -> Element<SwarmMonitorMessage> {
-    let label_text = text(label).size(12).style(Color::from_rgb(0.6, 0.6, 0.7));
-    let value_text = text(value).size(14).style(Color::from_rgb(0.9, 0.9, 0.95));
+fn detail_row(label: impl Into<String>, value: impl Into<String>) -> Element<'static, SwarmMonitorMessage> {
+    let label_text = text(label.into()).size(12).color(Color::from_rgb(0.6, 0.6, 0.7));
+    let value_text = text(value.into()).size(14).color(Color::from_rgb(0.9, 0.9, 0.95));
 
     row![container(label_text).width(150), value_text,]
         .spacing(20)
@@ -1499,7 +1501,7 @@ fn detail_row(label: &str, value: &str) -> Element<SwarmMonitorMessage> {
 }
 
 /// Render agent timeline
-fn view_timeline(timeline: &[StatusTransition]) -> Element<SwarmMonitorMessage> {
+fn view_timeline(timeline: &[StatusTransition]) -> Element<'static, SwarmMonitorMessage> {
     let mut timeline_col = column![].spacing(10);
 
     for transition in timeline.iter().rev() {
@@ -1513,14 +1515,14 @@ fn view_timeline(timeline: &[StatusTransition]) -> Element<SwarmMonitorMessage> 
 
         let time_text = text(transition.timestamp.format("%H:%M:%S").to_string())
             .size(11)
-            .style(Color::from_rgb(0.5, 0.5, 0.6));
+            .color(Color::from_rgb(0.5, 0.5, 0.6));
 
         let transition_text = text(format!("{} → {}", from_text, transition.to))
             .size(12)
-            .style(to_color);
+            .color(to_color);
 
         let reason_text = if let Some(reason) = &transition.reason {
-            text(reason).size(11).style(Color::from_rgb(0.6, 0.6, 0.7))
+            text(reason.clone()).size(11).color(Color::from_rgb(0.6, 0.6, 0.7))
         } else {
             text("").size(11)
         };
@@ -1541,7 +1543,7 @@ fn view_timeline(timeline: &[StatusTransition]) -> Element<SwarmMonitorMessage> 
     container(timeline_col)
         .padding(15)
         .width(Length::Fill)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.5).into()),
             border: iced::Border {
                 width: 1.0,
@@ -1558,16 +1560,16 @@ fn view_timeline(timeline: &[StatusTransition]) -> Element<SwarmMonitorMessage> 
 // ============================================================================
 
 /// Get color for agent status
-fn get_status_color(status: AgentStatus) -> Color {
+fn get_status_color(status: RuntimeAgentStatus) -> Color {
     match status {
-        AgentStatus::Idle => Color::from_rgb(0.5, 0.5, 0.5),
-        AgentStatus::Initializing => Color::from_rgb(0.5, 0.7, 0.9),
-        AgentStatus::Running => Color::from_rgb(0.3, 0.8, 0.3),
-        AgentStatus::Thinking => Color::from_rgb(0.5, 0.7, 1.0),
-        AgentStatus::Paused => Color::from_rgb(0.9, 0.7, 0.3),
-        AgentStatus::Completed => Color::from_rgb(0.4, 0.6, 0.4),
-        AgentStatus::Failed => Color::from_rgb(0.9, 0.3, 0.3),
-        AgentStatus::Terminated => Color::from_rgb(0.6, 0.3, 0.3),
+        RuntimeAgentStatus::Idle => Color::from_rgb(0.5, 0.5, 0.5),
+        RuntimeAgentStatus::Initializing => Color::from_rgb(0.5, 0.7, 0.9),
+        RuntimeAgentStatus::Running => Color::from_rgb(0.3, 0.8, 0.3),
+        RuntimeAgentStatus::Thinking => Color::from_rgb(0.5, 0.7, 1.0),
+        RuntimeAgentStatus::Paused => Color::from_rgb(0.9, 0.7, 0.3),
+        RuntimeAgentStatus::Completed => Color::from_rgb(0.4, 0.6, 0.4),
+        RuntimeAgentStatus::Failed => Color::from_rgb(0.9, 0.3, 0.3),
+        RuntimeAgentStatus::Terminated => Color::from_rgb(0.6, 0.3, 0.3),
     }
 }
 

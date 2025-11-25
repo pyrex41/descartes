@@ -26,7 +26,7 @@ pub use client::{RpcClient, RpcClientBuilder, RpcClientConfig};
 pub use config::DaemonConfig;
 pub use errors::{DaemonError, DaemonResult};
 pub use event_client::{EventClient, EventClientBuilder, EventClientConfig, EventClientState};
-pub use events::{AgentEvent, DescartesEvent, EventBus, EventFilter, SystemEvent, TaskEvent};
+pub use events::{AgentEvent, DescartesEvent, EventBus, EventFilter, SystemEvent, TaskEvent, TaskEventType};
 pub use rpc_agent_methods::{AgentMonitoringRpcImpl, AgentMonitoringRpcServer, AgentStatusFilter};
 pub use rpc_client::{UnixSocketRpcClient, UnixSocketRpcClientBuilder};
 pub use rpc_server::{ApprovalResult, DescartesRpcServer, TaskInfo, UnixSocketRpcServer};
