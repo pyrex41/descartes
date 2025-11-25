@@ -1,0 +1,15 @@
+# Descartes
+data/
+logs/
+backups/
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets
+config.toml
+secrets/
+
+# Cache
+cache/
+*.cache

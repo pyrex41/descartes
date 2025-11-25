@@ -6,7 +6,7 @@
 use chrono::{DateTime, Utc};
 use descartes_core::agent_stream_parser::StreamHandler;
 use descartes_core::AgentRuntimeState;
-use descartes_core::{AgentError, AgentProgress, AgentStatus, LifecycleEvent, OutputStream};
+use descartes_core::{AgentError, AgentProgress, AgentStatus, LifecycleEvent, OutputStream, RuntimeAgentError, RuntimeAgentStatus};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
@@ -100,7 +100,7 @@ impl Default for GuiStreamHandler {
 }
 
 impl StreamHandler for GuiStreamHandler {
-    fn on_status_update(&mut self, agent_id: Uuid, status: AgentStatus, _timestamp: DateTime<Utc>) {
+    fn on_status_update(&mut self, agent_id: Uuid, status: RuntimeAgentStatus, _timestamp: DateTime<Utc>) {
         self.update_agent(agent_id, |agent| {
             agent
                 .transition_to(status, Some("Status update from stream".to_string()))
@@ -148,7 +148,7 @@ impl StreamHandler for GuiStreamHandler {
         tracing::debug!("Agent {} {:?}: {}", agent_id, stream, content);
     }
 
-    fn on_error(&mut self, agent_id: Uuid, error: AgentError, _timestamp: DateTime<Utc>) {
+    fn on_error(&mut self, agent_id: Uuid, error: RuntimeAgentError, _timestamp: DateTime<Utc>) {
         self.update_agent(agent_id, |agent| {
             agent.set_error(error.clone());
             agent

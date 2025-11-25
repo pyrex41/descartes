@@ -605,7 +605,7 @@ impl<Message> canvas::Program<Message> for TimelineCanvas {
 
     fn draw(
         &self,
-        _state: &Self::State,
+        _state: &<Self as canvas::Program<Message>>::State,
         renderer: &Renderer,
         _theme: &Theme,
         bounds: Rectangle,
