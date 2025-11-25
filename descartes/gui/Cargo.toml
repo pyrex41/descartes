@@ -17,7 +17,7 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 
 # GUI framework
-iced = { version = "0.13", features = ["debug", "tokio", "advanced"] }
+iced = { version = "0.13", features = ["debug", "tokio", "advanced", "canvas"] }
 
 [[bin]]
 name = "descartes-gui"
@@ -25,6 +25,7 @@ path = "src/main.rs"
 
 [dev-dependencies]
 criterion = "0.5"
+futures = "0.3"
 
 [[bench]]
 name = "swarm_monitor_bench"
