@@ -61,6 +61,26 @@ pub enum DaemonError {
     #[error("Metrics error: {0}")]
     MetricsError(String),
 
+    /// Resource exhausted error (e.g., max sessions reached)
+    #[error("Resource exhausted: {0}")]
+    ResourceExhausted(String),
+
+    /// Authentication failed error
+    #[error("Authentication failed: {0}")]
+    AuthenticationFailed(String),
+
+    /// Agent pause error
+    #[error("Failed to pause agent: {0}")]
+    PauseError(String),
+
+    /// Agent resume error
+    #[error("Failed to resume agent: {0}")]
+    ResumeError(String),
+
+    /// Attach session error
+    #[error("Attach session error: {0}")]
+    AttachError(String),
+
     /// IO error
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
@@ -103,6 +123,15 @@ impl DaemonError {
                 (-32700, format!("Serialization error: {}", msg))
             }
             DaemonError::MetricsError(msg) => (-32008, format!("Metrics error: {}", msg)),
+            DaemonError::ResourceExhausted(msg) => {
+                (-32011, format!("Resource exhausted: {}", msg))
+            }
+            DaemonError::AuthenticationFailed(msg) => {
+                (-32012, format!("Authentication failed: {}", msg))
+            }
+            DaemonError::PauseError(msg) => (-32013, format!("Pause error: {}", msg)),
+            DaemonError::ResumeError(msg) => (-32014, format!("Resume error: {}", msg)),
+            DaemonError::AttachError(msg) => (-32015, format!("Attach error: {}", msg)),
             DaemonError::IoError(e) => (-32603, format!("IO error: {}", e)),
             DaemonError::Timeout => (-32009, "Operation timed out".to_string()),
             DaemonError::ConnectionError(msg) => (-32010, format!("Connection error: {}", msg)),
@@ -132,6 +161,11 @@ impl DaemonError {
             DaemonError::PoolError(_) => -32007,
             DaemonError::SerializationError(_) => -32700,
             DaemonError::MetricsError(_) => -32008,
+            DaemonError::ResourceExhausted(_) => -32011,
+            DaemonError::AuthenticationFailed(_) => -32012,
+            DaemonError::PauseError(_) => -32013,
+            DaemonError::ResumeError(_) => -32014,
+            DaemonError::AttachError(_) => -32015,
             DaemonError::IoError(_) => -32603,
             DaemonError::Timeout => -32009,
             DaemonError::ConnectionError(_) => -32010,

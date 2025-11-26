@@ -137,6 +137,18 @@ pub trait AgentRunner: Send + Sync {
 
     /// Send a signal to an agent.
     async fn signal(&self, agent_id: &Uuid, signal: AgentSignal) -> AgentResult<()>;
+
+    /// Pause a running agent.
+    ///
+    /// If `force` is false, sends a cooperative pause notification via stdin.
+    /// If `force` is true, uses SIGSTOP (Unix) to immediately freeze the process.
+    async fn pause(&self, agent_id: &Uuid, force: bool) -> AgentResult<()>;
+
+    /// Resume a paused agent.
+    ///
+    /// If the agent was force-paused, sends SIGCONT to unfreeze it.
+    /// Sends a resume notification via stdin.
+    async fn resume(&self, agent_id: &Uuid) -> AgentResult<()>;
 }
 
 /// Configuration for spawning an agent.
@@ -151,11 +163,13 @@ pub struct AgentConfig {
 }
 
 /// Signal to send to an agent.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentSignal {
-    Interrupt, // SIGINT
-    Terminate, // SIGTERM
-    Kill,      // SIGKILL
+    Interrupt,  // SIGINT - cooperative pause request
+    Terminate,  // SIGTERM - graceful shutdown
+    Kill,       // SIGKILL - force kill
+    ForcePause, // SIGSTOP - emergency freeze (Unix only)
+    Resume,     // SIGCONT - resume from forced pause
 }
 
 /// Information about a running agent.
@@ -167,6 +181,45 @@ pub struct AgentInfo {
     pub model_backend: String,
     pub started_at: std::time::SystemTime,
     pub task: String,
+    /// When the agent was paused (if currently paused)
+    #[serde(default)]
+    pub paused_at: Option<std::time::SystemTime>,
+    /// How the agent was paused (cooperative or forced)
+    #[serde(default)]
+    pub pause_mode: Option<PauseMode>,
+    /// Attachment info for connecting external TUIs
+    #[serde(default)]
+    pub attach_info: Option<AttachInfo>,
+}
+
+/// How an agent was paused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PauseMode {
+    /// Paused via stdin notification, agent acknowledged
+    Cooperative,
+    /// Paused via SIGSTOP, process frozen immediately
+    Forced,
+}
+
+impl std::fmt::Display for PauseMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PauseMode::Cooperative => write!(f, "cooperative"),
+            PauseMode::Forced => write!(f, "forced"),
+        }
+    }
+}
+
+/// Connection information for attaching an external TUI to a paused agent.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AttachInfo {
+    /// ZMQ endpoint URL for connecting (e.g., "ipc:///tmp/descartes-agent-xxx.sock")
+    pub connect_url: String,
+    /// Authentication token for the attach session
+    pub token: String,
+    /// Unix timestamp when the token expires
+    pub expires_at: i64,
 }
 
 /// Status of an agent.

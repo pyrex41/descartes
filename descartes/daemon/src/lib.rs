@@ -1,6 +1,7 @@
 /// Descartes Daemon: JSON-RPC 2.0 Server for Remote Agent Control
 /// Provides HTTP and WebSocket interfaces for managing agents, workflows, and state
 pub mod agent_monitor; // Phase 3:5.3 - Agent monitoring with RPC integration
+pub mod attach_session; // Attach session management for paused agents
 pub mod auth;
 pub mod client;
 pub mod config;
@@ -22,6 +23,10 @@ pub mod types;
 
 // Re-export commonly used types
 pub use agent_monitor::{AgentMonitor, AgentMonitorConfig, HealthSummary, MonitorStats};
+pub use attach_session::{
+    AttachCredentials, AttachSession, AttachSessionConfig, AttachSessionInfo, AttachSessionManager,
+    ClientType,
+};
 pub use client::{RpcClient, RpcClientBuilder, RpcClientConfig};
 pub use config::DaemonConfig;
 pub use errors::{DaemonError, DaemonResult};
