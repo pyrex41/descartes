@@ -3,6 +3,7 @@
 pub mod agent_monitor; // Phase 3:5.3 - Agent monitoring with RPC integration
 pub mod attach_session; // Attach session management for paused agents
 pub mod auth;
+pub mod claude_code_tui; // Claude Code TUI attachment handler (Phase 4)
 pub mod client;
 pub mod config;
 pub mod errors;
@@ -26,6 +27,9 @@ pub use agent_monitor::{AgentMonitor, AgentMonitorConfig, HealthSummary, Monitor
 pub use attach_session::{
     AttachCredentials, AttachSession, AttachSessionConfig, AttachSessionInfo, AttachSessionManager,
     ClientType,
+};
+pub use claude_code_tui::{
+    start_attach_server, ClaudeCodeTuiConfig, ClaudeCodeTuiHandler, OutputBuffer,
 };
 pub use client::{RpcClient, RpcClientBuilder, RpcClientConfig};
 pub use config::DaemonConfig;
