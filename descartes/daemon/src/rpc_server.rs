@@ -79,6 +79,66 @@ pub trait DescartesRpc {
     /// The current state
     #[method(name = "get_state")]
     async fn get_state(&self, entity_id: Option<String>) -> Result<Value, ErrorObjectOwned>;
+
+    /// Pause a running agent
+    ///
+    /// # Arguments
+    /// * `agent_id` - The ID of the agent to pause
+    /// * `force` - If true, use SIGSTOP (forced); otherwise use cooperative pause
+    ///
+    /// # Returns
+    /// Pause confirmation with timestamp and mode
+    #[method(name = "agent.pause")]
+    async fn pause_agent(
+        &self,
+        agent_id: String,
+        force: bool,
+    ) -> Result<PauseResult, ErrorObjectOwned>;
+
+    /// Resume a paused agent
+    ///
+    /// # Arguments
+    /// * `agent_id` - The ID of the agent to resume
+    ///
+    /// # Returns
+    /// Resume confirmation with timestamp
+    #[method(name = "agent.resume")]
+    async fn resume_agent(&self, agent_id: String) -> Result<ResumeResult, ErrorObjectOwned>;
+
+    /// Request attach credentials for a paused agent
+    ///
+    /// # Arguments
+    /// * `agent_id` - The ID of the agent to attach to
+    /// * `client_type` - The type of client requesting attachment (e.g., "claude-code")
+    ///
+    /// # Returns
+    /// Attach credentials including token and connect URL
+    #[method(name = "agent.attach.request")]
+    async fn attach_request(
+        &self,
+        agent_id: String,
+        client_type: String,
+    ) -> Result<AttachCredentialsResult, ErrorObjectOwned>;
+
+    /// Validate an attach token
+    ///
+    /// # Arguments
+    /// * `token` - The attach token to validate
+    ///
+    /// # Returns
+    /// Validation result including whether token is valid and associated agent
+    #[method(name = "agent.attach.validate")]
+    async fn attach_validate(&self, token: String) -> Result<AttachValidateResult, ErrorObjectOwned>;
+
+    /// Revoke an attach token
+    ///
+    /// # Arguments
+    /// * `token` - The attach token to revoke
+    ///
+    /// # Returns
+    /// Whether the token was successfully revoked
+    #[method(name = "agent.attach.revoke")]
+    async fn attach_revoke(&self, token: String) -> Result<AttachRevokeResult, ErrorObjectOwned>;
 }
 
 /// Task information
@@ -99,6 +159,44 @@ pub struct ApprovalResult {
     pub timestamp: i64,
 }
 
+/// Pause result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PauseResult {
+    pub agent_id: String,
+    pub paused_at: i64,
+    pub pause_mode: String,
+}
+
+/// Resume result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResumeResult {
+    pub agent_id: String,
+    pub resumed_at: i64,
+}
+
+/// Attach credentials result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachCredentialsResult {
+    pub agent_id: String,
+    pub token: String,
+    pub connect_url: String,
+    pub expires_at: i64,
+}
+
+/// Attach validate result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachValidateResult {
+    pub valid: bool,
+    pub agent_id: Option<String>,
+    pub expires_at: Option<i64>,
+}
+
+/// Attach revoke result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachRevokeResult {
+    pub revoked: bool,
+}
+
 /// Implementation of the RPC server
 pub struct RpcServerImpl {
     /// Agent runner for spawning and managing agents
@@ -107,6 +205,8 @@ pub struct RpcServerImpl {
     state_store: Arc<dyn descartes_core::traits::StateStore>,
     /// Mapping of agent IDs (String -> Uuid) for convenience
     agent_ids: Arc<dashmap::DashMap<String, uuid::Uuid>>,
+    /// Attach session manager for managing TUI attachment sessions
+    attach_manager: Arc<crate::attach_session::AttachSessionManager>,
 }
 
 impl RpcServerImpl {
@@ -115,10 +215,27 @@ impl RpcServerImpl {
         agent_runner: Arc<dyn descartes_core::traits::AgentRunner>,
         state_store: Arc<dyn descartes_core::traits::StateStore>,
     ) -> Self {
+        let attach_config = crate::attach_session::AttachSessionConfig::default();
+        let attach_manager = Arc::new(crate::attach_session::AttachSessionManager::new(attach_config));
         Self {
             agent_runner,
             state_store,
             agent_ids: Arc::new(dashmap::DashMap::new()),
+            attach_manager,
+        }
+    }
+
+    /// Create a new RPC server implementation with custom attach manager
+    pub fn with_attach_manager(
+        agent_runner: Arc<dyn descartes_core::traits::AgentRunner>,
+        state_store: Arc<dyn descartes_core::traits::StateStore>,
+        attach_manager: Arc<crate::attach_session::AttachSessionManager>,
+    ) -> Self {
+        Self {
+            agent_runner,
+            state_store,
+            agent_ids: Arc::new(dashmap::DashMap::new()),
+            attach_manager,
         }
     }
 
@@ -346,6 +463,214 @@ impl RpcServerImpl {
             "timestamp": chrono::Utc::now().to_rfc3339(),
         }))
     }
+
+    pub(crate) async fn pause_agent_internal(
+        &self,
+        agent_id: String,
+        force: bool,
+    ) -> Result<PauseResult, ErrorObjectOwned> {
+        info!("Pausing agent: {} (force: {})", agent_id, force);
+
+        let agent_uuid = Uuid::parse_str(&agent_id).map_err(|e| {
+            error!("Invalid agent ID format: {}", e);
+            ErrorObjectOwned::owned(-32602, format!("Invalid agent ID format: {}", e), None::<()>)
+        })?;
+
+        // Check if agent exists and is running
+        let agent_info = self
+            .agent_runner
+            .get_agent(&agent_uuid)
+            .await
+            .map_err(|e| {
+                error!("Failed to get agent: {}", e);
+                ErrorObjectOwned::owned(-32603, format!("Failed to get agent: {}", e), None::<()>)
+            })?
+            .ok_or_else(|| {
+                error!("Agent not found: {}", agent_id);
+                ErrorObjectOwned::owned(-32002, format!("Agent not found: {}", agent_id), None::<()>)
+            })?;
+
+        // Check if agent is running
+        if !matches!(agent_info.status, descartes_core::traits::AgentStatus::Running) {
+            return Err(ErrorObjectOwned::owned(
+                -32013,
+                format!("Agent is not running (status: {:?})", agent_info.status),
+                None::<()>,
+            ));
+        }
+
+        // Pause the agent
+        self.agent_runner.pause(&agent_uuid, force).await.map_err(|e| {
+            error!("Failed to pause agent: {}", e);
+            ErrorObjectOwned::owned(-32013, format!("Failed to pause agent: {}", e), None::<()>)
+        })?;
+
+        let pause_mode = if force { "forced" } else { "cooperative" };
+        let paused_at = chrono::Utc::now().timestamp();
+
+        info!("Agent {} paused successfully (mode: {})", agent_id, pause_mode);
+
+        Ok(PauseResult {
+            agent_id,
+            paused_at,
+            pause_mode: pause_mode.to_string(),
+        })
+    }
+
+    pub(crate) async fn resume_agent_internal(
+        &self,
+        agent_id: String,
+    ) -> Result<ResumeResult, ErrorObjectOwned> {
+        info!("Resuming agent: {}", agent_id);
+
+        let agent_uuid = Uuid::parse_str(&agent_id).map_err(|e| {
+            error!("Invalid agent ID format: {}", e);
+            ErrorObjectOwned::owned(-32602, format!("Invalid agent ID format: {}", e), None::<()>)
+        })?;
+
+        // Check if agent exists and is paused
+        let agent_info = self
+            .agent_runner
+            .get_agent(&agent_uuid)
+            .await
+            .map_err(|e| {
+                error!("Failed to get agent: {}", e);
+                ErrorObjectOwned::owned(-32603, format!("Failed to get agent: {}", e), None::<()>)
+            })?
+            .ok_or_else(|| {
+                error!("Agent not found: {}", agent_id);
+                ErrorObjectOwned::owned(-32002, format!("Agent not found: {}", agent_id), None::<()>)
+            })?;
+
+        // Check if agent is paused
+        if !matches!(agent_info.status, descartes_core::traits::AgentStatus::Paused) {
+            return Err(ErrorObjectOwned::owned(
+                -32014,
+                format!("Agent is not paused (status: {:?})", agent_info.status),
+                None::<()>,
+            ));
+        }
+
+        // Resume the agent
+        self.agent_runner.resume(&agent_uuid).await.map_err(|e| {
+            error!("Failed to resume agent: {}", e);
+            ErrorObjectOwned::owned(-32014, format!("Failed to resume agent: {}", e), None::<()>)
+        })?;
+
+        let resumed_at = chrono::Utc::now().timestamp();
+
+        info!("Agent {} resumed successfully", agent_id);
+
+        Ok(ResumeResult {
+            agent_id,
+            resumed_at,
+        })
+    }
+
+    pub(crate) async fn attach_request_internal(
+        &self,
+        agent_id: String,
+        client_type: String,
+    ) -> Result<AttachCredentialsResult, ErrorObjectOwned> {
+        info!("Attach request for agent: {} from client: {}", agent_id, client_type);
+
+        let agent_uuid = Uuid::parse_str(&agent_id).map_err(|e| {
+            error!("Invalid agent ID format: {}", e);
+            ErrorObjectOwned::owned(-32602, format!("Invalid agent ID format: {}", e), None::<()>)
+        })?;
+
+        // Check if agent exists and is paused
+        let agent_info = self
+            .agent_runner
+            .get_agent(&agent_uuid)
+            .await
+            .map_err(|e| {
+                error!("Failed to get agent: {}", e);
+                ErrorObjectOwned::owned(-32603, format!("Failed to get agent: {}", e), None::<()>)
+            })?
+            .ok_or_else(|| {
+                error!("Agent not found: {}", agent_id);
+                ErrorObjectOwned::owned(-32002, format!("Agent not found: {}", agent_id), None::<()>)
+            })?;
+
+        // Agent should be paused to attach
+        if !matches!(agent_info.status, descartes_core::traits::AgentStatus::Paused) {
+            return Err(ErrorObjectOwned::owned(
+                -32015,
+                format!("Cannot attach to agent that is not paused (status: {:?})", agent_info.status),
+                None::<()>,
+            ));
+        }
+
+        // Parse client type
+        let parsed_client_type = match client_type.as_str() {
+            "claude-code" => crate::attach_session::ClientType::ClaudeCode,
+            "opencode" => crate::attach_session::ClientType::OpenCode,
+            other => crate::attach_session::ClientType::Custom(other.to_string()),
+        };
+
+        // Create attach session
+        let session = self
+            .attach_manager
+            .create_session(agent_uuid, agent_info.name.clone(), agent_info.task.clone(), parsed_client_type)
+            .await
+            .map_err(|e| {
+                error!("Failed to create attach session: {}", e);
+                ErrorObjectOwned::owned(-32015, format!("Failed to create attach session: {}", e), None::<()>)
+            })?;
+
+        info!("Attach session created for agent {}: token={}", agent_id, session.token);
+
+        Ok(AttachCredentialsResult {
+            agent_id,
+            token: session.token,
+            connect_url: session.connect_url,
+            expires_at: session.expires_at,
+        })
+    }
+
+    pub(crate) async fn attach_validate_internal(
+        &self,
+        token: String,
+    ) -> Result<AttachValidateResult, ErrorObjectOwned> {
+        info!("Validating attach token");
+
+        match self.attach_manager.validate_token(&token).await {
+            Some(session_info) => {
+                info!("Token valid for agent {}", session_info.agent_id);
+                Ok(AttachValidateResult {
+                    valid: true,
+                    agent_id: Some(session_info.agent_id.to_string()),
+                    expires_at: Some(session_info.expires_at),
+                })
+            }
+            None => {
+                info!("Token invalid or expired");
+                Ok(AttachValidateResult {
+                    valid: false,
+                    agent_id: None,
+                    expires_at: None,
+                })
+            }
+        }
+    }
+
+    pub(crate) async fn attach_revoke_internal(
+        &self,
+        token: String,
+    ) -> Result<AttachRevokeResult, ErrorObjectOwned> {
+        info!("Revoking attach token");
+
+        let revoked = self.attach_manager.revoke_session(&token).await;
+
+        if revoked {
+            info!("Token revoked successfully");
+        } else {
+            info!("Token not found or already revoked");
+        }
+
+        Ok(AttachRevokeResult { revoked })
+    }
 }
 
 // Import ErrorObjectOwned for the trait implementation
@@ -376,6 +701,34 @@ impl DescartesRpcServer for RpcServerImpl {
 
     async fn get_state(&self, entity_id: Option<String>) -> Result<Value, ErrorObjectOwned> {
         self.get_state_internal(entity_id).await
+    }
+
+    async fn pause_agent(
+        &self,
+        agent_id: String,
+        force: bool,
+    ) -> Result<PauseResult, ErrorObjectOwned> {
+        self.pause_agent_internal(agent_id, force).await
+    }
+
+    async fn resume_agent(&self, agent_id: String) -> Result<ResumeResult, ErrorObjectOwned> {
+        self.resume_agent_internal(agent_id).await
+    }
+
+    async fn attach_request(
+        &self,
+        agent_id: String,
+        client_type: String,
+    ) -> Result<AttachCredentialsResult, ErrorObjectOwned> {
+        self.attach_request_internal(agent_id, client_type).await
+    }
+
+    async fn attach_validate(&self, token: String) -> Result<AttachValidateResult, ErrorObjectOwned> {
+        self.attach_validate_internal(token).await
+    }
+
+    async fn attach_revoke(&self, token: String) -> Result<AttachRevokeResult, ErrorObjectOwned> {
+        self.attach_revoke_internal(token).await
     }
 }
 
@@ -655,6 +1008,80 @@ impl UnixSocketRpcServer {
                 },
                 Err(response) => response,
             },
+            "agent.pause" => match Self::parse_pause_params(&request) {
+                Ok((agent_id, force)) => {
+                    match server_impl.pause_agent_internal(agent_id, force).await {
+                        Ok(result) => match serde_json::to_value(result) {
+                            Ok(value) => RpcResponse::success(value, request.id.clone()),
+                            Err(e) => RpcResponse::error(
+                                -32603,
+                                format!("Serialization error: {}", e),
+                                request.id.clone(),
+                            ),
+                        },
+                        Err(err) => Self::convert_error(err, request.id.clone()),
+                    }
+                }
+                Err(response) => response,
+            },
+            "agent.resume" => match Self::parse_resume_params(&request) {
+                Ok(agent_id) => match server_impl.resume_agent_internal(agent_id).await {
+                    Ok(result) => match serde_json::to_value(result) {
+                        Ok(value) => RpcResponse::success(value, request.id.clone()),
+                        Err(e) => RpcResponse::error(
+                            -32603,
+                            format!("Serialization error: {}", e),
+                            request.id.clone(),
+                        ),
+                    },
+                    Err(err) => Self::convert_error(err, request.id.clone()),
+                },
+                Err(response) => response,
+            },
+            "agent.attach.request" => match Self::parse_attach_request_params(&request) {
+                Ok((agent_id, client_type)) => {
+                    match server_impl.attach_request_internal(agent_id, client_type).await {
+                        Ok(result) => match serde_json::to_value(result) {
+                            Ok(value) => RpcResponse::success(value, request.id.clone()),
+                            Err(e) => RpcResponse::error(
+                                -32603,
+                                format!("Serialization error: {}", e),
+                                request.id.clone(),
+                            ),
+                        },
+                        Err(err) => Self::convert_error(err, request.id.clone()),
+                    }
+                }
+                Err(response) => response,
+            },
+            "agent.attach.validate" => match Self::parse_token_params(&request) {
+                Ok(token) => match server_impl.attach_validate_internal(token).await {
+                    Ok(result) => match serde_json::to_value(result) {
+                        Ok(value) => RpcResponse::success(value, request.id.clone()),
+                        Err(e) => RpcResponse::error(
+                            -32603,
+                            format!("Serialization error: {}", e),
+                            request.id.clone(),
+                        ),
+                    },
+                    Err(err) => Self::convert_error(err, request.id.clone()),
+                },
+                Err(response) => response,
+            },
+            "agent.attach.revoke" => match Self::parse_token_params(&request) {
+                Ok(token) => match server_impl.attach_revoke_internal(token).await {
+                    Ok(result) => match serde_json::to_value(result) {
+                        Ok(value) => RpcResponse::success(value, request.id.clone()),
+                        Err(e) => RpcResponse::error(
+                            -32603,
+                            format!("Serialization error: {}", e),
+                            request.id.clone(),
+                        ),
+                    },
+                    Err(err) => Self::convert_error(err, request.id.clone()),
+                },
+                Err(response) => response,
+            },
             _ => RpcResponse::error(-32601, "Method not found".to_string(), request.id.clone()),
         }
     }
@@ -745,6 +1172,99 @@ impl UnixSocketRpcServer {
         }
     }
 
+    fn parse_pause_params(request: &RpcRequest) -> Result<(String, bool), RpcResponse> {
+        let params = match &request.params {
+            Some(Value::Array(arr)) => arr,
+            _ => {
+                return Err(Self::invalid_params(
+                    request.id.clone(),
+                    "Expected positional parameters [agent_id, force]",
+                ))
+            }
+        };
+
+        let agent_id = params
+            .get(0)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
+            .to_string();
+
+        // force defaults to false if not provided
+        let force = params
+            .get(1)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        Ok((agent_id, force))
+    }
+
+    fn parse_resume_params(request: &RpcRequest) -> Result<String, RpcResponse> {
+        let params = match &request.params {
+            Some(Value::Array(arr)) => arr,
+            _ => {
+                return Err(Self::invalid_params(
+                    request.id.clone(),
+                    "Expected positional parameters [agent_id]",
+                ))
+            }
+        };
+
+        let agent_id = params
+            .get(0)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
+            .to_string();
+
+        Ok(agent_id)
+    }
+
+    fn parse_attach_request_params(request: &RpcRequest) -> Result<(String, String), RpcResponse> {
+        let params = match &request.params {
+            Some(Value::Array(arr)) => arr,
+            _ => {
+                return Err(Self::invalid_params(
+                    request.id.clone(),
+                    "Expected positional parameters [agent_id, client_type]",
+                ))
+            }
+        };
+
+        let agent_id = params
+            .get(0)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
+            .to_string();
+
+        // client_type defaults to "claude-code" if not provided
+        let client_type = params
+            .get(1)
+            .and_then(|v| v.as_str())
+            .unwrap_or("claude-code")
+            .to_string();
+
+        Ok((agent_id, client_type))
+    }
+
+    fn parse_token_params(request: &RpcRequest) -> Result<String, RpcResponse> {
+        let params = match &request.params {
+            Some(Value::Array(arr)) => arr,
+            _ => {
+                return Err(Self::invalid_params(
+                    request.id.clone(),
+                    "Expected positional parameters [token]",
+                ))
+            }
+        };
+
+        let token = params
+            .get(0)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing token parameter"))?
+            .to_string();
+
+        Ok(token)
+    }
+
     fn convert_error(err: ErrorObjectOwned, id: Option<Value>) -> RpcResponse {
         let data = err
             .data()
@@ -777,6 +1297,7 @@ impl Clone for RpcServerImpl {
             agent_runner: Arc::clone(&self.agent_runner),
             state_store: Arc::clone(&self.state_store),
             agent_ids: Arc::clone(&self.agent_ids),
+            attach_manager: Arc::clone(&self.attach_manager),
         }
     }
 }

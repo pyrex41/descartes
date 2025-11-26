@@ -232,3 +232,83 @@ pub struct ConnectionInfo {
     pub connected_at: DateTime<Utc>,
     pub last_activity: DateTime<Utc>,
 }
+
+// ============================================================================
+// Pause/Resume/Attach Types
+// ============================================================================
+
+/// Agent pause request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentPauseRequest {
+    pub agent_id: String,
+    #[serde(default)]
+    pub force: bool,
+}
+
+/// Agent pause response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentPauseResponse {
+    pub agent_id: String,
+    pub paused_at: DateTime<Utc>,
+    pub pause_mode: String,
+}
+
+/// Agent resume request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentResumeRequest {
+    pub agent_id: String,
+}
+
+/// Agent resume response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentResumeResponse {
+    pub agent_id: String,
+    pub resumed_at: DateTime<Utc>,
+}
+
+/// Attach credentials request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachRequest {
+    pub agent_id: String,
+    #[serde(default = "default_client_type")]
+    pub client_type: String,
+}
+
+fn default_client_type() -> String {
+    "claude-code".to_string()
+}
+
+/// Attach credentials response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachCredentialsResponse {
+    pub agent_id: String,
+    pub token: String,
+    pub connect_url: String,
+    pub expires_at: i64,
+}
+
+/// Attach validation request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachValidateRequest {
+    pub token: String,
+}
+
+/// Attach validation response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachValidateResponse {
+    pub valid: bool,
+    pub agent_id: Option<String>,
+    pub expires_at: Option<i64>,
+}
+
+/// Attach revoke request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachRevokeRequest {
+    pub token: String,
+}
+
+/// Attach revoke response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachRevokeResponse {
+    pub revoked: bool,
+}
