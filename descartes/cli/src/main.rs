@@ -13,7 +13,7 @@ fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
     Ok(manager.config().clone())
 }
 
-use commands::{init, kill, logs, plugins, ps, spawn};
+use commands::{attach, init, kill, logs, pause, plugins, ps, resume, spawn};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -87,6 +87,36 @@ enum Commands {
         /// Force kill (SIGKILL instead of SIGTERM)
         #[arg(short, long)]
         force: bool,
+    },
+
+    /// Pause a running agent
+    Pause {
+        /// Agent ID
+        id: String,
+
+        /// Force pause (SIGSTOP instead of cooperative)
+        #[arg(short, long)]
+        force: bool,
+    },
+
+    /// Resume a paused agent
+    Resume {
+        /// Agent ID
+        id: String,
+    },
+
+    /// Get attach credentials for a paused agent
+    Attach {
+        /// Agent ID
+        id: String,
+
+        /// Client type (claude-code, opencode, or custom)
+        #[arg(short, long, default_value = "claude-code")]
+        client: String,
+
+        /// Output JSON for scripting
+        #[arg(long)]
+        json: bool,
     },
 
     /// View agent logs
@@ -165,6 +195,21 @@ async fn main() -> anyhow::Result<()> {
         Commands::Kill { id, force } => {
             let config = load_config(args.config.as_deref())?;
             kill::execute(&config, &id, force).await?;
+        }
+
+        Commands::Pause { id, force } => {
+            let config = load_config(args.config.as_deref())?;
+            pause::execute(&config, &id, force).await?;
+        }
+
+        Commands::Resume { id } => {
+            let config = load_config(args.config.as_deref())?;
+            resume::execute(&config, &id).await?;
+        }
+
+        Commands::Attach { id, client, json } => {
+            let config = load_config(args.config.as_deref())?;
+            attach::execute(&config, &id, &client, json).await?;
         }
 
         Commands::Logs {

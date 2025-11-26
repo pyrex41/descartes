@@ -66,6 +66,12 @@ pub enum AgentEventType {
     Log,
     /// Agent metric update
     Metric,
+    /// Attach session requested for paused agent
+    AttachRequested,
+    /// External TUI connected to paused agent
+    AttachConnected,
+    /// External TUI disconnected from paused agent
+    AttachDisconnected,
 }
 
 /// Task execution events

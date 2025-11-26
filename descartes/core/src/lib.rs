@@ -2,6 +2,8 @@
 // Core library providing traits, providers, and orchestration utilities
 
 pub mod agent_history;
+pub mod attach;
+pub mod attach_protocol;
 pub mod agent_runner;
 pub mod agent_state;
 pub mod agent_stream_parser;
@@ -46,9 +48,9 @@ pub use errors::{
 
 pub use traits::{
     ActorType, AgentConfig, AgentHandle, AgentInfo, AgentRunner, AgentSignal, AgentStatus,
-    ContextSyncer, Event, ExitStatus, FinishReason, Message, MessageRole, ModelBackend,
-    ModelProviderMode, ModelRequest, ModelResponse, StateStore, Task, TaskComplexity, TaskPriority,
-    TaskStatus, Tool, ToolCall, ToolParameters,
+    AttachInfo, ContextSyncer, Event, ExitStatus, FinishReason, Message, MessageRole, ModelBackend,
+    ModelProviderMode, ModelRequest, ModelResponse, PauseMode, StateStore, Task, TaskComplexity,
+    TaskPriority, TaskStatus, Tool, ToolCall, ToolParameters,
 };
 
 pub use providers::{
@@ -57,6 +59,12 @@ pub use providers::{
 };
 
 pub use agent_runner::{GracefulShutdown, LocalProcessRunner, ProcessRunnerConfig};
+
+pub use attach::{AttachToken, AttachTokenStore, DEFAULT_TOKEN_TTL_SECS};
+
+pub use attach_protocol::{
+    AttachHandshake, AttachHandshakeResponse, AttachMessage, AttachMessageType, HistoricalOutput,
+};
 
 pub use agent_state::{
     AgentError as RuntimeAgentError, AgentProgress, AgentRuntimeState, AgentStateCollection,

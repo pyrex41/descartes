@@ -12,6 +12,7 @@
 use crate::errors::{AgentError, AgentResult};
 use crate::traits::{
     AgentConfig, AgentHandle, AgentInfo, AgentRunner, AgentSignal, AgentStatus, ExitStatus,
+    PauseMode,
 };
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -309,6 +310,9 @@ impl AgentRunner for LocalProcessRunner {
             model_backend: config.model_backend.clone(),
             started_at: SystemTime::now(),
             task: config.task.clone(),
+            paused_at: None,
+            pause_mode: None,
+            attach_info: None,
         };
 
         let handle = LocalAgentHandle::new(
@@ -434,6 +438,46 @@ impl AgentRunner for LocalProcessRunner {
                 AgentSignal::Kill => {
                     child_guard.kill().await?;
                 }
+                AgentSignal::ForcePause => {
+                    // Send SIGSTOP to freeze the process
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child_guard.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGSTOP).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGSTOP: {}", e))
+                            })?;
+                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        return Err(AgentError::UnsupportedOperation(
+                            "SIGSTOP not supported on this platform".into(),
+                        ));
+                    }
+                }
+                AgentSignal::Resume => {
+                    // Send SIGCONT to resume the process
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child_guard.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGCONT).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGCONT: {}", e))
+                            })?;
+                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        return Err(AgentError::UnsupportedOperation(
+                            "SIGCONT not supported on this platform".into(),
+                        ));
+                    }
+                }
             }
 
             drop(child_guard);
@@ -441,7 +485,7 @@ impl AgentRunner for LocalProcessRunner {
             {
                 let mut handle_guard = handle.write();
                 match signal {
-                    AgentSignal::Interrupt => handle_guard.set_status(AgentStatus::Paused),
+                    AgentSignal::Interrupt => handle_guard.set_paused(PauseMode::Cooperative),
                     AgentSignal::Terminate => handle_guard.set_status(AgentStatus::Terminated),
                     AgentSignal::Kill => {
                         handle_guard.set_status(AgentStatus::Terminated);
@@ -450,9 +494,131 @@ impl AgentRunner for LocalProcessRunner {
                             success: false,
                         });
                     }
+                    AgentSignal::ForcePause => handle_guard.set_paused(PauseMode::Forced),
+                    AgentSignal::Resume => {
+                        handle_guard.clear_paused();
+                        handle_guard.set_status(AgentStatus::Running);
+                    }
                 }
             }
 
+            Ok(())
+        } else {
+            Err(AgentError::NotFound(format!(
+                "Agent not found: {}",
+                agent_id
+            )))
+        }
+    }
+
+    async fn pause(&self, agent_id: &Uuid, force: bool) -> AgentResult<()> {
+        if let Some(handle) = self.agents.get(agent_id) {
+            // Check if agent is in a pauseable state
+            {
+                let handle_guard = handle.read();
+                match handle_guard.status {
+                    AgentStatus::Running | AgentStatus::Thinking => {}
+                    AgentStatus::Paused => {
+                        return Err(AgentError::ExecutionError(
+                            "Agent is already paused".into(),
+                        ));
+                    }
+                    status if status.is_terminal() => {
+                        return Err(AgentError::ExecutionError(format!(
+                            "Cannot pause agent in terminal state: {}",
+                            status
+                        )));
+                    }
+                    status => {
+                        return Err(AgentError::ExecutionError(format!(
+                            "Cannot pause agent in state: {}",
+                            status
+                        )));
+                    }
+                }
+            }
+
+            if force {
+                // Force pause using SIGSTOP
+                self.signal(agent_id, AgentSignal::ForcePause).await?;
+                tracing::info!("Agent {} force-paused (SIGSTOP)", agent_id);
+            } else {
+                // Cooperative pause: send notification via stdin
+                let stdin = {
+                    let handle_guard = handle.read();
+                    Arc::clone(&handle_guard.stdin)
+                };
+
+                // Send pause notification (JSON format for compatibility)
+                let pause_msg = r#"{"type":"pause","action":"pause"}"#;
+                {
+                    let mut stdin_guard = stdin.lock().await;
+                    stdin_guard
+                        .write_all(format!("{}\n", pause_msg).as_bytes())
+                        .await?;
+                    stdin_guard.flush().await?;
+                }
+
+                // Update status to paused
+                {
+                    let mut handle_guard = handle.write();
+                    handle_guard.set_paused(PauseMode::Cooperative);
+                }
+
+                tracing::info!("Agent {} cooperatively paused", agent_id);
+            }
+
+            Ok(())
+        } else {
+            Err(AgentError::NotFound(format!(
+                "Agent not found: {}",
+                agent_id
+            )))
+        }
+    }
+
+    async fn resume(&self, agent_id: &Uuid) -> AgentResult<()> {
+        if let Some(handle) = self.agents.get(agent_id) {
+            let pause_mode = {
+                let handle_guard = handle.read();
+                if handle_guard.status != AgentStatus::Paused {
+                    return Err(AgentError::ExecutionError(format!(
+                        "Agent is not paused, current status: {}",
+                        handle_guard.status
+                    )));
+                }
+                handle_guard.pause_mode
+            };
+
+            // If force-paused, send SIGCONT first
+            if pause_mode == Some(PauseMode::Forced) {
+                self.signal(agent_id, AgentSignal::Resume).await?;
+            } else {
+                // For cooperative pause, send resume via stdin and update status
+                let stdin = {
+                    let handle_guard = handle.read();
+                    Arc::clone(&handle_guard.stdin)
+                };
+
+                // Send resume notification
+                let resume_msg = r#"{"type":"pause","action":"resume"}"#;
+                {
+                    let mut stdin_guard = stdin.lock().await;
+                    stdin_guard
+                        .write_all(format!("{}\n", resume_msg).as_bytes())
+                        .await?;
+                    stdin_guard.flush().await?;
+                }
+
+                // Update status
+                {
+                    let mut handle_guard = handle.write();
+                    handle_guard.clear_paused();
+                    handle_guard.set_status(AgentStatus::Running);
+                }
+            }
+
+            tracing::info!("Agent {} resumed", agent_id);
             Ok(())
         } else {
             Err(AgentError::NotFound(format!(
@@ -488,6 +654,8 @@ struct LocalAgentHandle {
     _stdout_tx: mpsc::UnboundedSender<Vec<u8>>,
     /// Stderr sender (for background task)
     _stderr_tx: mpsc::UnboundedSender<Vec<u8>>,
+    /// How the agent was paused (if currently paused)
+    pause_mode: Option<PauseMode>,
 }
 
 impl LocalAgentHandle {
@@ -522,6 +690,7 @@ impl LocalAgentHandle {
             stderr_buffer: Arc::new(Mutex::new(stderr_rx)),
             _stdout_tx: stdout_tx,
             _stderr_tx: stderr_tx,
+            pause_mode: None,
         }
     }
 
@@ -567,6 +736,22 @@ impl LocalAgentHandle {
     fn set_status(&mut self, status: AgentStatus) {
         self.status = status;
         self.info.status = status;
+    }
+
+    /// Set paused state with pause mode and timestamp.
+    fn set_paused(&mut self, mode: PauseMode) {
+        self.status = AgentStatus::Paused;
+        self.info.status = AgentStatus::Paused;
+        self.pause_mode = Some(mode);
+        self.info.pause_mode = Some(mode);
+        self.info.paused_at = Some(SystemTime::now());
+    }
+
+    /// Clear paused state.
+    fn clear_paused(&mut self) {
+        self.pause_mode = None;
+        self.info.pause_mode = None;
+        self.info.paused_at = None;
     }
 
     /// Record the final exit status from the process.
@@ -649,12 +834,54 @@ impl LocalAgentHandle {
                     // Send SIGKILL
                     child.kill().await?;
                 }
+                AgentSignal::ForcePause => {
+                    // Send SIGSTOP
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGSTOP).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGSTOP: {}", e))
+                            })?;
+                        }
+                    }
+
+                    #[cfg(not(unix))]
+                    {
+                        return Err(AgentError::UnsupportedOperation(
+                            "SIGSTOP not supported on this platform".into(),
+                        ));
+                    }
+                }
+                AgentSignal::Resume => {
+                    // Send SIGCONT
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGCONT).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGCONT: {}", e))
+                            })?;
+                        }
+                    }
+
+                    #[cfg(not(unix))]
+                    {
+                        return Err(AgentError::UnsupportedOperation(
+                            "SIGCONT not supported on this platform".into(),
+                        ));
+                    }
+                }
             }
         }
 
         match signal {
             AgentSignal::Interrupt => {
-                self.set_status(AgentStatus::Paused);
+                self.set_paused(PauseMode::Cooperative);
             }
             AgentSignal::Terminate => {
                 self.set_status(AgentStatus::Terminated);
@@ -665,6 +892,13 @@ impl LocalAgentHandle {
                     code: None,
                     success: false,
                 });
+            }
+            AgentSignal::ForcePause => {
+                self.set_paused(PauseMode::Forced);
+            }
+            AgentSignal::Resume => {
+                self.clear_paused();
+                self.set_status(AgentStatus::Running);
             }
         }
 
@@ -941,5 +1175,118 @@ mod tests {
             config.health_check_interval_secs,
             HEALTH_CHECK_INTERVAL_SECS
         );
+    }
+
+    #[test]
+    fn test_pause_mode_display() {
+        assert_eq!(PauseMode::Cooperative.to_string(), "cooperative");
+        assert_eq!(PauseMode::Forced.to_string(), "forced");
+    }
+
+    #[test]
+    fn test_pause_mode_equality() {
+        assert_eq!(PauseMode::Cooperative, PauseMode::Cooperative);
+        assert_eq!(PauseMode::Forced, PauseMode::Forced);
+        assert_ne!(PauseMode::Cooperative, PauseMode::Forced);
+    }
+
+    #[test]
+    fn test_agent_signal_variants() {
+        // Verify all AgentSignal variants exist and are copyable
+        let signals = [
+            AgentSignal::Interrupt,
+            AgentSignal::Terminate,
+            AgentSignal::Kill,
+            AgentSignal::ForcePause,
+            AgentSignal::Resume,
+        ];
+
+        // Ensure they're Copy/Clone
+        let copied = signals[0];
+        assert_eq!(copied, AgentSignal::Interrupt);
+    }
+
+    #[tokio::test]
+    async fn test_pause_nonexistent_agent() {
+        let runner = LocalProcessRunner::new();
+        let agent_id = Uuid::new_v4();
+        let result = runner.pause(&agent_id, false).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Agent not found"));
+    }
+
+    #[tokio::test]
+    async fn test_resume_nonexistent_agent() {
+        let runner = LocalProcessRunner::new();
+        let agent_id = Uuid::new_v4();
+        let result = runner.resume(&agent_id).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Agent not found"));
+    }
+
+    #[test]
+    fn test_agent_info_with_pause_fields() {
+        let info = AgentInfo {
+            id: Uuid::new_v4(),
+            name: "test-agent".to_string(),
+            status: AgentStatus::Running,
+            model_backend: "claude".to_string(),
+            started_at: SystemTime::now(),
+            task: "test task".to_string(),
+            paused_at: None,
+            pause_mode: None,
+            attach_info: None,
+        };
+
+        assert!(info.paused_at.is_none());
+        assert!(info.pause_mode.is_none());
+        assert!(info.attach_info.is_none());
+    }
+
+    #[test]
+    fn test_agent_info_paused() {
+        let info = AgentInfo {
+            id: Uuid::new_v4(),
+            name: "test-agent".to_string(),
+            status: AgentStatus::Paused,
+            model_backend: "claude".to_string(),
+            started_at: SystemTime::now(),
+            task: "test task".to_string(),
+            paused_at: Some(SystemTime::now()),
+            pause_mode: Some(PauseMode::Cooperative),
+            attach_info: None,
+        };
+
+        assert!(info.paused_at.is_some());
+        assert_eq!(info.pause_mode, Some(PauseMode::Cooperative));
+        assert_eq!(info.status, AgentStatus::Paused);
+    }
+
+    #[test]
+    fn test_attach_info_serialization() {
+        use crate::traits::AttachInfo;
+
+        let attach_info = AttachInfo {
+            connect_url: "ipc:///tmp/test.sock".to_string(),
+            token: "test-token-123".to_string(),
+            expires_at: 1234567890,
+        };
+
+        // Test serialization
+        let json = serde_json::to_string(&attach_info).unwrap();
+        assert!(json.contains("connect_url"));
+        assert!(json.contains("test.sock"));
+
+        // Test deserialization
+        let deserialized: AttachInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.connect_url, attach_info.connect_url);
+        assert_eq!(deserialized.token, attach_info.token);
+        assert_eq!(deserialized.expires_at, attach_info.expires_at);
     }
 }
