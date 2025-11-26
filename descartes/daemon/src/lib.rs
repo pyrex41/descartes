@@ -6,6 +6,7 @@ pub mod auth;
 pub mod claude_code_tui; // Claude Code TUI attachment handler (Phase 4)
 pub mod client;
 pub mod config;
+pub mod opencode_tui; // OpenCode TUI attachment handler (Phase 5)
 pub mod errors;
 pub mod event_client;
 pub mod event_stream;
@@ -32,6 +33,7 @@ pub use claude_code_tui::{
     start_attach_server, ClaudeCodeTuiConfig, ClaudeCodeTuiHandler, OutputBuffer,
 };
 pub use client::{RpcClient, RpcClientBuilder, RpcClientConfig};
+pub use opencode_tui::{start_opencode_attach_server, OpenCodeTuiConfig, OpenCodeTuiHandler};
 pub use config::DaemonConfig;
 pub use errors::{DaemonError, DaemonResult};
 pub use event_client::{EventClient, EventClientBuilder, EventClientConfig, EventClientState};
