@@ -118,6 +118,12 @@ pub struct SwarmMonitorState {
 
     /// Connection status
     pub connection_status: ConnectionStatus,
+
+    /// Pending attach request (agent_id waiting for credentials)
+    pub pending_attach: Option<Uuid>,
+
+    /// Last received attach credentials (agent_id, token, url)
+    pub last_attach_credentials: Option<(Uuid, String, String)>,
 }
 
 impl Default for SwarmMonitorState {
@@ -138,6 +144,8 @@ impl Default for SwarmMonitorState {
             frame_times: Vec::with_capacity(MAX_FRAME_TIME_SAMPLES),
             max_frame_time: 0.0,
             connection_status: ConnectionStatus::Disconnected,
+            pending_attach: None,
+            last_attach_credentials: None,
         }
     }
 }
@@ -627,6 +635,24 @@ pub enum SwarmMonitorMessage {
 
     /// Batch agent update (more efficient for large updates)
     BatchAgentUpdate(Vec<AgentRuntimeState>),
+
+    /// Pause an agent
+    PauseAgent(Uuid),
+
+    /// Resume a paused agent
+    ResumeAgent(Uuid),
+
+    /// Request attach credentials for an agent
+    AttachToAgent(Uuid),
+
+    /// Pause operation completed
+    PauseResult(Uuid, Result<(), String>),
+
+    /// Resume operation completed
+    ResumeResult(Uuid, Result<(), String>),
+
+    /// Attach operation completed (with token and URL)
+    AttachResult(Uuid, Result<(String, String), String>),
 }
 
 // ============================================================================
@@ -680,6 +706,64 @@ pub fn update(state: &mut SwarmMonitorState, message: SwarmMonitorMessage) {
                 .map(|agent| (agent.agent_id, agent))
                 .collect();
             state.update_agents_batch(agent_map);
+        }
+        SwarmMonitorMessage::PauseAgent(agent_id) => {
+            // Log the pause request - actual RPC call would be triggered by main app
+            tracing::info!("Pause requested for agent: {}", agent_id);
+            // Mark agent as transitioning (optional local state update)
+            if let Some(agent) = state.agents.get_mut(&agent_id) {
+                agent.status = RuntimeAgentStatus::Paused;
+            }
+        }
+        SwarmMonitorMessage::ResumeAgent(agent_id) => {
+            tracing::info!("Resume requested for agent: {}", agent_id);
+            if let Some(agent) = state.agents.get_mut(&agent_id) {
+                agent.status = RuntimeAgentStatus::Running;
+            }
+        }
+        SwarmMonitorMessage::AttachToAgent(agent_id) => {
+            tracing::info!("Attach requested for agent: {}", agent_id);
+            // This would trigger a modal or copy credentials to clipboard
+            state.pending_attach = Some(agent_id);
+        }
+        SwarmMonitorMessage::PauseResult(agent_id, result) => {
+            match result {
+                Ok(()) => {
+                    tracing::info!("Agent {} paused successfully", agent_id);
+                    if let Some(agent) = state.agents.get_mut(&agent_id) {
+                        agent.status = RuntimeAgentStatus::Paused;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to pause agent {}: {}", agent_id, e);
+                }
+            }
+        }
+        SwarmMonitorMessage::ResumeResult(agent_id, result) => {
+            match result {
+                Ok(()) => {
+                    tracing::info!("Agent {} resumed successfully", agent_id);
+                    if let Some(agent) = state.agents.get_mut(&agent_id) {
+                        agent.status = RuntimeAgentStatus::Running;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to resume agent {}: {}", agent_id, e);
+                }
+            }
+        }
+        SwarmMonitorMessage::AttachResult(agent_id, result) => {
+            match result {
+                Ok((token, url)) => {
+                    tracing::info!("Attach credentials for agent {}: token={}, url={}", agent_id, token, url);
+                    state.last_attach_credentials = Some((agent_id, token, url));
+                    state.pending_attach = None;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to get attach credentials for agent {}: {}", agent_id, e);
+                    state.pending_attach = None;
+                }
+            }
         }
     }
 }
@@ -1157,6 +1241,80 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
         .into()
 }
 
+/// Render control buttons for agent actions (pause/resume/attach)
+fn view_agent_control_buttons(agent: &AgentRuntimeState) -> Element<'static, SwarmMonitorMessage> {
+    let agent_id = agent.agent_id;
+
+    let mut buttons_row = row![].spacing(6);
+
+    // Pause button (only show for Running/Thinking states)
+    if matches!(
+        agent.status,
+        RuntimeAgentStatus::Running | RuntimeAgentStatus::Thinking
+    ) {
+        let pause_btn = button(text("⏸ Pause").size(11))
+            .padding([4, 8])
+            .style(|_theme: &Theme, _status| button::Style {
+                background: Some(Color::from_rgb(0.8, 0.6, 0.2).into()),
+                text_color: Color::WHITE,
+                border: iced::Border {
+                    width: 1.0,
+                    color: Color::from_rgb(0.9, 0.7, 0.3),
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            })
+            .on_press(SwarmMonitorMessage::PauseAgent(agent_id));
+        buttons_row = buttons_row.push(pause_btn);
+    }
+
+    // Resume button (only show for Paused state)
+    if agent.status == RuntimeAgentStatus::Paused {
+        let resume_btn = button(text("▶ Resume").size(11))
+            .padding([4, 8])
+            .style(|_theme: &Theme, _status| button::Style {
+                background: Some(Color::from_rgb(0.2, 0.7, 0.4).into()),
+                text_color: Color::WHITE,
+                border: iced::Border {
+                    width: 1.0,
+                    color: Color::from_rgb(0.3, 0.8, 0.5),
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            })
+            .on_press(SwarmMonitorMessage::ResumeAgent(agent_id));
+        buttons_row = buttons_row.push(resume_btn);
+    }
+
+    // Attach button (show for active or paused agents)
+    let is_active = matches!(
+        agent.status,
+        RuntimeAgentStatus::Running
+            | RuntimeAgentStatus::Thinking
+            | RuntimeAgentStatus::Paused
+    );
+    if is_active {
+        let attach_btn = button(text("🔗 Attach").size(11))
+            .padding([4, 8])
+            .style(|_theme: &Theme, _status| button::Style {
+                background: Some(Color::from_rgb(0.3, 0.5, 0.8).into()),
+                text_color: Color::WHITE,
+                border: iced::Border {
+                    width: 1.0,
+                    color: Color::from_rgb(0.4, 0.6, 0.9),
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            })
+            .on_press(SwarmMonitorMessage::AttachToAgent(agent_id));
+        buttons_row = buttons_row.push(attach_btn);
+    }
+
+    container(buttons_row)
+        .width(Length::Fill)
+        .into()
+}
+
 /// Render an individual agent card
 fn view_agent_card(
     agent: &AgentRuntimeState,
@@ -1197,6 +1355,10 @@ fn view_agent_card(
         .size(12)
         .color(Color::from_rgb(0.8, 0.8, 0.85));
     card_content = card_content.push(Space::with_height(5)).push(task_text);
+
+    // Control buttons (pause/resume/attach)
+    let control_buttons = view_agent_control_buttons(agent);
+    card_content = card_content.push(Space::with_height(8)).push(control_buttons);
 
     // Thinking state with animated bubble
     if agent.status == RuntimeAgentStatus::Thinking {
