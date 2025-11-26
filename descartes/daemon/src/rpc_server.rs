@@ -10,15 +10,18 @@
 //! - get_state: Query the current state
 
 use crate::errors::{DaemonError, DaemonResult};
+use crate::types::{RpcError, RpcRequest, RpcResponse};
 use descartes_core::traits::{AgentConfig, Task, TaskStatus};
 use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
-use jsonrpsee::server::{Server, ServerHandle};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::oneshot;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -118,14 +121,8 @@ impl RpcServerImpl {
             agent_ids: Arc::new(dashmap::DashMap::new()),
         }
     }
-}
 
-// Import ErrorObjectOwned for the trait implementation
-use jsonrpsee::types::ErrorObjectOwned;
-
-#[async_trait]
-impl DescartesRpcServer for RpcServerImpl {
-    async fn spawn(
+    pub(crate) async fn spawn_agent_internal(
         &self,
         name: String,
         agent_type: String,
@@ -133,7 +130,6 @@ impl DescartesRpcServer for RpcServerImpl {
     ) -> Result<String, ErrorObjectOwned> {
         info!("Spawning agent: {} (type: {})", name, agent_type);
 
-        // Parse configuration from JSON
         let environment: HashMap<String, String> = config
             .get("environment")
             .and_then(|e| serde_json::from_value(e.clone()).ok())
@@ -155,7 +151,6 @@ impl DescartesRpcServer for RpcServerImpl {
             .and_then(|s| s.as_str())
             .map(|s| s.to_string());
 
-        // Create agent configuration
         let agent_config = AgentConfig {
             name: name.clone(),
             model_backend: agent_type,
@@ -165,7 +160,6 @@ impl DescartesRpcServer for RpcServerImpl {
             environment,
         };
 
-        // Spawn the agent using the agent runner
         let agent_handle = self.agent_runner.spawn(agent_config).await.map_err(|e| {
             error!("Failed to spawn agent: {}", e);
             ErrorObjectOwned::owned(-32603, format!("Failed to spawn agent: {}", e), None::<()>)
@@ -173,24 +167,23 @@ impl DescartesRpcServer for RpcServerImpl {
 
         let agent_id = agent_handle.id();
         let agent_id_str = agent_id.to_string();
-
-        // Store the mapping for future reference
         self.agent_ids.insert(agent_id_str.clone(), agent_id);
 
         info!("Agent spawned successfully with ID: {}", agent_id_str);
         Ok(agent_id_str)
     }
 
-    async fn list_tasks(&self, filter: Option<Value>) -> Result<Vec<TaskInfo>, ErrorObjectOwned> {
+    pub(crate) async fn list_tasks_internal(
+        &self,
+        filter: Option<Value>,
+    ) -> Result<Vec<TaskInfo>, ErrorObjectOwned> {
         info!("Listing tasks with filter: {:?}", filter);
 
-        // Get all tasks from state store
         let tasks = self.state_store.get_tasks().await.map_err(|e| {
             error!("Failed to get tasks: {}", e);
             ErrorObjectOwned::owned(-32603, format!("Failed to get tasks: {}", e), None::<()>)
         })?;
 
-        // Apply filters if provided
         let mut filtered_tasks = tasks;
 
         if let Some(filter_obj) = filter {
@@ -205,7 +198,6 @@ impl DescartesRpcServer for RpcServerImpl {
             }
         }
 
-        // Convert to TaskInfo format
         let task_infos: Vec<TaskInfo> = filtered_tasks
             .into_iter()
             .map(|task| TaskInfo {
@@ -221,20 +213,18 @@ impl DescartesRpcServer for RpcServerImpl {
         Ok(task_infos)
     }
 
-    async fn approve(
+    pub(crate) async fn approve_task_internal(
         &self,
         task_id: String,
         approved: bool,
     ) -> Result<ApprovalResult, ErrorObjectOwned> {
         info!("Approving task: {} (approved: {})", task_id, approved);
 
-        // Parse task ID as UUID
         let task_uuid = Uuid::parse_str(&task_id).map_err(|e| {
             error!("Invalid task ID format: {}", e);
             ErrorObjectOwned::owned(-32602, format!("Invalid task ID format: {}", e), None::<()>)
         })?;
 
-        // Get the task from state store
         let mut task = self
             .state_store
             .get_task(&task_uuid)
@@ -248,7 +238,6 @@ impl DescartesRpcServer for RpcServerImpl {
                 ErrorObjectOwned::owned(-32602, format!("Task not found: {}", task_id), None::<()>)
             })?;
 
-        // Update task status based on approval
         task.status = if approved {
             TaskStatus::InProgress
         } else {
@@ -256,7 +245,6 @@ impl DescartesRpcServer for RpcServerImpl {
         };
         task.updated_at = chrono::Utc::now().timestamp();
 
-        // Add approval metadata
         let mut metadata = task.metadata.unwrap_or_else(|| serde_json::json!({}));
         if let Some(obj) = metadata.as_object_mut() {
             obj.insert("approved".to_string(), serde_json::json!(approved));
@@ -267,29 +255,26 @@ impl DescartesRpcServer for RpcServerImpl {
         }
         task.metadata = Some(metadata);
 
-        // Save the updated task
         self.state_store.save_task(&task).await.map_err(|e| {
             error!("Failed to save task: {}", e);
             ErrorObjectOwned::owned(-32603, format!("Failed to save task: {}", e), None::<()>)
         })?;
 
-        let result = ApprovalResult {
+        Ok(ApprovalResult {
             task_id,
             approved,
             timestamp: task.updated_at,
-        };
-
-        info!("Task approval recorded successfully");
-        Ok(result)
+        })
     }
 
-    async fn get_state(&self, entity_id: Option<String>) -> Result<Value, ErrorObjectOwned> {
+    pub(crate) async fn get_state_internal(
+        &self,
+        entity_id: Option<String>,
+    ) -> Result<Value, ErrorObjectOwned> {
         info!("Getting state for entity: {:?}", entity_id);
 
         if let Some(entity_id_str) = entity_id {
-            // Try to parse as agent ID
             if let Ok(agent_uuid) = Uuid::parse_str(&entity_id_str) {
-                // Get agent info from agent runner
                 let agent_info = self
                     .agent_runner
                     .get_agent(&agent_uuid)
@@ -326,7 +311,6 @@ impl DescartesRpcServer for RpcServerImpl {
                 }
             }
 
-            // If not an agent ID, return error
             return Err(ErrorObjectOwned::owned(
                 -32602,
                 format!("Invalid entity ID format: {}", entity_id_str),
@@ -334,7 +318,6 @@ impl DescartesRpcServer for RpcServerImpl {
             ));
         }
 
-        // Return system-wide state
         let agents = self.agent_runner.list_agents().await.map_err(|e| {
             error!("Failed to list agents: {}", e);
             ErrorObjectOwned::owned(-32603, format!("Failed to list agents: {}", e), None::<()>)
@@ -345,7 +328,7 @@ impl DescartesRpcServer for RpcServerImpl {
             ErrorObjectOwned::owned(-32603, format!("Failed to get tasks: {}", e), None::<()>)
         })?;
 
-        let state = serde_json::json!({
+        Ok(serde_json::json!({
             "entity_type": "system",
             "agents": {
                 "total": agents.len(),
@@ -361,25 +344,81 @@ impl DescartesRpcServer for RpcServerImpl {
                 "blocked": tasks.iter().filter(|t| t.status == TaskStatus::Blocked).count(),
             },
             "timestamp": chrono::Utc::now().to_rfc3339(),
-        });
+        }))
+    }
+}
 
-        Ok(state)
+// Import ErrorObjectOwned for the trait implementation
+use jsonrpsee::types::ErrorObjectOwned;
+
+#[async_trait]
+impl DescartesRpcServer for RpcServerImpl {
+    async fn spawn(
+        &self,
+        name: String,
+        agent_type: String,
+        config: Value,
+    ) -> Result<String, ErrorObjectOwned> {
+        self.spawn_agent_internal(name, agent_type, config).await
+    }
+
+    async fn list_tasks(&self, filter: Option<Value>) -> Result<Vec<TaskInfo>, ErrorObjectOwned> {
+        self.list_tasks_internal(filter).await
+    }
+
+    async fn approve(
+        &self,
+        task_id: String,
+        approved: bool,
+    ) -> Result<ApprovalResult, ErrorObjectOwned> {
+        self.approve_task_internal(task_id, approved).await
+    }
+
+    async fn get_state(&self, entity_id: Option<String>) -> Result<Value, ErrorObjectOwned> {
+        self.get_state_internal(entity_id).await
     }
 }
 
 /// Unix socket RPC server
 pub struct UnixSocketRpcServer {
     socket_path: PathBuf,
-    server_impl: RpcServerImpl,
+    server_impl: Arc<RpcServerImpl>,
+}
+
+/// Handle returned by the Unix socket RPC server.
+pub struct UnixServerHandle {
+    shutdown_tx: Option<oneshot::Sender<()>>,
+}
+
+impl UnixServerHandle {
+    /// Stop the running server.
+    pub fn stop(&mut self) -> DaemonResult<()> {
+        if let Some(tx) = self.shutdown_tx.take() {
+            tx.send(())
+                .map_err(|_| DaemonError::ServerError("RPC server already stopped".to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Compatibility helper to mirror jsonrpsee's ServerHandle API.
+    pub async fn stopped(self) {
+        let mut handle = self;
+        if let Err(err) = handle.stop() {
+            warn!("Error while stopping RPC server: {}", err);
+        }
+    }
+}
+
+impl Drop for UnixServerHandle {
+    fn drop(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
+    }
 }
 
 impl UnixSocketRpcServer {
-    /// Create a new Unix socket RPC server
-    ///
-    /// # Arguments
-    /// * `socket_path` - Path to the Unix socket file
-    /// * `agent_runner` - Agent runner for spawning and managing agents
-    /// * `state_store` - State store for persisting tasks and events
+    /// Create a new Unix socket RPC server.
     pub fn new(
         socket_path: PathBuf,
         agent_runner: Arc<dyn descartes_core::traits::AgentRunner>,
@@ -387,16 +426,12 @@ impl UnixSocketRpcServer {
     ) -> Self {
         Self {
             socket_path,
-            server_impl: RpcServerImpl::new(agent_runner, state_store),
+            server_impl: Arc::new(RpcServerImpl::new(agent_runner, state_store)),
         }
     }
 
-    /// Start the RPC server
-    ///
-    /// # Returns
-    /// A handle to the running server
-    pub async fn start(&self) -> DaemonResult<ServerHandle> {
-        // Remove existing socket file if it exists
+    /// Start listening for JSON-RPC requests over a Unix domain socket.
+    pub async fn start(&self) -> DaemonResult<UnixServerHandle> {
         if self.socket_path.exists() {
             info!("Removing existing socket file: {:?}", self.socket_path);
             std::fs::remove_file(&self.socket_path).map_err(|e| {
@@ -404,7 +439,6 @@ impl UnixSocketRpcServer {
             })?;
         }
 
-        // Create parent directory if it doesn't exist
         if let Some(parent) = self.socket_path.parent() {
             if !parent.exists() {
                 std::fs::create_dir_all(parent).map_err(|e| {
@@ -413,26 +447,322 @@ impl UnixSocketRpcServer {
             }
         }
 
-        info!("Starting RPC server on Unix socket: {:?}", self.socket_path);
+        let listener = UnixListener::bind(&self.socket_path).map_err(|e| {
+            DaemonError::ServerError(format!("Failed to bind to Unix socket: {}", e))
+        })?;
 
-        // Build the server
-        let server = Server::builder()
-            .build(
-                self.socket_path
-                    .to_str()
-                    .ok_or_else(|| DaemonError::ServerError("Invalid socket path".to_string()))?,
-            )
+        info!("RPC server listening on {:?}", self.socket_path);
+
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let server_impl = Arc::clone(&self.server_impl);
+        let socket_path = self.socket_path.clone();
+
+        tokio::spawn(async move {
+            Self::run_listener(listener, server_impl, socket_path, shutdown_rx).await;
+        });
+
+        Ok(UnixServerHandle {
+            shutdown_tx: Some(shutdown_tx),
+        })
+    }
+
+    async fn run_listener(
+        listener: UnixListener,
+        server_impl: Arc<RpcServerImpl>,
+        socket_path: PathBuf,
+        mut shutdown_rx: oneshot::Receiver<()>,
+    ) {
+        let listener = listener;
+        loop {
+            tokio::select! {
+                _ = &mut shutdown_rx => {
+                    info!("Shutting down Unix RPC server");
+                    break;
+                }
+                accept_result = listener.accept() => {
+                    match accept_result {
+                        Ok((stream, _)) => {
+                            let impl_clone = Arc::clone(&server_impl);
+                            tokio::spawn(async move {
+                                if let Err(err) = Self::handle_connection(stream, impl_clone).await {
+                                    error!("Unix RPC connection error: {}", err);
+                                }
+                            });
+                        }
+                        Err(err) => {
+                            error!("Unix RPC accept error: {}", err);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Err(err) = tokio::fs::remove_file(&socket_path).await {
+            warn!(
+                "Failed to remove Unix socket {:?} during shutdown: {}",
+                socket_path, err
+            );
+        }
+    }
+
+    async fn handle_connection(
+        stream: UnixStream,
+        server_impl: Arc<RpcServerImpl>,
+    ) -> DaemonResult<()> {
+        let mut reader = BufReader::new(stream);
+        let mut payload = String::new();
+        let bytes_read = reader
+            .read_line(&mut payload)
             .await
-            .map_err(|e| {
-                DaemonError::ServerError(format!("Failed to bind to Unix socket: {}", e))
-            })?;
+            .map_err(|e| DaemonError::ServerError(format!("Failed to read RPC request: {}", e)))?;
 
-        // Start the server with our RPC implementation
-        let handle = server.start(self.server_impl.clone().into_rpc());
+        if bytes_read == 0 {
+            return Ok(());
+        }
 
-        info!("RPC server started successfully on {:?}", self.socket_path);
+        let response = Self::handle_payload(server_impl, payload.trim()).await;
+        let mut stream = reader.into_inner();
+        stream.write_all(response.as_bytes()).await.map_err(|e| {
+            DaemonError::ServerError(format!("Failed to write RPC response: {}", e))
+        })?;
+        stream.write_all(b"\n").await.map_err(|e| {
+            DaemonError::ServerError(format!("Failed to write RPC terminator: {}", e))
+        })?;
+        stream
+            .shutdown()
+            .await
+            .map_err(|e| DaemonError::ServerError(format!("Failed to shutdown stream: {}", e)))?;
 
-        Ok(handle)
+        Ok(())
+    }
+
+    async fn handle_payload(server_impl: Arc<RpcServerImpl>, payload: &str) -> String {
+        if payload.is_empty() {
+            return serde_json::to_string(&RpcResponse::error(
+                -32600,
+                "Invalid Request".to_string(),
+                None,
+            ))
+            .unwrap();
+        }
+
+        let trimmed = payload.trim();
+        if trimmed.starts_with('[') {
+            match serde_json::from_str::<Vec<RpcRequest>>(trimmed) {
+                Ok(requests) if !requests.is_empty() => {
+                    let mut responses = Vec::with_capacity(requests.len());
+                    for request in requests {
+                        responses.push(
+                            Self::process_single_request(Arc::clone(&server_impl), request).await,
+                        );
+                    }
+                    serde_json::to_string(&responses).unwrap_or_else(|e| {
+                        serde_json::to_string(&RpcResponse::error(
+                            -32603,
+                            format!("Serialization error: {}", e),
+                            None,
+                        ))
+                        .unwrap()
+                    })
+                }
+                Ok(_) => serde_json::to_string(&RpcResponse::error(
+                    -32600,
+                    "Invalid Request".to_string(),
+                    None,
+                ))
+                .unwrap(),
+                Err(_) => serde_json::to_string(&RpcResponse::error(
+                    -32700,
+                    "Parse error".to_string(),
+                    None,
+                ))
+                .unwrap(),
+            }
+        } else {
+            match serde_json::from_str::<RpcRequest>(trimmed) {
+                Ok(request) => {
+                    serde_json::to_string(&Self::process_single_request(server_impl, request).await)
+                        .unwrap_or_else(|e| {
+                            serde_json::to_string(&RpcResponse::error(
+                                -32603,
+                                format!("Serialization error: {}", e),
+                                None,
+                            ))
+                            .unwrap()
+                        })
+                }
+                Err(_) => serde_json::to_string(&RpcResponse::error(
+                    -32700,
+                    "Parse error".to_string(),
+                    None,
+                ))
+                .unwrap(),
+            }
+        }
+    }
+
+    async fn process_single_request(
+        server_impl: Arc<RpcServerImpl>,
+        request: RpcRequest,
+    ) -> RpcResponse {
+        let method = request.method.clone();
+        match method.as_str() {
+            "spawn" | "agent.spawn" => match Self::parse_spawn_params(&request) {
+                Ok((name, agent_type, config)) => match server_impl
+                    .spawn_agent_internal(name, agent_type, config)
+                    .await
+                {
+                    Ok(agent_id) => RpcResponse::success(json!(agent_id), request.id.clone()),
+                    Err(err) => Self::convert_error(err, request.id.clone()),
+                },
+                Err(response) => response,
+            },
+            "list_tasks" | "task.list" => match Self::parse_list_params(&request) {
+                Ok(filter) => match server_impl.list_tasks_internal(filter).await {
+                    Ok(tasks) => match serde_json::to_value(tasks) {
+                        Ok(value) => RpcResponse::success(value, request.id.clone()),
+                        Err(e) => RpcResponse::error(
+                            -32603,
+                            format!("Serialization error: {}", e),
+                            request.id.clone(),
+                        ),
+                    },
+                    Err(err) => Self::convert_error(err, request.id.clone()),
+                },
+                Err(response) => response,
+            },
+            "approve" | "task.approve" => match Self::parse_approve_params(&request) {
+                Ok((task_id, approved)) => {
+                    match server_impl.approve_task_internal(task_id, approved).await {
+                        Ok(result) => match serde_json::to_value(result) {
+                            Ok(value) => RpcResponse::success(value, request.id.clone()),
+                            Err(e) => RpcResponse::error(
+                                -32603,
+                                format!("Serialization error: {}", e),
+                                request.id.clone(),
+                            ),
+                        },
+                        Err(err) => Self::convert_error(err, request.id.clone()),
+                    }
+                }
+                Err(response) => response,
+            },
+            "get_state" | "state.get" => match Self::parse_state_params(&request) {
+                Ok(entity_id) => match server_impl.get_state_internal(entity_id).await {
+                    Ok(value) => RpcResponse::success(value, request.id.clone()),
+                    Err(err) => Self::convert_error(err, request.id.clone()),
+                },
+                Err(response) => response,
+            },
+            _ => RpcResponse::error(-32601, "Method not found".to_string(), request.id.clone()),
+        }
+    }
+
+    fn parse_spawn_params(request: &RpcRequest) -> Result<(String, String, Value), RpcResponse> {
+        let params = match &request.params {
+            Some(Value::Array(arr)) => arr,
+            _ => {
+                return Err(Self::invalid_params(
+                    request.id.clone(),
+                    "Expected positional parameters",
+                ))
+            }
+        };
+
+        let name = params
+            .get(0)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                Self::invalid_params(request.id.clone(), "Missing agent name parameter")
+            })?
+            .to_string();
+        let agent_type = params
+            .get(1)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                Self::invalid_params(request.id.clone(), "Missing agent type parameter")
+            })?
+            .to_string();
+        let config = params
+            .get(2)
+            .cloned()
+            .unwrap_or_else(|| Value::Object(Default::default()));
+
+        Ok((name, agent_type, config))
+    }
+
+    fn parse_list_params(request: &RpcRequest) -> Result<Option<Value>, RpcResponse> {
+        match &request.params {
+            None => Ok(None),
+            Some(Value::Array(arr)) => Ok(arr.get(0).cloned().filter(|v| !v.is_null())),
+            Some(Value::Null) => Ok(None),
+            _ => Err(Self::invalid_params(
+                request.id.clone(),
+                "Expected optional filter parameter",
+            )),
+        }
+    }
+
+    fn parse_approve_params(request: &RpcRequest) -> Result<(String, bool), RpcResponse> {
+        let params = match &request.params {
+            Some(Value::Array(arr)) => arr,
+            _ => {
+                return Err(Self::invalid_params(
+                    request.id.clone(),
+                    "Expected positional parameters",
+                ))
+            }
+        };
+
+        let task_id = params
+            .get(0)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing task_id parameter"))?
+            .to_string();
+        let approved = params.get(1).and_then(|v| v.as_bool()).ok_or_else(|| {
+            Self::invalid_params(request.id.clone(), "Missing approved parameter")
+        })?;
+
+        Ok((task_id, approved))
+    }
+
+    fn parse_state_params(request: &RpcRequest) -> Result<Option<String>, RpcResponse> {
+        match &request.params {
+            None => Ok(None),
+            Some(Value::Array(arr)) => Ok(arr.get(0).and_then(|value| {
+                if value.is_null() {
+                    None
+                } else {
+                    value.as_str().map(|s| s.to_string())
+                }
+            })),
+            Some(Value::Null) => Ok(None),
+            _ => Err(Self::invalid_params(
+                request.id.clone(),
+                "Expected optional entity_id parameter",
+            )),
+        }
+    }
+
+    fn convert_error(err: ErrorObjectOwned, id: Option<Value>) -> RpcResponse {
+        let data = err
+            .data()
+            .and_then(|raw| serde_json::from_str(raw.get()).ok());
+        RpcResponse {
+            jsonrpc: "2.0".to_string(),
+            result: None,
+            error: Some(RpcError {
+                code: err.code() as i64,
+                message: err.message().to_string(),
+                data,
+            }),
+            id,
+        }
+    }
+
+    fn invalid_params(id: Option<Value>, message: impl Into<String>) -> RpcResponse {
+        RpcResponse::error(-32602, message.into(), id)
     }
 
     /// Get the socket path
@@ -456,29 +786,31 @@ mod tests {
     use super::*;
     use descartes_core::agent_runner::LocalProcessRunner;
     use descartes_core::state_store::SqliteStateStore;
+    use descartes_core::traits::StateStore;
     use tempfile::tempdir;
 
     async fn create_test_dependencies() -> (
         Arc<dyn descartes_core::traits::AgentRunner>,
         Arc<dyn descartes_core::traits::StateStore>,
+        tempfile::TempDir,
     ) {
         let agent_runner =
             Arc::new(LocalProcessRunner::new()) as Arc<dyn descartes_core::traits::AgentRunner>;
 
         let temp_db = tempdir().unwrap();
         let db_path = temp_db.path().join("test.db");
-        let mut state_store = SqliteStateStore::new(db_path, false).await.unwrap();
+        let mut state_store = SqliteStateStore::new(db_path, true).await.unwrap();
         state_store.initialize().await.unwrap();
         let state_store = Arc::new(state_store) as Arc<dyn descartes_core::traits::StateStore>;
 
-        (agent_runner, state_store)
+        (agent_runner, state_store, temp_db)
     }
 
     #[tokio::test]
     async fn test_server_creation() {
         let dir = tempdir().unwrap();
         let socket_path = dir.path().join("test.sock");
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
         let server = UnixSocketRpcServer::new(socket_path.clone(), agent_runner, state_store);
         assert_eq!(server.socket_path(), &socket_path);
     }
@@ -517,7 +849,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_tasks_empty() {
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
         let server_impl = RpcServerImpl::new(agent_runner, state_store);
 
         let result = server_impl.list_tasks(None).await;
@@ -530,7 +862,7 @@ mod tests {
     async fn test_list_tasks_with_data() {
         use descartes_core::traits::{TaskComplexity, TaskPriority};
 
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
 
         // Create test tasks
         let task1 = Task {
@@ -593,7 +925,7 @@ mod tests {
     async fn test_approve_task() {
         use descartes_core::traits::{TaskComplexity, TaskPriority};
 
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
 
         // Create a test task
         let task = Task {
@@ -632,7 +964,7 @@ mod tests {
     async fn test_approve_task_rejection() {
         use descartes_core::traits::{TaskComplexity, TaskPriority};
 
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
 
         // Create a test task
         let task = Task {
@@ -668,7 +1000,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_approve_nonexistent_task() {
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
         let server_impl = RpcServerImpl::new(agent_runner, state_store);
 
         let fake_task_id = Uuid::new_v4().to_string();
@@ -678,7 +1010,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_approve_invalid_task_id() {
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
         let server_impl = RpcServerImpl::new(agent_runner, state_store);
 
         let result = server_impl.approve("invalid-uuid".to_string(), true).await;
@@ -687,7 +1019,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_state_system() {
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
         let server_impl = RpcServerImpl::new(agent_runner, state_store);
 
         let result = server_impl.get_state(None).await;
@@ -700,7 +1032,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_state_invalid_entity() {
-        let (agent_runner, state_store) = create_test_dependencies().await;
+        let (agent_runner, state_store, _temp_db) = create_test_dependencies().await;
         let server_impl = RpcServerImpl::new(agent_runner, state_store);
 
         let result = server_impl

@@ -135,6 +135,7 @@ impl RpcClient {
             method: method.to_string(),
             params,
             id: Some(json!(request_id)),
+            auth_token: None,
         };
 
         debug!("RPC call: {} (id: {})", method, request_id);
@@ -228,6 +229,7 @@ impl RpcClient {
                 method: method.to_string(),
                 params,
                 id: Some(json!(request_id)),
+                auth_token: None,
             });
         }
 

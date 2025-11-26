@@ -102,7 +102,10 @@ mod tests {
     fn test_provider_endpoint_extraction_openai() {
         let mut config = HashMap::new();
         config.insert("api_key".to_string(), "test-key".to_string());
-        config.insert("endpoint".to_string(), "https://custom.openai.endpoint".to_string());
+        config.insert(
+            "endpoint".to_string(),
+            "https://custom.openai.endpoint".to_string(),
+        );
 
         let result = ProviderFactory::create("openai", config);
         assert!(result.is_ok());
@@ -119,7 +122,10 @@ mod tests {
     fn test_provider_endpoint_extraction_anthropic() {
         let mut config = HashMap::new();
         config.insert("api_key".to_string(), "test-key".to_string());
-        config.insert("endpoint".to_string(), "https://custom.anthropic.endpoint".to_string());
+        config.insert(
+            "endpoint".to_string(),
+            "https://custom.anthropic.endpoint".to_string(),
+        );
 
         let result = ProviderFactory::create("anthropic", config);
         assert!(result.is_ok());
@@ -189,38 +195,53 @@ mod tests {
     #[test]
     fn test_provider_mode_verification_openai() {
         let provider = OpenAiProvider::new("test-key".to_string(), None);
-        matches!(provider.mode(), crate::traits::ModelProviderMode::Api { .. });
+        matches!(
+            provider.mode(),
+            crate::traits::ModelProviderMode::Api { .. }
+        );
     }
 
     #[test]
     fn test_provider_mode_verification_anthropic() {
         let provider = AnthropicProvider::new("test-key".to_string(), None);
-        matches!(provider.mode(), crate::traits::ModelProviderMode::Api { .. });
+        matches!(
+            provider.mode(),
+            crate::traits::ModelProviderMode::Api { .. }
+        );
     }
 
     #[test]
     fn test_provider_mode_verification_ollama() {
         let provider = OllamaProvider::new(None, None);
-        matches!(provider.mode(), crate::traits::ModelProviderMode::Local { .. });
+        matches!(
+            provider.mode(),
+            crate::traits::ModelProviderMode::Local { .. }
+        );
     }
 
     #[test]
     fn test_provider_mode_verification_claude_code() {
         let adapter = ClaudeCodeAdapter::new(None, None);
-        matches!(adapter.mode(), crate::traits::ModelProviderMode::Headless { .. });
+        matches!(
+            adapter.mode(),
+            crate::traits::ModelProviderMode::Headless { .. }
+        );
     }
 
     #[test]
     fn test_provider_mode_verification_headless_cli() {
         let adapter = HeadlessCliAdapter::new("test-cmd".to_string(), vec![]);
-        matches!(adapter.mode(), crate::traits::ModelProviderMode::Headless { .. });
+        matches!(
+            adapter.mode(),
+            crate::traits::ModelProviderMode::Headless { .. }
+        );
     }
 
     #[test]
     fn test_openai_provider_with_custom_endpoint() {
         let provider = OpenAiProvider::new(
             "test-key".to_string(),
-            Some("https://custom.endpoint.com/v1".to_string())
+            Some("https://custom.endpoint.com/v1".to_string()),
         );
         assert_eq!(provider.name(), "openai");
 
@@ -235,7 +256,7 @@ mod tests {
     fn test_anthropic_provider_with_custom_endpoint() {
         let provider = AnthropicProvider::new(
             "test-key".to_string(),
-            Some("https://custom.anthropic.com/v1".to_string())
+            Some("https://custom.anthropic.com/v1".to_string()),
         );
         assert_eq!(provider.name(), "anthropic");
 
@@ -248,13 +269,15 @@ mod tests {
 
     #[test]
     fn test_ollama_provider_with_custom_endpoint() {
-        let provider = OllamaProvider::new(
-            Some("http://192.168.1.100:11434".to_string()),
-            Some(600)
-        );
+        let provider =
+            OllamaProvider::new(Some("http://192.168.1.100:11434".to_string()), Some(600));
         assert_eq!(provider.name(), "ollama");
 
-        if let crate::traits::ModelProviderMode::Local { endpoint, timeout_secs } = provider.mode() {
+        if let crate::traits::ModelProviderMode::Local {
+            endpoint,
+            timeout_secs,
+        } = provider.mode()
+        {
             assert_eq!(endpoint, "http://192.168.1.100:11434");
             assert_eq!(*timeout_secs, 600);
         } else {
@@ -266,7 +289,7 @@ mod tests {
     fn test_claude_code_adapter_with_custom_command() {
         let adapter = ClaudeCodeAdapter::new(
             Some("/usr/local/bin/claude".to_string()),
-            Some(vec!["--model".to_string(), "claude-3".to_string()])
+            Some(vec!["--model".to_string(), "claude-3".to_string()]),
         );
         assert_eq!(adapter.name(), "claude-code-cli");
 

@@ -172,18 +172,17 @@ fn test_export_with_metadata() {
     let config = default_export_config()
         .with_resource(
             "database",
-            ResourceConfig {
-                resource_type: "Database".to_string(),
-                connection_string: Some("db://localhost".to_string()),
-                config: HashMap::new(),
+            ResourceConfig::Database {
+                connection_string: "db://localhost".to_string(),
+                pool_size: None,
             },
         )
         .with_resource(
             "api",
-            ResourceConfig {
-                resource_type: "API".to_string(),
-                connection_string: Some("https://api.example.com".to_string()),
-                config: HashMap::new(),
+            ResourceConfig::Http {
+                endpoint: "https://api.example.com".to_string(),
+                auth_required: None,
+                secret_key: None,
             },
         );
 

@@ -1,7 +1,7 @@
 /// Integration tests for the logs command
 use sqlx::sqlite::SqlitePool;
-use tempfile::TempDir;
 use std::time::SystemTime;
+use tempfile::TempDir;
 use uuid::Uuid;
 
 /// Helper to create a temporary directory for testing
@@ -85,12 +85,10 @@ async fn test_logs_empty_events() {
     let pool = setup_test_db(&temp_dir).await;
 
     // Query for events - should be empty
-    let rows = sqlx::query(
-        "SELECT * FROM events ORDER BY timestamp DESC LIMIT 100"
-    )
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query events");
+    let rows = sqlx::query("SELECT * FROM events ORDER BY timestamp DESC LIMIT 100")
+        .fetch_all(&pool)
+        .await
+        .expect("Failed to query events");
 
     assert!(rows.is_empty(), "Should have no events initially");
 }
@@ -123,13 +121,11 @@ async fn test_logs_query_by_session() {
     .await;
 
     // Query by session
-    let rows = sqlx::query(
-        "SELECT * FROM events WHERE session_id = ?1 ORDER BY timestamp DESC"
-    )
-    .bind(session_id)
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query events");
+    let rows = sqlx::query("SELECT * FROM events WHERE session_id = ?1 ORDER BY timestamp DESC")
+        .bind(session_id)
+        .fetch_all(&pool)
+        .await
+        .expect("Failed to query events");
 
     assert_eq!(rows.len(), 1, "Should have one event for session");
 }
@@ -171,13 +167,12 @@ async fn test_logs_query_by_event_type() {
     .await;
 
     // Query by event type
-    let error_rows = sqlx::query(
-        "SELECT * FROM events WHERE event_type = ?1 ORDER BY timestamp DESC"
-    )
-    .bind("error")
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query events");
+    let error_rows =
+        sqlx::query("SELECT * FROM events WHERE event_type = ?1 ORDER BY timestamp DESC")
+            .bind("error")
+            .fetch_all(&pool)
+            .await
+            .expect("Failed to query events");
 
     assert_eq!(error_rows.len(), 1, "Should have one error event");
 }
@@ -203,12 +198,10 @@ async fn test_logs_limit() {
     }
 
     // Query with limit
-    let rows = sqlx::query(
-        "SELECT * FROM events ORDER BY timestamp DESC LIMIT 100"
-    )
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query events");
+    let rows = sqlx::query("SELECT * FROM events ORDER BY timestamp DESC LIMIT 100")
+        .fetch_all(&pool)
+        .await
+        .expect("Failed to query events");
 
     assert_eq!(rows.len(), 100, "Should be limited to 100 events");
 }
@@ -267,7 +260,7 @@ async fn test_logs_combined_filters() {
 
     // Query with both session and event type filter
     let rows = sqlx::query(
-        "SELECT * FROM events WHERE session_id = ?1 AND event_type = ?2 ORDER BY timestamp DESC"
+        "SELECT * FROM events WHERE session_id = ?1 AND event_type = ?2 ORDER BY timestamp DESC",
     )
     .bind("session-a")
     .bind("error")
@@ -293,12 +286,10 @@ async fn test_logs_ordering() {
     insert_test_event(&pool, "third", "session", "System", "sys", "Third event").await;
 
     // Query in descending order (newest first)
-    let rows = sqlx::query(
-        "SELECT event_type FROM events ORDER BY timestamp DESC"
-    )
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query events");
+    let rows = sqlx::query("SELECT event_type FROM events ORDER BY timestamp DESC")
+        .fetch_all(&pool)
+        .await
+        .expect("Failed to query events");
 
     assert_eq!(rows.len(), 3);
 
@@ -315,18 +306,44 @@ async fn test_logs_search_content() {
     let pool = setup_test_db(&temp_dir).await;
 
     // Insert events with different content
-    insert_test_event(&pool, "info", "session", "Agent", "agent-1", "Hello world message").await;
-    insert_test_event(&pool, "info", "session", "Agent", "agent-2", "Goodbye message").await;
-    insert_test_event(&pool, "info", "session", "Agent", "agent-3", "Another content").await;
+    insert_test_event(
+        &pool,
+        "info",
+        "session",
+        "Agent",
+        "agent-1",
+        "Hello world message",
+    )
+    .await;
+    insert_test_event(
+        &pool,
+        "info",
+        "session",
+        "Agent",
+        "agent-2",
+        "Goodbye message",
+    )
+    .await;
+    insert_test_event(
+        &pool,
+        "info",
+        "session",
+        "Agent",
+        "agent-3",
+        "Another content",
+    )
+    .await;
 
     // Search in content
-    let rows = sqlx::query(
-        "SELECT * FROM events WHERE content LIKE ?1"
-    )
-    .bind("%message%")
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query events");
+    let rows = sqlx::query("SELECT * FROM events WHERE content LIKE ?1")
+        .bind("%message%")
+        .fetch_all(&pool)
+        .await
+        .expect("Failed to query events");
 
-    assert_eq!(rows.len(), 2, "Should find two events with 'message' in content");
+    assert_eq!(
+        rows.len(),
+        2,
+        "Should find two events with 'message' in content"
+    );
 }

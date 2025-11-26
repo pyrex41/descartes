@@ -9,7 +9,6 @@
 /// - Audit trails for agent actions
 /// - Performance analysis and optimization
 /// - Recovery and restoration from any point in history
-
 use crate::errors::{StateStoreError, StateStoreResult};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -123,11 +122,7 @@ pub struct AgentHistoryEvent {
 
 impl AgentHistoryEvent {
     /// Create a new history event
-    pub fn new(
-        agent_id: String,
-        event_type: HistoryEventType,
-        event_data: Value,
-    ) -> Self {
+    pub fn new(agent_id: String, event_type: HistoryEventType, event_data: Value) -> Self {
         Self {
             event_id: Uuid::new_v4(),
             agent_id,
@@ -314,7 +309,11 @@ pub trait AgentHistoryStore: Send + Sync {
     async fn record_events(&self, events: &[AgentHistoryEvent]) -> StateStoreResult<()>;
 
     /// Get events for a specific agent
-    async fn get_events(&self, agent_id: &str, limit: i64) -> StateStoreResult<Vec<AgentHistoryEvent>>;
+    async fn get_events(
+        &self,
+        agent_id: &str,
+        limit: i64,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>>;
 
     /// Query events with filters
     async fn query_events(&self, query: &HistoryQuery) -> StateStoreResult<Vec<AgentHistoryEvent>>;
@@ -336,7 +335,10 @@ pub trait AgentHistoryStore: Send + Sync {
     ) -> StateStoreResult<Vec<AgentHistoryEvent>>;
 
     /// Get events by session
-    async fn get_events_by_session(&self, session_id: &str) -> StateStoreResult<Vec<AgentHistoryEvent>>;
+    async fn get_events_by_session(
+        &self,
+        session_id: &str,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>>;
 
     /// Create a snapshot of agent history
     async fn create_snapshot(&self, snapshot: &HistorySnapshot) -> StateStoreResult<()>;
@@ -362,6 +364,7 @@ pub trait AgentHistoryStore: Send + Sync {
 // ============================================================================
 
 /// SQLite-backed implementation of AgentHistoryStore
+#[derive(Clone)]
 pub struct SqliteAgentHistoryStore {
     pool: SqlitePool,
 }
@@ -381,14 +384,13 @@ impl SqliteAgentHistoryStore {
         }
 
         // Create connection options
-        let connect_options = sqlx::sqlite::SqliteConnectOptions::from_str(
-            db_path.to_string_lossy().as_ref(),
-        )
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to parse database path: {}", e))
-        })?
-        .create_if_missing(true)
-        .foreign_keys(true);
+        let connect_options =
+            sqlx::sqlite::SqliteConnectOptions::from_str(db_path.to_string_lossy().as_ref())
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to parse database path: {}", e))
+                })?
+                .create_if_missing(true)
+                .foreign_keys(true);
 
         // Create connection pool
         let pool = SqlitePoolOptions::new()
@@ -529,9 +531,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(metadata_json)
         .execute(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to record event: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to record event: {}", e)))?;
 
         Ok(())
     }
@@ -587,7 +587,11 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         Ok(())
     }
 
-    async fn get_events(&self, agent_id: &str, limit: i64) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    async fn get_events(
+        &self,
+        agent_id: &str,
+        limit: i64,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         let rows = sqlx::query(
             r#"
             SELECT event_id, agent_id, timestamp, event_type, event_data, git_commit_hash,
@@ -602,9 +606,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to fetch events: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch events: {}", e)))?;
 
         self.rows_to_events(rows)
     }
@@ -741,7 +743,10 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         self.rows_to_events(rows)
     }
 
-    async fn get_events_by_session(&self, session_id: &str) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    async fn get_events_by_session(
+        &self,
+        session_id: &str,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         let rows = sqlx::query(
             r#"
             SELECT event_id, agent_id, timestamp, event_type, event_data, git_commit_hash,
@@ -786,22 +791,21 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(agent_state_json)
         .execute(&mut *tx)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to create snapshot: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to create snapshot: {}", e)))?;
 
         // Link events to snapshot
         for event in &snapshot.events {
-            sqlx::query(
-                "INSERT INTO snapshot_events (snapshot_id, event_id) VALUES (?, ?)",
-            )
-            .bind(snapshot.snapshot_id.to_string())
-            .bind(event.event_id.to_string())
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| {
-                StateStoreError::DatabaseError(format!("Failed to link event to snapshot: {}", e))
-            })?;
+            sqlx::query("INSERT INTO snapshot_events (snapshot_id, event_id) VALUES (?, ?)")
+                .bind(snapshot.snapshot_id.to_string())
+                .bind(event.event_id.to_string())
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!(
+                        "Failed to link event to snapshot: {}",
+                        e
+                    ))
+                })?;
         }
 
         tx.commit().await.map_err(|e| {
@@ -822,9 +826,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(snapshot_id.to_string())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to fetch snapshot: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch snapshot: {}", e)))?;
 
         if let Some(row) = row {
             let snapshot_id_str: String = row.get("snapshot_id");
@@ -885,9 +887,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         .bind(agent_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to list snapshots: {}", e))
-        })?;
+        .map_err(|e| StateStoreError::DatabaseError(format!("Failed to list snapshots: {}", e)))?;
 
         let mut snapshots = Vec::new();
 
@@ -917,15 +917,14 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
 
     async fn get_statistics(&self, agent_id: &str) -> StateStoreResult<HistoryStatistics> {
         // Get total events
-        let total_events: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM agent_history_events WHERE agent_id = ?",
-        )
-        .bind(agent_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to get total events: {}", e))
-        })?;
+        let total_events: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM agent_history_events WHERE agent_id = ?")
+                .bind(agent_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to get total events: {}", e))
+                })?;
 
         // Get events by type
         let type_rows = sqlx::query(
@@ -946,15 +945,14 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
         }
 
         // Get total snapshots
-        let total_snapshots: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM history_snapshots WHERE agent_id = ?",
-        )
-        .bind(agent_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| {
-            StateStoreError::DatabaseError(format!("Failed to get total snapshots: {}", e))
-        })?;
+        let total_snapshots: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM history_snapshots WHERE agent_id = ?")
+                .bind(agent_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    StateStoreError::DatabaseError(format!("Failed to get total snapshots: {}", e))
+                })?;
 
         // Get time range
         let time_range = sqlx::query(
@@ -1027,9 +1025,7 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
             .bind(id.to_string())
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| {
-                StateStoreError::DatabaseError(format!("Failed to fetch event: {}", e))
-            })?;
+            .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch event: {}", e)))?;
 
             if let Some(row) = row {
                 let parent_id_str: Option<String> = row.get("parent_event_id");
@@ -1048,7 +1044,10 @@ impl AgentHistoryStore for SqliteAgentHistoryStore {
 
 // Helper methods for SqliteAgentHistoryStore
 impl SqliteAgentHistoryStore {
-    fn rows_to_events(&self, rows: Vec<sqlx::sqlite::SqliteRow>) -> StateStoreResult<Vec<AgentHistoryEvent>> {
+    fn rows_to_events(
+        &self,
+        rows: Vec<sqlx::sqlite::SqliteRow>,
+    ) -> StateStoreResult<Vec<AgentHistoryEvent>> {
         rows.iter().map(|row| self.row_to_event(row)).collect()
     }
 
@@ -1076,11 +1075,9 @@ impl SqliteAgentHistoryStore {
             StateStoreError::SerializationError(format!("Failed to parse tags: {}", e))
         })?;
 
-        let metadata = metadata_str
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let metadata = metadata_str.and_then(|s| serde_json::from_str(&s).ok());
 
-        let parent_event_id = parent_event_id_str
-            .and_then(|s| Uuid::parse_str(&s).ok());
+        let parent_event_id = parent_event_id_str.and_then(|s| Uuid::parse_str(&s).ok());
 
         Ok(AgentHistoryEvent {
             event_id,
@@ -1100,12 +1097,10 @@ impl SqliteAgentHistoryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
 
     async fn create_test_store() -> SqliteAgentHistoryStore {
-        let temp_file = NamedTempFile::new().unwrap();
-        let path = temp_file.path().to_str().unwrap();
-        let mut store = SqliteAgentHistoryStore::new(path).await.unwrap();
+        // Use in-memory SQLite for faster tests
+        let mut store = SqliteAgentHistoryStore::new(":memory:").await.unwrap();
         store.initialize().await.unwrap();
         store
     }
@@ -1268,43 +1263,43 @@ mod tests {
     async fn test_time_range_query() {
         let store = create_test_store().await;
 
-        let start_time = Utc::now().timestamp();
+        // Use explicit timestamps (Unix timestamps in seconds)
+        let now = chrono::Utc::now().timestamp();
+        let earlier_time = now - 10; // 10 seconds earlier
 
-        let event1 = AgentHistoryEvent::new(
+        // Create event1 with earlier timestamp
+        let mut event1 = AgentHistoryEvent::new(
             "agent-1".to_string(),
             HistoryEventType::Thought,
             serde_json::json!({"content": "early thought"}),
         );
+        event1.timestamp = earlier_time;
 
         store.record_event(&event1).await.unwrap();
 
-        // Sleep to ensure different timestamp
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-
-        let mid_time = Utc::now().timestamp();
-
-        let event2 = AgentHistoryEvent::new(
+        // Create event2 with current timestamp
+        let mut event2 = AgentHistoryEvent::new(
             "agent-1".to_string(),
             HistoryEventType::Thought,
             serde_json::json!({"content": "later thought"}),
         );
+        event2.timestamp = now;
 
         store.record_event(&event2).await.unwrap();
 
-        let end_time = Utc::now().timestamp();
-
         // Query full range
         let all_events = store
-            .get_events_by_time_range("agent-1", start_time, end_time)
+            .get_events_by_time_range("agent-1", earlier_time, now)
             .await
             .unwrap();
         assert_eq!(all_events.len(), 2);
 
-        // Query first half
+        // Query only event1's exact timestamp - should return just event1
         let early_events = store
-            .get_events_by_time_range("agent-1", start_time, mid_time)
+            .get_events_by_time_range("agent-1", earlier_time, earlier_time)
             .await
             .unwrap();
         assert_eq!(early_events.len(), 1);
+        assert_eq!(early_events[0].event_id, event1.event_id);
     }
 }

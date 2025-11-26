@@ -7,8 +7,99 @@
 /// - Allows file selection and interaction
 /// - Provides filtering and search capabilities
 /// - Integrates with the FileTree data model
+#[cfg(feature = "agent-runner")]
 use descartes_agent_runner::knowledge_graph::{FileNodeType, FileTree, FileTreeNode};
+#[cfg(feature = "agent-runner")]
 use descartes_agent_runner::types::Language;
+
+// Stub types when agent-runner feature is not enabled
+#[cfg(not(feature = "agent-runner"))]
+mod stub_types {
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    #[derive(Debug, Clone)]
+    pub struct FileTree {
+        pub root_id: Option<String>,
+        pub nodes: HashMap<String, FileTreeNode>,
+        pub base_path: PathBuf,
+        pub file_count: usize,
+        pub directory_count: usize,
+    }
+
+    impl FileTree {
+        pub fn get_node(&self, _id: &str) -> Option<&FileTreeNode> {
+            None
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct FileTreeNode {
+        pub node_id: String,
+        pub name: String,
+        pub path: PathBuf,
+        pub node_type: FileNodeType,
+        pub depth: usize,
+        pub parent_id: Option<String>,
+        pub children: Vec<String>,
+        pub metadata: FileMetadata,
+        pub knowledge_links: Vec<String>,
+    }
+
+    impl FileTreeNode {
+        pub fn is_directory(&self) -> bool {
+            matches!(self.node_type, FileNodeType::Directory)
+        }
+
+        pub fn add_knowledge_link(&mut self, _link: String) {}
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct FileMetadata {
+        pub language: Option<Language>,
+        pub is_binary: bool,
+        pub size: Option<u64>,
+        pub modified: Option<i64>,
+        pub git_status: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum FileNodeType {
+        File,
+        Directory,
+        Symlink,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Language {
+        Rust,
+        Python,
+        JavaScript,
+        TypeScript,
+        Go,
+        Java,
+        C,
+        Cpp,
+        Ruby,
+        Php,
+        Swift,
+        Kotlin,
+        Scala,
+        Bash,
+        Sql,
+        Html,
+        Css,
+        Json,
+        Xml,
+        Yaml,
+        Toml,
+        Markdown,
+    }
+}
+
+#[cfg(not(feature = "agent-runner"))]
+use stub_types::{FileNodeType, FileTree, FileTreeNode, Language};
+
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::{
     button, column, container, row, scrollable, text, text_input, Column, Row, Space,
@@ -301,8 +392,8 @@ pub fn update(state: &mut FileTreeState, message: FileTreeMessage) {
         }
         FileTreeMessage::ShowKnowledgeNodes(node_id) => {
             state.show_knowledge_for = Some(node_id.clone());
-            state.selected_node = Some(node_id);
             tracing::info!("Showing knowledge nodes for file: {}", node_id);
+            state.selected_node = Some(node_id);
         }
         FileTreeMessage::NavigateToKnowledgeNode(knowledge_node_id) => {
             tracing::info!("Navigating to knowledge node: {}", knowledge_node_id);
@@ -627,7 +718,7 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
     let name_text = text(&node.name).size(14);
 
     // Enhanced knowledge badge with icon and color
-    let knowledge_badge = if !node.knowledge_links.is_empty() {
+    let knowledge_badge: Element<'a, FileTreeMessage> = if !node.knowledge_links.is_empty() {
         let badge_text = if node.knowledge_links.len() > 9 {
             format!(" 🔗 {}+", node.knowledge_links.len())
         } else {
@@ -640,14 +731,15 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
                 .color(Color::from_rgb8(120, 200, 255)),
         )
         .padding(2)
-        .style(|theme: &Theme| button::Style {
+        .style(|_theme: &Theme, _status| button::Style {
             background: Some(Color::from_rgba8(120, 200, 255, 0.2).into()),
             border: iced::Border {
                 width: 1.0,
                 color: Color::from_rgb8(120, 200, 255),
                 radius: 3.0.into(),
             },
-            ..button::Style::default()
+            text_color: Color::from_rgb8(120, 200, 255),
+            shadow: iced::Shadow::default(),
         })
         .on_press(FileTreeMessage::ShowKnowledgeNodes(node.node_id.clone()))
         .into()
@@ -657,9 +749,8 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
 
     // Git status indicator
     let git_status = if let Some(ref status) = node.metadata.git_status {
-        text(format!(" {}", status))
-            .size(12)
-            .style(get_git_status_color(status))
+        let color = get_git_status_color(status);
+        text(format!(" {}", status)).size(12).color(color)
     } else {
         text("")
     };
@@ -743,7 +834,7 @@ fn view_node<'a>(state: &'a FileTreeState, node: &'a FileTreeNode) -> Element<'a
 }
 
 /// Render footer with statistics
-fn view_footer(state: &FileTreeState, tree: &FileTree) -> Element<FileTreeMessage> {
+fn view_footer<'a>(state: &'a FileTreeState, tree: &'a FileTree) -> Element<'a, FileTreeMessage> {
     let filtered_nodes = filter_nodes(state, tree);
     let visible_count = filtered_nodes.len();
 

@@ -4,7 +4,7 @@
 /// multiple agents in a workflow, including pub/sub, request/response,
 /// and state sharing patterns.
 use descartes_core::{
-    IpcMessage, MessageBus, MessageBusConfig, MessageHandler, MessageType, RoutingRule,
+    IpcMessage, IpcRoutingRule, MessageBus, MessageBusConfig, MessageHandler, MessageType,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -186,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Add routing rules
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "route-lifecycle".to_string(),
             msg_type_filter: Some(MessageType::PublishMessage),
             sender_filter: None,
@@ -199,7 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "route-data".to_string(),
             msg_type_filter: Some(MessageType::PublishMessage),
             sender_filter: None,
@@ -212,7 +212,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "route-results".to_string(),
             msg_type_filter: Some(MessageType::PublishMessage),
             sender_filter: None,

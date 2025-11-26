@@ -103,7 +103,7 @@ fn create_directory_structure(base_dir: &Path) -> Result<()> {
 }
 
 async fn initialize_database(base_dir: &Path) -> Result<()> {
-    use sqlx::sqlite::{SqlitePool, SqliteConnectOptions};
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 
     let db_path = base_dir.join("data/descartes.db");
     let db_url = format!("sqlite://{}", db_path.display());

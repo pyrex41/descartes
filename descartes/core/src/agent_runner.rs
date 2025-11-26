@@ -18,7 +18,7 @@ use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, Mutex};
@@ -88,7 +88,15 @@ impl LocalProcessRunner {
     /// Check if we can spawn more agents based on max_concurrent_agents
     fn can_spawn_agent(&self) -> bool {
         if let Some(max) = self.config.max_concurrent_agents {
-            self.agents.len() < max
+            let active_agents = self
+                .agents
+                .iter()
+                .filter(|entry| {
+                    let handle = entry.value().read();
+                    !handle.status.is_terminal()
+                })
+                .count();
+            active_agents < max
         } else {
             true
         }
@@ -196,12 +204,55 @@ impl LocalProcessRunner {
                     // Update status to terminated
                     if let Some(h) = agents.get(&agent_id) {
                         let mut handle_guard = h.write();
-                        if handle_guard.status == AgentStatus::Running {
-                            handle_guard.status = AgentStatus::Terminated;
+                        if handle_guard.exit_status.is_some() {
+                            // Already recorded by exit observer
+                        } else if !handle_guard.status.is_terminal() {
+                            handle_guard.set_status(AgentStatus::Terminated);
                         }
                     }
                     break;
                 }
+            }
+        });
+    }
+
+    /// Monitor exit status so handles update once the child process finishes.
+    fn spawn_exit_observer(&self, agent_id: Uuid, handle: Arc<RwLock<LocalAgentHandle>>) {
+        tokio::spawn(async move {
+            loop {
+                let child_handle = {
+                    let handle_read = handle.read();
+                    if handle_read.status.is_terminal() || handle_read.exit_status.is_some() {
+                        break;
+                    }
+                    Arc::clone(&handle_read.child)
+                };
+
+                let mut child_guard = child_handle.lock().await;
+                match child_guard.try_wait() {
+                    Ok(Some(status)) => {
+                        let exit_status = ExitStatus {
+                            code: status.code(),
+                            success: status.success(),
+                        };
+                        {
+                            let mut handle_write = handle.write();
+                            handle_write.record_exit_status(exit_status);
+                        }
+                        break;
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to poll process status for agent {}: {}",
+                            agent_id,
+                            e
+                        );
+                        break;
+                    }
+                }
+
+                tokio::time::sleep(Duration::from_millis(250)).await;
             }
         });
     }
@@ -274,6 +325,7 @@ impl AgentRunner for LocalProcessRunner {
 
         // Spawn health checker
         self.spawn_health_checker(agent_id, self.agents.clone());
+        self.spawn_exit_observer(agent_id, handle_arc.clone());
 
         // Return boxed handle wrapper
         Ok(Box::new(AgentHandleWrapper {
@@ -314,7 +366,11 @@ impl AgentRunner for LocalProcessRunner {
             // Update the handle's status
             {
                 let mut handle_guard = handle.write();
-                handle_guard.status = AgentStatus::Terminated;
+                handle_guard.set_status(AgentStatus::Terminated);
+                handle_guard.exit_status = Some(ExitStatus {
+                    code: None,
+                    success: false,
+                });
             }
 
             self.agents.remove(agent_id);
@@ -380,6 +436,23 @@ impl AgentRunner for LocalProcessRunner {
                 }
             }
 
+            drop(child_guard);
+
+            {
+                let mut handle_guard = handle.write();
+                match signal {
+                    AgentSignal::Interrupt => handle_guard.set_status(AgentStatus::Paused),
+                    AgentSignal::Terminate => handle_guard.set_status(AgentStatus::Terminated),
+                    AgentSignal::Kill => {
+                        handle_guard.set_status(AgentStatus::Terminated);
+                        handle_guard.exit_status = Some(ExitStatus {
+                            code: None,
+                            success: false,
+                        });
+                    }
+                }
+            }
+
             Ok(())
         } else {
             Err(AgentError::NotFound(format!(
@@ -403,8 +476,8 @@ struct LocalAgentHandle {
     stdin: Arc<Mutex<ChildStdin>>,
     /// Current status
     status: AgentStatus,
-    /// Exit code if completed
-    exit_code: Option<i32>,
+    /// Recorded exit status (if the process has completed)
+    exit_status: Option<ExitStatus>,
     /// Enable JSON streaming mode
     json_streaming: bool,
     /// Buffered stdout lines
@@ -443,7 +516,7 @@ impl LocalAgentHandle {
             child: Arc::new(Mutex::new(child)),
             stdin: Arc::new(Mutex::new(stdin)),
             status: AgentStatus::Running,
-            exit_code: None,
+            exit_status: None,
             json_streaming,
             stdout_buffer: Arc::new(Mutex::new(stdout_rx)),
             stderr_buffer: Arc::new(Mutex::new(stderr_rx)),
@@ -490,6 +563,28 @@ impl LocalAgentHandle {
         });
     }
 
+    /// Update both the internal status and the externally reported AgentInfo.
+    fn set_status(&mut self, status: AgentStatus) {
+        self.status = status;
+        self.info.status = status;
+    }
+
+    /// Record the final exit status from the process.
+    fn record_exit_status(&mut self, exit_status: ExitStatus) {
+        self.exit_status = Some(exit_status.clone());
+        if self.status == AgentStatus::Terminated {
+            // Preserve explicit termination status
+            return;
+        }
+
+        let next_status = if exit_status.success {
+            AgentStatus::Completed
+        } else {
+            AgentStatus::Failed
+        };
+        self.set_status(next_status);
+    }
+
     /// Check if the process is still alive.
     fn is_alive(&self) -> bool {
         // Try to get a non-blocking lock
@@ -507,56 +602,69 @@ impl LocalAgentHandle {
 
     /// Send a signal to the process.
     async fn send_signal(&mut self, signal: AgentSignal) -> AgentResult<()> {
-        let mut child = self.child.lock().await;
+        {
+            let mut child = self.child.lock().await;
+
+            match signal {
+                AgentSignal::Interrupt => {
+                    // Send SIGINT (Ctrl+C)
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGINT).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGINT: {}", e))
+                            })?;
+                        }
+                    }
+
+                    #[cfg(not(unix))]
+                    {
+                        // On Windows, try to gracefully shutdown
+                        child.kill().await?;
+                    }
+                }
+                AgentSignal::Terminate => {
+                    // Send SIGTERM
+                    #[cfg(unix)]
+                    {
+                        use nix::sys::signal::{kill, Signal};
+                        use nix::unistd::Pid;
+
+                        if let Some(pid) = child.id() {
+                            kill(Pid::from_raw(pid as i32), Signal::SIGTERM).map_err(|e| {
+                                AgentError::ExecutionError(format!("Failed to send SIGTERM: {}", e))
+                            })?;
+                        }
+                    }
+
+                    #[cfg(not(unix))]
+                    {
+                        child.kill().await?;
+                    }
+                }
+                AgentSignal::Kill => {
+                    // Send SIGKILL
+                    child.kill().await?;
+                }
+            }
+        }
 
         match signal {
             AgentSignal::Interrupt => {
-                // Send SIGINT (Ctrl+C)
-                #[cfg(unix)]
-                {
-                    use nix::sys::signal::{kill, Signal};
-                    use nix::unistd::Pid;
-
-                    if let Some(pid) = child.id() {
-                        kill(Pid::from_raw(pid as i32), Signal::SIGINT).map_err(|e| {
-                            AgentError::ExecutionError(format!("Failed to send SIGINT: {}", e))
-                        })?;
-                    }
-                }
-
-                #[cfg(not(unix))]
-                {
-                    // On Windows, try to gracefully shutdown
-                    child.kill().await?;
-                }
-
-                self.status = AgentStatus::Paused;
+                self.set_status(AgentStatus::Paused);
             }
             AgentSignal::Terminate => {
-                // Send SIGTERM
-                #[cfg(unix)]
-                {
-                    use nix::sys::signal::{kill, Signal};
-                    use nix::unistd::Pid;
-
-                    if let Some(pid) = child.id() {
-                        kill(Pid::from_raw(pid as i32), Signal::SIGTERM).map_err(|e| {
-                            AgentError::ExecutionError(format!("Failed to send SIGTERM: {}", e))
-                        })?;
-                    }
-                }
-
-                #[cfg(not(unix))]
-                {
-                    child.kill().await?;
-                }
-
-                self.status = AgentStatus::Terminated;
+                self.set_status(AgentStatus::Terminated);
             }
             AgentSignal::Kill => {
-                // Send SIGKILL
-                child.kill().await?;
-                self.status = AgentStatus::Terminated;
+                self.set_status(AgentStatus::Terminated);
+                self.exit_status = Some(ExitStatus {
+                    code: None,
+                    success: false,
+                });
             }
         }
 
@@ -565,28 +673,31 @@ impl LocalAgentHandle {
 
     /// Kill the process immediately.
     async fn kill(&mut self) -> AgentResult<()> {
-        let mut child = self.child.lock().await;
-        child.kill().await?;
-        self.status = AgentStatus::Terminated;
+        {
+            let mut child = self.child.lock().await;
+            child.kill().await?;
+        }
+        self.set_status(AgentStatus::Terminated);
+        self.exit_status = Some(ExitStatus {
+            code: None,
+            success: false,
+        });
         Ok(())
     }
 
     /// Wait for the process to complete.
     async fn wait(&mut self) -> AgentResult<ExitStatus> {
-        let mut child = self.child.lock().await;
-        let status = child.wait().await?;
+        let status = {
+            let mut child = self.child.lock().await;
+            child.wait().await?
+        };
 
         let exit_status = ExitStatus {
             code: status.code(),
             success: status.success(),
         };
 
-        self.exit_code = status.code();
-        self.status = if status.success() {
-            AgentStatus::Completed
-        } else {
-            AgentStatus::Failed
-        };
+        self.record_exit_status(exit_status.clone());
 
         Ok(exit_status)
     }
@@ -662,24 +773,30 @@ impl AgentHandle for AgentHandleWrapper {
     }
 
     async fn wait(&mut self) -> AgentResult<ExitStatus> {
+        if let Some(status) = {
+            let handle = self.handle.read();
+            handle.exit_status.clone()
+        } {
+            return Ok(status);
+        }
+
         let child = {
             let handle = self.handle.read();
             Arc::clone(&handle.child)
         };
         let mut child_guard = child.lock().await;
         let status = child_guard.wait().await?;
-
-        // Update the handle's status
-        {
-            let mut handle = self.handle.write();
-            handle.status = AgentStatus::Completed;
-            handle.exit_code = status.code();
-        }
-
-        Ok(ExitStatus {
+        let exit_status = ExitStatus {
             code: status.code(),
             success: status.success(),
-        })
+        };
+
+        {
+            let mut handle = self.handle.write();
+            handle.record_exit_status(exit_status.clone());
+        }
+
+        Ok(exit_status)
     }
 
     async fn kill(&mut self) -> AgentResult<()> {
@@ -693,7 +810,11 @@ impl AgentHandle for AgentHandleWrapper {
         // Update the handle's status
         {
             let mut handle = self.handle.write();
-            handle.status = AgentStatus::Terminated;
+            handle.set_status(AgentStatus::Terminated);
+            handle.exit_status = Some(ExitStatus {
+                code: None,
+                success: false,
+            });
         }
 
         Ok(())
@@ -701,7 +822,10 @@ impl AgentHandle for AgentHandleWrapper {
 
     fn exit_code(&self) -> Option<i32> {
         let handle = self.handle.read();
-        handle.exit_code
+        handle
+            .exit_status
+            .as_ref()
+            .and_then(|exit_status| exit_status.code)
     }
 }
 

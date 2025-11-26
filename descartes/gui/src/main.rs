@@ -4,6 +4,7 @@ use iced::widget::{button, column, container, row, text, Space};
 use iced::{window, Element, Event, Length, Size, Theme};
 use std::sync::Arc;
 
+mod dag_canvas_interactions;
 mod dag_editor;
 mod event_handler;
 mod file_tree_view;
@@ -226,7 +227,7 @@ impl DescartesGui {
                 }
 
                 // Update status
-                self.status_message = Some(format!("Received event: {:?}", event.event_type));
+                self.status_message = Some(format!("Received event: {:?}", event));
                 iced::Task::none()
             }
             Message::TimeTravel(tt_msg) => {
@@ -776,19 +777,22 @@ impl DescartesGui {
             // Create event subscription using the event handler
             let event_handler_arc = self.event_handler.as_ref().unwrap().clone();
 
-            iced::Subscription::run_with_id("daemon_events", iced::stream::channel(100, move |mut output| {
-                let event_handler_arc = event_handler_arc.clone();
-                async move {
-                    // This is a simplified subscription - in a real implementation,
-                    // we would properly integrate with the EventHandler's subscription system
-                    tracing::info!("Event subscription active");
+            iced::Subscription::run_with_id(
+                "daemon_events",
+                iced::stream::channel(100, move |mut output| {
+                    let event_handler_arc = event_handler_arc.clone();
+                    async move {
+                        // This is a simplified subscription - in a real implementation,
+                        // we would properly integrate with the EventHandler's subscription system
+                        tracing::info!("Event subscription active");
 
-                    // Keep the subscription alive
-                    loop {
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        // Keep the subscription alive
+                        loop {
+                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        }
                     }
-                }
-            }))
+                }),
+            )
         } else {
             iced::Subscription::none()
         };
@@ -833,11 +837,11 @@ impl DescartesGui {
         let message_display = if let Some(ref error) = self.connection_error {
             text(format!("Error: {}", error))
                 .size(12)
-                .style(iced::Color::from_rgb8(255, 150, 150))
+                .color(iced::Color::from_rgb8(255, 150, 150))
         } else if let Some(ref msg) = self.status_message {
             text(msg)
                 .size(12)
-                .style(iced::Color::from_rgb8(200, 200, 200))
+                .color(iced::Color::from_rgb8(200, 200, 200))
         } else {
             text("")
         };
@@ -963,7 +967,7 @@ impl DescartesGui {
             column![
                 text("Status: Connected to daemon")
                     .size(14)
-                    .style(iced::Color::from_rgb8(100, 255, 100)),
+                    .color(iced::Color::from_rgb8(100, 255, 100)),
                 Space::with_height(5),
                 text(format!("Recent events: {}", self.recent_events.len())).size(12),
             ]
@@ -972,7 +976,7 @@ impl DescartesGui {
             column![
                 text("Status: Not connected")
                     .size(14)
-                    .style(iced::Color::from_rgb8(255, 150, 150)),
+                    .color(iced::Color::from_rgb8(255, 150, 150)),
                 Space::with_height(5),
                 text("Click 'Connect' in the top right to connect to the daemon").size(12),
             ]
@@ -987,17 +991,19 @@ impl DescartesGui {
                 .rev()
                 .take(5)
                 .map(|event| {
-                    text(format!(
-                        "• {:?}: {}",
-                        event.event_type,
-                        event
-                            .data
-                            .get("message")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("No message")
-                    ))
-                    .size(12)
-                    .into()
+                    // Format event based on its variant
+                    let event_str = match event {
+                        DescartesEvent::AgentEvent(e) => {
+                            format!("Agent {:?}: {}", e.event_type, e.agent_id)
+                        }
+                        DescartesEvent::TaskEvent(e) => format!("Task: {}", e.task_id),
+                        DescartesEvent::WorkflowEvent(e) => format!("Workflow: {}", e.workflow_id),
+                        DescartesEvent::SystemEvent(e) => format!("System: {:?}", e.event_type),
+                        DescartesEvent::StateEvent(e) => {
+                            format!("State {:?}: {}", e.event_type, e.key)
+                        }
+                    };
+                    text(format!("• {}", event_str)).size(12).into()
                 })
                 .collect();
 
@@ -1197,6 +1203,7 @@ impl DescartesGui {
     }
 
     /// Load sample file tree for demonstration
+    #[cfg(feature = "agent-runner")]
     fn load_sample_file_tree(&mut self) {
         use descartes_agent_runner::file_tree_builder::FileTreeBuilder;
         use std::path::PathBuf;
@@ -1237,29 +1244,37 @@ impl DescartesGui {
         }
     }
 
+    /// Load sample file tree for demonstration (stub without agent-runner feature)
+    #[cfg(not(feature = "agent-runner"))]
+    fn load_sample_file_tree(&mut self) {
+        self.status_message =
+            Some("File tree feature requires the 'agent-runner' feature to be enabled".to_string());
+        tracing::warn!("File tree loading not available without agent-runner feature");
+    }
+
     /// Add sample knowledge links to the tree for demonstration
+    #[cfg(feature = "agent-runner")]
     fn add_sample_knowledge_links_to_tree(
         &mut self,
-        tree: &descartes_agent_runner::knowledge_graph::FileTree,
+        _tree: &descartes_agent_runner::knowledge_graph::FileTree,
     ) {
         // This is a demonstration function that adds sample knowledge links
         // In a real application, these would come from actual code analysis
 
-        // For now, we'll just add some random knowledge links to Rust files
+        // For now, we'll add deterministic knowledge links to Rust files
         // to show how the badges appear in the UI
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-
         if let Some(tree_state) = &mut self.file_tree_state.tree {
+            let mut counter = 0u32;
             for (_, node) in tree_state.nodes.iter_mut() {
                 // Add knowledge links to some Rust files
                 if let Some(lang) = &node.metadata.language {
                     if matches!(lang, descartes_agent_runner::types::Language::Rust) {
-                        // Randomly add 0-5 knowledge links
-                        let link_count = rng.gen_range(0..=5);
-                        for _ in 0..link_count {
-                            node.add_knowledge_link(uuid::Uuid::new_v4().to_string());
+                        // Deterministically add 0-5 knowledge links based on counter
+                        let link_count = (counter % 6) as usize;
+                        for i in 0..link_count {
+                            node.add_knowledge_link(format!("demo-link-{}-{}", counter, i));
                         }
+                        counter = counter.wrapping_add(1);
                     }
                 }
             }
@@ -1307,6 +1322,7 @@ impl DescartesGui {
     }
 
     /// Load sample knowledge graph for demonstration
+    #[cfg(feature = "agent-runner")]
     fn load_sample_knowledge_graph(&mut self) {
         use descartes_agent_runner::knowledge_graph::{
             FileReference, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType,
@@ -1487,7 +1503,17 @@ impl DescartesGui {
         self.status_message = Some("Sample knowledge graph loaded successfully!".to_string());
     }
 
+    /// Load sample knowledge graph for demonstration (stub without agent-runner feature)
+    #[cfg(not(feature = "agent-runner"))]
+    fn load_sample_knowledge_graph(&mut self) {
+        self.status_message = Some(
+            "Knowledge graph feature requires the 'agent-runner' feature to be enabled".to_string(),
+        );
+        tracing::warn!("Knowledge graph loading not available without agent-runner feature");
+    }
+
     /// Generate knowledge graph from the current file tree
+    #[cfg(feature = "agent-runner")]
     fn generate_knowledge_graph_from_file_tree(&mut self) {
         if self.file_tree_state.tree.is_none() {
             self.status_message = Some("No file tree loaded. Load a file tree first.".to_string());
@@ -1541,5 +1567,15 @@ impl DescartesGui {
                 self.status_message = Some(format!("Failed to create overlay: {}", e));
             }
         }
+    }
+
+    /// Generate knowledge graph from the current file tree (stub without agent-runner feature)
+    #[cfg(not(feature = "agent-runner"))]
+    fn generate_knowledge_graph_from_file_tree(&mut self) {
+        self.status_message = Some(
+            "Knowledge graph generation requires the 'agent-runner' feature to be enabled"
+                .to_string(),
+        );
+        tracing::warn!("Knowledge graph generation not available without agent-runner feature");
     }
 }

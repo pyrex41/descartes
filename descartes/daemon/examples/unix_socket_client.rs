@@ -9,11 +9,9 @@
 //! Usage:
 //!   cargo run --example unix_socket_client
 
-use jsonrpsee::client_transport::ws::Url;
-use jsonrpsee::core::client::ClientT;
-use jsonrpsee::rpc_params;
-use jsonrpsee::ws_client::WsClientBuilder;
-use serde_json::Value;
+// Note: jsonrpsee 0.21 doesn't expose client_transport module with current features
+// use jsonrpsee::core::client::ClientT;
+// use jsonrpsee::ws_client::WsClientBuilder;
 use std::path::PathBuf;
 use tracing::{info, Level};
 

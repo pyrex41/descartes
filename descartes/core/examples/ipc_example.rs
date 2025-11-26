@@ -8,9 +8,9 @@
 /// 5. Backpressure handling
 /// 6. Dead letter queue management
 use descartes_core::{
-    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MemoryTransport,
-    MessageBus, MessageBusConfig, MessageHandler, MessageRouter, MessageType,
-    RequestResponseTracker, RoutingRule,
+    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, IpcRoutingRule,
+    MemoryTransport, MessageBus, MessageBusConfig, MessageHandler, MessageRouter, MessageType,
+    RequestResponseTracker,
 };
 use std::sync::Arc;
 use tokio::time::Duration;
@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     router.register_handler("handler1".to_string(), handler1)?;
 
     // 3. Add routing rules
-    let rule = RoutingRule {
+    let rule = IpcRoutingRule {
         id: "rule1".to_string(),
         msg_type_filter: Some(MessageType::PublishMessage),
         sender_filter: None,

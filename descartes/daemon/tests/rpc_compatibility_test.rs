@@ -8,7 +8,7 @@
 
 use descartes_core::agent_runner::LocalProcessRunner;
 use descartes_core::state_store::SqliteStateStore;
-use descartes_core::traits::{Task, TaskComplexity, TaskPriority, TaskStatus};
+use descartes_core::traits::{StateStore, Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::{UnixSocketRpcClient, UnixSocketRpcServer};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -45,7 +45,7 @@ async fn test_spawn_method_compatibility() {
     let (server, _state_store, socket_path) = create_test_server().await;
 
     // Start server in background
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     sleep(Duration::from_millis(100)).await; // Give server time to start
 
     // Create client
@@ -109,7 +109,7 @@ async fn test_list_tasks_with_filters() {
     state_store.save_task(&task2).await.unwrap();
 
     // Start server
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
     // Create client
@@ -158,7 +158,7 @@ async fn test_approve_workflow() {
     state_store.save_task(&task).await.unwrap();
 
     // Start server
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
     // Create client
@@ -240,7 +240,7 @@ async fn test_get_state_system_and_agent() {
     state_store.save_task(&task2).await.unwrap();
 
     // Start server
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
     // Create client
@@ -282,7 +282,7 @@ async fn test_multiple_concurrent_clients() {
     }
 
     // Start server
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
     // Create multiple clients and make concurrent requests
@@ -327,7 +327,7 @@ async fn test_error_handling() {
     let (server, _state_store, socket_path) = create_test_server().await;
 
     // Start server
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
     // Create client
@@ -355,7 +355,7 @@ async fn test_json_rpc_compliance() {
     let (server, _state_store, socket_path) = create_test_server().await;
 
     // Start server
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
     // Create client

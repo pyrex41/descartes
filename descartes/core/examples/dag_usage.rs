@@ -85,9 +85,9 @@ fn main() {
                     } else {
                         for (i, path) in paths.iter().enumerate() {
                             print!("  Path {}: ", i + 1);
-                            let path_names: Vec<_> = path
+                            let path_names: Vec<String> = path
                                 .iter()
-                                .filter_map(|id| dag.get_node(*id).map(|n| &n.label))
+                                .filter_map(|id| dag.get_node(*id).map(|n| n.label.clone()))
                                 .collect();
                             println!("{}", path_names.join(" -> "));
                         }

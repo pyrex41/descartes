@@ -19,7 +19,6 @@ use descartes_core::{
 };
 use serde_json::json;
 use std::process::Command;
-use std::sync::Arc;
 use tempfile::{NamedTempFile, TempDir};
 use tokio;
 
@@ -150,7 +149,6 @@ async fn create_test_events<S: AgentHistoryStore>(
 #[tokio::test]
 async fn test_create_rewind_manager() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let manager = DefaultRewindManager::new(store, repo_path, 10);
@@ -160,7 +158,6 @@ async fn test_create_rewind_manager() {
 #[tokio::test]
 async fn test_get_rewind_points() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create events with git commits
@@ -190,7 +187,6 @@ async fn test_get_rewind_points() {
 #[tokio::test]
 async fn test_can_rewind_to() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
@@ -221,7 +217,6 @@ async fn test_can_rewind_to() {
 #[tokio::test]
 async fn test_rewind_to_point() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create first commit with events
@@ -247,7 +242,7 @@ async fn test_rewind_to_point() {
     );
 
     // Rewind to commit 1
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
 
     let point = RewindPoint {
         timestamp: events1[0].timestamp,
@@ -286,7 +281,6 @@ async fn test_rewind_to_point() {
 #[tokio::test]
 async fn test_rewind_with_validation() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
@@ -322,7 +316,6 @@ async fn test_rewind_with_validation() {
 #[tokio::test]
 async fn test_rewind_creates_backup() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
@@ -362,7 +355,6 @@ async fn test_rewind_creates_backup() {
 #[tokio::test]
 async fn test_undo_rewind() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create two commits
@@ -378,7 +370,7 @@ async fn test_undo_rewind() {
     .with_git_commit(commit2.clone());
     store.record_event(&event).await.unwrap();
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
 
     // Record original commit
     let body_manager = GitBodyRestoreManager::new(&repo_path).unwrap();
@@ -423,7 +415,6 @@ async fn test_undo_rewind() {
 #[tokio::test]
 async fn test_resume_context_creation() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
@@ -456,13 +447,12 @@ async fn test_resume_context_creation() {
 #[tokio::test]
 async fn test_resume_from_context() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
     let events = create_test_events(&store, "agent-1", Some(commit.clone())).await;
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path, 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path, 10).unwrap();
 
     let point = RewindPoint {
         timestamp: events[0].timestamp,
@@ -490,7 +480,6 @@ async fn test_resume_from_context() {
 #[tokio::test]
 async fn test_create_snapshot() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
@@ -512,13 +501,12 @@ async fn test_create_snapshot() {
 #[tokio::test]
 async fn test_rewind_to_snapshot() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
     create_test_events(&store, "agent-1", Some(commit)).await;
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path, 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path, 10).unwrap();
 
     // Create snapshot
     let snapshot_id = manager
@@ -544,7 +532,6 @@ async fn test_rewind_to_snapshot() {
 #[tokio::test]
 async fn test_rewind_to_nonexistent_commit() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     create_test_events(&store, "agent-1", None).await;
@@ -569,7 +556,6 @@ async fn test_rewind_to_nonexistent_commit() {
 #[tokio::test]
 async fn test_validation_catches_inconsistencies() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit1 = create_git_commit(&repo_path, "content 1", "Commit 1");
@@ -583,7 +569,7 @@ async fn test_validation_catches_inconsistencies() {
     // Get brain state (which references commit1)
     use descartes_core::brain_restore::{BrainRestore, DefaultBrainRestore, RestoreOptions};
     let (history_store, _temp_file2) = create_test_history_store().await;
-    let brain_restore = DefaultBrainRestore::new(Arc::new(history_store));
+    let brain_restore = DefaultBrainRestore::new(history_store);
     let brain_result = brain_restore
         .replay_events(events, RestoreOptions::default())
         .await
@@ -657,7 +643,6 @@ async fn test_slider_to_rewind_point() {
 #[tokio::test]
 async fn test_rewind_to_first_event() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit = create_git_commit(&repo_path, "content", "Test commit");
@@ -694,7 +679,6 @@ async fn test_rewind_to_first_event() {
 #[tokio::test]
 async fn test_multiple_rewinds_in_sequence() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create multiple commits with events
@@ -719,7 +703,7 @@ async fn test_multiple_rewinds_in_sequence() {
     .with_git_commit(commit3.clone());
     store.record_event(&event3).await.unwrap();
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
     let body_manager = GitBodyRestoreManager::new(&repo_path).unwrap();
 
     // Rewind #1: Go to commit 1
@@ -775,7 +759,6 @@ async fn test_multiple_rewinds_in_sequence() {
 #[tokio::test]
 async fn test_complete_rewind_resume_cycle() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create multiple events
@@ -792,7 +775,7 @@ async fn test_complete_rewind_resume_cycle() {
         store.record_event(&event).await.unwrap();
     }
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
 
     // Rewind to middle event
     let point = RewindPoint {
@@ -820,10 +803,9 @@ async fn test_complete_rewind_resume_cycle() {
 
 #[tokio::test]
 async fn test_state_conflict_detection() {
-    use descartes_core::brain_restore::{BrainState, DefaultBrainRestore, RestoreOptions};
+    use descartes_core::brain_restore::{DefaultBrainRestore, RestoreOptions};
 
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     let commit1 = create_git_commit(&repo_path, "content 1", "Commit 1");
@@ -838,7 +820,7 @@ async fn test_state_conflict_detection() {
     .with_git_commit(commit1.clone());
     store.record_event(&event).await.unwrap();
 
-    let brain_restore = DefaultBrainRestore::new(Arc::clone(&store));
+    let brain_restore = DefaultBrainRestore::new(store.clone());
     let brain_result = brain_restore
         .replay_events(vec![event], RestoreOptions::default())
         .await
@@ -847,7 +829,7 @@ async fn test_state_conflict_detection() {
     let brain_state = brain_result.brain_state.unwrap();
 
     // Validate against commit2 (should detect conflict)
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path, 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path, 10).unwrap();
     let validation = manager
         .validate_consistency(&brain_state, &commit2)
         .await
@@ -866,13 +848,12 @@ async fn test_state_conflict_detection() {
 #[tokio::test]
 async fn test_rewind_with_no_git_commit() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create events without git commits
     create_test_events(&store, "agent-1", None).await;
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
 
     // Try to rewind using timestamp only (no git commit)
     let point = RewindPoint {
@@ -903,7 +884,6 @@ async fn test_rewind_with_no_git_commit() {
 #[ignore] // Run explicitly with --ignored flag
 async fn test_performance_large_event_history() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     println!("Creating 1000+ events...");
@@ -937,7 +917,7 @@ async fn test_performance_large_event_history() {
     // Create git commit
     let commit = create_git_commit(&repo_path, "large history", "Large history commit");
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
 
     // Test: Get rewind points
     let start = std::time::Instant::now();
@@ -980,7 +960,6 @@ async fn test_performance_large_event_history() {
 #[ignore] // Run explicitly with --ignored flag
 async fn test_performance_many_git_commits() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     println!("Creating 100+ git commits...");
@@ -1010,7 +989,7 @@ async fn test_performance_many_git_commits() {
     let creation_time = start.elapsed();
     println!("Created 100 commits in {:?}", creation_time);
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
 
     // Test: Get rewind points (should include all commits)
     let start = std::time::Instant::now();
@@ -1062,7 +1041,6 @@ async fn test_performance_many_git_commits() {
 #[ignore] // Run explicitly with --ignored flag
 async fn test_performance_snapshot_creation() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create 500 events
@@ -1100,7 +1078,6 @@ async fn test_performance_snapshot_creation() {
 #[ignore] // Run explicitly with --ignored flag
 async fn test_performance_undo_history() {
     let (store, _temp_file) = create_test_history_store().await;
-    let store = Arc::new(store);
     let (_temp, repo_path) = create_test_git_repo();
 
     // Create commits
@@ -1118,7 +1095,7 @@ async fn test_performance_undo_history() {
         store.record_event(&event).await.unwrap();
     }
 
-    let manager = DefaultRewindManager::new(Arc::clone(&store), repo_path.clone(), 10).unwrap();
+    let manager = DefaultRewindManager::new(store.clone(), repo_path.clone(), 10).unwrap();
 
     println!("Performing 15 rewinds to build undo history...");
     let mut backup_ids = Vec::new();

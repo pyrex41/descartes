@@ -15,7 +15,9 @@
 //! - **Error Display**: Clear error messages for failed agents
 //! - **Timeline View**: Status transition history
 
-use descartes_core::{AgentProgress, AgentRuntimeState, RuntimeAgentError, RuntimeAgentStatus, StatusTransition};
+use descartes_core::{
+    AgentProgress, AgentRuntimeState, RuntimeAgentError, RuntimeAgentStatus, StatusTransition,
+};
 use iced::widget::rule;
 use iced::widget::{
     button, column, container, progress_bar, row, scrollable, text, text_input, Space,
@@ -194,7 +196,8 @@ impl SwarmMonitorState {
                 vec![("All Agents".to_string(), filtered)]
             }
             GroupingMode::ByStatus => {
-                let mut groups: HashMap<RuntimeAgentStatus, Vec<&AgentRuntimeState>> = HashMap::new();
+                let mut groups: HashMap<RuntimeAgentStatus, Vec<&AgentRuntimeState>> =
+                    HashMap::new();
                 for agent in filtered {
                     groups
                         .entry(agent.status)
@@ -384,7 +387,10 @@ impl SwarmMonitorState {
             AgentEvent::AgentCompleted { agent_id } => {
                 if let Some(agent) = self.agents.get_mut(&agent_id) {
                     agent
-                        .transition_to(RuntimeAgentStatus::Completed, Some("Agent completed".to_string()))
+                        .transition_to(
+                            RuntimeAgentStatus::Completed,
+                            Some("Agent completed".to_string()),
+                        )
                         .ok();
                 }
             }
@@ -912,7 +918,11 @@ fn view_statistics_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessa
 }
 
 /// Create a stat box widget
-fn stat_box(label: impl Into<String>, value: impl Into<String>, color: Color) -> Element<'static, SwarmMonitorMessage> {
+fn stat_box(
+    label: impl Into<String>,
+    value: impl Into<String>,
+    color: Color,
+) -> Element<'static, SwarmMonitorMessage> {
     let label_text = text(label.into()).size(12);
     let value_text = text(value.into()).size(24).color(color);
 
@@ -1129,7 +1139,9 @@ fn view_agent_grid(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage> {
                     current_row.push(Space::with_width(Length::FillPortion(1)).into());
                 }
 
-                let grid_row = row(std::mem::take(&mut current_row)).spacing(15).width(Length::Fill);
+                let grid_row = row(std::mem::take(&mut current_row))
+                    .spacing(15)
+                    .width(Length::Fill);
 
                 agent_elements.push(grid_row.into());
             }
@@ -1167,9 +1179,12 @@ fn view_agent_card(
     // Agent name and ID
     let name_text = text(agent.name.clone()).size(16).color(Color::WHITE);
     let agent_id_str = agent.agent_id.to_string();
-    let id_text = text(format!("ID: {}", &agent_id_str[..8.min(agent_id_str.len())]))
-        .size(10)
-        .color(Color::from_rgb(0.6, 0.6, 0.7));
+    let id_text = text(format!(
+        "ID: {}",
+        &agent_id_str[..8.min(agent_id_str.len())]
+    ))
+    .size(10)
+    .color(Color::from_rgb(0.6, 0.6, 0.7));
 
     let header = row![name_text, Space::with_width(Length::Fill), status_badge]
         .spacing(10)
@@ -1187,7 +1202,9 @@ fn view_agent_card(
     if agent.status == RuntimeAgentStatus::Thinking {
         if let Some(thought) = &agent.current_thought {
             let thinking_icon = text("💭").size(16);
-            let thought_text = text(thought.clone()).size(12).color(Color::from_rgb(0.5, 0.8, 1.0));
+            let thought_text = text(thought.clone())
+                .size(12)
+                .color(Color::from_rgb(0.5, 0.8, 1.0));
 
             let thinking_row = row![thinking_icon, thought_text]
                 .spacing(8)
@@ -1372,7 +1389,9 @@ fn view_agent_detail(
         let thought_header = text("Current Thought:")
             .size(16)
             .color(Color::from_rgb(0.8, 0.8, 0.9));
-        let thought_content = text(thought.clone()).size(14).color(Color::from_rgb(0.6, 0.8, 1.0));
+        let thought_content = text(thought.clone())
+            .size(14)
+            .color(Color::from_rgb(0.6, 0.8, 1.0));
 
         let thought_box =
             container(column![thought_header, Space::with_height(8), thought_content].spacing(5))
@@ -1414,8 +1433,11 @@ fn view_agent_detail(
         }
 
         if let Some(msg) = &progress.message {
-            progress_col =
-                progress_col.push(text(msg.clone()).size(12).color(Color::from_rgb(0.7, 0.7, 0.8)));
+            progress_col = progress_col.push(
+                text(msg.clone())
+                    .size(12)
+                    .color(Color::from_rgb(0.7, 0.7, 0.8)),
+            );
         }
 
         details = details.push(Space::with_height(10)).push(progress_col);
@@ -1490,9 +1512,16 @@ fn view_agent_detail(
 }
 
 /// Helper to create a detail row
-fn detail_row(label: impl Into<String>, value: impl Into<String>) -> Element<'static, SwarmMonitorMessage> {
-    let label_text = text(label.into()).size(12).color(Color::from_rgb(0.6, 0.6, 0.7));
-    let value_text = text(value.into()).size(14).color(Color::from_rgb(0.9, 0.9, 0.95));
+fn detail_row(
+    label: impl Into<String>,
+    value: impl Into<String>,
+) -> Element<'static, SwarmMonitorMessage> {
+    let label_text = text(label.into())
+        .size(12)
+        .color(Color::from_rgb(0.6, 0.6, 0.7));
+    let value_text = text(value.into())
+        .size(14)
+        .color(Color::from_rgb(0.9, 0.9, 0.95));
 
     row![container(label_text).width(150), value_text,]
         .spacing(20)
@@ -1522,7 +1551,9 @@ fn view_timeline(timeline: &[StatusTransition]) -> Element<'static, SwarmMonitor
             .color(to_color);
 
         let reason_text = if let Some(reason) = &transition.reason {
-            text(reason.clone()).size(11).color(Color::from_rgb(0.6, 0.6, 0.7))
+            text(reason.clone())
+                .size(11)
+                .color(Color::from_rgb(0.6, 0.6, 0.7))
         } else {
             text("").size(11)
         };

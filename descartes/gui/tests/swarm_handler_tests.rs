@@ -11,8 +11,8 @@
 
 use chrono::Utc;
 use descartes_core::{
-    AgentError as RuntimeAgentError, AgentProgress, AgentRuntimeState, AgentStatus, LifecycleEvent,
-    OutputStream, StreamHandler,
+    agent_state::AgentError, AgentProgress, AgentRuntimeState, LifecycleEvent, OutputStream,
+    RuntimeAgentStatus, StreamHandler,
 };
 use descartes_gui::swarm_handler::GuiStreamHandler;
 use std::sync::Arc;
@@ -129,8 +129,8 @@ fn test_on_status_update() {
     let agent_id = Uuid::new_v4();
     let timestamp = Utc::now();
 
-    // Call on_status_update (this should auto-create the agent)
-    handler.on_status_update(agent_id, AgentStatus::Running, timestamp);
+    // Call on_status_update - must follow valid transitions: Idle -> Initializing -> Running
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Initializing, timestamp);
 
     // Verify agent was created and status was set
     let agents = handler.get_agents();
@@ -138,15 +138,22 @@ fn test_on_status_update() {
     assert!(agents.contains_key(&agent_id));
 
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Running);
+    assert_eq!(agent.status, RuntimeAgentStatus::Initializing);
     assert_eq!(agent.agent_id, agent_id);
 
-    // Update status again
-    handler.on_status_update(agent_id, AgentStatus::Completed, timestamp);
+    // Transition to Running (valid from Initializing)
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Running, timestamp);
 
     let agents = handler.get_agents();
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Completed);
+    assert_eq!(agent.status, RuntimeAgentStatus::Running);
+
+    // Update status again to Completed (valid from Running)
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Completed, timestamp);
+
+    let agents = handler.get_agents();
+    let agent = agents.get(&agent_id).unwrap();
+    assert_eq!(agent.status, RuntimeAgentStatus::Completed);
 }
 
 #[test]
@@ -157,15 +164,18 @@ fn test_thought_update_transitions_status() {
     let timestamp = Utc::now();
     let thought = "Analyzing the problem...".to_string();
 
-    // Call on_thought_update (should auto-create agent and set to Thinking)
+    // Must first transition to Initializing (valid from Idle), then thought_update can transition to Thinking
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Initializing, timestamp);
+
+    // Call on_thought_update (should transition from Initializing to Thinking)
     handler.on_thought_update(agent_id, thought.clone(), timestamp);
 
-    // Verify agent was created with Thinking status
+    // Verify agent has Thinking status
     let agents = handler.get_agents();
     assert_eq!(agents.len(), 1);
 
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Thinking);
+    assert_eq!(agent.status, RuntimeAgentStatus::Thinking);
     assert_eq!(agent.current_thought, Some(thought.clone()));
 
     // Update thought again
@@ -174,7 +184,7 @@ fn test_thought_update_transitions_status() {
 
     let agents = handler.get_agents();
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Thinking);
+    assert_eq!(agent.status, RuntimeAgentStatus::Thinking);
     assert_eq!(agent.current_thought, Some(new_thought));
 }
 
@@ -185,20 +195,21 @@ fn test_status_update_clears_thought() {
     let agent_id = Uuid::new_v4();
     let timestamp = Utc::now();
 
-    // Set agent to Thinking with a thought
+    // First transition to Initializing, then set agent to Thinking with a thought
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Initializing, timestamp);
     handler.on_thought_update(agent_id, "Thinking...".to_string(), timestamp);
 
     let agents = handler.get_agents();
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Thinking);
+    assert_eq!(agent.status, RuntimeAgentStatus::Thinking);
     assert!(agent.current_thought.is_some());
 
-    // Transition to Running (should clear thought)
-    handler.on_status_update(agent_id, AgentStatus::Running, timestamp);
+    // Transition to Running (should clear thought) - valid from Thinking
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Running, timestamp);
 
     let agents = handler.get_agents();
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Running);
+    assert_eq!(agent.status, RuntimeAgentStatus::Running);
     assert!(agent.current_thought.is_none());
 }
 
@@ -241,10 +252,32 @@ fn test_output_update() {
 
     // Send output (note: output is logged but not stored in agent state)
     // This test just verifies the handler doesn't crash
-    handler.on_output(agent_id, OutputStream::Stdout, "Hello".to_string(), timestamp);
-    handler.on_output(agent_id, OutputStream::Stderr, "Error".to_string(), timestamp);
+    handler.on_output(
+        agent_id,
+        OutputStream::Stdout,
+        "Hello".to_string(),
+        timestamp,
+    );
+    handler.on_output(
+        agent_id,
+        OutputStream::Stderr,
+        "Error".to_string(),
+        timestamp,
+    );
 
-    // Agent should still be auto-created
+    // Output alone does NOT auto-create agents (by design - output is just logged)
+    let agents = handler.get_agents();
+    assert_eq!(agents.len(), 0);
+
+    // But if we create an agent first, output calls work fine
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Initializing, timestamp);
+    handler.on_output(
+        agent_id,
+        OutputStream::Stdout,
+        "Hello".to_string(),
+        timestamp,
+    );
+
     let agents = handler.get_agents();
     assert_eq!(agents.len(), 1);
 }
@@ -256,13 +289,16 @@ fn test_on_error_sets_failed_status() {
     let agent_id = Uuid::new_v4();
     let timestamp = Utc::now();
 
+    // Start agent in a valid state (Initializing) before it can fail
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Initializing, timestamp);
+
     // Create error
-    let error = RuntimeAgentError::new(
+    let error = AgentError::new(
         "CONNECTION_ERROR".to_string(),
         "Failed to connect to database".to_string(),
     );
 
-    // Send error event
+    // Send error event (Failed is valid from Initializing)
     handler.on_error(agent_id, error.clone(), timestamp);
 
     // Verify agent status is Failed and error is set
@@ -270,7 +306,7 @@ fn test_on_error_sets_failed_status() {
     assert_eq!(agents.len(), 1);
 
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Failed);
+    assert_eq!(agent.status, RuntimeAgentStatus::Failed);
     assert!(agent.error.is_some());
     assert_eq!(agent.error.as_ref().unwrap().code, "CONNECTION_ERROR");
     assert_eq!(
@@ -288,16 +324,16 @@ fn test_on_lifecycle() {
 
     // Test various lifecycle events
     let lifecycle_transitions = vec![
-        (LifecycleEvent::Spawned, AgentStatus::Idle),
-        (LifecycleEvent::Started, AgentStatus::Initializing),
-        (LifecycleEvent::Resumed, AgentStatus::Running),
-        (LifecycleEvent::Paused, AgentStatus::Paused),
-        (LifecycleEvent::Resumed, AgentStatus::Running),
-        (LifecycleEvent::Completed, AgentStatus::Completed),
+        (LifecycleEvent::Spawned, RuntimeAgentStatus::Idle),
+        (LifecycleEvent::Started, RuntimeAgentStatus::Initializing),
+        (LifecycleEvent::Resumed, RuntimeAgentStatus::Running),
+        (LifecycleEvent::Paused, RuntimeAgentStatus::Paused),
+        (LifecycleEvent::Resumed, RuntimeAgentStatus::Running),
+        (LifecycleEvent::Completed, RuntimeAgentStatus::Completed),
     ];
 
     for (event, expected_status) in lifecycle_transitions {
-        handler.on_lifecycle(agent_id, event, timestamp);
+        handler.on_lifecycle(agent_id, event.clone(), timestamp);
 
         let agents = handler.get_agents();
         let agent = agents.get(&agent_id).unwrap();
@@ -328,7 +364,7 @@ fn test_auto_creates_unknown_agent() {
     // Check that default name starts with "agent-"
     assert!(agent.name.starts_with("agent-"));
     assert_eq!(agent.task, "Auto-created from stream");
-    assert_eq!(agent.model, "unknown");
+    assert_eq!(agent.model_backend, "unknown");
 }
 
 #[test]
@@ -380,14 +416,11 @@ async fn test_concurrent_agent_updates() {
             // Lock handler and perform updates
             let mut h = handler_clone.lock().unwrap();
 
-            // Multiple operations for this agent
-            h.on_status_update(agent_id, AgentStatus::Running, timestamp);
+            // Multiple operations for this agent - follow valid state transitions
+            h.on_status_update(agent_id, RuntimeAgentStatus::Initializing, timestamp);
+            h.on_status_update(agent_id, RuntimeAgentStatus::Running, timestamp);
             h.on_progress_update(agent_id, AgentProgress::new(i as f32 * 10.0), timestamp);
-            h.on_thought_update(
-                agent_id,
-                format!("Agent {} thinking...", i),
-                timestamp,
-            );
+            h.on_thought_update(agent_id, format!("Agent {} thinking...", i), timestamp);
 
             agent_id
         });
@@ -411,7 +444,7 @@ async fn test_concurrent_agent_updates() {
     for agent_id in agent_ids {
         assert!(agents.contains_key(&agent_id));
         let agent = agents.get(&agent_id).unwrap();
-        assert_eq!(agent.status, AgentStatus::Thinking); // Thought update transitions to Thinking
+        assert_eq!(agent.status, RuntimeAgentStatus::Thinking); // Thought update transitions to Thinking
         assert!(agent.current_thought.is_some());
     }
 }
@@ -502,37 +535,40 @@ fn test_complete_agent_lifecycle() {
     handler.on_lifecycle(agent_id, LifecycleEvent::Spawned, timestamp);
 
     let agents = handler.get_agents();
-    assert_eq!(agents.get(&agent_id).unwrap().status, AgentStatus::Idle);
+    assert_eq!(
+        agents.get(&agent_id).unwrap().status,
+        RuntimeAgentStatus::Idle
+    );
 
     handler.on_lifecycle(agent_id, LifecycleEvent::Started, timestamp);
     assert_eq!(
         handler.get_agents().get(&agent_id).unwrap().status,
-        AgentStatus::Initializing
+        RuntimeAgentStatus::Initializing
     );
 
-    handler.on_status_update(agent_id, AgentStatus::Running, timestamp);
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Running, timestamp);
     assert_eq!(
         handler.get_agents().get(&agent_id).unwrap().status,
-        AgentStatus::Running
+        RuntimeAgentStatus::Running
     );
 
     handler.on_thought_update(agent_id, "Processing data...".to_string(), timestamp);
     assert_eq!(
         handler.get_agents().get(&agent_id).unwrap().status,
-        AgentStatus::Thinking
+        RuntimeAgentStatus::Thinking
     );
 
-    handler.on_status_update(agent_id, AgentStatus::Running, timestamp);
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Running, timestamp);
     assert_eq!(
         handler.get_agents().get(&agent_id).unwrap().status,
-        AgentStatus::Running
+        RuntimeAgentStatus::Running
     );
 
     handler.on_progress_update(agent_id, AgentProgress::new(100.0), timestamp);
     handler.on_lifecycle(agent_id, LifecycleEvent::Completed, timestamp);
     assert_eq!(
         handler.get_agents().get(&agent_id).unwrap().status,
-        AgentStatus::Completed
+        RuntimeAgentStatus::Completed
     );
 }
 
@@ -543,13 +579,13 @@ fn test_error_during_execution() {
     let agent_id = Uuid::new_v4();
     let timestamp = Utc::now();
 
-    // Start agent
+    // Start agent - Lifecycle Started goes to Initializing, then we can go to Running
     handler.on_lifecycle(agent_id, LifecycleEvent::Started, timestamp);
-    handler.on_status_update(agent_id, AgentStatus::Running, timestamp);
+    handler.on_status_update(agent_id, RuntimeAgentStatus::Running, timestamp);
     handler.on_progress_update(agent_id, AgentProgress::new(50.0), timestamp);
 
     // Error occurs
-    let error = RuntimeAgentError::new(
+    let error = AgentError::new(
         "RUNTIME_ERROR".to_string(),
         "Unexpected error occurred".to_string(),
     );
@@ -558,7 +594,7 @@ fn test_error_during_execution() {
     // Verify agent is in Failed state
     let agents = handler.get_agents();
     let agent = agents.get(&agent_id).unwrap();
-    assert_eq!(agent.status, AgentStatus::Failed);
+    assert_eq!(agent.status, RuntimeAgentStatus::Failed);
     assert!(agent.error.is_some());
     assert_eq!(agent.progress.as_ref().unwrap().percentage, 50.0); // Progress preserved
 }
@@ -568,33 +604,48 @@ fn test_multiple_agents_different_states() {
     let mut handler = GuiStreamHandler::new();
     let timestamp = Utc::now();
 
-    // Create agents in different states
+    // Create agents in different states - must follow valid state transitions
+    // Agent 1: Idle -> Initializing -> Running
     let agent1_id = Uuid::new_v4();
-    handler.on_status_update(agent1_id, AgentStatus::Running, timestamp);
+    handler.on_status_update(agent1_id, RuntimeAgentStatus::Initializing, timestamp);
+    handler.on_status_update(agent1_id, RuntimeAgentStatus::Running, timestamp);
     handler.on_progress_update(agent1_id, AgentProgress::new(25.0), timestamp);
 
+    // Agent 2: Idle -> Initializing -> Thinking (thought_update auto-transitions to Thinking)
     let agent2_id = Uuid::new_v4();
+    handler.on_status_update(agent2_id, RuntimeAgentStatus::Initializing, timestamp);
     handler.on_thought_update(agent2_id, "Analyzing...".to_string(), timestamp);
 
+    // Agent 3: Idle -> Initializing -> Running -> Completed
     let agent3_id = Uuid::new_v4();
-    handler.on_lifecycle(agent3_id, LifecycleEvent::Completed, timestamp);
+    handler.on_lifecycle(agent3_id, LifecycleEvent::Started, timestamp); // -> Initializing
+    handler.on_lifecycle(agent3_id, LifecycleEvent::Resumed, timestamp); // -> Running
+    handler.on_lifecycle(agent3_id, LifecycleEvent::Completed, timestamp); // -> Completed
 
+    // Agent 4: Idle -> Initializing -> Failed
     let agent4_id = Uuid::new_v4();
-    let error = RuntimeAgentError::new("ERR".to_string(), "Error".to_string());
+    handler.on_status_update(agent4_id, RuntimeAgentStatus::Initializing, timestamp);
+    let error = AgentError::new("ERR".to_string(), "Error".to_string());
     handler.on_error(agent4_id, error, timestamp);
 
     // Verify all agents
     let agents = handler.get_agents();
     assert_eq!(agents.len(), 4);
 
-    assert_eq!(agents.get(&agent1_id).unwrap().status, AgentStatus::Running);
+    assert_eq!(
+        agents.get(&agent1_id).unwrap().status,
+        RuntimeAgentStatus::Running
+    );
     assert_eq!(
         agents.get(&agent2_id).unwrap().status,
-        AgentStatus::Thinking
+        RuntimeAgentStatus::Thinking
     );
     assert_eq!(
         agents.get(&agent3_id).unwrap().status,
-        AgentStatus::Completed
+        RuntimeAgentStatus::Completed
     );
-    assert_eq!(agents.get(&agent4_id).unwrap().status, AgentStatus::Failed);
+    assert_eq!(
+        agents.get(&agent4_id).unwrap().status,
+        RuntimeAgentStatus::Failed
+    );
 }

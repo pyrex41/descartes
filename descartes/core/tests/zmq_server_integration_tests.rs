@@ -119,7 +119,7 @@ async fn test_server_spawn_agent() {
             let status = client.get_agent_status(&agent_info.id).await.unwrap();
             assert!(matches!(
                 status,
-                AgentStatus::Running | AgentStatus::Idle | AgentStatus::Starting
+                AgentStatus::Running | AgentStatus::Idle | AgentStatus::Initializing
             ));
 
             // Stop the agent

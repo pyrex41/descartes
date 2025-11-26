@@ -118,7 +118,10 @@ impl WorkflowState {
             (WorkflowState::Running, WorkflowState::Cancelled) => true,
             (WorkflowState::Paused, WorkflowState::Cancelled) => true,
 
-            // Terminal states - no transitions
+            // Failed can retry to Running
+            (WorkflowState::Failed, WorkflowState::Running) => true,
+
+            // Terminal states - no transitions (except Failed can retry)
             (WorkflowState::Completed, _) => false,
             (WorkflowState::Failed, _) => false,
             (WorkflowState::Cancelled, _) => false,
@@ -132,7 +135,10 @@ impl WorkflowState {
 
     /// Check if this is a terminal state
     pub fn is_terminal(&self) -> bool {
-        matches!(self, WorkflowState::Completed | WorkflowState::Failed | WorkflowState::Cancelled)
+        matches!(
+            self,
+            WorkflowState::Completed | WorkflowState::Failed | WorkflowState::Cancelled
+        )
     }
 }
 

@@ -11,9 +11,145 @@
 /// - Relationship type filtering
 /// - Visual node clustering
 /// - Export capabilities
+#[cfg(feature = "agent-runner")]
 use descartes_agent_runner::knowledge_graph::{
     KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, RelationshipType,
 };
+
+// Stub types when agent-runner feature is not enabled
+#[cfg(not(feature = "agent-runner"))]
+mod stub_types {
+    use std::collections::HashMap;
+
+    #[derive(Debug, Clone)]
+    pub struct KnowledgeGraph {
+        pub nodes: HashMap<String, KnowledgeNode>,
+        pub edges: Vec<KnowledgeEdge>,
+    }
+
+    impl KnowledgeGraph {
+        pub fn new() -> Self {
+            Self {
+                nodes: HashMap::new(),
+                edges: Vec::new(),
+            }
+        }
+
+        pub fn get_node(&self, _id: &str) -> Option<&KnowledgeNode> {
+            None
+        }
+
+        pub fn get_nodes_by_type(&self, _node_type: KnowledgeNodeType) -> Vec<&KnowledgeNode> {
+            Vec::new()
+        }
+
+        pub fn get_outgoing_edges(&self, _node_id: &str) -> Vec<&KnowledgeEdge> {
+            Vec::new()
+        }
+
+        pub fn get_incoming_edges(&self, _node_id: &str) -> Vec<&KnowledgeEdge> {
+            Vec::new()
+        }
+
+        pub fn find_path(&self, _from: &str, _to: &str) -> Option<Vec<String>> {
+            None
+        }
+
+        pub fn stats(&self) -> GraphStats {
+            GraphStats {
+                total_nodes: 0,
+                total_edges: 0,
+                avg_degree: 0.0,
+            }
+        }
+    }
+
+    pub struct GraphStats {
+        pub total_nodes: usize,
+        pub total_edges: usize,
+        pub avg_degree: f32,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct KnowledgeNode {
+        pub node_id: String,
+        pub name: String,
+        pub qualified_name: String,
+        pub content_type: KnowledgeNodeType,
+        pub signature: Option<String>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct KnowledgeEdge {
+        pub from_node_id: String,
+        pub to_node_id: String,
+        pub relationship_type: RelationshipType,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum KnowledgeNodeType {
+        Function,
+        Method,
+        Class,
+        Struct,
+        Enum,
+        Interface,
+        Module,
+        TypeAlias,
+        Constant,
+        Variable,
+        Macro,
+        Concept,
+        Documentation,
+    }
+
+    impl KnowledgeNodeType {
+        pub fn as_str(&self) -> &'static str {
+            match self {
+                Self::Function => "Function",
+                Self::Method => "Method",
+                Self::Class => "Class",
+                Self::Struct => "Struct",
+                Self::Enum => "Enum",
+                Self::Interface => "Interface",
+                Self::Module => "Module",
+                Self::TypeAlias => "TypeAlias",
+                Self::Constant => "Constant",
+                Self::Variable => "Variable",
+                Self::Macro => "Macro",
+                Self::Concept => "Concept",
+                Self::Documentation => "Documentation",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum RelationshipType {
+        Calls,
+        Uses,
+        Inherits,
+        Implements,
+        DefinedIn,
+    }
+
+    impl RelationshipType {
+        pub fn as_str(&self) -> &'static str {
+            match self {
+                Self::Calls => "Calls",
+                Self::Uses => "Uses",
+                Self::Inherits => "Inherits",
+                Self::Implements => "Implements",
+                Self::DefinedIn => "DefinedIn",
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "agent-runner"))]
+use stub_types::{
+    KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, RelationshipType,
+};
+
 use iced::widget::{
     button, canvas, checkbox, column, container, horizontal_space, pick_list, row, scrollable,
     text, text_input, Canvas, Column, Row, Space,
@@ -26,7 +162,7 @@ use std::collections::{HashMap, HashSet};
 /// ============================================================================
 
 /// Knowledge graph panel state
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct KnowledgeGraphPanelState {
     /// The knowledge graph data
     pub graph: Option<KnowledgeGraph>,
@@ -128,6 +264,37 @@ impl Default for KnowledgeGraphPanelState {
             show_minimap: false,
             file_filter: None,
             call_hierarchy: None,
+        }
+    }
+}
+
+impl Clone for KnowledgeGraphPanelState {
+    fn clone(&self) -> Self {
+        Self {
+            graph: self.graph.clone(),
+            selected_node: self.selected_node.clone(),
+            hovered_node: self.hovered_node.clone(),
+            search_query: self.search_query.clone(),
+            fuzzy_search: self.fuzzy_search,
+            type_filters: self.type_filters.clone(),
+            relationship_filters: self.relationship_filters.clone(),
+            show_only_connected: self.show_only_connected,
+            layout_algorithm: self.layout_algorithm,
+            viewport: self.viewport.clone(),
+            node_positions: self.node_positions.clone(),
+            dragging_node: self.dragging_node.clone(),
+            visualization_mode: self.visualization_mode,
+            show_labels: self.show_labels,
+            show_edge_labels: self.show_edge_labels,
+            search_results: self.search_results.clone(),
+            canvas_cache: canvas::Cache::default(), // Cannot clone cache, create new one
+            dependency_path: self.dependency_path.clone(),
+            impact_nodes: self.impact_nodes.clone(),
+            related_suggestions: self.related_suggestions.clone(),
+            comparison_nodes: self.comparison_nodes.clone(),
+            show_minimap: self.show_minimap,
+            file_filter: self.file_filter.clone(),
+            call_hierarchy: self.call_hierarchy.clone(),
         }
     }
 }
@@ -902,10 +1069,10 @@ fn view_graph_canvas<'a>(
 }
 
 /// Render footer with statistics
-fn view_footer(
-    state: &KnowledgeGraphPanelState,
-    graph: &KnowledgeGraph,
-) -> Element<KnowledgeGraphMessage> {
+fn view_footer<'a>(
+    state: &'a KnowledgeGraphPanelState,
+    graph: &'a KnowledgeGraph,
+) -> Element<'a, KnowledgeGraphMessage> {
     let stats = graph.stats();
 
     let visible_nodes = if state.type_filters.is_empty() {

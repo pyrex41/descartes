@@ -21,6 +21,7 @@ pub mod lease;
 pub mod lease_manager;
 pub mod notification_router_impl;
 pub mod notifications;
+pub mod plugins;
 pub mod providers;
 pub mod secrets;
 pub mod secrets_crypto;
@@ -97,7 +98,7 @@ pub use notification_router_impl::DefaultNotificationRouter;
 pub use ipc::{
     BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MemoryTransport,
     MessageBus, MessageBusConfig, MessageBusStats, MessageHandler, MessageRouter, MessageTransport,
-    MessageType, RequestResponseTracker, UnixSocketTransport,
+    MessageType, RequestResponseTracker, RoutingRule as IpcRoutingRule, UnixSocketTransport,
 };
 
 pub use lease::{

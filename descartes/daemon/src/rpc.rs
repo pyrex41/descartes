@@ -37,7 +37,13 @@ impl JsonRpcServer {
         let start = Instant::now();
 
         // Extract auth context
-        let auth_context = self.extract_auth_context(&request).await;
+        let auth_context = match self.extract_auth_context(&request).await {
+            Ok(ctx) => ctx,
+            Err(e) => {
+                error!("Authentication failed for {}: {}", method, e);
+                return RpcResponse::error(-32001, "Authentication failed".to_string(), request_id);
+            }
+        };
 
         debug!("Processing RPC request: {} (id: {:?})", method, request_id);
 
@@ -92,9 +98,55 @@ impl JsonRpcServer {
     }
 
     /// Extract authentication context from request
-    async fn extract_auth_context(&self, _request: &RpcRequest) -> AuthContext {
-        // TODO: Extract from request headers or params
-        AuthContext::unauthenticated()
+    async fn extract_auth_context(&self, request: &RpcRequest) -> DaemonResult<AuthContext> {
+        let auth_manager = match &self.auth {
+            Some(manager) if manager.is_enabled() => manager,
+            _ => return Ok(AuthContext::unauthenticated()),
+        };
+
+        let token = Self::resolve_auth_token(request)
+            .ok_or_else(|| DaemonError::AuthError("Missing authentication token".to_string()))?;
+
+        if let Ok(claims) = auth_manager.verify_token(&token) {
+            return Ok(AuthContext::new(claims.sub, claims.scope));
+        }
+
+        if auth_manager.verify_api_key(&token).is_ok() {
+            return Ok(AuthContext::new(
+                "api-key".to_string(),
+                vec!["*".to_string()],
+            ));
+        }
+
+        Err(DaemonError::AuthError(
+            "Invalid authentication token".to_string(),
+        ))
+    }
+
+    fn resolve_auth_token(request: &RpcRequest) -> Option<String> {
+        request
+            .auth_token
+            .clone()
+            .or_else(|| Self::token_from_params(&request.params))
+    }
+
+    fn token_from_params(params: &Option<Value>) -> Option<String> {
+        match params {
+            Some(Value::Object(map)) => {
+                if let Some(token) = map.get("auth_token").and_then(|v| v.as_str()) {
+                    return Some(token.to_string());
+                }
+
+                if let Some(Value::Object(auth_obj)) = map.get("auth") {
+                    if let Some(token) = auth_obj.get("token").and_then(|v| v.as_str()) {
+                        return Some(token.to_string());
+                    }
+                }
+
+                None
+            }
+            _ => None,
+        }
     }
 
     // RPC method handlers
@@ -199,6 +251,7 @@ impl JsonRpcServer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::AuthConfig;
 
     #[tokio::test]
     async fn test_invalid_jsonrpc_version() {
@@ -211,6 +264,7 @@ mod tests {
             method: "agent.list".to_string(),
             params: None,
             id: Some(json!(1)),
+            auth_token: None,
         };
 
         let response = server.process_request(request).await;
@@ -229,6 +283,7 @@ mod tests {
             method: "unknown.method".to_string(),
             params: None,
             id: Some(json!(1)),
+            auth_token: None,
         };
 
         let response = server.process_request(request).await;
@@ -247,10 +302,71 @@ mod tests {
             method: "system.health".to_string(),
             params: None,
             id: Some(json!(1)),
+            auth_token: None,
         };
 
         let response = server.process_request(request).await;
         assert!(response.result.is_some());
         assert!(response.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_authentication_required_when_enabled() {
+        let handlers = Arc::new(RpcHandlers::new());
+        let metrics = Arc::new(MetricsCollector::new().unwrap());
+        let auth_manager = Arc::new(
+            AuthManager::new(AuthConfig {
+                enabled: true,
+                jwt_secret: "auth-secret".to_string(),
+                token_expiry_secs: 3600,
+                api_key: Some("api-test-key".to_string()),
+            })
+            .unwrap(),
+        );
+        let server = JsonRpcServer::new(handlers, Some(auth_manager), metrics);
+
+        let request = RpcRequest {
+            jsonrpc: "2.0".to_string(),
+            method: "system.health".to_string(),
+            params: None,
+            id: Some(json!(1)),
+            auth_token: None,
+        };
+
+        let response = server.process_request(request).await;
+        assert!(response.error.is_some());
+        assert_eq!(response.error.unwrap().code, -32001);
+    }
+
+    #[tokio::test]
+    async fn test_authentication_with_valid_token() {
+        let handlers = Arc::new(RpcHandlers::new());
+        let metrics = Arc::new(MetricsCollector::new().unwrap());
+        let auth_manager = Arc::new(
+            AuthManager::new(AuthConfig {
+                enabled: true,
+                jwt_secret: "valid-secret".to_string(),
+                token_expiry_secs: 3600,
+                api_key: None,
+            })
+            .unwrap(),
+        );
+        let server = JsonRpcServer::new(handlers, Some(auth_manager.clone()), metrics);
+
+        let token = auth_manager
+            .generate_token("user-1", vec!["*".to_string()])
+            .unwrap();
+
+        let request = RpcRequest {
+            jsonrpc: "2.0".to_string(),
+            method: "system.health".to_string(),
+            params: None,
+            id: Some(json!(1)),
+            auth_token: Some(token.token),
+        };
+
+        let response = server.process_request(request).await;
+        assert!(response.error.is_none());
+        assert!(response.result.is_some());
     }
 }

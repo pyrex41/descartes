@@ -405,6 +405,36 @@ impl AgentStreamParser {
     // EVENT HANDLERS
     // ========================================================================
 
+    /// Ensure newly auto-created agents follow a valid transition path to the
+    /// observed target status.
+    fn bootstrap_agent_state(agent: &mut AgentRuntimeState, target: AgentStatus) {
+        use AgentStatus::*;
+
+        let transitions: &[AgentStatus] = match target {
+            Idle => &[],
+            Initializing => &[Initializing],
+            Running => &[Initializing, Running],
+            Thinking => &[Initializing, Thinking],
+            Paused => &[Initializing, Running, Paused],
+            Completed => &[Initializing, Running, Completed],
+            Failed => &[Initializing, Running, Failed],
+            Terminated => &[Terminated],
+        };
+
+        for next in transitions {
+            if let Err(err) = agent.transition_to(*next, Some("Initial status from stream".into()))
+            {
+                tracing::warn!(
+                    "Bootstrap transition {:?} failed for agent {}: {}",
+                    next,
+                    agent.agent_id,
+                    err
+                );
+                break;
+            }
+        }
+    }
+
     /// Handle status update message
     fn handle_status_update(
         &mut self,
@@ -430,9 +460,7 @@ impl AgentStreamParser {
                 "Auto-created from stream".to_string(),
                 "unknown".to_string(),
             );
-            agent
-                .transition_to(status, Some("Initial status from stream".to_string()))
-                .ok();
+            Self::bootstrap_agent_state(&mut agent, status);
             self.agents.insert(agent_id, agent);
         } else {
             return Err(StreamParseError::UnknownAgent(agent_id));
@@ -470,7 +498,7 @@ impl AgentStreamParser {
                 "Auto-created from stream".to_string(),
                 "unknown".to_string(),
             );
-            agent.transition_to(AgentStatus::Thinking, None).ok();
+            Self::bootstrap_agent_state(&mut agent, AgentStatus::Thinking);
             agent.update_thought(thought.clone());
             self.agents.insert(agent_id, agent);
         } else {
@@ -553,6 +581,8 @@ impl AgentStreamParser {
                 "unknown".to_string(),
             );
             agent.set_error(error.clone());
+            // Must transition through Initializing to reach Failed state
+            agent.transition_to(AgentStatus::Initializing, None).ok();
             agent.transition_to(AgentStatus::Failed, None).ok();
             self.agents.insert(agent_id, agent);
         } else {
@@ -982,16 +1012,18 @@ mod tests {
         let initial_time = agent.updated_at;
         parser.add_agent(agent);
 
-        // Send heartbeat
+        // Send heartbeat with a timestamp in the future
+        let heartbeat_time = initial_time + chrono::Duration::seconds(10);
         let json = format!(
-            r#"{{"type":"heartbeat","agent_id":"{}","timestamp":"2025-11-24T06:00:00Z"}}"#,
-            agent_id
+            r#"{{"type":"heartbeat","agent_id":"{}","timestamp":"{}"}}"#,
+            agent_id,
+            heartbeat_time.to_rfc3339()
         );
 
         parser.process_lines(&[&json]).unwrap();
 
         let agent = parser.get_agent(&agent_id).unwrap();
-        // Heartbeat should update the timestamp
-        assert!(agent.updated_at >= initial_time);
+        // Heartbeat should update the timestamp to the heartbeat time
+        assert_eq!(agent.updated_at, heartbeat_time);
     }
 }

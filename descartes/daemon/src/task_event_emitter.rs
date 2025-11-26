@@ -408,14 +408,19 @@ pub struct TaskEmitterStatistics {
 mod tests {
     use super::*;
     use descartes_core::state_store::SqliteStateStore;
-    use descartes_core::traits::{TaskComplexity, TaskPriority, TaskStatus};
+    use descartes_core::traits::{StateStore, TaskComplexity, TaskPriority, TaskStatus};
     use tempfile::NamedTempFile;
 
-    async fn setup_test_emitter() -> (TaskEventEmitter, Arc<SqliteStateStore>, Arc<EventBus>) {
+    async fn setup_test_emitter() -> (
+        TaskEventEmitter,
+        Arc<SqliteStateStore>,
+        Arc<EventBus>,
+        NamedTempFile,
+    ) {
         let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        let db_path = temp_file.path().to_str().unwrap();
+        let db_path = temp_file.path().to_str().unwrap().to_string();
 
-        let mut state_store = SqliteStateStore::new(db_path, false)
+        let mut state_store = SqliteStateStore::new(&db_path, true)
             .await
             .expect("Failed to create state store");
         state_store
@@ -444,12 +449,12 @@ mod tests {
             .await
             .expect("Failed to initialize cache");
 
-        (emitter, state_store, event_bus)
+        (emitter, state_store, event_bus, temp_file)
     }
 
     #[tokio::test]
     async fn test_task_creation_event() {
-        let (emitter, _, event_bus) = setup_test_emitter().await;
+        let (emitter, _, event_bus, _temp_file) = setup_test_emitter().await;
 
         // Subscribe to events
         let (_sub_id, mut rx) = event_bus.subscribe(None).await;
@@ -499,7 +504,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_task_update_event() {
-        let (emitter, _, event_bus) = setup_test_emitter().await;
+        let (emitter, _, event_bus, _temp_file) = setup_test_emitter().await;
 
         // Subscribe to events
         let (_sub_id, mut rx) = event_bus.subscribe(None).await;
@@ -564,20 +569,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_debouncing() {
-        let (state_store, event_bus) = {
-            let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-            let db_path = temp_file.path().to_str().unwrap();
+        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let db_path = temp_file.path().to_str().unwrap().to_string();
 
-            let mut store = SqliteStateStore::new(db_path, false)
-                .await
-                .expect("Failed to create state store");
-            store.initialize().await.expect("Failed to initialize");
+        let mut store = SqliteStateStore::new(&db_path, true)
+            .await
+            .expect("Failed to create state store");
+        store.initialize().await.expect("Failed to initialize");
 
-            (
-                Arc::new(store) as Arc<dyn StateStore>,
-                Arc::new(EventBus::new()),
-            )
-        };
+        let state_store = Arc::new(store) as Arc<dyn StateStore>;
+        let event_bus = Arc::new(EventBus::new());
 
         let config = TaskEventEmitterConfig {
             enable_debouncing: true,
@@ -630,11 +631,14 @@ mod tests {
             "Expected debouncing to reduce events, got {}",
             event_count
         );
+
+        // Keep temp_file alive until the end of the test
+        drop(temp_file);
     }
 
     #[tokio::test]
     async fn test_get_statistics() {
-        let (emitter, _, _) = setup_test_emitter().await;
+        let (emitter, _, _, _temp_file) = setup_test_emitter().await;
 
         // Create some tasks
         for i in 0..10 {

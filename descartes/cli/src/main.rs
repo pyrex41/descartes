@@ -13,7 +13,7 @@ fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
     Ok(manager.config().clone())
 }
 
-use commands::{init, kill, logs, ps, spawn};
+use commands::{init, kill, logs, plugins, ps, spawn};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -113,6 +113,10 @@ enum Commands {
 
     /// Launch the GUI
     Gui,
+
+    /// Manage plugins
+    #[command(subcommand)]
+    Plugins(plugins::PluginCommands),
 }
 
 #[tokio::main]
@@ -185,6 +189,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Gui => {
             println!("{}", "Launching Descartes GUI...".cyan());
             println!("{}", "Feature: Phase 3 - Iced UI (Planned)".yellow());
+        }
+
+        Commands::Plugins(cmd) => {
+            plugins::execute(&cmd).await?;
         }
     }
 

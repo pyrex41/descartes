@@ -167,13 +167,14 @@ impl IpcMessage {
     }
 
     /// Serialize the message to bytes
+    /// Using JSON because bincode doesn't support serde_json::Value
     pub fn serialize(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        Ok(bincode::serialize(self)?)
+        Ok(serde_json::to_vec(self)?)
     }
 
     /// Deserialize a message from bytes
     pub fn deserialize(bytes: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(bincode::deserialize(bytes)?)
+        Ok(serde_json::from_slice(bytes)?)
     }
 }
 

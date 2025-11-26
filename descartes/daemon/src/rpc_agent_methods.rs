@@ -345,6 +345,7 @@ mod tests {
             "task1".to_string(),
             "claude".to_string(),
         );
+        agent1.transition_to(AgentStatus::Initializing, None).ok();
         agent1.transition_to(AgentStatus::Running, None).ok();
 
         let agent2 = AgentRuntimeState::new(
@@ -411,13 +412,23 @@ mod tests {
         let rpc = create_test_impl();
 
         let agent_id = Uuid::new_v4();
-        let message = AgentStreamMessage::StatusUpdate {
+
+        // First transition to Initializing
+        let message1 = AgentStreamMessage::StatusUpdate {
+            agent_id,
+            status: AgentStatus::Initializing,
+            timestamp: chrono::Utc::now(),
+        };
+        rpc.push_agent_update(message1).await.ok();
+
+        // Then transition to Running
+        let message2 = AgentStreamMessage::StatusUpdate {
             agent_id,
             status: AgentStatus::Running,
             timestamp: chrono::Utc::now(),
         };
 
-        let result = rpc.push_agent_update(message).await;
+        let result = rpc.push_agent_update(message2).await;
         assert!(result.is_ok());
         assert!(result.unwrap());
 

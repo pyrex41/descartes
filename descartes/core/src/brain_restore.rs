@@ -826,12 +826,10 @@ mod tests {
     use super::*;
     use crate::agent_history::{AgentHistoryStore, SqliteAgentHistoryStore};
     use serde_json::json;
-    use tempfile::NamedTempFile;
 
     async fn create_test_store() -> SqliteAgentHistoryStore {
-        let temp_file = NamedTempFile::new().unwrap();
-        let path = temp_file.path().to_str().unwrap();
-        let mut store = SqliteAgentHistoryStore::new(path).await.unwrap();
+        // Use in-memory SQLite for faster tests
+        let mut store = SqliteAgentHistoryStore::new(":memory:").await.unwrap();
         store.initialize().await.unwrap();
         store
     }

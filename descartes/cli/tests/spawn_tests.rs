@@ -61,11 +61,7 @@ async fn test_get_model_for_provider_anthropic_default() {
     let config = create_test_config();
 
     // Test default model for Anthropic
-    let model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        "anthropic",
-        None,
-    );
+    let model = descartes_cli::commands::spawn::get_model_for_provider(&config, "anthropic", None);
 
     assert!(model.is_ok());
     assert_eq!(model.unwrap(), config.providers.anthropic.model);
@@ -76,11 +72,7 @@ async fn test_get_model_for_provider_openai_default() {
     let config = create_test_config();
 
     // Test default model for OpenAI
-    let model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        "openai",
-        None,
-    );
+    let model = descartes_cli::commands::spawn::get_model_for_provider(&config, "openai", None);
 
     assert!(model.is_ok());
     assert_eq!(model.unwrap(), config.providers.openai.model);
@@ -91,11 +83,7 @@ async fn test_get_model_for_provider_ollama_default() {
     let config = create_test_config();
 
     // Test default model for Ollama
-    let model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        "ollama",
-        None,
-    );
+    let model = descartes_cli::commands::spawn::get_model_for_provider(&config, "ollama", None);
 
     assert!(model.is_ok());
     assert_eq!(model.unwrap(), config.providers.ollama.model);
@@ -106,11 +94,7 @@ async fn test_get_model_for_provider_deepseek_default() {
     let config = create_test_config();
 
     // Test default model for DeepSeek
-    let model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        "deepseek",
-        None,
-    );
+    let model = descartes_cli::commands::spawn::get_model_for_provider(&config, "deepseek", None);
 
     assert!(model.is_ok());
     assert_eq!(model.unwrap(), config.providers.deepseek.model);
@@ -121,11 +105,7 @@ async fn test_get_model_for_provider_groq_default() {
     let config = create_test_config();
 
     // Test default model for Groq
-    let model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        "groq",
-        None,
-    );
+    let model = descartes_cli::commands::spawn::get_model_for_provider(&config, "groq", None);
 
     assert!(model.is_ok());
     assert_eq!(model.unwrap(), config.providers.groq.model);
@@ -136,17 +116,11 @@ async fn test_get_model_for_provider_unknown_provider() {
     let config = create_test_config();
 
     // Test unknown provider
-    let model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        "unknown-provider",
-        None,
-    );
+    let model =
+        descartes_cli::commands::spawn::get_model_for_provider(&config, "unknown-provider", None);
 
     assert!(model.is_err());
-    assert!(model
-        .unwrap_err()
-        .to_string()
-        .contains("Unknown provider"));
+    assert!(model.unwrap_err().to_string().contains("Unknown provider"));
 }
 
 #[tokio::test]
@@ -172,11 +146,7 @@ async fn test_spawn_explicit_provider_override() {
     let config = create_custom_provider_config("anthropic", "claude-3-5-sonnet-20241022");
 
     // Even if primary is anthropic, we can explicitly use OpenAI
-    let model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        "openai",
-        None,
-    );
+    let model = descartes_cli::commands::spawn::get_model_for_provider(&config, "openai", None);
 
     assert!(model.is_ok());
     assert_eq!(model.unwrap(), config.providers.openai.model);
@@ -193,7 +163,10 @@ async fn test_create_backend_anthropic() {
         "claude-3-5-sonnet-20241022",
     );
 
-    assert!(backend.is_ok(), "Should create Anthropic backend successfully");
+    assert!(
+        backend.is_ok(),
+        "Should create Anthropic backend successfully"
+    );
 }
 
 #[tokio::test]
@@ -201,11 +174,7 @@ async fn test_create_backend_openai() {
     let config = create_test_config();
 
     // Test creating OpenAI backend
-    let backend = descartes_cli::commands::spawn::create_backend(
-        &config,
-        "openai",
-        "gpt-4-turbo",
-    );
+    let backend = descartes_cli::commands::spawn::create_backend(&config, "openai", "gpt-4-turbo");
 
     assert!(backend.is_ok(), "Should create OpenAI backend successfully");
 }
@@ -215,11 +184,7 @@ async fn test_create_backend_ollama() {
     let config = create_test_config();
 
     // Test creating Ollama backend (no API key required)
-    let backend = descartes_cli::commands::spawn::create_backend(
-        &config,
-        "ollama",
-        "llama2",
-    );
+    let backend = descartes_cli::commands::spawn::create_backend(&config, "ollama", "llama2");
 
     assert!(backend.is_ok(), "Should create Ollama backend successfully");
 }
@@ -230,14 +195,14 @@ async fn test_create_backend_deepseek() {
 
     // Test creating DeepSeek backend
     // Note: DeepSeek is not yet implemented in ProviderFactory
-    let backend = descartes_cli::commands::spawn::create_backend(
-        &config,
-        "deepseek",
-        "deepseek-chat",
-    );
+    let backend =
+        descartes_cli::commands::spawn::create_backend(&config, "deepseek", "deepseek-chat");
 
     // This should fail because DeepSeek is not yet implemented
-    assert!(backend.is_err(), "DeepSeek provider is not yet implemented in ProviderFactory");
+    assert!(
+        backend.is_err(),
+        "DeepSeek provider is not yet implemented in ProviderFactory"
+    );
     if let Err(e) = backend {
         let error_msg = e.to_string();
         assert!(
@@ -254,14 +219,14 @@ async fn test_create_backend_groq() {
 
     // Test creating Groq backend
     // Note: Groq is not yet implemented in ProviderFactory
-    let backend = descartes_cli::commands::spawn::create_backend(
-        &config,
-        "groq",
-        "mixtral-8x7b-32768",
-    );
+    let backend =
+        descartes_cli::commands::spawn::create_backend(&config, "groq", "mixtral-8x7b-32768");
 
     // This should fail because Groq is not yet implemented
-    assert!(backend.is_err(), "Groq provider is not yet implemented in ProviderFactory");
+    assert!(
+        backend.is_err(),
+        "Groq provider is not yet implemented in ProviderFactory"
+    );
     if let Err(e) = backend {
         let error_msg = e.to_string();
         assert!(
@@ -277,11 +242,8 @@ async fn test_create_backend_unknown_provider() {
     let config = create_test_config();
 
     // Test unknown provider
-    let backend = descartes_cli::commands::spawn::create_backend(
-        &config,
-        "unknown-provider",
-        "some-model",
-    );
+    let backend =
+        descartes_cli::commands::spawn::create_backend(&config, "unknown-provider", "some-model");
 
     assert!(backend.is_err(), "Should fail for unknown provider");
     if let Err(e) = backend {
@@ -308,14 +270,17 @@ async fn test_create_backend_with_custom_endpoints() {
         "anthropic",
         "claude-3-5-sonnet-20241022",
     );
-    assert!(anthropic_backend.is_ok(), "Should create backend with custom Anthropic endpoint");
-
-    let openai_backend = descartes_cli::commands::spawn::create_backend(
-        &config,
-        "openai",
-        "gpt-4-turbo",
+    assert!(
+        anthropic_backend.is_ok(),
+        "Should create backend with custom Anthropic endpoint"
     );
-    assert!(openai_backend.is_ok(), "Should create backend with custom OpenAI endpoint");
+
+    let openai_backend =
+        descartes_cli::commands::spawn::create_backend(&config, "openai", "gpt-4-turbo");
+    assert!(
+        openai_backend.is_ok(),
+        "Should create backend with custom OpenAI endpoint"
+    );
 }
 
 #[tokio::test]
@@ -347,11 +312,8 @@ async fn test_model_resolution_with_explicit_flags() {
     let provider = "openai";
     let model = Some("gpt-3.5-turbo");
 
-    let resolved_model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        provider,
-        model,
-    );
+    let resolved_model =
+        descartes_cli::commands::spawn::get_model_for_provider(&config, provider, model);
 
     assert!(resolved_model.is_ok());
     assert_eq!(resolved_model.unwrap(), "gpt-3.5-turbo");
@@ -365,11 +327,8 @@ async fn test_model_resolution_fallback_to_config() {
     let provider = "openai";
     let model = None;
 
-    let resolved_model = descartes_cli::commands::spawn::get_model_for_provider(
-        &config,
-        provider,
-        model,
-    );
+    let resolved_model =
+        descartes_cli::commands::spawn::get_model_for_provider(&config, provider, model);
 
     assert!(resolved_model.is_ok());
     assert_eq!(resolved_model.unwrap(), "gpt-4-turbo");
@@ -393,11 +352,7 @@ async fn test_all_providers_backend_creation() {
     ];
 
     for (provider, model) in supported_providers {
-        let backend = descartes_cli::commands::spawn::create_backend(
-            &config,
-            provider,
-            model,
-        );
+        let backend = descartes_cli::commands::spawn::create_backend(&config, provider, model);
 
         assert!(
             backend.is_ok(),
@@ -407,11 +362,7 @@ async fn test_all_providers_backend_creation() {
     }
 
     for (provider, model) in unsupported_providers {
-        let backend = descartes_cli::commands::spawn::create_backend(
-            &config,
-            provider,
-            model,
-        );
+        let backend = descartes_cli::commands::spawn::create_backend(&config, provider, model);
 
         assert!(
             backend.is_err(),

@@ -262,10 +262,7 @@ fn handle_right_click(
 }
 
 /// Handle middle mouse button press (start panning)
-fn handle_middle_press(
-    state: &mut DAGEditorState,
-    position: Point,
-) -> Option<InteractionResult> {
+fn handle_middle_press(state: &mut DAGEditorState, position: Point) -> Option<InteractionResult> {
     state.interaction.pan_state = Some(PanState {
         start_cursor: position,
         start_offset: state.canvas_state.offset,
@@ -288,10 +285,7 @@ pub fn handle_mouse_release(
 }
 
 /// Handle left mouse button release
-fn handle_left_release(
-    state: &mut DAGEditorState,
-    position: Point,
-) -> Option<InteractionResult> {
+fn handle_left_release(state: &mut DAGEditorState, position: Point) -> Option<InteractionResult> {
     // Handle drag end
     if let Some(drag_state) = state.interaction.drag_state.take() {
         // Finalize node positions
@@ -379,10 +373,7 @@ fn handle_middle_release(state: &mut DAGEditorState) -> Option<InteractionResult
 }
 
 /// Handle mouse move
-pub fn handle_mouse_move(
-    state: &mut DAGEditorState,
-    position: Point,
-) -> Option<InteractionResult> {
+pub fn handle_mouse_move(state: &mut DAGEditorState, position: Point) -> Option<InteractionResult> {
     // Update hover state
     state.interaction.hover_node = find_node_at_position(state, position);
 
@@ -575,10 +566,7 @@ pub fn handle_key_press(
 }
 
 /// Handle keyboard release
-pub fn handle_key_release(
-    state: &mut DAGEditorState,
-    key: Key,
-) -> Option<InteractionResult> {
+pub fn handle_key_release(state: &mut DAGEditorState, key: Key) -> Option<InteractionResult> {
     match key {
         Key::Named(iced::keyboard::key::Named::Space) => {
             state.extended_interaction.space_held = false;

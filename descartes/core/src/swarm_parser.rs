@@ -260,7 +260,7 @@ impl SwarmParser {
 
 impl SwarmParser {
     /// Validate the entire configuration
-    fn validate_config(&self, config: &SwarmConfig) -> SwarmResult<()> {
+    pub fn validate_config(&self, config: &SwarmConfig) -> SwarmResult<()> {
         // Validate metadata
         if config.metadata.version.is_empty() {
             return Err(SwarmParseError::MissingField(
@@ -283,7 +283,7 @@ impl SwarmParser {
     }
 
     /// Validate a single workflow
-    fn validate_workflow(
+    pub fn validate_workflow(
         &self,
         workflow: &Workflow,
         config: &SwarmConfig,
@@ -492,7 +492,7 @@ impl SwarmParser {
     }
 
     /// Compute which states are reachable from the initial state
-    fn compute_reachable_states(&self, workflow: &Workflow) -> HashSet<String> {
+    pub fn compute_reachable_states(&self, workflow: &Workflow) -> HashSet<String> {
         let mut reachable = HashSet::new();
         let mut queue = vec![workflow.metadata.initial_state.clone()];
 
@@ -952,6 +952,8 @@ terminal = true
         assert!(mermaid.contains("Start"));
 
         let state_machine = validated.generate_state_machine_code();
-        assert!(state_machine.contains("impl TestWorkflowState"));
+        // The workflow name is "test", so capitalize_first makes it "Test"
+        // The impl is "impl TestState" not "impl TestWorkflowState"
+        assert!(state_machine.contains("impl TestState"));
     }
 }

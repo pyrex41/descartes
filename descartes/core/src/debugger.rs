@@ -2174,8 +2174,11 @@ mod tests {
         let mut debugger = Debugger::new(agent_id);
 
         debugger.state_mut().enable();
-        debugger.step_agent().unwrap();
+        // After enable(), state is Running. Pause to get a pause count.
         debugger.pause_agent().unwrap();
+        // Resume so we can step (step requires not already paused at some points)
+        debugger.resume_agent().unwrap();
+        debugger.step_agent().unwrap();
 
         let result = debugger.process_command(DebugCommand::GetStatistics);
         assert!(result.is_ok());

@@ -1,8 +1,7 @@
 use anyhow::Result;
 use colored::Colorize;
 use descartes_core::{
-    DescaratesConfig, Message, MessageRole, ModelBackend, ModelRequest,
-    ProviderFactory,
+    DescaratesConfig, Message, MessageRole, ModelBackend, ModelRequest, ProviderFactory,
 };
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -145,28 +144,43 @@ pub fn create_backend(
             if let Some(ref api_key) = config.providers.anthropic.api_key {
                 provider_config.insert("api_key".to_string(), api_key.clone());
             }
-            provider_config.insert("endpoint".to_string(), config.providers.anthropic.endpoint.clone());
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.anthropic.endpoint.clone(),
+            );
         }
         "openai" => {
             if let Some(ref api_key) = config.providers.openai.api_key {
                 provider_config.insert("api_key".to_string(), api_key.clone());
             }
-            provider_config.insert("endpoint".to_string(), config.providers.openai.endpoint.clone());
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.openai.endpoint.clone(),
+            );
         }
         "ollama" => {
-            provider_config.insert("endpoint".to_string(), config.providers.ollama.endpoint.clone());
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.ollama.endpoint.clone(),
+            );
         }
         "deepseek" => {
             if let Some(ref api_key) = config.providers.deepseek.api_key {
                 provider_config.insert("api_key".to_string(), api_key.clone());
             }
-            provider_config.insert("endpoint".to_string(), config.providers.deepseek.endpoint.clone());
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.deepseek.endpoint.clone(),
+            );
         }
         "groq" => {
             if let Some(ref api_key) = config.providers.groq.api_key {
                 provider_config.insert("api_key".to_string(), api_key.clone());
             }
-            provider_config.insert("endpoint".to_string(), config.providers.groq.endpoint.clone());
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.groq.endpoint.clone(),
+            );
         }
         _ => {
             anyhow::bail!("Unknown provider: {}", provider);

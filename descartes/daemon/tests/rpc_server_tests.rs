@@ -12,7 +12,7 @@
 
 use descartes_core::agent_runner::LocalProcessRunner;
 use descartes_core::state_store::SqliteStateStore;
-use descartes_core::traits::{Task, TaskComplexity, TaskPriority, TaskStatus};
+use descartes_core::traits::{StateStore, Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::rpc_server::{ApprovalResult, TaskInfo, UnixSocketRpcServer};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -62,7 +62,7 @@ fn create_rpc_request(method: &str, params: Value, id: u64) -> String {
 async fn send_rpc_request(
     socket_path: &PathBuf,
     request: &str,
-) -> Result<Value, Box<dyn std::error::Error>> {
+) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
     let mut stream = UnixStream::connect(socket_path).await?;
 
     // Send request
@@ -84,10 +84,10 @@ async fn send_rpc_request_with_timeout(
     socket_path: &PathBuf,
     request: &str,
     timeout_duration: Duration,
-) -> Result<Value, Box<dyn std::error::Error>> {
+) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
     timeout(timeout_duration, send_rpc_request(socket_path, request))
         .await
-        .map_err(|_| "Request timeout".into())?
+        .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> { "Request timeout".into() })?
 }
 
 /// Test helper to create a test task in the database
@@ -123,7 +123,7 @@ async fn test_server_start_and_stop() {
     let (server, socket_path, _) = setup_test_server().await;
 
     // Start the server
-    let handle = server.start().await.expect("Failed to start server");
+    let mut handle = server.start().await.expect("Failed to start server");
 
     // Verify socket file was created
     assert!(socket_path.exists(), "Socket file should exist");
@@ -142,7 +142,7 @@ async fn test_server_socket_cleanup() {
     assert!(socket_path.exists());
 
     // Start the server - it should remove the existing socket
-    let handle = server.start().await.expect("Failed to start server");
+    let mut handle = server.start().await.expect("Failed to start server");
     assert!(socket_path.exists(), "Socket file should be recreated");
 
     handle.stop().unwrap();
@@ -152,7 +152,7 @@ async fn test_server_socket_cleanup() {
 #[tokio::test]
 async fn test_multiple_clients_can_connect() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
 
     // Give server time to start
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -177,7 +177,7 @@ async fn test_multiple_clients_can_connect() {
 #[tokio::test]
 async fn test_list_tasks_empty() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
@@ -201,7 +201,7 @@ async fn test_list_tasks_with_data() {
     create_test_task(&state_store, "Task 2", TaskStatus::InProgress).await;
     create_test_task(&state_store, "Task 3", TaskStatus::Done).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
@@ -232,7 +232,7 @@ async fn test_list_tasks_filter_by_status() {
     create_test_task(&state_store, "InProgress Task", TaskStatus::InProgress).await;
     create_test_task(&state_store, "Done Task", TaskStatus::Done).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Filter by Todo status
@@ -259,7 +259,7 @@ async fn test_list_tasks_filter_by_assigned_to() {
     task2.assigned_to = Some("agent-2".to_string());
     state_store.save_task(&task2).await.unwrap();
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Filter by assigned_to
@@ -286,7 +286,7 @@ async fn test_list_tasks_filter_multiple_criteria() {
     task2.assigned_to = Some("agent-1".to_string());
     state_store.save_task(&task2).await.unwrap();
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Filter by both status and assigned_to
@@ -315,7 +315,7 @@ async fn test_approve_task_success() {
     let task = create_test_task(&state_store, "Approval Test", TaskStatus::Todo).await;
     let task_id = task.id.to_string();
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("approve", json!([task_id.clone(), true]), 1);
@@ -342,7 +342,7 @@ async fn test_approve_task_rejection() {
     let task = create_test_task(&state_store, "Rejection Test", TaskStatus::Todo).await;
     let task_id = task.id.to_string();
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("approve", json!([task_id.clone(), false]), 1);
@@ -362,7 +362,7 @@ async fn test_approve_task_rejection() {
 #[tokio::test]
 async fn test_approve_nonexistent_task() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let fake_task_id = Uuid::new_v4().to_string();
@@ -384,7 +384,7 @@ async fn test_approve_nonexistent_task() {
 #[tokio::test]
 async fn test_approve_invalid_task_id() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("approve", json!(["not-a-valid-uuid", true]), 1);
@@ -415,7 +415,7 @@ async fn test_approve_task_metadata_preservation() {
 
     let task_id = task.id.to_string();
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("approve", json!([task_id, true]), 1);
@@ -446,7 +446,7 @@ async fn test_get_state_system_level() {
     create_test_task(&state_store, "Task 2", TaskStatus::InProgress).await;
     create_test_task(&state_store, "Task 3", TaskStatus::Done).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("get_state", json!([null]), 1);
@@ -469,7 +469,7 @@ async fn test_get_state_system_level() {
 #[tokio::test]
 async fn test_get_state_invalid_entity_id() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("get_state", json!(["not-a-valid-id"]), 1);
@@ -485,7 +485,7 @@ async fn test_get_state_invalid_entity_id() {
 #[tokio::test]
 async fn test_get_state_nonexistent_agent() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let fake_agent_id = Uuid::new_v4().to_string();
@@ -509,7 +509,7 @@ async fn test_get_state_nonexistent_agent() {
 #[tokio::test]
 async fn test_spawn_agent_basic() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request(
@@ -533,7 +533,7 @@ async fn test_spawn_agent_basic() {
 #[tokio::test]
 async fn test_spawn_agent_with_full_config() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request(
@@ -561,7 +561,7 @@ async fn test_spawn_agent_with_full_config() {
 #[tokio::test]
 async fn test_spawn_agent_minimal_config() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("spawn", json!(["minimal-agent", "basic", {}]), 1);
@@ -581,7 +581,7 @@ async fn test_spawn_agent_minimal_config() {
 #[tokio::test]
 async fn test_invalid_json_request() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let invalid_json = "{ this is not valid json }";
@@ -605,7 +605,7 @@ async fn test_invalid_json_request() {
 #[tokio::test]
 async fn test_invalid_method_name() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("nonexistent_method", json!([]), 1);
@@ -622,7 +622,7 @@ async fn test_invalid_method_name() {
 #[tokio::test]
 async fn test_missing_required_params() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // approve requires task_id and approved params
@@ -639,7 +639,7 @@ async fn test_missing_required_params() {
 #[tokio::test]
 async fn test_wrong_param_types() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // approved should be boolean, not string
@@ -669,7 +669,7 @@ async fn test_concurrent_list_tasks_requests() {
         create_test_task(&state_store, &format!("Task {}", i), TaskStatus::Todo).await;
     }
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Send 10 concurrent requests
@@ -706,7 +706,7 @@ async fn test_concurrent_mixed_requests() {
     let task1 = create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
     let task2 = create_test_task(&state_store, "Task 2", TaskStatus::Todo).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Send different types of requests concurrently
@@ -753,7 +753,7 @@ async fn test_concurrent_task_approvals() {
         task_ids.push(task.id);
     }
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Approve all tasks concurrently
@@ -792,7 +792,7 @@ async fn test_concurrent_task_approvals() {
 #[tokio::test]
 async fn test_request_with_timeout() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
@@ -808,7 +808,7 @@ async fn test_request_with_timeout() {
 #[tokio::test]
 async fn test_rapid_sequential_requests() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Send 50 requests in rapid succession
@@ -842,7 +842,7 @@ async fn test_large_task_list_performance() {
         .await;
     }
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let start = std::time::Instant::now();
@@ -864,7 +864,7 @@ async fn test_large_task_list_performance() {
 #[tokio::test]
 async fn test_json_rpc_version_field() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
@@ -879,7 +879,7 @@ async fn test_json_rpc_version_field() {
 #[tokio::test]
 async fn test_request_id_preservation() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Test with different ID types
@@ -898,7 +898,7 @@ async fn test_request_id_preservation() {
 #[tokio::test]
 async fn test_error_object_structure() {
     let (server, socket_path, _) = setup_test_server().await;
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("approve", json!(["invalid-uuid", true]), 1);
@@ -919,7 +919,7 @@ async fn test_task_info_structure() {
 
     create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
@@ -948,7 +948,7 @@ async fn test_approval_result_structure() {
 
     let task = create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("approve", json!([task.id.to_string(), true]), 1);
@@ -978,7 +978,7 @@ async fn test_empty_filter_object() {
 
     create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Empty filter should return all tasks
@@ -997,7 +997,7 @@ async fn test_filter_with_nonexistent_field() {
 
     create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Filter with non-existent field should be ignored
@@ -1018,7 +1018,7 @@ async fn test_very_long_task_title() {
     let long_title = "A".repeat(1000);
     create_test_task(&state_store, &long_title, TaskStatus::Todo).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
@@ -1037,7 +1037,7 @@ async fn test_task_with_special_characters() {
     let special_title = r#"Task with "quotes", 'apostrophes', \backslashes, and émojis 🚀"#;
     create_test_task(&state_store, special_title, TaskStatus::Todo).await;
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let request = create_rpc_request("list_tasks", json!([null]), 1);
@@ -1056,7 +1056,7 @@ async fn test_multiple_approvals_same_task() {
     let task = create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
     let task_id = task.id.to_string();
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // First approval
@@ -1080,7 +1080,7 @@ async fn test_approve_then_reject_task() {
     let task = create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
     let task_id = task.id.to_string();
 
-    let handle = server.start().await.unwrap();
+    let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Approve first

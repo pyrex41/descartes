@@ -660,13 +660,23 @@ mod tests {
         monitor.register_event_handler().await;
 
         let agent_id = Uuid::new_v4();
-        let message = AgentStreamMessage::StatusUpdate {
+
+        // First transition to Initializing
+        let message1 = AgentStreamMessage::StatusUpdate {
+            agent_id,
+            status: AgentStatus::Initializing,
+            timestamp: Utc::now(),
+        };
+        monitor.process_stream_message(message1).await.ok();
+
+        // Then transition to Running
+        let message2 = AgentStreamMessage::StatusUpdate {
             agent_id,
             status: AgentStatus::Running,
             timestamp: Utc::now(),
         };
 
-        let result = monitor.process_stream_message(message).await;
+        let result = monitor.process_stream_message(message2).await;
         assert!(result.is_ok());
 
         // Agent should be auto-discovered
@@ -693,6 +703,7 @@ mod tests {
             "task2".to_string(),
             "claude".to_string(),
         );
+        agent2.transition_to(AgentStatus::Initializing, None).ok();
         agent2.transition_to(AgentStatus::Running, None).ok();
 
         monitor.register_agent(agent1).await;
@@ -734,6 +745,7 @@ mod tests {
             "task1".to_string(),
             "claude".to_string(),
         );
+        agent1.transition_to(AgentStatus::Initializing, None).ok();
         agent1.transition_to(AgentStatus::Running, None).ok();
 
         let mut agent2 = AgentRuntimeState::new(
@@ -742,6 +754,7 @@ mod tests {
             "task2".to_string(),
             "claude".to_string(),
         );
+        agent2.transition_to(AgentStatus::Initializing, None).ok();
         agent2.transition_to(AgentStatus::Running, None).ok();
 
         let agent3 = AgentRuntimeState::new(

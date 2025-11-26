@@ -1,11 +1,13 @@
 use chrono::Utc;
 /// Comprehensive integration tests for SqliteStateStore
 use descartes_core::{
-    ActorType, AgentState, Event, SqliteStateStore, StateStore, Task, TaskStatus,
+    ActorType, AgentState, Event, SqliteStateStore, StateStore, Task, TaskComplexity, TaskPriority,
+    TaskStatus,
 };
 use serde_json::json;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use uuid::Uuid;
 
 fn setup_test_db(name: &str) -> String {
@@ -438,7 +440,10 @@ async fn test_save_and_retrieve_tasks() {
         title: "Test Task".to_string(),
         description: Some("A test task".to_string()),
         status: TaskStatus::InProgress,
+        priority: TaskPriority::High,
+        complexity: TaskComplexity::Moderate,
         assigned_to: Some("agent_1".to_string()),
+        dependencies: vec![],
         created_at: Utc::now().timestamp(),
         updated_at: Utc::now().timestamp(),
         metadata: Some(json!({ "priority": "high" })),
@@ -472,7 +477,10 @@ async fn test_get_all_tasks() {
             title: format!("Task {}", i),
             description: None,
             status: TaskStatus::Todo,
+            priority: TaskPriority::Medium,
+            complexity: TaskComplexity::Simple,
             assigned_to: None,
+            dependencies: vec![],
             created_at: Utc::now().timestamp(),
             updated_at: Utc::now().timestamp(),
             metadata: None,

@@ -172,7 +172,7 @@ async fn test_spawn_with_sleep_backend() {
     let config = AgentConfig {
         name: "test-sleep".to_string(),
         model_backend: "sleep-cli".to_string(), // Will spawn 'sleep' command
-        task: "2".to_string(),                   // Sleep for 2 seconds
+        task: "2".to_string(),                  // Sleep for 2 seconds
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
@@ -197,7 +197,7 @@ async fn test_agent_lifecycle() {
     let config = AgentConfig {
         name: "lifecycle-test".to_string(),
         model_backend: "sleep-cli".to_string(), // Use sleep as a simple long-running process
-        task: "30".to_string(),                  // Sleep for 30 seconds (will be killed before)
+        task: "30".to_string(),                 // Sleep for 30 seconds (will be killed before)
         context: None,
         system_prompt: None,
         environment: HashMap::new(),

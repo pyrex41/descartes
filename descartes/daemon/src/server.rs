@@ -7,6 +7,7 @@ use crate::metrics::MetricsCollector;
 use crate::pool::ConnectionPool;
 use crate::rpc::JsonRpcServer;
 use crate::types::*;
+use hyper::header::AUTHORIZATION;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
 use serde_json::json;
@@ -165,10 +166,22 @@ async fn handle_http_request(
 
     match *req.method() {
         hyper::Method::POST => {
+            let auth_header = req
+                .headers()
+                .get(AUTHORIZATION)
+                .and_then(|value| value.to_str().ok())
+                .map(|s| s.to_string());
+
             let body_bytes = hyper::body::to_bytes(req.into_body()).await?;
+            let header_token = auth_header
+                .as_deref()
+                .and_then(|raw| parse_bearer_token(raw).or_else(|| Some(raw.trim().to_string())));
 
             let result = match serde_json::from_slice::<RpcRequest>(&body_bytes) {
-                Ok(request) => {
+                Ok(mut request) => {
+                    if request.auth_token.is_none() {
+                        request.auth_token = header_token.clone();
+                    }
                     let response = rpc.process_request(request).await;
                     serde_json::to_string(&response).unwrap_or_else(|_| {
                         json!({
@@ -182,15 +195,36 @@ async fn handle_http_request(
                         .to_string()
                     })
                 }
-                Err(e) => json!({
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32700,
-                        "message": format!("Parse error: {}", e)
-                    },
-                    "id": serde_json::Value::Null
-                })
-                .to_string(),
+                Err(_) => match serde_json::from_slice::<Vec<RpcRequest>>(&body_bytes) {
+                    Ok(mut requests) => {
+                        for request in requests.iter_mut() {
+                            if request.auth_token.is_none() {
+                                request.auth_token = header_token.clone();
+                            }
+                        }
+                        let responses = rpc.process_batch(requests).await;
+                        serde_json::to_string(&responses).unwrap_or_else(|_| {
+                            json!({
+                                "jsonrpc": "2.0",
+                                "error": {
+                                    "code": -32603,
+                                    "message": "Internal server error"
+                                },
+                                "id": serde_json::Value::Null
+                            })
+                            .to_string()
+                        })
+                    }
+                    Err(e) => json!({
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32700,
+                            "message": format!("Parse error: {}", e)
+                        },
+                        "id": serde_json::Value::Null
+                    })
+                    .to_string(),
+                },
             };
 
             metrics.record_connection_closed();
@@ -233,6 +267,21 @@ async fn handle_http_request(
                 .body(Body::from("Method not allowed"))
                 .unwrap())
         }
+    }
+}
+
+fn parse_bearer_token(header: &str) -> Option<String> {
+    let trimmed = header.trim();
+    let mut parts = trimmed.splitn(2, ' ');
+    let scheme = parts.next()?.to_ascii_lowercase();
+    if scheme != "bearer" {
+        return None;
+    }
+    let token = parts.next()?.trim();
+    if token.is_empty() {
+        None
+    } else {
+        Some(token.to_string())
     }
 }
 

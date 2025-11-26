@@ -654,7 +654,13 @@ fn view_line<'a>(
                     .size(11)
                     .color(Color::from_rgb8(200, 200, 100)),
             )
-            .padding(iced::Padding::default().top(2.0).right(2.0).bottom(2.0).left(30.0))
+            .padding(
+                iced::Padding::default()
+                    .top(2.0)
+                    .right(2.0)
+                    .bottom(2.0)
+                    .left(30.0),
+            )
             .style(|_theme: &Theme| container::Style {
                 background: Some(Color::from_rgba8(100, 100, 50, 0.3).into()),
                 border: iced::Border::default(),

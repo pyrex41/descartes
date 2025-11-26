@@ -7,7 +7,7 @@
 /// 4. Error handling and recovery
 /// 5. Statistics monitoring
 use descartes_core::{
-    IpcMessage, MessageBus, MessageBusConfig, MessageHandler, MessageType, RoutingRule,
+    IpcMessage, IpcRoutingRule, MessageBus, MessageBusConfig, MessageHandler, MessageType,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -230,11 +230,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Register handlers
     println!("--- Registering handlers ---\n");
-    router.register_handler("market_validator".to_string(), Arc::clone(&validator))?;
-    router.register_handler("trade_executor".to_string(), Arc::clone(&executor))?;
-    router.register_handler("result_aggregator".to_string(), Arc::clone(&aggregator))?;
-    router.register_handler("health_monitor".to_string(), Arc::clone(&health_monitor))?;
-    router.register_handler("audit_logger".to_string(), Arc::clone(&audit_logger))?;
+    router.register_handler(
+        "market_validator".to_string(),
+        validator.clone() as Arc<dyn MessageHandler>,
+    )?;
+    router.register_handler(
+        "trade_executor".to_string(),
+        executor.clone() as Arc<dyn MessageHandler>,
+    )?;
+    router.register_handler(
+        "result_aggregator".to_string(),
+        aggregator.clone() as Arc<dyn MessageHandler>,
+    )?;
+    router.register_handler(
+        "health_monitor".to_string(),
+        health_monitor.clone() as Arc<dyn MessageHandler>,
+    )?;
+    router.register_handler(
+        "audit_logger".to_string(),
+        audit_logger.clone() as Arc<dyn MessageHandler>,
+    )?;
 
     println!("Registered 5 custom handlers\n");
 
@@ -243,7 +258,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Rule 1: Market data goes to validator (high priority)
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "market-validate".to_string(),
             msg_type_filter: Some(MessageType::PublishMessage),
             sender_filter: Some("market_data_source".to_string()),
@@ -257,7 +272,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Rule 2: Trade requests go to executor
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "execute-trade".to_string(),
             msg_type_filter: Some(MessageType::DirectMessage),
             sender_filter: None,
@@ -271,7 +286,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Rule 3: Results go to aggregator
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "aggregate-results".to_string(),
             msg_type_filter: Some(MessageType::PublishMessage),
             sender_filter: None,
@@ -285,7 +300,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Rule 4: High priority messages go to health monitor
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "health-alert".to_string(),
             msg_type_filter: Some(MessageType::Error),
             sender_filter: None,
@@ -299,7 +314,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Rule 5: All messages logged for audit (lowest priority)
     router
-        .add_rule(RoutingRule {
+        .add_rule(IpcRoutingRule {
             id: "audit-all".to_string(),
             msg_type_filter: None,
             sender_filter: None,

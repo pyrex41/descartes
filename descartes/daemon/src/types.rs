@@ -10,6 +10,8 @@ pub struct RpcRequest {
     pub method: String,
     pub params: Option<serde_json::Value>,
     pub id: Option<serde_json::Value>,
+    #[serde(skip)]
+    pub auth_token: Option<String>,
 }
 
 /// JSON-RPC 2.0 Response

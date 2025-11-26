@@ -206,6 +206,28 @@ impl std::fmt::Display for AgentStatus {
     }
 }
 
+impl AgentStatus {
+    /// Return true when the agent has reached a terminal lifecycle state.
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            AgentStatus::Completed | AgentStatus::Failed | AgentStatus::Terminated
+        )
+    }
+
+    /// Return true while the agent is still eligible to run work.
+    pub fn is_active(&self) -> bool {
+        matches!(
+            self,
+            AgentStatus::Idle
+                | AgentStatus::Initializing
+                | AgentStatus::Running
+                | AgentStatus::Thinking
+                | AgentStatus::Paused
+        )
+    }
+}
+
 /// Handle to control a running agent.
 #[async_trait]
 pub trait AgentHandle: Send + Sync {

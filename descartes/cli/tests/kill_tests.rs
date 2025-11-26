@@ -1,7 +1,7 @@
 /// Integration tests for the kill command
 use sqlx::sqlite::SqlitePool;
-use tempfile::TempDir;
 use std::time::SystemTime;
+use tempfile::TempDir;
 use uuid::Uuid;
 
 /// Helper to create a temporary directory for testing
@@ -42,12 +42,7 @@ async fn setup_test_db(temp_dir: &TempDir) -> SqlitePool {
 }
 
 /// Insert a test agent into the database
-async fn insert_test_agent(
-    pool: &SqlitePool,
-    id: &str,
-    name: &str,
-    status: &str,
-) {
+async fn insert_test_agent(pool: &SqlitePool, id: &str, name: &str, status: &str) {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -102,14 +97,12 @@ async fn test_kill_updates_agent_status() {
         .unwrap()
         .as_secs() as i64;
 
-    sqlx::query(
-        "UPDATE agents SET status = 'Terminated', completed_at = ?1 WHERE id = ?2"
-    )
-    .bind(now)
-    .bind(agent_id)
-    .execute(&pool)
-    .await
-    .expect("Failed to update agent status");
+    sqlx::query("UPDATE agents SET status = 'Terminated', completed_at = ?1 WHERE id = ?2")
+        .bind(now)
+        .bind(agent_id)
+        .execute(&pool)
+        .await
+        .expect("Failed to update agent status");
 
     // Verify the update
     let row = sqlx::query("SELECT status, completed_at FROM agents WHERE id = ?1")
@@ -202,14 +195,12 @@ async fn test_kill_multiple_agents_independently() {
         .unwrap()
         .as_secs() as i64;
 
-    sqlx::query(
-        "UPDATE agents SET status = 'Terminated', completed_at = ?1 WHERE id = ?2"
-    )
-    .bind(now)
-    .bind(agent1_id)
-    .execute(&pool)
-    .await
-    .expect("Failed to kill agent1");
+    sqlx::query("UPDATE agents SET status = 'Terminated', completed_at = ?1 WHERE id = ?2")
+        .bind(now)
+        .bind(agent1_id)
+        .execute(&pool)
+        .await
+        .expect("Failed to kill agent1");
 
     // Verify agent1 is terminated
     let row1 = sqlx::query("SELECT status FROM agents WHERE id = ?1")

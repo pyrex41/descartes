@@ -8,15 +8,13 @@
 //! cargo run --example agent_monitor_usage --features="agent-monitoring"
 //! ```
 
-use descartes_core::{
-    agent_state::{
-        AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage, LifecycleEvent,
-    },
-    AgentError as RuntimeAgentError,
+use descartes_core::agent_state::{
+    AgentError, AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage, LifecycleEvent,
 };
+use descartes_daemon::events::EventCategory;
 use descartes_daemon::{
     AgentMonitor, AgentMonitoringRpcImpl, AgentMonitoringRpcServer, AgentStatusFilter, EventBus,
-    EventCategory, EventFilter,
+    EventFilter,
 };
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
@@ -173,7 +171,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Agent 1: Failed
     rpc.push_agent_update(AgentStreamMessage::Error {
         agent_id: agent_ids[1],
-        error: RuntimeAgentError::new("TASK_ERROR".to_string(), "Simulated error".to_string()),
+        error: AgentError::new("TASK_ERROR".to_string(), "Simulated task error".to_string()),
         timestamp: chrono::Utc::now(),
     })
     .await?;

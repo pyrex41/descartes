@@ -139,7 +139,11 @@ async fn test_init_creates_thoughts_directory() {
     // Verify subdirectories exist
     for subdir in subdirs {
         let path = thoughts_dir.join(subdir);
-        assert!(path.exists(), "Thoughts subdirectory {:?} should exist", path);
+        assert!(
+            path.exists(),
+            "Thoughts subdirectory {:?} should exist",
+            path
+        );
     }
 
     // Create README
@@ -156,7 +160,10 @@ async fn test_init_creates_example_files() {
     // Create example system prompt
     let example_prompt = base_path.join("example_system_prompt.txt");
     std::fs::write(&example_prompt, "Test system prompt").expect("Failed to write example prompt");
-    assert!(example_prompt.exists(), "Example system prompt should exist");
+    assert!(
+        example_prompt.exists(),
+        "Example system prompt should exist"
+    );
 
     // Create .gitignore
     let gitignore = base_path.join(".gitignore");

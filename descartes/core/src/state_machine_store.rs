@@ -124,11 +124,22 @@ impl SqliteWorkflowStore {
                 handler_details TEXT,
                 context_snapshot TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL,
-                FOREIGN KEY (workflow_id) REFERENCES workflows(workflow_id),
-                INDEX idx_workflow_id (workflow_id),
-                INDEX idx_created_at (created_at)
+                FOREIGN KEY (workflow_id) REFERENCES workflows(workflow_id)
             )
             "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // Create indexes separately for SQLite compatibility
+        sqlx::query(
+            r#"CREATE INDEX IF NOT EXISTS idx_workflow_id ON state_transitions(workflow_id)"#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"CREATE INDEX IF NOT EXISTS idx_created_at ON state_transitions(created_at)"#,
         )
         .execute(&self.pool)
         .await?;
@@ -500,17 +511,17 @@ impl WorkflowRecovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
+
+    async fn create_test_store() -> SqliteWorkflowStore {
+        // Use in-memory SQLite for faster tests
+        SqliteWorkflowStore::new("sqlite::memory:", StateStoreConfig::default())
+            .await
+            .expect("Failed to create store")
+    }
 
     #[tokio::test]
     async fn test_schema_initialization() {
-        let file = NamedTempFile::new().expect("Failed to create temp file");
-        let path = file.path().to_str().unwrap();
-        let url = format!("sqlite://{}", path);
-
-        let store = SqliteWorkflowStore::new(&url, StateStoreConfig::default())
-            .await
-            .expect("Failed to create store");
+        let store = create_test_store().await;
 
         // Verify tables exist
         let workflows = store.list_workflows().await.expect("Failed to list");
@@ -519,13 +530,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_load_workflow() {
-        let file = NamedTempFile::new().expect("Failed to create temp file");
-        let path = file.path().to_str().unwrap();
-        let url = format!("sqlite://{}", path);
-
-        let store = SqliteWorkflowStore::new(&url, StateStoreConfig::default())
-            .await
-            .expect("Failed to create store");
+        let store = create_test_store().await;
 
         // Create and save workflow
         let sm = Arc::new(WorkflowStateMachine::new("test-workflow".to_string()));

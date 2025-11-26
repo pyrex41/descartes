@@ -1,7 +1,7 @@
 /// Integration tests for the ps command
 use sqlx::sqlite::SqlitePool;
-use tempfile::TempDir;
 use std::time::SystemTime;
+use tempfile::TempDir;
 
 /// Helper to create a temporary directory for testing
 fn create_temp_dir() -> TempDir {
@@ -188,13 +188,12 @@ async fn test_ps_agent_data_integrity() {
     .await;
 
     // Query and verify data
-    let rows = sqlx::query(
-        "SELECT id, name, status, model_backend, task FROM agents WHERE id = ?1"
-    )
-    .bind("uuid-12345")
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query agent");
+    let rows =
+        sqlx::query("SELECT id, name, status, model_backend, task FROM agents WHERE id = ?1")
+            .bind("uuid-12345")
+            .fetch_all(&pool)
+            .await
+            .expect("Failed to query agent");
 
     assert_eq!(rows.len(), 1);
 

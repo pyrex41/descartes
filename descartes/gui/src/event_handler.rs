@@ -105,43 +105,46 @@ impl EventHandler {
         let event_rx = Arc::clone(&self.event_rx);
         let state = Arc::clone(&self.state);
 
-        iced::Subscription::run_with_id("event_stream", iced::stream::channel(100, move |mut output| {
-            let event_rx = Arc::clone(&event_rx);
-            let state = Arc::clone(&state);
-            let f = f.clone();
+        iced::Subscription::run_with_id(
+            "event_stream",
+            iced::stream::channel(100, move |mut output| {
+                let event_rx = Arc::clone(&event_rx);
+                let state = Arc::clone(&state);
+                let f = f.clone();
 
-            async move {
-                loop {
-                    // Wait for event receiver to be available
-                    let mut rx_guard = event_rx.write().await;
-                    if let Some(rx) = rx_guard.as_mut() {
-                        // Wait for next event
-                        match rx.recv().await {
-                            Some(event) => {
-                                debug!("Received event: {:?}", event);
-                                let msg = f(event);
-                                if output.send(msg).await.is_err() {
-                                    error!("Failed to send event to output channel");
+                async move {
+                    loop {
+                        // Wait for event receiver to be available
+                        let mut rx_guard = event_rx.write().await;
+                        if let Some(rx) = rx_guard.as_mut() {
+                            // Wait for next event
+                            match rx.recv().await {
+                                Some(event) => {
+                                    debug!("Received event: {:?}", event);
+                                    let msg = f(event);
+                                    if output.send(msg).await.is_err() {
+                                        error!("Failed to send event to output channel");
+                                        break;
+                                    }
+                                }
+                                None => {
+                                    warn!("Event channel closed");
+                                    *state.write().await = EventClientState::Disconnected;
                                     break;
                                 }
                             }
-                            None => {
-                                warn!("Event channel closed");
-                                *state.write().await = EventClientState::Disconnected;
-                                break;
-                            }
+                        } else {
+                            // Wait for connection
+                            drop(rx_guard);
+                            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                         }
-                    } else {
-                        // Wait for connection
-                        drop(rx_guard);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                     }
-                }
 
-                std::future::pending::<()>().await;
-                unreachable!()
-            }
-        }))
+                    std::future::pending::<()>().await;
+                    unreachable!()
+                }
+            }),
+        )
     }
 
     /// Disconnect from the event stream

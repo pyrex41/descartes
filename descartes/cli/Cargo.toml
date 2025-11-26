@@ -23,6 +23,7 @@ chrono = { workspace = true }
 colored = "2.0"
 atty = "0.2"
 async-trait = { workspace = true }
+dirs = "5.0"
 
 [[bin]]
 name = "descartes"
@@ -30,3 +31,5 @@ path = "src/main.rs"
 
 [dev-dependencies]
 tempfile = "3.8"
+assert_cmd = "2.0"
+wat = "1.0"

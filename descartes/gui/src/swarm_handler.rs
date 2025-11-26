@@ -6,7 +6,9 @@
 use chrono::{DateTime, Utc};
 use descartes_core::agent_stream_parser::StreamHandler;
 use descartes_core::AgentRuntimeState;
-use descartes_core::{AgentProgress, LifecycleEvent, OutputStream, RuntimeAgentError, RuntimeAgentStatus};
+use descartes_core::{
+    AgentProgress, LifecycleEvent, OutputStream, RuntimeAgentError, RuntimeAgentStatus,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
@@ -100,7 +102,12 @@ impl Default for GuiStreamHandler {
 }
 
 impl StreamHandler for GuiStreamHandler {
-    fn on_status_update(&mut self, agent_id: Uuid, status: RuntimeAgentStatus, _timestamp: DateTime<Utc>) {
+    fn on_status_update(
+        &mut self,
+        agent_id: Uuid,
+        status: RuntimeAgentStatus,
+        _timestamp: DateTime<Utc>,
+    ) {
         self.update_agent(agent_id, |agent| {
             agent
                 .transition_to(status, Some("Status update from stream".to_string()))
@@ -120,7 +127,10 @@ impl StreamHandler for GuiStreamHandler {
             // Auto-transition to Thinking state if not already
             if agent.status != RuntimeAgentStatus::Thinking {
                 agent
-                    .transition_to(RuntimeAgentStatus::Thinking, Some("Thought detected".to_string()))
+                    .transition_to(
+                        RuntimeAgentStatus::Thinking,
+                        Some("Thought detected".to_string()),
+                    )
                     .ok();
             }
         });
@@ -202,7 +212,10 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "anthropic".to_string(),
     );
     agent1
-        .transition_to(RuntimeAgentStatus::Running, Some("Analyzing files".to_string()))
+        .transition_to(
+            RuntimeAgentStatus::Running,
+            Some("Analyzing files".to_string()),
+        )
         .ok();
     agent1.update_progress(AgentProgress::with_steps(15, 30));
     agents.insert(agent1_id, agent1);
@@ -249,7 +262,9 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Run integration tests".to_string(),
         "anthropic".to_string(),
     );
-    agent4.transition_to(RuntimeAgentStatus::Initializing, None).ok();
+    agent4
+        .transition_to(RuntimeAgentStatus::Initializing, None)
+        .ok();
     agent4.transition_to(RuntimeAgentStatus::Running, None).ok();
     agent4
         .transition_to(
@@ -292,7 +307,10 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Failed to connect to database: connection timeout".to_string(),
     ));
     agent6
-        .transition_to(RuntimeAgentStatus::Failed, Some("Connection error".to_string()))
+        .transition_to(
+            RuntimeAgentStatus::Failed,
+            Some("Connection error".to_string()),
+        )
         .ok();
     agents.insert(agent6_id, agent6);
 
@@ -315,7 +333,10 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "anthropic".to_string(),
     );
     agent8
-        .transition_to(RuntimeAgentStatus::Initializing, Some("Loading data".to_string()))
+        .transition_to(
+            RuntimeAgentStatus::Initializing,
+            Some("Loading data".to_string()),
+        )
         .ok();
     agents.insert(agent8_id, agent8);
 
@@ -339,7 +360,9 @@ pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
         "Audit security vulnerabilities".to_string(),
         "anthropic".to_string(),
     );
-    agent10.transition_to(RuntimeAgentStatus::Thinking, None).ok();
+    agent10
+        .transition_to(RuntimeAgentStatus::Thinking, None)
+        .ok();
     agent10.update_thought("Analyzing authentication flows for potential security vulnerabilities, checking for SQL injection, XSS, and CSRF attack vectors...".to_string());
     agent10.update_progress(AgentProgress::new(62.5));
     agents.insert(agent10_id, agent10);

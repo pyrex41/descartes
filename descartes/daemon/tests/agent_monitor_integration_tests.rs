@@ -6,12 +6,9 @@
 //! - RPC methods
 //! - Event bus integration
 
-use descartes_core::{
-    agent_state::{
-        AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage, LifecycleEvent,
-        OutputStream,
-    },
-    AgentError as RuntimeAgentError,
+use descartes_core::agent_state::{
+    AgentError, AgentProgress, AgentRuntimeState, AgentStatus, AgentStreamMessage, LifecycleEvent,
+    OutputStream,
 };
 use descartes_daemon::{
     AgentMonitor, AgentMonitorConfig, AgentMonitoringRpcImpl, AgentMonitoringRpcServer,
@@ -164,6 +161,9 @@ async fn test_rpc_filter_by_status() {
         "task1".to_string(),
         "claude".to_string(),
     );
+    agent1
+        .transition_to(AgentStatus::Initializing, None)
+        .unwrap();
     agent1.transition_to(AgentStatus::Running, None).unwrap();
 
     let mut agent2 = AgentRuntimeState::new(
@@ -213,6 +213,9 @@ async fn test_rpc_get_statistics() {
         "task1".to_string(),
         "claude".to_string(),
     );
+    agent1
+        .transition_to(AgentStatus::Initializing, None)
+        .unwrap();
     agent1.transition_to(AgentStatus::Running, None).unwrap();
 
     let mut agent2 = AgentRuntimeState::new(
@@ -221,6 +224,9 @@ async fn test_rpc_get_statistics() {
         "task2".to_string(),
         "claude".to_string(),
     );
+    agent2
+        .transition_to(AgentStatus::Initializing, None)
+        .unwrap();
     agent2.transition_to(AgentStatus::Thinking, None).unwrap();
 
     let mut agent3 = AgentRuntimeState::new(
@@ -229,6 +235,9 @@ async fn test_rpc_get_statistics() {
         "task3".to_string(),
         "claude".to_string(),
     );
+    agent3
+        .transition_to(AgentStatus::Initializing, None)
+        .unwrap();
     agent3.transition_to(AgentStatus::Failed, None).unwrap();
 
     rpc.register_agent(agent1).await.unwrap();
@@ -302,6 +311,9 @@ async fn test_rpc_monitoring_health() {
             format!("task-{}", i),
             "claude".to_string(),
         );
+        agent
+            .transition_to(AgentStatus::Initializing, None)
+            .unwrap();
         agent.transition_to(AgentStatus::Running, None).unwrap();
         rpc.register_agent(agent).await.unwrap();
     }
@@ -409,7 +421,7 @@ async fn test_agent_error_handling() {
     // Send error message
     let error_msg = AgentStreamMessage::Error {
         agent_id,
-        error: RuntimeAgentError::new("TEST_ERROR".to_string(), "Test error message".to_string()),
+        error: AgentError::new("TEST_ERROR".to_string(), "Test error message".to_string()),
         timestamp: chrono::Utc::now(),
     };
 

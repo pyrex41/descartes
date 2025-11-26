@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Step 4: Start the server
     println!("4. Starting RPC server on Unix socket: {:?}", socket_path);
-    let handle = server.start().await?;
+    let mut handle = server.start().await?;
     println!("   ✓ Server started successfully!\n");
 
     println!("=== RPC Methods Available ===");

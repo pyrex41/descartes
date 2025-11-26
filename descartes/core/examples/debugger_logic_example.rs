@@ -439,8 +439,7 @@ fn demo_callbacks() {
     println!("   Breakpoint callbacks: {}", *bp_count.lock().unwrap());
 }
 
-#[tokio::main]
-async fn demo_agent_integration() {
+fn demo_agent_integration() {
     println!("\n=== Demo: Agent Integration ===\n");
 
     let agent_id = Uuid::new_v4();
@@ -507,7 +506,7 @@ async fn main() {
     demo_call_stack();
     demo_command_processing();
     demo_callbacks();
-    demo_agent_integration().await;
+    demo_agent_integration();
 
     println!("\n╔════════════════════════════════════════════════════════╗");
     println!("║   All demonstrations completed successfully!           ║");
