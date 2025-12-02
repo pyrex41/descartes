@@ -209,7 +209,7 @@ impl KnowledgeGraphOverlay {
         // Check cache first
         if self.config.enable_cache {
             if let Some(cached) = self.check_cache(&file_node.path)? {
-                return Ok(cached.node_ids);
+                return Ok(cached.node_ids.clone());
             }
         }
 
@@ -280,7 +280,7 @@ impl KnowledgeGraphOverlay {
                 format!(
                     "{}: {}",
                     p.name,
-                    p.type_annotation.as_deref().unwrap_or("_")
+                    if p.param_type.is_empty() { "_" } else { &p.param_type }
                 )
             })
             .collect();
@@ -412,7 +412,7 @@ impl KnowledgeGraphOverlay {
     }
 
     /// Get all parseable files from the file tree
-    fn get_parseable_files(&self, file_tree: &FileTree) -> Vec<&FileTreeNode> {
+    fn get_parseable_files<'a>(&self, file_tree: &'a FileTree) -> Vec<&'a FileTreeNode> {
         file_tree
             .get_all_files()
             .into_iter()
@@ -537,11 +537,11 @@ impl KnowledgeGraphOverlay {
     // ============================================================================
 
     /// Find all entities defined in a file
-    pub fn find_entities_in_file(
+    pub fn find_entities_in_file<'a>(
         &self,
         file_path: &Path,
-        knowledge_graph: &KnowledgeGraph,
-    ) -> Vec<&KnowledgeNode> {
+        knowledge_graph: &'a KnowledgeGraph,
+    ) -> Vec<&'a KnowledgeNode> {
         knowledge_graph
             .nodes
             .values()
@@ -554,22 +554,22 @@ impl KnowledgeGraphOverlay {
     }
 
     /// Find the definition location for an entity
-    pub fn find_definition(
+    pub fn find_definition<'a>(
         &self,
         qualified_name: &str,
-        knowledge_graph: &KnowledgeGraph,
-    ) -> Option<&FileReference> {
+        knowledge_graph: &'a KnowledgeGraph,
+    ) -> Option<&'a FileReference> {
         knowledge_graph
             .get_node_by_name(qualified_name)
             .and_then(|node| node.file_references.iter().find(|fr| fr.is_definition))
     }
 
     /// Find all references to an entity
-    pub fn find_references(
+    pub fn find_references<'a>(
         &self,
         entity_name: &str,
-        knowledge_graph: &KnowledgeGraph,
-    ) -> Vec<&FileReference> {
+        knowledge_graph: &'a KnowledgeGraph,
+    ) -> Vec<&'a FileReference> {
         knowledge_graph
             .nodes
             .values()
@@ -646,20 +646,20 @@ impl KnowledgeGraphOverlay {
     }
 
     /// Find all entities of a specific type
-    pub fn find_by_type(
+    pub fn find_by_type<'a>(
         &self,
         node_type: KnowledgeNodeType,
-        knowledge_graph: &KnowledgeGraph,
-    ) -> Vec<&KnowledgeNode> {
+        knowledge_graph: &'a KnowledgeGraph,
+    ) -> Vec<&'a KnowledgeNode> {
         knowledge_graph.get_nodes_by_type(node_type)
     }
 
     /// Find entities by name pattern
-    pub fn find_by_name_pattern(
+    pub fn find_by_name_pattern<'a>(
         &self,
         pattern: &str,
-        knowledge_graph: &KnowledgeGraph,
-    ) -> Vec<&KnowledgeNode> {
+        knowledge_graph: &'a KnowledgeGraph,
+    ) -> Vec<&'a KnowledgeNode> {
         knowledge_graph
             .nodes
             .values()
@@ -668,11 +668,11 @@ impl KnowledgeGraphOverlay {
     }
 
     /// Get all callers of a function
-    pub fn find_callers(
+    pub fn find_callers<'a>(
         &self,
         function_name: &str,
-        knowledge_graph: &KnowledgeGraph,
-    ) -> Vec<&KnowledgeNode> {
+        knowledge_graph: &'a KnowledgeGraph,
+    ) -> Vec<&'a KnowledgeNode> {
         if let Some(node) = knowledge_graph.get_node_by_name(function_name) {
             knowledge_graph
                 .get_incoming_edges(&node.node_id)
@@ -686,11 +686,11 @@ impl KnowledgeGraphOverlay {
     }
 
     /// Get all functions called by a function
-    pub fn find_callees(
+    pub fn find_callees<'a>(
         &self,
         function_name: &str,
-        knowledge_graph: &KnowledgeGraph,
-    ) -> Vec<&KnowledgeNode> {
+        knowledge_graph: &'a KnowledgeGraph,
+    ) -> Vec<&'a KnowledgeNode> {
         if let Some(node) = knowledge_graph.get_node_by_name(function_name) {
             knowledge_graph
                 .get_outgoing_edges(&node.node_id)

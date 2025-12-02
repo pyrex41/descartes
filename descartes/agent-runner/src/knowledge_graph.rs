@@ -892,7 +892,7 @@ impl KnowledgeGraph {
 
         let mut queue = VecDeque::new();
         let mut visited = HashSet::new();
-        let mut parent = HashMap::new();
+        let mut parent: HashMap<String, String> = HashMap::new();
 
         queue.push_back(from_id.to_string());
         visited.insert(from_id.to_string());

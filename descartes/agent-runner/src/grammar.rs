@@ -30,11 +30,11 @@ static GRAMMAR_CACHE: Lazy<RwLock<GrammarCache>> =
 
 /// Load the grammar for a specific language
 pub fn load_grammar(language: Language) -> ParserResult<TreeSitterLanguage> {
-    let result = match language {
-        Language::Rust => tree_sitter_rust::language(),
-        Language::Python => tree_sitter_python::language(),
-        Language::JavaScript => tree_sitter_javascript::language(),
-        Language::TypeScript => tree_sitter_typescript::language_typescript(),
+    let result: TreeSitterLanguage = match language {
+        Language::Rust => tree_sitter_rust::LANGUAGE.into(),
+        Language::Python => tree_sitter_python::LANGUAGE.into(),
+        Language::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
+        Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
     };
 
     // Mark as loaded in cache
@@ -57,7 +57,7 @@ pub fn create_parser(language: Language) -> ParserResult<Parser> {
     let grammar = load_grammar(language)?;
     let mut parser = Parser::new();
 
-    parser.set_language(grammar).map_err(|e| {
+    parser.set_language(&grammar).map_err(|e| {
         ParserError::LanguageInitError(format!("Failed to set language for parser: {}", e))
     })?;
 

@@ -7,3 +7,4 @@ pub mod plugins;
 pub mod ps;
 pub mod resume;
 pub mod spawn;
+pub mod tasks;

@@ -2,6 +2,7 @@
 use crate::errors::{ParserError, ParserResult};
 use crate::types::{Language, SemanticNodeType};
 use std::collections::VecDeque;
+use streaming_iterator::StreamingIterator;
 use tree_sitter::{Node, Tree};
 
 /// A traversal strategy for the AST
@@ -179,9 +180,8 @@ impl<'a> AstTraversal<'a> {
         }
 
         let source_slice = &source[start..end];
-        String::from_utf8(source_slice.to_vec())
-            .map(|s| Box::leak(s.into_boxed_str()))
-            .map_err(|e| ParserError::Utf8Error(e))
+        std::str::from_utf8(source_slice)
+            .map_err(|e| ParserError::NodeExtractionError(format!("UTF-8 error: {}", e)))
     }
 
     /// Get all named children of a node
@@ -257,7 +257,7 @@ impl QueryHelper {
     pub fn new(language: Language, query_string: &str) -> ParserResult<Self> {
         let lang_ts = crate::grammar::load_grammar(language)?;
 
-        let query = tree_sitter::Query::new(lang_ts, query_string).map_err(|e| {
+        let query = tree_sitter::Query::new(&lang_ts, query_string).map_err(|e| {
             ParserError::QueryCompileError(format!("Failed to compile query: {}", e))
         })?;
 
@@ -269,18 +269,19 @@ impl QueryHelper {
         let mut cursor = tree_sitter::QueryCursor::new();
         let root = tree.root_node();
 
-        let matches = cursor.matches(&self.query, root, source);
+        let mut matches = cursor.matches(&self.query, root, source);
 
-        let results = matches
-            .map(|m| QueryMatch {
-                capture_names: self.query.capture_names().to_vec(),
+        let mut results = Vec::new();
+        while let Some(m) = matches.next() {
+            results.push(QueryMatch {
+                capture_names: self.query.capture_names().iter().map(|s| s.to_string()).collect(),
                 captures: m
                     .captures
                     .iter()
                     .map(|c| (c.index as usize, c.node))
                     .collect(),
-            })
-            .collect();
+            });
+        }
 
         Ok(results)
     }

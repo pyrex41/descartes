@@ -427,23 +427,12 @@ fn test_language_detection() {
         detect_language(Path::new("test.ts")),
         Some(Language::TypeScript)
     );
-    assert_eq!(detect_language(Path::new("test.go")), Some(Language::Go));
-    assert_eq!(
-        detect_language(Path::new("test.java")),
-        Some(Language::Java)
-    );
-    assert_eq!(
-        detect_language(Path::new("test.md")),
-        Some(Language::Markdown)
-    );
-    assert_eq!(
-        detect_language(Path::new("test.json")),
-        Some(Language::Json)
-    );
-    assert_eq!(
-        detect_language(Path::new("test.yaml")),
-        Some(Language::Yaml)
-    );
+    // Languages not currently supported (no tree-sitter grammars)
+    assert_eq!(detect_language(Path::new("test.go")), None);
+    assert_eq!(detect_language(Path::new("test.java")), None);
+    assert_eq!(detect_language(Path::new("test.md")), None);
+    assert_eq!(detect_language(Path::new("test.json")), None);
+    assert_eq!(detect_language(Path::new("test.yaml")), None);
     assert_eq!(detect_language(Path::new("test.txt")), None);
 }
 

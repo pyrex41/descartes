@@ -32,6 +32,7 @@ pub mod state_machine_store;
 pub mod state_store;
 pub mod swarm_parser;
 pub mod task_queries;
+pub mod scg_task_storage;
 pub mod thoughts;
 pub mod time_travel_integration;
 pub mod traits;
@@ -51,6 +52,9 @@ pub use traits::{
     AttachInfo, ContextSyncer, Event, ExitStatus, FinishReason, Message, MessageRole, ModelBackend,
     ModelProviderMode, ModelRequest, ModelResponse, PauseMode, StateStore, Task, TaskComplexity,
     TaskPriority, TaskStatus, Tool, ToolCall, ToolParameters,
+    // SCUD integration types (for gradual migration to unified task model)
+    ScudPhase, ScudPriority, ScudStorage, ScudTask, ScudTaskStatus,
+    parse_scg, serialize_scg, scud_to_task, task_to_scud,
 };
 
 pub use providers::{
@@ -120,6 +124,10 @@ pub use state_store::{AgentState, Migration, SqliteStateStore, StateTransition};
 
 pub use task_queries::{
     KanbanBoard, SortOrder, TaskQueries, TaskQueryBuilder, TaskSortField, TaskStatistics,
+};
+
+pub use scg_task_storage::{
+    ScgPhaseStats, ScgSortField, ScgSortOrder, ScgTaskQueries, ScgTaskQueryBuilder, ScgTaskStorage,
 };
 
 pub use config::{

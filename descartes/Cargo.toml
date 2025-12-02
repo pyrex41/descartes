@@ -50,3 +50,6 @@ statig = "0.3"
 
 # Date/Time
 chrono = { version = "0.4.41", features = ["serde"] }
+
+# SCUD task management (shared models and SCG format)
+scud = { version = "1.19", package = "scud-cli" }

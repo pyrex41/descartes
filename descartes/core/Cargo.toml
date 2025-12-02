@@ -54,6 +54,9 @@ bincode = "1.3"
 # State machine
 statig = { workspace = true }
 
+# SCUD task management
+scud = { workspace = true }
+
 # ZeroMQ for remote agent communication
 zeromq = "0.4"
 rmp-serde = "1.1"  # MessagePack for efficient serialization

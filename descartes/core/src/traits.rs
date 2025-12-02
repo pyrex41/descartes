@@ -1,6 +1,7 @@
 /// Core trait definitions for the Descartes orchestration system.
 use crate::errors::{AgentResult, StateStoreResult};
 use async_trait::async_trait;
+use chrono::Utc;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -480,6 +481,167 @@ impl std::str::FromStr for TaskComplexity {
             _ => Err(format!("Invalid complexity: {}", s)),
         }
     }
+}
+
+// ============================================================================
+// SCUD Integration Types
+// Re-export SCUD types for gradual migration to unified task model
+// ============================================================================
+
+/// Re-export SCUD task types with Scud prefix to avoid conflicts during migration
+pub use scud::models::{Phase as ScudPhase, Priority as ScudPriority, Task as ScudTask, TaskStatus as ScudTaskStatus};
+
+/// Re-export SCUD storage for SCG file operations
+pub use scud::storage::Storage as ScudStorage;
+
+/// Re-export SCUD format utilities
+pub use scud::formats::{parse_scg, serialize_scg};
+
+/// Convert Descartes TaskStatus to SCUD TaskStatus
+impl From<TaskStatus> for ScudTaskStatus {
+    fn from(status: TaskStatus) -> Self {
+        match status {
+            TaskStatus::Todo => ScudTaskStatus::Pending,
+            TaskStatus::InProgress => ScudTaskStatus::InProgress,
+            TaskStatus::Done => ScudTaskStatus::Done,
+            TaskStatus::Blocked => ScudTaskStatus::Blocked,
+        }
+    }
+}
+
+/// Convert SCUD TaskStatus to Descartes TaskStatus
+impl From<ScudTaskStatus> for TaskStatus {
+    fn from(status: ScudTaskStatus) -> Self {
+        match status {
+            ScudTaskStatus::Pending => TaskStatus::Todo,
+            ScudTaskStatus::InProgress => TaskStatus::InProgress,
+            ScudTaskStatus::Done => TaskStatus::Done,
+            ScudTaskStatus::Blocked => TaskStatus::Blocked,
+            ScudTaskStatus::Expanded => TaskStatus::Done, // Expanded tasks are parent containers
+            ScudTaskStatus::Review => TaskStatus::InProgress, // Map review to in-progress
+            ScudTaskStatus::Deferred => TaskStatus::Blocked, // Map deferred to blocked
+            ScudTaskStatus::Cancelled => TaskStatus::Done, // Map cancelled to done
+        }
+    }
+}
+
+/// Convert Descartes TaskPriority to SCUD Priority
+impl From<TaskPriority> for ScudPriority {
+    fn from(priority: TaskPriority) -> Self {
+        match priority {
+            TaskPriority::Low => ScudPriority::Low,
+            TaskPriority::Medium => ScudPriority::Medium,
+            TaskPriority::High => ScudPriority::High,
+            TaskPriority::Critical => ScudPriority::Critical,
+        }
+    }
+}
+
+/// Convert SCUD Priority to Descartes TaskPriority
+impl From<ScudPriority> for TaskPriority {
+    fn from(priority: ScudPriority) -> Self {
+        match priority {
+            ScudPriority::Low => TaskPriority::Low,
+            ScudPriority::Medium => TaskPriority::Medium,
+            ScudPriority::High => TaskPriority::High,
+            ScudPriority::Critical => TaskPriority::Critical,
+        }
+    }
+}
+
+/// Convert Descartes TaskComplexity to SCUD complexity (Fibonacci u32)
+impl From<TaskComplexity> for u32 {
+    fn from(complexity: TaskComplexity) -> Self {
+        match complexity {
+            TaskComplexity::Trivial => 1,   // < 1 hour
+            TaskComplexity::Simple => 2,    // 1-4 hours
+            TaskComplexity::Moderate => 5,  // 1-2 days
+            TaskComplexity::Complex => 13,  // 3-5 days
+            TaskComplexity::Epic => 21,     // > 1 week
+        }
+    }
+}
+
+/// Convert SCUD complexity (Fibonacci u32) to Descartes TaskComplexity
+impl From<u32> for TaskComplexity {
+    fn from(complexity: u32) -> Self {
+        match complexity {
+            0 | 1 => TaskComplexity::Trivial,
+            2 | 3 => TaskComplexity::Simple,
+            5 | 8 => TaskComplexity::Moderate,
+            13 => TaskComplexity::Complex,
+            _ => TaskComplexity::Epic, // 21, 34, 55, 89
+        }
+    }
+}
+
+/// Convert a Descartes Task to a SCUD Task
+pub fn task_to_scud(task: &Task) -> ScudTask {
+    let now = chrono::Utc::now().to_rfc3339();
+    ScudTask {
+        id: task.id.to_string(),
+        title: task.title.clone(),
+        description: task.description.clone().unwrap_or_default(),
+        status: task.status.clone().into(),
+        priority: task.priority.into(),
+        complexity: task.complexity.into(),
+        dependencies: task.dependencies.iter().map(|id| id.to_string()).collect(),
+        assigned_to: task.assigned_to.clone(),
+        parent_id: None, // Descartes doesn't have parent task concept yet
+        subtasks: Vec::new(),
+        details: None,
+        test_strategy: None,
+        created_at: Some(chrono::DateTime::from_timestamp(task.created_at, 0)
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_else(|| now.clone())),
+        updated_at: Some(chrono::DateTime::from_timestamp(task.updated_at, 0)
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or(now)),
+        locked_by: None,
+        locked_at: None,
+    }
+}
+
+/// Convert a SCUD Task to a Descartes Task
+/// Note: Some SCUD-specific fields (parent_id, subtasks, locked_by, details, test_strategy) are not preserved
+pub fn scud_to_task(scud_task: &ScudTask) -> Result<Task, uuid::Error> {
+    let id = Uuid::parse_str(&scud_task.id)?;
+    let dependencies: Result<Vec<Uuid>, _> = scud_task
+        .dependencies
+        .iter()
+        .map(|s| Uuid::parse_str(s))
+        .collect();
+
+    let now = chrono::Utc::now().timestamp();
+
+    // Parse RFC3339 timestamps from SCUD, fallback to current time
+    let created_at = scud_task.created_at.as_ref()
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.timestamp())
+        .unwrap_or(now);
+
+    let updated_at = scud_task.updated_at.as_ref()
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.timestamp())
+        .unwrap_or(now);
+
+    Ok(Task {
+        id,
+        title: scud_task.title.clone(),
+        description: if scud_task.description.is_empty() {
+            None
+        } else {
+            Some(scud_task.description.clone())
+        },
+        status: scud_task.status.clone().into(),
+        priority: scud_task.priority.clone().into(),
+        complexity: scud_task.complexity.into(),
+        assigned_to: scud_task.assigned_to.clone(),
+        dependencies: dependencies?,
+        created_at,
+        updated_at,
+        metadata: None,
+    })
 }
 
 /// ContextSyncer trait - loads and streams context.

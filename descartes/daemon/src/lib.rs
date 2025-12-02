@@ -21,6 +21,7 @@ pub mod rpc_client; // Unix socket RPC client
 pub mod rpc_server; // New jsonrpsee-based Unix socket server
 pub mod server;
 pub mod task_event_emitter;
+pub mod scg_task_event_emitter; // SCG file-based task event emitter
 pub mod types;
 
 // Re-export commonly used types
@@ -48,6 +49,9 @@ pub use rpc_server::{
 pub use server::RpcServer;
 pub use task_event_emitter::{
     TaskChangeEvent, TaskEmitterStatistics, TaskEventEmitter, TaskEventEmitterConfig,
+};
+pub use scg_task_event_emitter::{
+    ScgTaskEventEmitter, ScgTaskEventEmitterConfig,
 };
 pub use types::{RpcRequest, RpcResponse};
 

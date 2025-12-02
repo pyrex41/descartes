@@ -10,7 +10,7 @@ use crate::knowledge_graph::{FileMetadata, FileNodeType, FileTree, FileTreeNode}
 use crate::types::Language;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -432,6 +432,7 @@ impl Default for FileTreeBuilder {
 }
 
 /// Detect programming language from file extension
+/// Currently only supports languages with tree-sitter grammars installed
 pub fn detect_language(path: &Path) -> Option<Language> {
     let extension = path.extension()?.to_str()?;
 
@@ -440,24 +441,9 @@ pub fn detect_language(path: &Path) -> Option<Language> {
         "py" | "pyw" | "pyi" => Some(Language::Python),
         "js" | "jsx" | "mjs" | "cjs" => Some(Language::JavaScript),
         "ts" | "tsx" | "mts" | "cts" => Some(Language::TypeScript),
-        "go" => Some(Language::Go),
-        "java" => Some(Language::Java),
-        "c" | "h" => Some(Language::C),
-        "cpp" | "cc" | "cxx" | "hpp" | "hxx" => Some(Language::Cpp),
-        "rb" => Some(Language::Ruby),
-        "php" => Some(Language::Php),
-        "swift" => Some(Language::Swift),
-        "kt" | "kts" => Some(Language::Kotlin),
-        "scala" | "sc" => Some(Language::Scala),
-        "sh" | "bash" => Some(Language::Bash),
-        "sql" => Some(Language::Sql),
-        "html" | "htm" => Some(Language::Html),
-        "css" | "scss" | "sass" | "less" => Some(Language::Css),
-        "json" => Some(Language::Json),
-        "xml" => Some(Language::Xml),
-        "yaml" | "yml" => Some(Language::Yaml),
-        "toml" => Some(Language::Toml),
-        "md" | "markdown" => Some(Language::Markdown),
+        // Other languages not yet supported with tree-sitter grammars:
+        // go, java, c, cpp, ruby, php, swift, kotlin, scala, bash, sql,
+        // html, css, json, xml, yaml, toml, markdown
         _ => None,
     }
 }
@@ -591,26 +577,33 @@ impl FileTreeUpdater {
             self.remove_node(tree, &child_id);
         }
 
+        // Extract needed data from the node before mutating tree
+        let (parent_id, node_type, node_path) = {
+            if let Some(node) = tree.get_node(node_id) {
+                (node.parent_id.clone(), node.node_type, node.path.clone())
+            } else {
+                return;
+            }
+        };
+
         // Remove from parent's children list
-        if let Some(node) = tree.get_node(node_id) {
-            if let Some(parent_id) = &node.parent_id {
-                if let Some(parent) = tree.get_node_mut(parent_id) {
-                    parent.children.retain(|id| id != node_id);
-                }
+        if let Some(parent_id) = parent_id {
+            if let Some(parent) = tree.get_node_mut(&parent_id) {
+                parent.children.retain(|id| id != node_id);
             }
-
-            // Update counts
-            match node.node_type {
-                FileNodeType::File => tree.file_count = tree.file_count.saturating_sub(1),
-                FileNodeType::Directory => {
-                    tree.directory_count = tree.directory_count.saturating_sub(1)
-                }
-                _ => {}
-            }
-
-            // Remove from path index
-            tree.path_index.remove(&node.path);
         }
+
+        // Update counts
+        match node_type {
+            FileNodeType::File => tree.file_count = tree.file_count.saturating_sub(1),
+            FileNodeType::Directory => {
+                tree.directory_count = tree.directory_count.saturating_sub(1)
+            }
+            _ => {}
+        }
+
+        // Remove from path index
+        tree.path_index.remove(&node_path);
 
         // Remove from nodes
         tree.nodes.remove(node_id);
@@ -646,11 +639,20 @@ impl FileTreeUpdater {
             .map(|n| n.node_id.clone())
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Path not found"))?;
 
-        // Update the node's path and name
-        if let Some(node) = tree.get_node_mut(&node_id) {
-            // Remove old path from index
-            tree.path_index.remove(&node.path);
+        // Get old path from node first
+        let old_node_path = tree.get_node(&node_id).map(|n| n.path.clone());
 
+        // Remove old path from index
+        if let Some(old_node_path) = old_node_path {
+            tree.path_index.remove(&old_node_path);
+        }
+
+        // Add new path to index
+        tree.path_index
+            .insert(new_path.to_path_buf(), node_id.clone());
+
+        // Update the node's path, name, and metadata
+        if let Some(node) = tree.get_node_mut(&node_id) {
             // Update node
             node.path = new_path.to_path_buf();
             node.name = new_path
@@ -658,10 +660,6 @@ impl FileTreeUpdater {
                 .and_then(|n| n.to_str())
                 .unwrap_or("")
                 .to_string();
-
-            // Add new path to index
-            tree.path_index
-                .insert(new_path.to_path_buf(), node_id.clone());
 
             // Update metadata
             if let Ok(fs_metadata) = fs::symlink_metadata(new_path) {

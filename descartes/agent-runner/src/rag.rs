@@ -12,7 +12,8 @@ use crate::parser::SemanticParser;
 use crate::types::{Language, SemanticNode};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use lancedb::connection::{Connection as LanceConnection, CreateTableMode};
+use lancedb::connection::Connection as LanceConnection;
+use lancedb::database::CreateTableMode;
 use lancedb::query::{ExecutableQuery, QueryBase};
 use ndarray::{Array1, Array2};
 use parking_lot::RwLock;
@@ -715,7 +716,7 @@ impl VectorStore {
             .as_ref()
             .ok_or_else(|| ParserError::DatabaseError("VectorStore not initialized".to_string()))?;
 
-        let _ = conn.drop_table(&self.table_name).await;
+        let _ = conn.drop_table(&self.table_name, &[]).await;
         Ok(())
     }
 }
@@ -825,7 +826,7 @@ impl FullTextSearch {
 
         let reader = index
             .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
+            .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()
             .map_err(|e| ParserError::DatabaseError(format!("Failed to create reader: {}", e)))?;
 
@@ -846,12 +847,15 @@ impl FullTextSearch {
 
         let results: Vec<(String, f32)> = top_docs
             .iter()
-            .map(|(score, doc_address)| {
-                let doc = searcher.doc(*doc_address).ok()?;
-                let id = doc.get_first(id_field)?.as_text()?.to_string();
-                Some((id, *score))
+            .filter_map(|(score, doc_address)| {
+                let doc: tantivy::TantivyDocument = searcher.doc(*doc_address).ok()?;
+                let value = doc.get_first(id_field)?;
+                if let tantivy::schema::OwnedValue::Str(id) = value {
+                    Some((id.clone(), *score))
+                } else {
+                    None
+                }
             })
-            .filter_map(|x| x)
             .collect();
 
         Ok(results)

@@ -133,7 +133,7 @@ impl SemanticExtractor {
                 // For Rust, look for identifier child nodes
                 for child in node.children(&mut node.walk()) {
                     if child.kind() == "identifier" {
-                        return Some(self.extract_source(child, source_code).ok()?);
+                        return Some(self.extract_source(&child, source_code).ok()?);
                     }
                 }
                 None
@@ -142,7 +142,7 @@ impl SemanticExtractor {
                 // For Python, look for NAME nodes
                 for child in node.children(&mut node.walk()) {
                     if child.kind() == "identifier" {
-                        return Some(self.extract_source(child, source_code).ok()?);
+                        return Some(self.extract_source(&child, source_code).ok()?);
                     }
                 }
                 None
@@ -151,7 +151,7 @@ impl SemanticExtractor {
                 // For JS/TS, look for identifier nodes
                 for child in node.children(&mut node.walk()) {
                     if child.kind() == "identifier" {
-                        return Some(self.extract_source(child, source_code).ok()?);
+                        return Some(self.extract_source(&child, source_code).ok()?);
                     }
                 }
                 None
