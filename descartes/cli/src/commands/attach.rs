@@ -1,17 +1,24 @@
+//! Get attach credentials for a paused agent via daemon RPC.
+//!
+//! This command calls the daemon's `agent.attach.request` RPC method
+//! to generate attach credentials (token, connect URL) that can be
+//! used by external TUI clients like Claude Code or OpenCode.
+
 use anyhow::Result;
 use colored::Colorize;
 use descartes_core::DescaratesConfig;
+use std::process::Command;
 use tracing::info;
 use uuid::Uuid;
 
-/// Default TTL for attach tokens in seconds (5 minutes)
-const DEFAULT_TOKEN_TTL_SECS: i64 = 300;
+use crate::rpc;
 
 pub async fn execute(
     config: &DescaratesConfig,
     id: &str,
     client_type: &str,
     output_json: bool,
+    launch: bool,
 ) -> Result<()> {
     if !output_json {
         println!(
@@ -22,110 +29,39 @@ pub async fn execute(
         );
     }
 
-    // Parse UUID
-    let agent_id = Uuid::parse_str(id)
+    // Parse UUID to validate format
+    let _agent_id = Uuid::parse_str(id)
         .map_err(|_| anyhow::anyhow!("Invalid agent ID format. Expected UUID."))?;
 
-    // Connect to database
-    let db_path = format!("{}/data/descartes.db", config.storage.base_path);
-    let db_url = format!("sqlite://{}", db_path);
-
-    let pool = sqlx::sqlite::SqlitePool::connect(&db_url).await?;
-
-    // Check if agent exists and get status
-    let row = sqlx::query("SELECT id, name, status, task FROM agents WHERE id = ?1")
-        .bind(id)
-        .fetch_optional(&pool)
-        .await?;
-
-    if row.is_none() {
-        anyhow::bail!("Agent not found: {}", id);
-    }
-
-    let row = row.unwrap();
-    let status: String = sqlx::Row::get(&row, "status");
-    let name: String = sqlx::Row::get(&row, "name");
-    let task: Option<String> = sqlx::Row::get(&row, "task");
-
-    if !output_json {
-        println!("  Agent: {}", name.cyan());
-        println!("  Status: {}", status.yellow());
-    }
-
-    // Check if agent is paused (attach only works for paused agents)
-    if status != "Paused" {
-        anyhow::bail!(
-            "Agent is not paused (status: {}). Pause the agent first with 'descartes pause'.",
-            status
-        );
-    }
-
     info!(
-        "Generating attach credentials for agent {} (client: {})",
-        id, client_type
+        "Connecting to daemon to request attach credentials for agent {}",
+        id
     );
 
-    // Generate attach token
-    let token = generate_attach_token();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs() as i64;
-    let expires_at = now + DEFAULT_TOKEN_TTL_SECS;
+    // Connect to daemon
+    let client = rpc::connect_or_bail(config).await?;
 
-    // Generate connect URL (Unix socket path for local connections)
-    let socket_path = format!("{}/run/attach-{}.sock", config.storage.base_path, id);
-    let connect_url = format!("unix://{}", socket_path);
-
-    // Store attach session in database
-    let session_id = Uuid::new_v4().to_string();
-    sqlx::query(
-        r#"
-        INSERT INTO attach_sessions (id, agent_id, token, client_type, connect_url, created_at, expires_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-        "#,
+    // Call attach.request RPC (daemon expects positional array: [agent_id, client_type])
+    let result = rpc::call_method(
+        &client,
+        "agent.attach.request",
+        serde_json::json!([id, client_type]),
     )
-    .bind(&session_id)
-    .bind(id)
-    .bind(&token)
-    .bind(client_type)
-    .bind(&connect_url)
-    .bind(now)
-    .bind(expires_at)
-    .execute(&pool)
-    .await
-    .or_else(|e| {
-        // Table might not exist yet, just log warning and continue
-        info!("Could not store attach session (table may not exist): {}", e);
-        Ok::<_, sqlx::Error>(sqlx::sqlite::SqliteQueryResult::default())
-    })?;
-
-    // Record attach request event
-    let event_id = Uuid::new_v4().to_string();
-    sqlx::query(
-        r#"
-        INSERT INTO events (id, event_type, timestamp, session_id, actor_type, actor_id, content)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-        "#,
-    )
-    .bind(&event_id)
-    .bind("attach_requested")
-    .bind(now)
-    .bind(id)
-    .bind("System")
-    .bind("cli")
-    .bind(format!(
-        "Attach credentials generated for agent {} (client: {})",
-        name, client_type
-    ))
-    .execute(&pool)
     .await?;
 
+    // Parse result
+    let token = result["token"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("No token in response"))?;
+    let connect_url = result["connect_url"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("No connect_url in response"))?;
+    let expires_at = result["expires_at"].as_i64().unwrap_or(0);
+
     if output_json {
-        // Output JSON for scripting/piping to other tools
+        // Output JSON for scripting
         let output = serde_json::json!({
             "agent_id": id,
-            "agent_name": name,
-            "task": task,
             "token": token,
             "connect_url": connect_url,
             "expires_at": expires_at,
@@ -161,30 +97,116 @@ pub async fn execute(
             }
         }
 
-        println!(
-            "\n{}",
-            format!(
-                "Note: Token expires in {} seconds.",
-                DEFAULT_TOKEN_TTL_SECS
-            )
-            .yellow()
-        );
+        // Calculate TTL from expires_at
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let ttl = expires_at - now;
+        if ttl > 0 {
+            println!(
+                "\n{}",
+                format!("Note: Token expires in {} seconds.", ttl).yellow()
+            );
+        }
+    }
+
+    // Launch TUI if requested
+    if launch {
+        launch_tui(client_type, token, connect_url)?;
     }
 
     Ok(())
 }
 
-/// Generate a secure random attach token
-fn generate_attach_token() -> String {
-    use rand::Rng;
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    const TOKEN_LEN: usize = 32;
+/// Launch the appropriate TUI client with attach credentials
+fn launch_tui(client_type: &str, token: &str, connect_url: &str) -> Result<()> {
+    println!(
+        "\n{}",
+        format!("Launching {} TUI...", client_type).green().bold()
+    );
 
-    let mut rng = rand::thread_rng();
-    (0..TOKEN_LEN)
-        .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect()
+    match client_type {
+        "claude-code" => {
+            // Try to find claude command
+            let claude_cmd = which_claude().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Could not find 'claude' command. Please ensure Claude Code is installed and in your PATH."
+                )
+            })?;
+
+            info!("Launching Claude Code TUI: {} --attach-token {} --connect {}", claude_cmd, token, connect_url);
+
+            // Spawn the TUI process, replacing the current process
+            let status = Command::new(&claude_cmd)
+                .arg("--attach-token")
+                .arg(token)
+                .arg("--connect")
+                .arg(connect_url)
+                .status()?;
+
+            if !status.success() {
+                anyhow::bail!("Claude Code exited with status: {:?}", status.code());
+            }
+        }
+        "opencode" => {
+            // Try to find opencode command
+            let opencode_cmd = which_opencode().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Could not find 'opencode' command. Please ensure OpenCode is installed and in your PATH."
+                )
+            })?;
+
+            info!("Launching OpenCode TUI: {} attach --token {} --url {}", opencode_cmd, token, connect_url);
+
+            let status = Command::new(&opencode_cmd)
+                .arg("attach")
+                .arg("--token")
+                .arg(token)
+                .arg("--url")
+                .arg(connect_url)
+                .status()?;
+
+            if !status.success() {
+                anyhow::bail!("OpenCode exited with status: {:?}", status.code());
+            }
+        }
+        other => {
+            anyhow::bail!(
+                "Cannot auto-launch unknown client type '{}'. Use --json to get credentials for manual connection.",
+                other
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Find the claude command in PATH
+fn which_claude() -> Option<String> {
+    // Try common names for the Claude Code CLI
+    for cmd in &["claude", "claude-code"] {
+        if Command::new("which")
+            .arg(cmd)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return Some(cmd.to_string());
+        }
+    }
+    None
+}
+
+/// Find the opencode command in PATH
+fn which_opencode() -> Option<String> {
+    if Command::new("which")
+        .arg("opencode")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        return Some("opencode".to_string());
+    }
+    None
 }

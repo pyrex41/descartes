@@ -3141,6 +3141,7 @@ dependencies = [
  "clap",
  "colored",
  "descartes-core",
+ "descartes-daemon",
  "dirs 5.0.1",
  "futures",
  "indicatif",
@@ -3207,6 +3208,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.21.7",
  "bytes 1.11.0",
  "chrono",
  "clap",

@@ -3,9 +3,11 @@
 /// This module provides a wrapper around the RPC client for use in the Iced GUI.
 /// It handles background communication with the daemon and provides a message-based interface.
 use descartes_daemon::{DaemonError, RpcClient, RpcClientBuilder};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 /// GUI RPC client wrapper
 pub struct GuiRpcClient {
@@ -54,6 +56,53 @@ impl GuiRpcClient {
     /// Disconnect
     pub async fn disconnect(&self) {
         *self.connected.write().await = false;
+    }
+
+    /// Pause a running agent
+    ///
+    /// # Arguments
+    /// * `agent_id` - The ID of the agent to pause
+    /// * `force` - If true, use SIGSTOP (forced); otherwise use cooperative pause
+    ///
+    /// # Returns
+    /// Pause confirmation with timestamp and mode
+    pub async fn pause_agent(&self, agent_id: Uuid, force: bool) -> Result<PauseResult, DaemonError> {
+        let params = json!([agent_id.to_string(), force]);
+        let result = self.client.call("agent.pause", Some(params)).await?;
+
+        serde_json::from_value(result)
+            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse pause result: {}", e)))
+    }
+
+    /// Resume a paused agent
+    ///
+    /// # Arguments
+    /// * `agent_id` - The ID of the agent to resume
+    ///
+    /// # Returns
+    /// Resume confirmation with timestamp
+    pub async fn resume_agent(&self, agent_id: Uuid) -> Result<ResumeResult, DaemonError> {
+        let params = json!([agent_id.to_string()]);
+        let result = self.client.call("agent.resume", Some(params)).await?;
+
+        serde_json::from_value(result)
+            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse resume result: {}", e)))
+    }
+
+    /// Request attach credentials for a paused agent
+    ///
+    /// # Arguments
+    /// * `agent_id` - The ID of the agent to attach to
+    /// * `client_type` - The type of client requesting attachment (e.g., "claude-code")
+    ///
+    /// # Returns
+    /// Attach credentials including token and connect URL
+    pub async fn attach_request(&self, agent_id: Uuid, client_type: &str) -> Result<AttachCredentialsResult, DaemonError> {
+        let params = json!([agent_id.to_string(), client_type]);
+        let result = self.client.call("agent.attach.request", Some(params)).await?;
+
+        serde_json::from_value(result)
+            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse attach credentials result: {}", e)))
     }
 }
 
@@ -149,6 +198,30 @@ impl GuiRpcClient {
 ///     }
 /// }
 /// ```
+
+/// Pause result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PauseResult {
+    pub agent_id: String,
+    pub paused_at: i64,
+    pub pause_mode: String,
+}
+
+/// Resume result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResumeResult {
+    pub agent_id: String,
+    pub resumed_at: i64,
+}
+
+/// Attach credentials result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachCredentialsResult {
+    pub agent_id: String,
+    pub token: String,
+    pub connect_url: String,
+    pub expires_at: i64,
+}
 
 impl Clone for GuiRpcClient {
     fn clone(&self) -> Self {

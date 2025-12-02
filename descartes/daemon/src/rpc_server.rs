@@ -22,7 +22,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::oneshot;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// RPC API trait defining all available methods
@@ -201,12 +201,19 @@ pub struct AttachRevokeResult {
 pub struct RpcServerImpl {
     /// Agent runner for spawning and managing agents
     agent_runner: Arc<dyn descartes_core::traits::AgentRunner>,
+    /// Concrete LocalProcessRunner reference for I/O channel access
+    /// Only set when using LocalProcessRunner as the backend
+    local_runner: Option<Arc<descartes_core::LocalProcessRunner>>,
     /// State store for persisting tasks and events
     state_store: Arc<dyn descartes_core::traits::StateStore>,
     /// Mapping of agent IDs (String -> Uuid) for convenience
     agent_ids: Arc<dashmap::DashMap<String, uuid::Uuid>>,
     /// Attach session manager for managing TUI attachment sessions
     attach_manager: Arc<crate::attach_session::AttachSessionManager>,
+    /// Event bus for system events
+    event_bus: Arc<crate::events::EventBus>,
+    /// Active attach server handles (agent_id -> JoinHandle)
+    attach_servers: Arc<dashmap::DashMap<uuid::Uuid, tokio::task::JoinHandle<()>>>,
 }
 
 impl RpcServerImpl {
@@ -216,12 +223,47 @@ impl RpcServerImpl {
         state_store: Arc<dyn descartes_core::traits::StateStore>,
     ) -> Self {
         let attach_config = crate::attach_session::AttachSessionConfig::default();
-        let attach_manager = Arc::new(crate::attach_session::AttachSessionManager::new(attach_config));
+        let token_store = Arc::new(descartes_core::AttachTokenStore::new());
+        let event_bus = Arc::new(crate::events::EventBus::new());
+        let attach_manager = Arc::new(crate::attach_session::AttachSessionManager::new(
+            Arc::clone(&token_store),
+            Arc::clone(&event_bus),
+            attach_config,
+        ));
         Self {
             agent_runner,
+            local_runner: None,
             state_store,
             agent_ids: Arc::new(dashmap::DashMap::new()),
             attach_manager,
+            event_bus,
+            attach_servers: Arc::new(dashmap::DashMap::new()),
+        }
+    }
+
+    /// Create a new RPC server implementation with a LocalProcessRunner
+    ///
+    /// This allows the server to access I/O channels for TUI attachment.
+    pub fn with_local_runner(
+        local_runner: Arc<descartes_core::LocalProcessRunner>,
+        state_store: Arc<dyn descartes_core::traits::StateStore>,
+    ) -> Self {
+        let attach_config = crate::attach_session::AttachSessionConfig::default();
+        let token_store = Arc::new(descartes_core::AttachTokenStore::new());
+        let event_bus = Arc::new(crate::events::EventBus::new());
+        let attach_manager = Arc::new(crate::attach_session::AttachSessionManager::new(
+            Arc::clone(&token_store),
+            Arc::clone(&event_bus),
+            attach_config,
+        ));
+        Self {
+            agent_runner: Arc::clone(&local_runner) as Arc<dyn descartes_core::traits::AgentRunner>,
+            local_runner: Some(local_runner),
+            state_store,
+            agent_ids: Arc::new(dashmap::DashMap::new()),
+            attach_manager,
+            event_bus,
+            attach_servers: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -230,12 +272,16 @@ impl RpcServerImpl {
         agent_runner: Arc<dyn descartes_core::traits::AgentRunner>,
         state_store: Arc<dyn descartes_core::traits::StateStore>,
         attach_manager: Arc<crate::attach_session::AttachSessionManager>,
+        event_bus: Arc<crate::events::EventBus>,
     ) -> Self {
         Self {
             agent_runner,
+            local_runner: None,
             state_store,
             agent_ids: Arc::new(dashmap::DashMap::new()),
             attach_manager,
+            event_bus,
+            attach_servers: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -508,6 +554,58 @@ impl RpcServerImpl {
         let pause_mode = if force { "forced" } else { "cooperative" };
         let paused_at = chrono::Utc::now().timestamp();
 
+        // Start attach server for the paused agent if we have LocalProcessRunner
+        if let Some(ref local_runner) = self.local_runner {
+            if let Some(handle) = local_runner.get_agent_handle(&agent_uuid) {
+                let handle_guard = handle.read();
+                let agent_info = handle_guard.agent_info();
+
+                // Get I/O channels
+                let stdin_tx = handle_guard.get_stdin_sender();
+                let stdout_tx = handle_guard.stdout_broadcast_sender();
+                let stderr_tx = handle_guard.stderr_broadcast_sender();
+
+                // Create socket path
+                let socket_path = std::path::PathBuf::from(format!(
+                    "/tmp/descartes-attach-{}.sock",
+                    agent_uuid
+                ));
+
+                let attach_manager = Arc::clone(&self.attach_manager);
+                let agent_name = agent_info.name.clone();
+                let agent_task = agent_info.task.clone();
+
+                drop(handle_guard); // Release the read lock before spawning
+
+                // Spawn attach server in background
+                let server_handle = tokio::spawn(async move {
+                    if let Err(e) = crate::claude_code_tui::start_attach_server(
+                        &socket_path,
+                        crate::claude_code_tui::ClaudeCodeTuiConfig::default(),
+                        attach_manager,
+                        agent_uuid,
+                        agent_name,
+                        agent_task,
+                        stdin_tx,
+                        stdout_tx,
+                        stderr_tx,
+                    )
+                    .await
+                    {
+                        error!("Attach server error for agent {}: {}", agent_uuid, e);
+                    }
+                });
+
+                // Store the handle so we can stop it when agent resumes
+                self.attach_servers.insert(agent_uuid, server_handle);
+                info!("Started attach server for paused agent {}", agent_uuid);
+            } else {
+                warn!("Could not get agent handle for attach server (agent {})", agent_uuid);
+            }
+        } else {
+            debug!("LocalProcessRunner not available, skipping attach server");
+        }
+
         info!("Agent {} paused successfully (mode: {})", agent_id, pause_mode);
 
         Ok(PauseResult {
@@ -549,6 +647,22 @@ impl RpcServerImpl {
                 format!("Agent is not paused (status: {:?})", agent_info.status),
                 None::<()>,
             ));
+        }
+
+        // Stop the attach server if running
+        if let Some((_, server_handle)) = self.attach_servers.remove(&agent_uuid) {
+            server_handle.abort();
+            info!("Stopped attach server for agent {}", agent_uuid);
+
+            // Clean up socket file
+            let socket_path = format!("/tmp/descartes-attach-{}.sock", agent_uuid);
+            let _ = std::fs::remove_file(&socket_path);
+
+            // Terminate any active attach sessions for this agent
+            let terminated_count = self.attach_manager.terminate_sessions_for_agent(&agent_uuid).await;
+            if terminated_count > 0 {
+                info!("Terminated {} attach session(s) for agent {}", terminated_count, agent_uuid);
+            }
         }
 
         // Resume the agent
@@ -602,6 +716,14 @@ impl RpcServerImpl {
             ));
         }
 
+        // Check if attach server is running for this agent
+        let socket_path = format!("/tmp/descartes-attach-{}.sock", agent_uuid);
+        if !self.attach_servers.contains_key(&agent_uuid) {
+            // Server not running - this could happen if daemon was restarted after pause
+            // or if using a runner that doesn't support TUI attachment
+            warn!("Attach server not running for agent {}, socket may not be available", agent_uuid);
+        }
+
         // Parse client type
         let parsed_client_type = match client_type.as_str() {
             "claude-code" => crate::attach_session::ClientType::ClaudeCode,
@@ -609,23 +731,24 @@ impl RpcServerImpl {
             other => crate::attach_session::ClientType::Custom(other.to_string()),
         };
 
-        // Create attach session
-        let session = self
+        // Request attach credentials
+        let credentials = self
             .attach_manager
-            .create_session(agent_uuid, agent_info.name.clone(), agent_info.task.clone(), parsed_client_type)
+            .request_attach(agent_uuid, parsed_client_type)
             .await
             .map_err(|e| {
-                error!("Failed to create attach session: {}", e);
-                ErrorObjectOwned::owned(-32015, format!("Failed to create attach session: {}", e), None::<()>)
+                error!("Failed to create attach credentials: {}", e);
+                ErrorObjectOwned::owned(-32015, format!("Failed to create attach credentials: {}", e), None::<()>)
             })?;
 
-        info!("Attach session created for agent {}: token={}", agent_id, session.token);
+        info!("Attach credentials created for agent {}: token={}", agent_id, credentials.token);
 
+        // Use the actual Unix socket path instead of the ZMQ IPC path from the attach manager
         Ok(AttachCredentialsResult {
             agent_id,
-            token: session.token,
-            connect_url: session.connect_url,
-            expires_at: session.expires_at,
+            token: credentials.token,
+            connect_url: socket_path,
+            expires_at: credentials.expires_at,
         })
     }
 
@@ -636,12 +759,14 @@ impl RpcServerImpl {
         info!("Validating attach token");
 
         match self.attach_manager.validate_token(&token).await {
-            Some(session_info) => {
-                info!("Token valid for agent {}", session_info.agent_id);
+            Some(agent_id) => {
+                info!("Token valid for agent {}", agent_id);
+                // Note: expires_at is not easily retrievable from the current API
+                // since validate_token only returns the agent_id
                 Ok(AttachValidateResult {
                     valid: true,
-                    agent_id: Some(session_info.agent_id.to_string()),
-                    expires_at: Some(session_info.expires_at),
+                    agent_id: Some(agent_id.to_string()),
+                    expires_at: None, // Token expiration not exposed by validate_token
                 })
             }
             None => {
@@ -661,7 +786,9 @@ impl RpcServerImpl {
     ) -> Result<AttachRevokeResult, ErrorObjectOwned> {
         info!("Revoking attach token");
 
-        let revoked = self.attach_manager.revoke_session(&token).await;
+        // Use the token store to revoke the token
+        let token_store = self.attach_manager.token_store();
+        let revoked = token_store.revoke(&token).await;
 
         if revoked {
             info!("Token revoked successfully");
@@ -1295,9 +1422,12 @@ impl Clone for RpcServerImpl {
     fn clone(&self) -> Self {
         Self {
             agent_runner: Arc::clone(&self.agent_runner),
+            local_runner: self.local_runner.as_ref().map(Arc::clone),
             state_store: Arc::clone(&self.state_store),
             agent_ids: Arc::clone(&self.agent_ids),
             attach_manager: Arc::clone(&self.attach_manager),
+            event_bus: Arc::clone(&self.event_bus),
+            attach_servers: Arc::clone(&self.attach_servers),
         }
     }
 }

@@ -58,7 +58,7 @@ pub use providers::{
     ProviderFactory,
 };
 
-pub use agent_runner::{GracefulShutdown, LocalProcessRunner, ProcessRunnerConfig};
+pub use agent_runner::{GracefulShutdown, LocalAgentHandle, LocalProcessRunner, ProcessRunnerConfig};
 
 pub use attach::{AttachToken, AttachTokenStore, DEFAULT_TOKEN_TTL_SECS};
 

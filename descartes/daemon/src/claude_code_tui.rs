@@ -257,7 +257,7 @@ impl ClaudeCodeTuiHandler {
         &self,
         reader: &mut BufReader<R>,
         writer: &mut W,
-    ) -> DaemonResult<AttachSessionInfo>
+    ) -> DaemonResult<Uuid>
     where
         R: AsyncReadExt + Unpin,
         W: AsyncWriteExt + Unpin,
@@ -302,7 +302,7 @@ impl ClaudeCodeTuiHandler {
         }
 
         // Validate token
-        let session_info = self
+        let validated_agent_id = self
             .session_manager
             .validate_token(&handshake.token)
             .await
@@ -311,7 +311,7 @@ impl ClaudeCodeTuiHandler {
             })?;
 
         // Verify agent ID matches
-        if session_info.agent_id != self.agent_id {
+        if validated_agent_id != self.agent_id {
             let response = AttachHandshakeResponse::failure("Token not valid for this agent");
             self.send_message(writer, &response.to_message()).await?;
             return Err(DaemonError::AuthenticationFailed(
@@ -331,7 +331,7 @@ impl ClaudeCodeTuiHandler {
 
         self.send_message(writer, &response.to_message()).await?;
 
-        Ok(session_info)
+        Ok(validated_agent_id)
     }
 
     /// Send historical output to the client
@@ -352,7 +352,7 @@ impl ClaudeCodeTuiHandler {
         &mut self,
         reader: &mut BufReader<R>,
         writer: &mut W,
-        _session_info: AttachSessionInfo,
+        _validated_agent_id: Uuid,
     ) -> DaemonResult<()>
     where
         R: AsyncReadExt + Unpin,
@@ -362,13 +362,19 @@ impl ClaudeCodeTuiHandler {
         let mut ping_timer = tokio::time::interval(ping_interval);
         let mut seq: u64 = 0;
 
+        // Extract mutable receivers to avoid borrow conflicts in select!
+        let stdout_rx = &mut self.stdout_rx;
+        let stderr_rx = &mut self.stderr_rx;
+        let output_buffer = &self.output_buffer;
+        let stdin_tx = &self.stdin_tx;
+
         loop {
             tokio::select! {
                 // Handle incoming messages from Claude Code
-                result = self.read_message(reader) => {
+                result = Self::read_message_static(reader) => {
                     match result {
                         Ok(msg) => {
-                            if !self.handle_client_message(msg, writer).await? {
+                            if !Self::handle_client_message_static(msg, writer, stdin_tx).await? {
                                 // Client disconnected gracefully
                                 info!("Claude Code client disconnected gracefully");
                                 break;
@@ -382,19 +388,19 @@ impl ClaudeCodeTuiHandler {
                 }
 
                 // Forward stdout from agent to Claude Code
-                result = self.stdout_rx.recv() => {
+                result = stdout_rx.recv() => {
                     match result {
                         Ok(data) => {
                             // Buffer for history
                             {
-                                let mut buffer = self.output_buffer.write().await;
+                                let mut buffer = output_buffer.write().await;
                                 buffer.push_stdout(data.clone());
                             }
 
                             // Forward to client
                             let output_data = OutputData::from_bytes(&data);
                             let msg = output_data.to_stdout_message();
-                            if let Err(e) = self.send_message(writer, &msg).await {
+                            if let Err(e) = Self::send_message_static(writer, &msg).await {
                                 warn!("Error sending stdout to client: {}", e);
                                 break;
                             }
@@ -410,19 +416,19 @@ impl ClaudeCodeTuiHandler {
                 }
 
                 // Forward stderr from agent to Claude Code
-                result = self.stderr_rx.recv() => {
+                result = stderr_rx.recv() => {
                     match result {
                         Ok(data) => {
                             // Buffer for history
                             {
-                                let mut buffer = self.output_buffer.write().await;
+                                let mut buffer = output_buffer.write().await;
                                 buffer.push_stderr(data.clone());
                             }
 
                             // Forward to client
                             let output_data = OutputData::from_bytes(&data);
                             let msg = output_data.to_stderr_message();
-                            if let Err(e) = self.send_message(writer, &msg).await {
+                            if let Err(e) = Self::send_message_static(writer, &msg).await {
                                 warn!("Error sending stderr to client: {}", e);
                                 break;
                             }
@@ -445,7 +451,7 @@ impl ClaudeCodeTuiHandler {
                         serde_json::json!({}),
                         seq,
                     );
-                    if let Err(e) = self.send_message(writer, &ping_msg).await {
+                    if let Err(e) = Self::send_message_static(writer, &ping_msg).await {
                         warn!("Error sending ping: {}", e);
                         break;
                     }
@@ -527,6 +533,14 @@ impl ClaudeCodeTuiHandler {
     where
         R: AsyncReadExt + Unpin,
     {
+        Self::read_message_static(reader).await
+    }
+
+    /// Static version of read_message for use in select! blocks
+    async fn read_message_static<R>(reader: &mut BufReader<R>) -> DaemonResult<AttachMessage>
+    where
+        R: AsyncReadExt + Unpin,
+    {
         // Read length prefix (4 bytes, big-endian)
         let mut len_buf = [0u8; 4];
         reader.read_exact(&mut len_buf).await.map_err(|e| {
@@ -555,6 +569,14 @@ impl ClaudeCodeTuiHandler {
     where
         W: AsyncWriteExt + Unpin,
     {
+        Self::send_message_static(writer, msg).await
+    }
+
+    /// Static version of send_message for use in select! blocks
+    async fn send_message_static<W>(writer: &mut W, msg: &AttachMessage) -> DaemonResult<()>
+    where
+        W: AsyncWriteExt + Unpin,
+    {
         let bytes = msg
             .to_bytes()
             .map_err(|e| DaemonError::AttachError(format!("Failed to serialize message: {}", e)))?;
@@ -575,6 +597,51 @@ impl ClaudeCodeTuiHandler {
         })?;
 
         Ok(())
+    }
+
+    /// Static version of handle_client_message for use in select! blocks
+    async fn handle_client_message_static<W>(
+        msg: AttachMessage,
+        writer: &mut W,
+        stdin_tx: &mpsc::Sender<Vec<u8>>,
+    ) -> DaemonResult<bool>
+    where
+        W: AsyncWriteExt + Unpin,
+    {
+        match msg.msg_type {
+            AttachMessageType::Stdin => {
+                // Forward stdin to agent
+                let stdin_data: StdinData = serde_json::from_value(msg.payload)
+                    .map_err(|e| DaemonError::AttachError(format!("Invalid stdin payload: {}", e)))?;
+
+                let data = stdin_data.to_bytes()
+                    .map_err(|e| DaemonError::AttachError(format!("Failed to decode stdin: {}", e)))?;
+
+                stdin_tx.send(data).await.map_err(|e| {
+                    DaemonError::AttachError(format!("Failed to send stdin to agent: {}", e))
+                })?;
+
+                Ok(true)
+            }
+            AttachMessageType::Pong => {
+                // Handle pong response
+                debug!("Received pong from client");
+                Ok(true)
+            }
+            AttachMessageType::Disconnect => {
+                // Client is disconnecting
+                info!("Client sent disconnect message");
+                Ok(false)
+            }
+            _ => {
+                warn!("Unexpected message type from client: {:?}", msg.msg_type);
+                let error_msg = AttachMessage::error(
+                    &format!("Unexpected message type: {:?}", msg.msg_type),
+                );
+                Self::send_message_static(writer, &error_msg).await?;
+                Ok(true)
+            }
+        }
     }
 }
 

@@ -22,7 +22,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{broadcast, mpsc, Mutex};
 use uuid::Uuid;
 
 /// Maximum buffer size for stdout/stderr streams (16KB)
@@ -84,6 +84,14 @@ impl LocalProcessRunner {
             agents: Arc::new(DashMap::new()),
             config,
         }
+    }
+
+    /// Get access to the agent handle for TUI attachment.
+    ///
+    /// This returns the raw Arc<RwLock<LocalAgentHandle>> which provides
+    /// access to the I/O channels needed for TUI forwarding.
+    pub fn get_agent_handle(&self, agent_id: &Uuid) -> Option<Arc<RwLock<LocalAgentHandle>>> {
+        self.agents.get(agent_id).map(|h| Arc::clone(&h))
     }
 
     /// Check if we can spawn more agents based on max_concurrent_agents
@@ -633,7 +641,7 @@ impl AgentRunner for LocalProcessRunner {
 ///
 /// Provides full control over the process lifecycle, including stdio streaming,
 /// signal handling, and status tracking.
-struct LocalAgentHandle {
+pub struct LocalAgentHandle {
     /// Agent information
     info: AgentInfo,
     /// The child process
@@ -654,6 +662,10 @@ struct LocalAgentHandle {
     _stdout_tx: mpsc::UnboundedSender<Vec<u8>>,
     /// Stderr sender (for background task)
     _stderr_tx: mpsc::UnboundedSender<Vec<u8>>,
+    /// Broadcast sender for stdout (for TUI attachment)
+    stdout_broadcast: broadcast::Sender<Vec<u8>>,
+    /// Broadcast sender for stderr (for TUI attachment)
+    stderr_broadcast: broadcast::Sender<Vec<u8>>,
     /// How the agent was paused (if currently paused)
     pause_mode: Option<PauseMode>,
 }
@@ -672,12 +684,16 @@ impl LocalAgentHandle {
         let (stdout_tx, stdout_rx) = mpsc::unbounded_channel();
         let (stderr_tx, stderr_rx) = mpsc::unbounded_channel();
 
+        // Create broadcast channels for TUI attachment (1024 message buffer)
+        let (stdout_broadcast, _) = broadcast::channel(1024);
+        let (stderr_broadcast, _) = broadcast::channel(1024);
+
         let stdout_reader = BufReader::new(stdout);
         let stderr_reader = BufReader::new(stderr);
 
-        // Spawn background tasks to read stdout/stderr
-        Self::spawn_stdout_reader(stdout_reader.into(), stdout_tx.clone());
-        Self::spawn_stderr_reader(stderr_reader.into(), stderr_tx.clone());
+        // Spawn background tasks to read stdout/stderr (also broadcasts)
+        Self::spawn_stdout_reader(stdout_reader.into(), stdout_tx.clone(), stdout_broadcast.clone());
+        Self::spawn_stderr_reader(stderr_reader.into(), stderr_tx.clone(), stderr_broadcast.clone());
 
         Self {
             info,
@@ -690,12 +706,18 @@ impl LocalAgentHandle {
             stderr_buffer: Arc::new(Mutex::new(stderr_rx)),
             _stdout_tx: stdout_tx,
             _stderr_tx: stderr_tx,
+            stdout_broadcast,
+            stderr_broadcast,
             pause_mode: None,
         }
     }
 
     /// Spawn a background task to read stdout lines into a channel.
-    fn spawn_stdout_reader(mut reader: BufReader<ChildStdout>, tx: mpsc::UnboundedSender<Vec<u8>>) {
+    fn spawn_stdout_reader(
+        mut reader: BufReader<ChildStdout>,
+        tx: mpsc::UnboundedSender<Vec<u8>>,
+        broadcast_tx: broadcast::Sender<Vec<u8>>,
+    ) {
         tokio::spawn(async move {
             let mut line = String::new();
             loop {
@@ -703,9 +725,13 @@ impl LocalAgentHandle {
                 match reader.read_line(&mut line).await {
                     Ok(0) => break, // EOF
                     Ok(_) => {
-                        if tx.send(line.as_bytes().to_vec()).is_err() {
+                        let data = line.as_bytes().to_vec();
+                        // Send to local buffer
+                        if tx.send(data.clone()).is_err() {
                             break; // Receiver dropped
                         }
+                        // Also broadcast to any attached TUIs (ignore errors - no subscribers is fine)
+                        let _ = broadcast_tx.send(data);
                     }
                     Err(_) => break,
                 }
@@ -714,7 +740,11 @@ impl LocalAgentHandle {
     }
 
     /// Spawn a background task to read stderr lines into a channel.
-    fn spawn_stderr_reader(mut reader: BufReader<ChildStderr>, tx: mpsc::UnboundedSender<Vec<u8>>) {
+    fn spawn_stderr_reader(
+        mut reader: BufReader<ChildStderr>,
+        tx: mpsc::UnboundedSender<Vec<u8>>,
+        broadcast_tx: broadcast::Sender<Vec<u8>>,
+    ) {
         tokio::spawn(async move {
             let mut line = String::new();
             loop {
@@ -722,9 +752,13 @@ impl LocalAgentHandle {
                 match reader.read_line(&mut line).await {
                     Ok(0) => break, // EOF
                     Ok(_) => {
-                        if tx.send(line.as_bytes().to_vec()).is_err() {
+                        let data = line.as_bytes().to_vec();
+                        // Send to local buffer
+                        if tx.send(data.clone()).is_err() {
                             break; // Receiver dropped
                         }
+                        // Also broadcast to any attached TUIs (ignore errors - no subscribers is fine)
+                        let _ = broadcast_tx.send(data);
                     }
                     Err(_) => break,
                 }
@@ -954,6 +988,55 @@ impl LocalAgentHandle {
     async fn read_stderr(&mut self) -> AgentResult<Option<Vec<u8>>> {
         let mut buffer = self.stderr_buffer.lock().await;
         Ok(buffer.try_recv().ok())
+    }
+
+    // ========= TUI Attachment Accessors =========
+
+    /// Get the agent info.
+    pub fn agent_info(&self) -> &AgentInfo {
+        &self.info
+    }
+
+    /// Get the stdin sender for writing to the agent.
+    /// Returns an mpsc sender that can be used to forward stdin from TUI.
+    pub fn get_stdin_sender(&self) -> mpsc::Sender<Vec<u8>> {
+        // Create a new channel that forwards to stdin
+        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(256);
+        let stdin = Arc::clone(&self.stdin);
+        tokio::spawn(async move {
+            while let Some(data) = rx.recv().await {
+                let mut stdin_guard = stdin.lock().await;
+                if stdin_guard.write_all(&data).await.is_err() {
+                    break;
+                }
+                if stdin_guard.flush().await.is_err() {
+                    break;
+                }
+            }
+        });
+        tx
+    }
+
+    /// Get a broadcast receiver for stdout.
+    /// Returns a receiver that will receive all stdout output from the agent.
+    pub fn subscribe_stdout(&self) -> broadcast::Receiver<Vec<u8>> {
+        self.stdout_broadcast.subscribe()
+    }
+
+    /// Get a broadcast receiver for stderr.
+    /// Returns a receiver that will receive all stderr output from the agent.
+    pub fn subscribe_stderr(&self) -> broadcast::Receiver<Vec<u8>> {
+        self.stderr_broadcast.subscribe()
+    }
+
+    /// Get the stdout broadcast sender for TUI handlers.
+    pub fn stdout_broadcast_sender(&self) -> broadcast::Sender<Vec<u8>> {
+        self.stdout_broadcast.clone()
+    }
+
+    /// Get the stderr broadcast sender for TUI handlers.
+    pub fn stderr_broadcast_sender(&self) -> broadcast::Sender<Vec<u8>> {
+        self.stderr_broadcast.clone()
     }
 }
 

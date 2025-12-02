@@ -5,6 +5,7 @@ use descartes_core::{ConfigManager, DescaratesConfig};
 use std::path::{Path, PathBuf};
 
 mod commands;
+mod rpc;
 mod state;
 
 /// Load configuration from the given path or default location
@@ -117,6 +118,10 @@ enum Commands {
         /// Output JSON for scripting
         #[arg(long)]
         json: bool,
+
+        /// Launch the TUI client after obtaining credentials
+        #[arg(short, long)]
+        launch: bool,
     },
 
     /// View agent logs
@@ -207,9 +212,9 @@ async fn main() -> anyhow::Result<()> {
             resume::execute(&config, &id).await?;
         }
 
-        Commands::Attach { id, client, json } => {
+        Commands::Attach { id, client, json, launch } => {
             let config = load_config(args.config.as_deref())?;
-            attach::execute(&config, &id, &client, json).await?;
+            attach::execute(&config, &id, &client, json, launch).await?;
         }
 
         Commands::Logs {

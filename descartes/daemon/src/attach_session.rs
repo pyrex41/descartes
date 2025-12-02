@@ -287,11 +287,14 @@ impl AttachSessionManager {
             "Attach credentials requested"
         );
 
+        let token_str = token.token.clone();
+        let expires_at = token.expires_at_unix();
+
         Ok(AttachCredentials {
             agent_id: agent_id.to_string(),
-            token: token.token,
+            token: token_str,
             connect_url: zmq_endpoint,
-            expires_at: token.expires_at_unix(),
+            expires_at,
         })
     }
 

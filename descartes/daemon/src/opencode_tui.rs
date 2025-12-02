@@ -8,7 +8,7 @@
 //! - Potential additional capabilities
 //! - Custom message types for OpenCode features
 
-use crate::attach_session::{AttachSessionInfo, AttachSessionManager, ClientType};
+use crate::attach_session::{AttachSessionManager, ClientType};
 use crate::claude_code_tui::{ClaudeCodeTuiConfig, OutputBuffer};
 use crate::errors::{DaemonError, DaemonResult};
 use descartes_core::attach_protocol::{
@@ -141,7 +141,7 @@ impl OpenCodeTuiHandler {
         &self,
         reader: &mut BufReader<R>,
         writer: &mut W,
-    ) -> DaemonResult<AttachSessionInfo>
+    ) -> DaemonResult<Uuid>
     where
         R: AsyncReadExt + Unpin,
         W: AsyncWriteExt + Unpin,
@@ -190,7 +190,7 @@ impl OpenCodeTuiHandler {
             return Err(DaemonError::AttachError("Protocol version mismatch".to_string()));
         }
 
-        let session_info = self
+        let validated_agent_id = self
             .session_manager
             .validate_token(&handshake.token)
             .await
@@ -198,7 +198,7 @@ impl OpenCodeTuiHandler {
                 DaemonError::AuthenticationFailed("Invalid or expired token".to_string())
             })?;
 
-        if session_info.agent_id != self.agent_id {
+        if validated_agent_id != self.agent_id {
             let response = AttachHandshakeResponse::failure("Token not valid for this agent");
             self.send_message(writer, &response.to_message()).await?;
             return Err(DaemonError::AuthenticationFailed(
@@ -226,7 +226,7 @@ impl OpenCodeTuiHandler {
 
         self.send_message(writer, &response.to_message()).await?;
 
-        Ok(session_info)
+        Ok(validated_agent_id)
     }
 
     /// Send historical output to the client
@@ -247,7 +247,7 @@ impl OpenCodeTuiHandler {
         &mut self,
         reader: &mut BufReader<R>,
         writer: &mut W,
-        _session_info: AttachSessionInfo,
+        _validated_agent_id: Uuid,
     ) -> DaemonResult<()>
     where
         R: AsyncReadExt + Unpin,
@@ -257,12 +257,18 @@ impl OpenCodeTuiHandler {
         let mut ping_timer = tokio::time::interval(ping_interval);
         let mut seq: u64 = 0;
 
+        // Extract mutable receivers to avoid borrow conflicts in select!
+        let stdout_rx = &mut self.stdout_rx;
+        let stderr_rx = &mut self.stderr_rx;
+        let output_buffer = &self.output_buffer;
+        let stdin_tx = &self.stdin_tx;
+
         loop {
             tokio::select! {
-                result = self.read_message(reader) => {
+                result = Self::read_message_static(reader) => {
                     match result {
                         Ok(msg) => {
-                            if !self.handle_client_message(msg, writer).await? {
+                            if !Self::handle_client_message_static(msg, writer, stdin_tx).await? {
                                 info!("OpenCode client disconnected gracefully");
                                 break;
                             }
@@ -274,17 +280,17 @@ impl OpenCodeTuiHandler {
                     }
                 }
 
-                result = self.stdout_rx.recv() => {
+                result = stdout_rx.recv() => {
                     match result {
                         Ok(data) => {
                             {
-                                let mut buffer = self.output_buffer.write().await;
+                                let mut buffer = output_buffer.write().await;
                                 buffer.push_stdout(data.clone());
                             }
 
                             let output_data = OutputData::from_bytes(&data);
                             let msg = output_data.to_stdout_message();
-                            if let Err(e) = self.send_message(writer, &msg).await {
+                            if let Err(e) = Self::send_message_static(writer, &msg).await {
                                 warn!("Error sending stdout to OpenCode client: {}", e);
                                 break;
                             }
@@ -299,17 +305,17 @@ impl OpenCodeTuiHandler {
                     }
                 }
 
-                result = self.stderr_rx.recv() => {
+                result = stderr_rx.recv() => {
                     match result {
                         Ok(data) => {
                             {
-                                let mut buffer = self.output_buffer.write().await;
+                                let mut buffer = output_buffer.write().await;
                                 buffer.push_stderr(data.clone());
                             }
 
                             let output_data = OutputData::from_bytes(&data);
                             let msg = output_data.to_stderr_message();
-                            if let Err(e) = self.send_message(writer, &msg).await {
+                            if let Err(e) = Self::send_message_static(writer, &msg).await {
                                 warn!("Error sending stderr to OpenCode client: {}", e);
                                 break;
                             }
@@ -331,7 +337,7 @@ impl OpenCodeTuiHandler {
                         serde_json::json!({}),
                         seq,
                     );
-                    if let Err(e) = self.send_message(writer, &ping_msg).await {
+                    if let Err(e) = Self::send_message_static(writer, &ping_msg).await {
                         warn!("Error sending ping to OpenCode: {}", e);
                         break;
                     }
@@ -408,6 +414,14 @@ impl OpenCodeTuiHandler {
     where
         R: AsyncReadExt + Unpin,
     {
+        Self::read_message_static(reader).await
+    }
+
+    /// Static version of read_message for use in select! blocks
+    async fn read_message_static<R>(reader: &mut BufReader<R>) -> DaemonResult<AttachMessage>
+    where
+        R: AsyncReadExt + Unpin,
+    {
         let mut len_buf = [0u8; 4];
         reader.read_exact(&mut len_buf).await.map_err(|e| {
             DaemonError::ConnectionError(format!("Failed to read message length: {}", e))
@@ -432,6 +446,14 @@ impl OpenCodeTuiHandler {
     where
         W: AsyncWriteExt + Unpin,
     {
+        Self::send_message_static(writer, msg).await
+    }
+
+    /// Static version of send_message for use in select! blocks
+    async fn send_message_static<W>(writer: &mut W, msg: &AttachMessage) -> DaemonResult<()>
+    where
+        W: AsyncWriteExt + Unpin,
+    {
         let bytes = msg
             .to_bytes()
             .map_err(|e| DaemonError::AttachError(format!("Failed to serialize message: {}", e)))?;
@@ -450,6 +472,68 @@ impl OpenCodeTuiHandler {
         })?;
 
         Ok(())
+    }
+
+    /// Static version of handle_client_message for use in select! blocks
+    async fn handle_client_message_static<W>(
+        msg: AttachMessage,
+        writer: &mut W,
+        stdin_tx: &mpsc::Sender<Vec<u8>>,
+    ) -> DaemonResult<bool>
+    where
+        W: AsyncWriteExt + Unpin,
+    {
+        match msg.msg_type {
+            AttachMessageType::Stdin => {
+                let stdin_data: StdinData = serde_json::from_value(msg.payload)
+                    .map_err(|e| DaemonError::AttachError(format!("Invalid stdin payload: {}", e)))?;
+
+                let data = stdin_data
+                    .to_bytes()
+                    .map_err(|e| DaemonError::AttachError(format!("Invalid stdin data: {}", e)))?;
+
+                stdin_tx
+                    .send(data)
+                    .await
+                    .map_err(|e| DaemonError::AttachError(format!("Failed to send stdin: {}", e)))?;
+
+                debug!("Forwarded {} bytes of stdin from OpenCode to agent", stdin_data.bytes);
+                Ok(true)
+            }
+
+            AttachMessageType::Ping => {
+                let pong_msg = AttachMessage::new(AttachMessageType::Pong, serde_json::json!({}));
+                Self::send_message_static(writer, &pong_msg).await?;
+                Ok(true)
+            }
+
+            AttachMessageType::Pong => {
+                debug!("Received pong from OpenCode client");
+                Ok(true)
+            }
+
+            AttachMessageType::Disconnect => {
+                info!("OpenCode client requested disconnect");
+                Ok(false)
+            }
+
+            AttachMessageType::ReadOutput => {
+                // Note: This case requires output_buffer which isn't available in static context
+                // For now, we'll skip sending historical output in this static version
+                warn!("ReadOutput not supported in static handler, skipping");
+                Ok(true)
+            }
+
+            _ => {
+                warn!("Unexpected message type from OpenCode client: {:?}", msg.msg_type);
+                let error_msg = AttachMessage::error(&format!(
+                    "Unexpected message type: {:?}",
+                    msg.msg_type
+                ));
+                Self::send_message_static(writer, &error_msg).await?;
+                Ok(true)
+            }
+        }
     }
 }
 
