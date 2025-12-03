@@ -644,8 +644,9 @@ fn view_task_card(task: Task, state: &TaskBoardState) -> Element<'static, TaskBo
 
     // Description (truncated)
     if let Some(ref desc) = task.description {
-        let truncated = if desc.len() > 60 {
-            format!("{}...", &desc[..60])
+        let truncated = if desc.chars().count() > 60 {
+            let truncated_str: String = desc.chars().take(60).collect();
+            format!("{}...", truncated_str)
         } else {
             desc.clone()
         };

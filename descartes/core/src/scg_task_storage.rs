@@ -40,7 +40,7 @@ impl ScgTaskStorage {
     }
 
     /// Initialize the storage directory structure
-    /// Creates .taskmaster/ directory with necessary files
+    /// Creates .scud/ directory with necessary files
     pub async fn initialize(&self) -> StateStoreResult<()> {
         // Run synchronous SCUD storage init in blocking task
         let project_root = self.project_root.clone();

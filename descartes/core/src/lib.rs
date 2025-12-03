@@ -41,6 +41,10 @@ pub mod zmq_client;
 pub mod zmq_communication;
 pub mod zmq_server;
 
+// Session/workspace management
+pub mod session;
+pub mod session_manager;
+
 // Re-export commonly used types
 pub use errors::{
     AgentError, AgentResult, ContextError, ContextResult, ProviderError, ProviderResult,
@@ -238,3 +242,9 @@ pub use dag_swarm_export::{
     export_dag_to_swarm_toml, import_swarm_toml_to_dag, load_dag_from_swarm_toml,
     save_dag_as_swarm_toml, SwarmExportConfig,
 };
+
+pub use session::{
+    DaemonInfo, Session, SessionDiscoveryConfig, SessionError, SessionManager, SessionStatus,
+};
+
+pub use session_manager::FileSystemSessionManager;

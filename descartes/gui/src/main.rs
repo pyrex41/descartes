@@ -1,7 +1,14 @@
 use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::{self, Key};
 use iced::widget::{button, column, container, row, text, Space};
-use iced::{window, Element, Event, Length, Size, Theme};
+use iced::{window, Element, Event, Font, Length, Size, Theme};
+
+/// JetBrains Mono font - Regular weight (embedded at compile time)
+const JETBRAINS_MONO_REGULAR: &[u8] = include_bytes!("../fonts/JetBrainsMono-Regular.ttf");
+/// JetBrains Mono font - Medium weight
+const JETBRAINS_MONO_MEDIUM: &[u8] = include_bytes!("../fonts/JetBrainsMono-Medium.ttf");
+/// JetBrains Mono font - Bold weight
+const JETBRAINS_MONO_BOLD: &[u8] = include_bytes!("../fonts/JetBrainsMono-Bold.ttf");
 use std::sync::Arc;
 
 mod dag_canvas_interactions;
@@ -10,8 +17,13 @@ mod event_handler;
 mod file_tree_view;
 mod knowledge_graph_panel;
 mod rpc_client;
+mod session_selector;
+mod session_state;
 mod task_board;
+mod theme;
 mod time_travel;
+
+use theme::{colors, container_styles, button_styles, humanlayer_theme};
 
 use chrono::Utc;
 use dag_editor::{DAGEditorMessage, DAGEditorState};
@@ -21,6 +33,7 @@ use event_handler::EventHandler;
 use file_tree_view::{FileTreeMessage, FileTreeState};
 use knowledge_graph_panel::{KnowledgeGraphMessage, KnowledgeGraphPanelState};
 use rpc_client::GuiRpcClient;
+use session_state::{SessionMessage, SessionState};
 use task_board::{KanbanBoard, TaskBoardMessage, TaskBoardState};
 use time_travel::{TimeTravelMessage, TimeTravelState};
 use uuid::Uuid;
@@ -35,12 +48,18 @@ fn main() -> iced::Result {
     iced::application("Descartes", DescartesGui::update, DescartesGui::view)
         .subscription(DescartesGui::subscription)
         .window(window::Settings {
-            size: Size::new(1200.0, 800.0),
+            size: Size::new(1400.0, 900.0),
             position: window::Position::Centered,
-            min_size: Some(Size::new(800.0, 600.0)),
+            min_size: Some(Size::new(900.0, 600.0)),
             ..Default::default()
         })
-        .theme(|_| Theme::TokyoNight)
+        .theme(|_| humanlayer_theme())
+        // Load JetBrains Mono font family
+        .font(JETBRAINS_MONO_REGULAR)
+        .font(JETBRAINS_MONO_MEDIUM)
+        .font(JETBRAINS_MONO_BOLD)
+        // Set JetBrains Mono as the default font
+        .default_font(Font::with_name("JetBrains Mono"))
         .run_with(|| (DescartesGui::new(), iced::Task::none()))
 }
 
@@ -52,6 +71,8 @@ struct DescartesGui {
     daemon_connected: bool,
     /// Connection error message
     connection_error: Option<String>,
+    /// Session/workspace state
+    session_state: SessionState,
     /// Time travel debugger state
     time_travel_state: TimeTravelState,
     /// Task board state
@@ -75,6 +96,7 @@ struct DescartesGui {
 /// Different views/modes in the application
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ViewMode {
+    Sessions,
     Dashboard,
     TaskBoard,
     SwarmMonitor,
@@ -98,6 +120,8 @@ enum Message {
     DisconnectDaemon,
     /// Daemon event received
     DaemonEvent(DescartesEvent),
+    /// Session management message
+    Session(SessionMessage),
     /// Time travel debugger message
     TimeTravel(TimeTravelMessage),
     /// Task board message
@@ -133,6 +157,7 @@ impl DescartesGui {
             current_view: ViewMode::Dashboard,
             daemon_connected: false,
             connection_error: None,
+            session_state: SessionState::default(),
             time_travel_state: TimeTravelState::default(),
             task_board_state: TaskBoardState::default(),
             dag_editor_state: DAGEditorState::default(),
@@ -142,7 +167,7 @@ impl DescartesGui {
             event_handler: None,
             recent_events: Vec::new(),
             status_message: Some(
-                "Welcome to Descartes GUI! Click 'Connect' to connect to the daemon.".to_string(),
+                "Welcome to Descartes GUI! Select a session or connect to the daemon.".to_string(),
             ),
         }
     }
@@ -228,6 +253,10 @@ impl DescartesGui {
 
                 // Update status
                 self.status_message = Some(format!("Received event: {:?}", event));
+                iced::Task::none()
+            }
+            Message::Session(msg) => {
+                session_state::update(&mut self.session_state, msg);
                 iced::Task::none()
             }
             Message::TimeTravel(tt_msg) => {
@@ -802,143 +831,165 @@ impl DescartesGui {
 
     /// Render the header bar
     fn view_header(&self) -> Element<Message> {
-        let title = text("Descartes GUI").size(24).width(Length::Shrink);
+        // Logo/brand with subtle styling
+        let logo = text("◆").size(20).color(colors::PRIMARY);
+        let title = text("DESCARTES").size(18).color(colors::TEXT_PRIMARY);
+        let subtitle = text("Agent Orchestration").size(12).color(colors::TEXT_MUTED);
 
-        let status_color = if self.daemon_connected {
-            iced::Color::from_rgb8(100, 255, 100) // Green
-        } else {
-            iced::Color::from_rgb8(255, 100, 100) // Red
-        };
-
-        let status_text = if self.daemon_connected {
-            "Connected"
-        } else {
-            "Disconnected"
-        };
-
-        let status_indicator = row![
-            text("●").size(16).color(status_color),
-            Space::with_width(5),
-            text(format!("Daemon: {}", status_text)).size(14),
+        let brand = row![
+            logo,
+            Space::with_width(8),
+            column![title, subtitle].spacing(0),
         ]
         .align_y(Vertical::Center);
 
-        let connect_button = if self.daemon_connected {
-            button(text("Disconnect"))
-                .on_press(Message::DisconnectDaemon)
-                .padding(8)
+        // Status indicator with modern pill design
+        let (status_color, status_bg, status_text) = if self.daemon_connected {
+            (colors::SUCCESS, colors::SUCCESS_DIM, "Connected")
         } else {
-            button(text("Connect"))
-                .on_press(Message::ConnectDaemon)
-                .padding(8)
+            (colors::ERROR, colors::ERROR_DIM, "Disconnected")
         };
 
-        // Show error or status message
+        let status_indicator = container(
+            row![
+                text("●").size(10).color(status_color),
+                Space::with_width(6),
+                text(status_text).size(12).color(colors::TEXT_PRIMARY),
+            ]
+            .align_y(Vertical::Center)
+        )
+        .padding([4, 12])
+        .style(container_styles::card);
+
+        // Connect/Disconnect button with modern styling
+        let connect_button = if self.daemon_connected {
+            button(text("Disconnect").size(13))
+                .on_press(Message::DisconnectDaemon)
+                .padding([8, 16])
+                .style(button_styles::secondary)
+        } else {
+            button(text("Connect").size(13))
+                .on_press(Message::ConnectDaemon)
+                .padding([8, 16])
+                .style(button_styles::primary)
+        };
+
+        // Status message area
         let message_display = if let Some(ref error) = self.connection_error {
-            text(format!("Error: {}", error))
+            text(format!("⚠ {}", error))
                 .size(12)
-                .color(iced::Color::from_rgb8(255, 150, 150))
+                .color(colors::ERROR)
         } else if let Some(ref msg) = self.status_message {
             text(msg)
                 .size(12)
-                .color(iced::Color::from_rgb8(200, 200, 200))
+                .color(colors::TEXT_SECONDARY)
         } else {
             text("")
         };
 
         let header_content = column![
             row![
-                title,
+                brand,
                 Space::with_width(Length::Fill),
                 status_indicator,
-                Space::with_width(20),
+                Space::with_width(12),
                 connect_button,
             ]
             .spacing(10)
             .align_y(Vertical::Center),
             if self.connection_error.is_some() || self.status_message.is_some() {
-                container(message_display).padding(5)
+                container(message_display).padding(8)
             } else {
                 container(text(""))
             },
         ]
-        .spacing(5);
+        .spacing(0);
 
         container(header_content)
             .width(Length::Fill)
-            .padding(15)
-            .style(|theme: &Theme| container::Style {
-                background: Some(theme.palette().background.into()),
-                border: iced::Border {
-                    width: 0.0,
-                    color: iced::Color::TRANSPARENT,
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            })
+            .padding([16, 20])
+            .style(container_styles::header)
             .into()
     }
 
     /// Render the navigation sidebar
     fn view_navigation(&self) -> Element<Message> {
+        // Navigation items with icons
         let nav_items = vec![
-            (ViewMode::Dashboard, "Dashboard"),
-            (ViewMode::TaskBoard, "Task Board"),
-            (ViewMode::SwarmMonitor, "Swarm Monitor"),
-            (ViewMode::Debugger, "Debugger"),
-            (ViewMode::DagEditor, "DAG Editor"),
-            (ViewMode::ContextBrowser, "Context Browser"),
-            (ViewMode::FileBrowser, "File Browser"),
-            (ViewMode::KnowledgeGraph, "Knowledge Graph"),
+            (ViewMode::Sessions, "\u{2726}", "Sessions"),  // ✦
+            (ViewMode::Dashboard, "\u{2302}", "Dashboard"),  // ⌂
+            (ViewMode::TaskBoard, "\u{2630}", "Tasks"),  // ☰
+            (ViewMode::SwarmMonitor, "\u{25CE}", "Swarm"),  // ◎
+            (ViewMode::Debugger, "\u{23F1}", "Debugger"),  // ⏱
+            (ViewMode::DagEditor, "\u{25C7}", "Workflows"),  // ◇
+            (ViewMode::ContextBrowser, "\u{25C8}", "Context"),  // ◈
+            (ViewMode::FileBrowser, "\u{25A4}", "Files"),  // ▤
+            (ViewMode::KnowledgeGraph, "\u{25C9}", "Graph"),  // ◉
         ];
 
         let buttons: Vec<Element<Message>> = nav_items
             .into_iter()
-            .map(|(view, label)| {
+            .map(|(view, icon, label)| {
                 let is_active = self.current_view == view;
-                let btn = button(
-                    text(label)
-                        .size(16)
-                        .width(Length::Fill)
-                        .align_x(Horizontal::Center),
-                )
-                .width(Length::Fill)
-                .padding(15)
-                .on_press(Message::SwitchView(view));
 
-                if is_active {
-                    container(btn)
-                        .style(|theme: &Theme| container::Style {
-                            background: Some(theme.palette().primary.into()),
-                            ..Default::default()
-                        })
-                        .into()
+                let text_color = if is_active {
+                    colors::TEXT_PRIMARY
                 } else {
-                    btn.into()
-                }
+                    colors::TEXT_SECONDARY
+                };
+
+                let icon_color = if is_active {
+                    colors::PRIMARY
+                } else {
+                    colors::TEXT_MUTED
+                };
+
+                let content = row![
+                    text(icon).size(16).color(icon_color),
+                    Space::with_width(10),
+                    text(label).size(14).color(text_color),
+                ]
+                .align_y(Vertical::Center);
+
+                let btn = button(content)
+                    .width(Length::Fill)
+                    .padding([12, 16])
+                    .on_press(Message::SwitchView(view))
+                    .style(if is_active {
+                        button_styles::nav_active
+                    } else {
+                        button_styles::nav
+                    });
+
+                container(btn)
+                    .width(Length::Fill)
+                    .into()
             })
             .collect();
 
-        let nav_column = column(buttons).spacing(5).padding(10);
+        // Section header
+        let section_header = text("NAVIGATION")
+            .size(10)
+            .color(colors::TEXT_MUTED);
+
+        let nav_column = column![
+            container(section_header).padding([8, 16]),
+            column(buttons).spacing(2),
+        ]
+        .spacing(0)
+        .padding([16, 8]);
 
         container(nav_column)
-            .width(200)
+            .width(180)
             .height(Length::Fill)
-            .style(|theme: &Theme| container::Style {
-                background: Some(theme.palette().background.into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: theme.palette().text.scale_alpha(0.2),
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            })
+            .style(container_styles::sidebar)
             .into()
     }
 
     /// Render the main content area
     fn view_content(&self) -> Element<Message> {
         let content = match self.current_view {
+            ViewMode::Sessions => self.view_sessions(),
             ViewMode::Dashboard => self.view_dashboard(),
             ViewMode::TaskBoard => self.view_task_board(),
             ViewMode::SwarmMonitor => self.view_swarm_monitor(),
@@ -956,32 +1007,61 @@ impl DescartesGui {
             .into()
     }
 
+    /// Sessions view
+    fn view_sessions(&self) -> Element<Message> {
+        session_selector::view_sessions_panel(&self.session_state)
+            .map(Message::Session)
+    }
+
     /// Dashboard view
     fn view_dashboard(&self) -> Element<Message> {
-        let title = text("Dashboard").size(32).width(Length::Fill);
+        let title = text("Dashboard")
+            .size(28)
+            .color(colors::TEXT_PRIMARY);
 
-        let welcome = text("Welcome to Descartes!").size(18).width(Length::Fill);
+        let subtitle = text("Welcome to Descartes Agent Orchestration")
+            .size(14)
+            .color(colors::TEXT_SECONDARY);
 
-        // Connection status section
-        let connection_status = if self.daemon_connected {
-            column![
-                text("Status: Connected to daemon")
-                    .size(14)
-                    .color(iced::Color::from_rgb8(100, 255, 100)),
-                Space::with_height(5),
-                text(format!("Recent events: {}", self.recent_events.len())).size(12),
-            ]
-            .spacing(5)
+        // Stats cards row
+        let task_count = self.task_board_state.kanban_board.todo.len() +
+            self.task_board_state.kanban_board.in_progress.len() +
+            self.task_board_state.kanban_board.done.len() +
+            self.task_board_state.kanban_board.blocked.len();
+
+        let stats_cards = row![
+            self.view_stat_card("Agents".to_string(), "0".to_string(), "◎".to_string(), colors::PRIMARY),
+            Space::with_width(12),
+            self.view_stat_card("Tasks".to_string(), format!("{}", task_count), "☰".to_string(), colors::INFO),
+            Space::with_width(12),
+            self.view_stat_card("Events".to_string(), format!("{}", self.recent_events.len()), "◈".to_string(), colors::SUCCESS),
+        ];
+
+        // Connection status card
+        let (status_color, status_text, status_desc) = if self.daemon_connected {
+            (colors::SUCCESS, "Connected", "Daemon is running and responsive")
         } else {
-            column![
-                text("Status: Not connected")
-                    .size(14)
-                    .color(iced::Color::from_rgb8(255, 150, 150)),
-                Space::with_height(5),
-                text("Click 'Connect' in the top right to connect to the daemon").size(12),
-            ]
-            .spacing(5)
+            (colors::WARNING, "Disconnected", "Click Connect to establish connection")
         };
+
+        let status_card = container(
+            column![
+                row![
+                    text("●").size(12).color(status_color),
+                    Space::with_width(8),
+                    text("Connection Status").size(14).color(colors::TEXT_PRIMARY),
+                ]
+                .align_y(Vertical::Center),
+                Space::with_height(8),
+                text(status_text).size(20).color(status_color),
+                Space::with_height(4),
+                text(status_desc).size(12).color(colors::TEXT_MUTED),
+            ]
+            .spacing(0)
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(container_styles::panel);
 
         // Recent events section
         let recent_events_section = if !self.recent_events.is_empty() {
@@ -991,58 +1071,122 @@ impl DescartesGui {
                 .rev()
                 .take(5)
                 .map(|event| {
-                    // Format event based on its variant
-                    let event_str = match event {
+                    let (icon, event_str, color) = match event {
                         DescartesEvent::AgentEvent(e) => {
-                            format!("Agent {:?}: {}", e.event_type, e.agent_id)
+                            ("◎", format!("Agent {:?}: {}", e.event_type, e.agent_id), colors::PRIMARY)
                         }
-                        DescartesEvent::TaskEvent(e) => format!("Task: {}", e.task_id),
-                        DescartesEvent::WorkflowEvent(e) => format!("Workflow: {}", e.workflow_id),
-                        DescartesEvent::SystemEvent(e) => format!("System: {:?}", e.event_type),
+                        DescartesEvent::TaskEvent(e) => {
+                            ("☰", format!("Task: {}", e.task_id), colors::INFO)
+                        }
+                        DescartesEvent::WorkflowEvent(e) => {
+                            ("◇", format!("Workflow: {}", e.workflow_id), colors::SUCCESS)
+                        }
+                        DescartesEvent::SystemEvent(e) => {
+                            ("⚙", format!("System: {:?}", e.event_type), colors::TEXT_MUTED)
+                        }
                         DescartesEvent::StateEvent(e) => {
-                            format!("State {:?}: {}", e.event_type, e.key)
+                            ("◈", format!("State {:?}: {}", e.event_type, e.key), colors::WARNING)
                         }
                     };
-                    text(format!("• {}", event_str)).size(12).into()
+                    container(
+                        row![
+                            text(icon).size(12).color(color),
+                            Space::with_width(8),
+                            text(event_str).size(12).color(colors::TEXT_SECONDARY),
+                        ]
+                        .align_y(Vertical::Center)
+                    )
+                    .padding([6, 0])
+                    .into()
                 })
                 .collect();
 
-            column![
-                Space::with_height(20),
-                text("Recent Events:").size(16),
-                Space::with_height(10),
-                column(event_list).spacing(5),
-            ]
-            .spacing(5)
+            container(
+                column![
+                    text("Recent Events").size(14).color(colors::TEXT_PRIMARY),
+                    Space::with_height(12),
+                    column(event_list).spacing(2),
+                ]
+            )
+            .padding(16)
+            .width(Length::Fill)
+            .style(container_styles::panel)
         } else {
-            column![]
+            container(
+                column![
+                    text("Recent Events").size(14).color(colors::TEXT_PRIMARY),
+                    Space::with_height(12),
+                    text("No events yet").size(12).color(colors::TEXT_MUTED),
+                ]
+            )
+            .padding(16)
+            .width(Length::Fill)
+            .style(container_styles::panel)
         };
 
-        let description = text(
-            "This is the Descartes GUI - a native interface for managing your AI agent workflows.\n\n\
-             Phase 3.4.4: Task Board GUI Component - Complete\n\n\
-             Features:\n\
-             - Real-time task monitoring (Task Board)\n\
-             - Agent swarm visualization (Swarm Monitor)\n\
-             - Interactive debugger with time-travel (Debugger)\n\
-             - Visual DAG editor (DAG Editor)\n\
-             - Context browser (Context Browser)\n\n\
-             Navigate using the sidebar to explore different views."
+        // Quick actions
+        let quick_actions = container(
+            column![
+                text("Quick Actions").size(14).color(colors::TEXT_PRIMARY),
+                Space::with_height(12),
+                row![
+                    button(text("Load Sample Tasks").size(12))
+                        .on_press(Message::LoadSampleTasks)
+                        .padding([8, 12])
+                        .style(button_styles::secondary),
+                    Space::with_width(8),
+                    button(text("Load Sample DAG").size(12))
+                        .on_press(Message::LoadSampleDAG)
+                        .padding([8, 12])
+                        .style(button_styles::secondary),
+                    Space::with_width(8),
+                    button(text("Load History").size(12))
+                        .on_press(Message::LoadSampleHistory)
+                        .padding([8, 12])
+                        .style(button_styles::secondary),
+                ]
+            ]
         )
-        .size(14)
-        .width(Length::Fill);
+        .padding(16)
+        .width(Length::Fill)
+        .style(container_styles::panel);
 
         column![
             title,
-            Space::with_height(20),
-            welcome,
-            Space::with_height(20),
-            connection_status,
-            recent_events_section,
-            Space::with_height(20),
-            description,
+            Space::with_height(4),
+            subtitle,
+            Space::with_height(24),
+            stats_cards,
+            Space::with_height(16),
+            row![
+                container(status_card).width(Length::FillPortion(1)),
+                Space::with_width(12),
+                container(recent_events_section).width(Length::FillPortion(2)),
+            ],
+            Space::with_height(16),
+            quick_actions,
         ]
-        .spacing(10)
+        .spacing(0)
+        .into()
+    }
+
+    /// Helper to create a stat card
+    fn view_stat_card(&self, label: String, value: String, icon: String, color: iced::Color) -> Element<Message> {
+        container(
+            column![
+                row![
+                    text(icon).size(14).color(color),
+                    Space::with_width(8),
+                    text(label).size(12).color(colors::TEXT_MUTED),
+                ]
+                .align_y(Vertical::Center),
+                Space::with_height(8),
+                text(value).size(28).color(colors::TEXT_PRIMARY),
+            ]
+        )
+        .padding(16)
+        .width(Length::Fill)
+        .style(container_styles::panel)
         .into()
     }
 
@@ -1055,25 +1199,27 @@ impl DescartesGui {
             + self.task_board_state.kanban_board.blocked.len();
 
         if total_tasks == 0 {
-            let title = text("Task Board").size(32).width(Length::Fill);
+            let title = text("Task Board")
+                .size(28)
+                .color(colors::TEXT_PRIMARY);
 
-            let description =
-                text("No tasks loaded. Load sample tasks to see the Task Board in action.")
-                    .size(16)
-                    .width(Length::Fill);
+            let description = text("No tasks loaded. Load sample tasks to see the Task Board in action.")
+                .size(14)
+                .color(colors::TEXT_SECONDARY);
 
-            let load_sample_btn = button(text("Load Sample Tasks"))
+            let load_sample_btn = button(text("Load Sample Tasks").size(13))
                 .on_press(Message::LoadSampleTasks)
-                .padding(10);
+                .padding([10, 16])
+                .style(button_styles::primary);
 
             column![
                 title,
-                Space::with_height(20),
+                Space::with_height(8),
                 description,
-                Space::with_height(20),
+                Space::with_height(24),
                 load_sample_btn,
             ]
-            .spacing(10)
+            .spacing(0)
             .into()
         } else {
             // Map task board messages to main messages
@@ -1083,29 +1229,60 @@ impl DescartesGui {
 
     /// Swarm Monitor view (placeholder)
     fn view_swarm_monitor(&self) -> Element<Message> {
-        let title = text("Swarm Monitor").size(32).width(Length::Fill);
+        let title = text("Swarm Monitor")
+            .size(28)
+            .color(colors::TEXT_PRIMARY);
 
-        let placeholder = text("Swarm Monitor will visualize active agents and their status.")
-            .size(16)
-            .width(Length::Fill);
+        let subtitle = text("Visualize active agents and their status")
+            .size(14)
+            .color(colors::TEXT_SECONDARY);
 
-        column![title, Space::with_height(20), placeholder,]
-            .spacing(10)
-            .into()
+        // Placeholder content
+        let placeholder_card = container(
+            column![
+                text("◎").size(32).color(colors::TEXT_MUTED),
+                Space::with_height(12),
+                text("No active agents").size(16).color(colors::TEXT_PRIMARY),
+                Space::with_height(4),
+                text("Spawn an agent to see it here").size(12).color(colors::TEXT_MUTED),
+            ]
+            .align_x(Horizontal::Center)
+        )
+        .padding(40)
+        .width(Length::Fill)
+        .style(container_styles::panel)
+        .align_x(Horizontal::Center);
+
+        column![
+            title,
+            Space::with_height(4),
+            subtitle,
+            Space::with_height(24),
+            placeholder_card,
+        ]
+        .spacing(0)
+        .into()
     }
 
     /// Debugger view with time travel UI
     fn view_debugger(&self) -> Element<Message> {
-        let title = text("Time Travel Debugger").size(32).width(Length::Fill);
+        let title = text("Time Travel Debugger")
+            .size(28)
+            .color(colors::TEXT_PRIMARY);
+
+        let subtitle = text("Step through agent execution history")
+            .size(14)
+            .color(colors::TEXT_SECONDARY);
 
         // Add a button to load sample history if no events are loaded
         let load_sample_btn = if self.time_travel_state.events.is_empty() {
             column![
-                Space::with_height(10),
-                button(text("Load Sample History"))
+                Space::with_height(16),
+                button(text("Load Sample History").size(13))
                     .on_press(Message::LoadSampleHistory)
-                    .padding(10),
-                Space::with_height(10),
+                    .padding([10, 16])
+                    .style(button_styles::primary),
+                Space::with_height(16),
             ]
         } else {
             column![]
@@ -1113,11 +1290,13 @@ impl DescartesGui {
 
         column![
             title,
+            Space::with_height(4),
+            subtitle,
             load_sample_btn,
             // Map time travel messages to main messages
             time_travel::view(&self.time_travel_state).map(Message::TimeTravel),
         ]
-        .spacing(10)
+        .spacing(0)
         .into()
     }
 
@@ -1125,24 +1304,27 @@ impl DescartesGui {
     fn view_dag_editor(&self) -> Element<Message> {
         // Check if DAG is empty
         if self.dag_editor_state.dag.nodes.is_empty() {
-            let title = text("DAG Editor").size(32).width(Length::Fill);
+            let title = text("Workflow Editor")
+                .size(28)
+                .color(colors::TEXT_PRIMARY);
 
-            let description = text("No DAG loaded. Load a sample DAG to see the editor in action.")
-                .size(16)
-                .width(Length::Fill);
+            let subtitle = text("Design and visualize agent workflows as directed acyclic graphs")
+                .size(14)
+                .color(colors::TEXT_SECONDARY);
 
-            let load_sample_btn = button(text("Load Sample DAG"))
+            let load_sample_btn = button(text("Load Sample Workflow").size(13))
                 .on_press(Message::LoadSampleDAG)
-                .padding(10);
+                .padding([10, 16])
+                .style(button_styles::primary);
 
             column![
                 title,
-                Space::with_height(20),
-                description,
-                Space::with_height(20),
+                Space::with_height(4),
+                subtitle,
+                Space::with_height(24),
                 load_sample_btn,
             ]
-            .spacing(10)
+            .spacing(0)
             .into()
         } else {
             // Map DAG editor messages to main messages
@@ -1152,49 +1334,81 @@ impl DescartesGui {
 
     /// Context Browser view (placeholder)
     fn view_context_browser(&self) -> Element<Message> {
-        let title = text("Context Browser").size(32).width(Length::Fill);
+        let title = text("Context Browser")
+            .size(28)
+            .color(colors::TEXT_PRIMARY);
 
-        let placeholder = text(
-            "Browse and manage agent execution context.\n\n\
-             Features coming soon:\n\
-             - View current agent state\n\
-             - Browse variable bindings\n\
-             - Inspect memory contents\n\
-             - Search through context history\n\
-             - Export context snapshots",
+        let subtitle = text("Browse and manage agent execution context")
+            .size(14)
+            .color(colors::TEXT_SECONDARY);
+
+        let features = vec![
+            ("◈", "View current agent state"),
+            ("◇", "Browse variable bindings"),
+            ("▤", "Inspect memory contents"),
+            ("⌕", "Search through context history"),
+            ("↗", "Export context snapshots"),
+        ];
+
+        let feature_list: Vec<Element<Message>> = features
+            .into_iter()
+            .map(|(icon, text_str)| {
+                row![
+                    text(icon).size(14).color(colors::TEXT_MUTED),
+                    Space::with_width(12),
+                    text(text_str).size(13).color(colors::TEXT_SECONDARY),
+                ]
+                .align_y(Vertical::Center)
+                .into()
+            })
+            .collect();
+
+        let coming_soon = container(
+            column![
+                text("Coming Soon").size(12).color(colors::WARNING),
+                Space::with_height(16),
+                column(feature_list).spacing(12),
+            ]
         )
-        .size(16)
-        .width(Length::Fill);
+        .padding(20)
+        .style(container_styles::panel);
 
-        column![title, Space::with_height(20), placeholder,]
-            .spacing(10)
-            .into()
+        column![
+            title,
+            Space::with_height(4),
+            subtitle,
+            Space::with_height(24),
+            coming_soon,
+        ]
+        .spacing(0)
+        .into()
     }
 
     /// File Browser view
     fn view_file_browser(&self) -> Element<Message> {
         // Check if file tree is loaded
         if self.file_tree_state.tree.is_none() {
-            let title = text("File Browser").size(32).width(Length::Fill);
+            let title = text("File Browser")
+                .size(28)
+                .color(colors::TEXT_PRIMARY);
 
-            let description = text(
-                "No file tree loaded. Load a sample file tree to browse the project structure.",
-            )
-            .size(16)
-            .width(Length::Fill);
+            let subtitle = text("Browse and navigate the project file structure")
+                .size(14)
+                .color(colors::TEXT_SECONDARY);
 
-            let load_sample_btn = button(text("Load Sample File Tree"))
+            let load_sample_btn = button(text("Load Sample File Tree").size(13))
                 .on_press(Message::LoadSampleFileTree)
-                .padding(10);
+                .padding([10, 16])
+                .style(button_styles::primary);
 
             column![
                 title,
-                Space::with_height(20),
-                description,
-                Space::with_height(20),
+                Space::with_height(4),
+                subtitle,
+                Space::with_height(24),
                 load_sample_btn,
             ]
-            .spacing(10)
+            .spacing(0)
             .into()
         } else {
             // Map file tree messages to main messages
@@ -1285,35 +1499,51 @@ impl DescartesGui {
     fn view_knowledge_graph(&self) -> Element<Message> {
         // Check if knowledge graph is loaded
         if self.knowledge_graph_panel_state.graph.is_none() {
-            let title = text("Knowledge Graph").size(32).width(Length::Fill);
+            let title = text("Knowledge Graph")
+                .size(24)
+                .color(colors::TEXT_PRIMARY);
 
             let description = text(
-                "No knowledge graph loaded. Generate one from the file tree or load a sample.\n\n\
-                Steps:\n\
-                1. Go to File Browser and load a file tree\n\
-                2. Come back here and click 'Generate from File Tree'\n\n\
-                Or click 'Load Sample' to see a demo knowledge graph.",
+                "No knowledge graph loaded. Generate one from the file tree or load a sample.",
             )
-            .size(16)
-            .width(Length::Fill);
+            .size(14)
+            .color(colors::TEXT_SECONDARY);
 
-            let load_sample_btn = button(text("Load Sample Knowledge Graph"))
-                .on_press(Message::LoadSampleKnowledgeGraph)
-                .padding(10);
-
-            let generate_btn = button(text("Generate from File Tree"))
-                .on_press(Message::GenerateKnowledgeGraph)
-                .padding(10);
-
-            column![
-                title,
-                Space::with_height(20),
-                description,
-                Space::with_height(20),
-                row![load_sample_btn, Space::with_width(10), generate_btn,].spacing(10),
+            let steps = column![
+                text("Steps:").size(14).color(colors::TEXT_PRIMARY),
+                text("1. Go to File Browser and load a file tree").size(13).color(colors::TEXT_SECONDARY),
+                text("2. Come back here and click 'Generate from File Tree'").size(13).color(colors::TEXT_SECONDARY),
+                text("Or click 'Load Sample' to see a demo knowledge graph.").size(13).color(colors::TEXT_MUTED),
             ]
-            .spacing(10)
-            .into()
+            .spacing(6);
+
+            let load_sample_btn = button(text("Load Sample").size(13))
+                .on_press(Message::LoadSampleKnowledgeGraph)
+                .padding([8, 16])
+                .style(button_styles::primary);
+
+            let generate_btn = button(text("Generate from File Tree").size(13))
+                .on_press(Message::GenerateKnowledgeGraph)
+                .padding([8, 16])
+                .style(button_styles::secondary);
+
+            let content = column![
+                title,
+                Space::with_height(12),
+                description,
+                Space::with_height(16),
+                steps,
+                Space::with_height(20),
+                row![load_sample_btn, generate_btn].spacing(12),
+            ]
+            .spacing(8)
+            .padding(24);
+
+            container(content)
+                .style(container_styles::panel)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
         } else {
             // Map knowledge graph messages to main messages
             knowledge_graph_panel::view(&self.knowledge_graph_panel_state)

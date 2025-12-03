@@ -90,7 +90,7 @@ pub async fn execute(cmd: &TaskCommands, project_root: Option<PathBuf>) -> Resul
         );
         println!(
             "{}",
-            "Run 'scud init' or ensure .taskmaster/ directory exists.".dimmed()
+            "Run 'scud init' or ensure .scud/ directory exists.".dimmed()
         );
         return Ok(());
     }

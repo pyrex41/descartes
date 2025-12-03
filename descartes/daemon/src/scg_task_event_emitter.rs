@@ -1,6 +1,6 @@
 //! SCG-based Task Event Emitter - File watching and event emission for SCG task files
 //!
-//! This module watches the .taskmaster/tasks/tasks.json file for changes and emits
+//! This module watches the .scud/tasks/tasks.json file for changes and emits
 //! events when tasks are created, updated, or deleted.
 //!
 //! Features:
@@ -117,7 +117,7 @@ impl ScgTaskEventEmitter {
     /// Returns a handle that must be kept alive
     pub async fn start_watching(&mut self) -> anyhow::Result<()> {
         let project_root = self.storage.project_root().to_path_buf();
-        let tasks_file = project_root.join(".taskmaster/tasks/tasks.json");
+        let tasks_file = project_root.join(".scud/tasks/tasks.json");
 
         if !tasks_file.exists() {
             if self.config.verbose_logging {
@@ -134,7 +134,7 @@ impl ScgTaskEventEmitter {
         self.shutdown_tx = Some(shutdown_tx);
 
         // Set up watcher
-        let tasks_dir = project_root.join(".taskmaster/tasks");
+        let tasks_dir = project_root.join(".scud/tasks");
         let tx_clone = tx.clone();
 
         let watcher = RecommendedWatcher::new(
@@ -177,12 +177,12 @@ impl ScgTaskEventEmitter {
                         tracing::info!("Watching directory: {}", tasks_dir.display());
                     }
                 } else {
-                    // Watch the .taskmaster directory instead and wait for tasks/ to be created
-                    let taskmaster_dir = project_root.join(".taskmaster");
-                    if taskmaster_dir.exists() {
-                        Watcher::watch(watcher, &taskmaster_dir, RecursiveMode::Recursive)?;
+                    // Watch the .scud directory instead and wait for tasks/ to be created
+                    let scud_dir = project_root.join(".scud");
+                    if scud_dir.exists() {
+                        Watcher::watch(watcher, &scud_dir, RecursiveMode::Recursive)?;
                         if self.config.verbose_logging {
-                            tracing::info!("Watching directory: {}", taskmaster_dir.display());
+                            tracing::info!("Watching directory: {}", scud_dir.display());
                         }
                     }
                 }
@@ -399,16 +399,16 @@ mod tests {
     async fn setup_test_emitter() -> (ScgTaskEventEmitter, Arc<EventBus>, TempDir) {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
 
-        // Create .taskmaster directory structure
-        let taskmaster_dir = temp_dir.path().join(".taskmaster/tasks");
-        std::fs::create_dir_all(&taskmaster_dir).expect("Failed to create taskmaster dir");
+        // Create .scud directory structure
+        let scud_dir = temp_dir.path().join(".scud/tasks");
+        std::fs::create_dir_all(&scud_dir).expect("Failed to create scud dir");
 
         // Create empty tasks.json
-        let tasks_file = taskmaster_dir.join("tasks.json");
+        let tasks_file = scud_dir.join("tasks.json");
         std::fs::write(&tasks_file, "{}").expect("Failed to create tasks.json");
 
         // Create workflow-state.json
-        let workflow_file = temp_dir.path().join(".taskmaster/workflow-state.json");
+        let workflow_file = temp_dir.path().join(".scud/workflow-state.json");
         std::fs::write(
             &workflow_file,
             r#"{"active_epic": null, "updated_at": null}"#,
