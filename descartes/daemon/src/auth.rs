@@ -5,7 +5,6 @@ use crate::types::AuthToken;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// JWT claims
 #[derive(Debug, Serialize, Deserialize)]

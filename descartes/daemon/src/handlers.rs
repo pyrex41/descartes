@@ -4,7 +4,7 @@ use crate::errors::{DaemonError, DaemonResult};
 use crate::types::*;
 use chrono::Utc;
 use dashmap::DashMap;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::sync::Arc;
 use uuid::Uuid;
 

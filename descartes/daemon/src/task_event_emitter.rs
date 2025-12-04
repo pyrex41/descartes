@@ -11,7 +11,6 @@
 //! - Includes task data in events
 //! - Thread-safe with Arc/Mutex
 
-use crate::errors::{DaemonError, DaemonResult};
 use crate::events::{DescartesEvent, EventBus, TaskEvent, TaskEventType};
 use chrono::Utc;
 use descartes_core::errors::StateStoreResult;

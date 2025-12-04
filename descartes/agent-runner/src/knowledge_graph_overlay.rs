@@ -190,7 +190,7 @@ impl KnowledgeGraphOverlay {
     /// # Returns
     /// * `KnowledgeGraph` - The generated knowledge graph
     pub fn generate_and_link(&mut self, file_tree: &mut FileTree) -> ParserResult<KnowledgeGraph> {
-        let mut knowledge_graph = self.generate_knowledge_overlay(file_tree)?;
+        let knowledge_graph = self.generate_knowledge_overlay(file_tree)?;
 
         // Link knowledge nodes back to file tree
         self.link_to_file_tree(file_tree, &knowledge_graph)?;

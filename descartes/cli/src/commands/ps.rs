@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Local};
 use colored::Colorize;
-use descartes_core::{AgentInfo, AgentStatus, DescaratesConfig};
+use descartes_core::DescaratesConfig;
 use serde_json::json;
 use std::time::SystemTime;
 

@@ -4,7 +4,7 @@ use crate::errors::{DaemonError, DaemonResult};
 use crate::handlers::RpcHandlers;
 use crate::metrics::MetricsCollector;
 use crate::types::*;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, error, info};

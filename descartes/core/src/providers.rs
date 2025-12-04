@@ -1,11 +1,11 @@
 /// Model provider implementations for API, Headless, and Local modes.
 use crate::errors::{AgentResult, ProviderError, ProviderResult};
 use crate::traits::{
-    FinishReason, Message, MessageRole, ModelBackend, ModelProviderMode, ModelRequest,
+    FinishReason, ModelBackend, ModelProviderMode, ModelRequest,
     ModelResponse,
 };
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 
 /// ============================================================================
@@ -277,7 +277,7 @@ impl ModelBackend for AnthropicProvider {
 pub struct ClaudeCodeAdapter {
     _mode: ModelProviderMode,
     command: String,
-    args: Vec<String>,
+    _args: Vec<String>,
 }
 
 impl ClaudeCodeAdapter {
@@ -291,7 +291,7 @@ impl ClaudeCodeAdapter {
                 args: a.clone(),
             },
             command: cmd,
-            args: a,
+            _args: a,
         }
     }
 }
@@ -372,7 +372,7 @@ impl ModelBackend for ClaudeCodeAdapter {
 pub struct HeadlessCliAdapter {
     _mode: ModelProviderMode,
     command: String,
-    args: Vec<String>,
+    _args: Vec<String>,
 }
 
 impl HeadlessCliAdapter {
@@ -384,7 +384,7 @@ impl HeadlessCliAdapter {
                 args: args.clone(),
             },
             command,
-            args,
+            _args: args,
         }
     }
 }

@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{Error as WsError, Message as WsMessage},
+    tungstenite::Message as WsMessage,
 };
 use tracing::{debug, error, info, warn};
 
@@ -227,7 +227,7 @@ impl EventClient {
     }
 
     /// Update the event filter
-    pub async fn update_filter(&self, filter: EventFilter) -> DaemonResult<()> {
+    pub async fn update_filter(&self, _filter: EventFilter) -> DaemonResult<()> {
         // This would require maintaining a WebSocket connection handle
         // For now, just update the config for next connection
         // TODO: Implement live filter updates

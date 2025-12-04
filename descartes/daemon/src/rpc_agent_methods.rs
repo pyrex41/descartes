@@ -12,7 +12,6 @@
 //! - `get_monitoring_health`: Get monitoring system health
 
 use crate::agent_monitor::{AgentMonitor, HealthSummary, MonitorStats};
-use crate::errors::{DaemonError, DaemonResult};
 use descartes_core::{
     agent_state::{AgentRuntimeState, AgentStateCollection, AgentStatus},
     AgentStreamMessage,

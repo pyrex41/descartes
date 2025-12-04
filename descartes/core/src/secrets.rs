@@ -1,11 +1,10 @@
 /// Secure secret management module for encrypted storage.
 /// Implements AES-256-GCM encryption with key derivation from master password.
 /// Supports multiple secret types, versioning, and audit logging.
-use crate::errors::{StateStoreError, StateStoreResult};
+use crate::errors::StateStoreResult;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use uuid::Uuid;
 use zeroize::Zeroize;
 

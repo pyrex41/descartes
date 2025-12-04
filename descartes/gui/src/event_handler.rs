@@ -4,7 +4,7 @@
 /// WebSocket subscriptions to the daemon's event stream and converts
 /// daemon events into Iced messages.
 use descartes_daemon::{
-    DescartesEvent, EventClient, EventClientBuilder, EventClientConfig, EventClientState,
+    DescartesEvent, EventClient, EventClientConfig, EventClientState,
     EventFilter,
 };
 use futures::SinkExt;

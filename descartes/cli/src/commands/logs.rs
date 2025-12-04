@@ -1,10 +1,9 @@
 use anyhow::Result;
 use chrono::{DateTime, Local};
 use colored::Colorize;
-use descartes_core::{ActorType, DescaratesConfig, Event};
+use descartes_core::DescaratesConfig;
 use serde_json::json;
 use std::time::{Duration, SystemTime};
-use tracing::info;
 
 pub async fn execute(
     config: &DescaratesConfig,

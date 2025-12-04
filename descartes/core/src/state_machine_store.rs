@@ -7,10 +7,9 @@
 //! - State snapshots for recovery
 
 use crate::state_machine::*;
-use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::json;
-use sqlx::{sqlite::SqlitePool, Row};
+use sqlx::sqlite::SqlitePool;
 use std::sync::Arc;
 
 // ============================================================================

@@ -1,9 +1,7 @@
 /// Core trait definitions for the Descartes orchestration system.
 use crate::errors::{AgentResult, StateStoreResult};
 use async_trait::async_trait;
-use chrono::Utc;
-use serde_json::{json, Value};
-use std::path::PathBuf;
+use serde_json::Value;
 use uuid::Uuid;
 
 /// Represents a message/context to be sent to a model provider.

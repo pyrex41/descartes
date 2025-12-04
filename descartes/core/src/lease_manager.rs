@@ -20,7 +20,7 @@ pub struct SqliteLeaseManager {
     pool: SqlitePool,
 
     /// Path to the SQLite database file
-    db_path: PathBuf,
+    _db_path: PathBuf,
 }
 
 impl SqliteLeaseManager {
@@ -52,7 +52,7 @@ impl SqliteLeaseManager {
                 AgentError::ExecutionError(format!("Failed to create database pool: {}", e))
             })?;
 
-        Ok(SqliteLeaseManager { pool, db_path })
+        Ok(SqliteLeaseManager { pool, _db_path: db_path })
     }
 
     /// Initialize the database schema

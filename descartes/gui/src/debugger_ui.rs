@@ -13,18 +13,17 @@
 
 use descartes_core::debugger::{
     Breakpoint, BreakpointLocation, CallFrame, DebugCommand, DebugContext, DebuggerState,
-    ExecutionState, ThoughtSnapshot,
+    ThoughtSnapshot,
 };
 use descartes_core::state_machine::WorkflowState;
 use iced::widget::{
-    button, checkbox, column, container, row, scrollable, text, Column, Row, Space,
+    button, checkbox, column, container, row, scrollable, text, Space,
 };
 use iced::{
     alignment::{Horizontal, Vertical},
     border, Color, Element, Length, Theme,
 };
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 // ============================================================================
@@ -297,7 +296,7 @@ fn view_disconnected() -> Element<'static, DebuggerMessage> {
 /// View the control bar with debugger controls
 fn view_control_bar<'a>(
     debugger_state: &'a DebuggerState,
-    settings: &'a DebuggerUiSettings,
+    _settings: &'a DebuggerUiSettings,
 ) -> Element<'a, DebuggerMessage> {
     let execution_state = &debugger_state.execution_state;
     let is_paused = execution_state.is_paused();
@@ -550,7 +549,7 @@ fn view_thought_content<'a>(
 
     let content_box = container(scrollable(content_text))
         .padding(10)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgb8(20, 20, 30).into()),
             border: border::rounded(4),
             ..Default::default()
@@ -719,7 +718,7 @@ fn view_call_frame(index: usize, frame: &CallFrame) -> Element<DebuggerMessage> 
 
     container(column![frame_header, Space::with_height(5), frame_info].spacing(5))
         .padding(8)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgb8(30, 30, 40).into()),
             border: border::rounded(4),
             ..Default::default()
@@ -809,7 +808,7 @@ fn view_metadata_tab(context: &DebugContext) -> Element<DebuggerMessage> {
     scrollable(
         container(text(metadata_str).size(12))
             .padding(10)
-            .style(|theme: &Theme| container::Style {
+            .style(|_theme: &Theme| container::Style {
                 background: Some(Color::from_rgb8(20, 20, 30).into()),
                 border: border::rounded(4),
                 ..Default::default()
@@ -928,13 +927,13 @@ fn view_breakpoint_item<'a>(
     .spacing(5);
 
     let style = if is_hovered {
-        |theme: &Theme| container::Style {
+        |_theme: &Theme| container::Style {
             background: Some(Color::from_rgb8(50, 50, 70).into()),
             border: border::rounded(4),
             ..Default::default()
         }
     } else {
-        |theme: &Theme| container::Style {
+        |_theme: &Theme| container::Style {
             background: Some(Color::from_rgb8(30, 30, 40).into()),
             border: border::rounded(4),
             ..Default::default()
@@ -949,7 +948,7 @@ fn view_breakpoint_item<'a>(
 }
 
 /// View the breakpoint creation form
-fn view_breakpoint_form(form_state: &BreakpointFormState) -> Element<DebuggerMessage> {
+fn view_breakpoint_form(_form_state: &BreakpointFormState) -> Element<DebuggerMessage> {
     // Location type selector (simplified - only step count for now)
     let form_content = column![
         text("Add New Breakpoint").size(16),
@@ -975,7 +974,7 @@ fn view_breakpoint_form(form_state: &BreakpointFormState) -> Element<DebuggerMes
 
     container(form_content)
         .width(Length::Fill)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgb8(40, 40, 50).into()),
             border: border::rounded(8),
             ..Default::default()
@@ -1179,8 +1178,8 @@ fn workflow_state_color(state: &WorkflowState) -> Color {
 // ============================================================================
 
 fn button_style_primary(
-    theme: &Theme,
-    status: iced::widget::button::Status,
+    _theme: &Theme,
+    _status: iced::widget::button::Status,
 ) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(50, 100, 200).into()),
@@ -1191,8 +1190,8 @@ fn button_style_primary(
 }
 
 fn button_style_success(
-    theme: &Theme,
-    status: iced::widget::button::Status,
+    _theme: &Theme,
+    _status: iced::widget::button::Status,
 ) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(50, 200, 100).into()),
@@ -1203,8 +1202,8 @@ fn button_style_success(
 }
 
 fn button_style_danger(
-    theme: &Theme,
-    status: iced::widget::button::Status,
+    _theme: &Theme,
+    _status: iced::widget::button::Status,
 ) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(200, 50, 50).into()),
@@ -1215,8 +1214,8 @@ fn button_style_danger(
 }
 
 fn button_style_disabled(
-    theme: &Theme,
-    status: iced::widget::button::Status,
+    _theme: &Theme,
+    _status: iced::widget::button::Status,
 ) -> iced::widget::button::Style {
     iced::widget::button::Style {
         background: Some(Color::from_rgb8(60, 60, 70).into()),

@@ -24,7 +24,6 @@ struct Args {
 
     /// HTTP server port
     #[arg(
-        short,
         long,
         value_name = "PORT",
         help = "HTTP server port (default: 8080)"

@@ -1,5 +1,5 @@
 use iced::mouse::{self, Cursor};
-use iced::widget::canvas::{Cache, Canvas, Frame, Geometry, Path, Stroke, Style, Text};
+use iced::widget::canvas::{Cache, Canvas, Frame, Geometry, Path, Stroke, Text};
 /// DAG Editor - Visual graph editor for task dependencies
 /// Phase 3.8.3: Basic Iced UI Renderer
 ///
@@ -13,9 +13,9 @@ use iced::widget::canvas::{Cache, Canvas, Frame, Geometry, Path, Stroke, Style, 
 /// - Bottom panel for graph statistics
 /// - Grid background with optional snap-to-grid
 /// - Performance optimized for 100+ nodes
-use iced::widget::{button, canvas, column, container, row, scrollable, text, Scrollable, Space};
+use iced::widget::{button, canvas, column, container, row, scrollable, text, Space};
 use iced::{
-    alignment::{Horizontal, Vertical},
+    alignment::Vertical,
     keyboard, Color, Element, Length, Point, Rectangle, Renderer, Size, Theme, Vector,
 };
 
@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use crate::dag_canvas_interactions::{
     handle_key_press, handle_key_release, handle_mouse_move, handle_mouse_press,
-    handle_mouse_release, handle_mouse_scroll, BoxSelection, EdgeCreation,
+    handle_mouse_release, handle_mouse_scroll,
     ExtendedInteractionState, InteractionResult,
 };
 
@@ -201,6 +201,7 @@ pub enum Tool {
 
 /// Messages for DAG Editor
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum DAGEditorMessage {
     /// Tool selection
     SelectTool(Tool),
@@ -1188,7 +1189,7 @@ fn handle_interaction_result(state: &mut DAGEditorState, result: InteractionResu
             // Positions already updated in interaction handler
         }
 
-        InteractionResult::NodeDragEnded(new_positions) => {
+        InteractionResult::NodeDragEnded(_new_positions) => {
             // Record the move operation for undo
             // Note: For simplicity, we record individual node updates
             // In a production system, you might want a compound operation
@@ -1244,7 +1245,7 @@ fn apply_undo_operation(state: &mut DAGEditorState, operation: DAGOperation) {
             let _ = state.dag.remove_node(node.node_id);
         }
 
-        DAGOperation::RemoveNode(node_id, node) => {
+        DAGOperation::RemoveNode(_node_id, node) => {
             // Undo remove by adding back
             let _ = state.dag.add_node(node);
         }
@@ -1259,7 +1260,7 @@ fn apply_undo_operation(state: &mut DAGEditorState, operation: DAGOperation) {
             let _ = state.dag.remove_edge(edge.edge_id);
         }
 
-        DAGOperation::RemoveEdge(edge_id, edge) => {
+        DAGOperation::RemoveEdge(_edge_id, edge) => {
             // Undo remove by adding back
             let _ = state.dag.add_edge(edge);
         }

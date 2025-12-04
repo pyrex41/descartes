@@ -1,8 +1,7 @@
 /// Semantic extraction from AST
-use crate::errors::{ParserError, ParserResult};
+use crate::errors::ParserResult;
 use crate::traversal::AstTraversal;
 use crate::types::{Language, Parameter, SemanticNode, SemanticNodeType};
-use serde_json::Value;
 use std::collections::HashMap;
 use tree_sitter::{Node, Tree};
 

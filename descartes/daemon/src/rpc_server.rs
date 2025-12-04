@@ -11,7 +11,7 @@
 
 use crate::errors::{DaemonError, DaemonResult};
 use crate::types::{RpcError, RpcRequest, RpcResponse};
-use descartes_core::traits::{AgentConfig, Task, TaskStatus};
+use descartes_core::traits::{AgentConfig, TaskStatus};
 use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
 use serde::{Deserialize, Serialize};
@@ -1437,7 +1437,7 @@ mod tests {
     use super::*;
     use descartes_core::agent_runner::LocalProcessRunner;
     use descartes_core::state_store::SqliteStateStore;
-    use descartes_core::traits::StateStore;
+    use descartes_core::traits::{StateStore, Task};
     use tempfile::tempdir;
 
     async fn create_test_dependencies() -> (

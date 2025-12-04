@@ -4,11 +4,13 @@ use descartes_core::{Event, StateStore, StateStoreResult, Task, TaskComplexity, 
 use sqlx::sqlite::SqlitePool;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub struct SimpleStateStore {
     pool: SqlitePool,
 }
 
 impl SimpleStateStore {
+    #[allow(dead_code)]
     pub async fn new(database_url: &str) -> StateStoreResult<Self> {
         let pool = SqlitePool::connect(database_url)
             .await
@@ -17,6 +19,7 @@ impl SimpleStateStore {
         Ok(Self { pool })
     }
 
+    #[allow(dead_code)]
     pub async fn from_config(config: &descartes_core::DescaratesConfig) -> StateStoreResult<Self> {
         let db_path = format!("{}/data/descartes.db", config.storage.base_path);
         let db_url = format!("sqlite://{}", db_path);
@@ -181,6 +184,7 @@ impl StateStore for SimpleStateStore {
 }
 
 impl SimpleStateStore {
+    #[allow(dead_code)]
     fn row_to_event(&self, row: &sqlx::sqlite::SqliteRow) -> StateStoreResult<Event> {
         use sqlx::Row;
 
@@ -212,6 +216,7 @@ impl SimpleStateStore {
         })
     }
 
+    #[allow(dead_code)]
     fn row_to_task(&self, row: &sqlx::sqlite::SqliteRow) -> StateStoreResult<Task> {
         use sqlx::Row;
 

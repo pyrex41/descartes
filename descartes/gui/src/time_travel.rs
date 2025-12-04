@@ -7,14 +7,14 @@
 /// - Playback controls for automatic replay
 /// - Event details display
 /// - Git commit integration
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use descartes_core::{AgentHistoryEvent, HistoryEventType, HistorySnapshot};
 use iced::mouse::Cursor;
-use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path, Stroke, Text};
-use iced::widget::{button, column, container, row, text, Column, Row, Space};
+use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path, Stroke};
+use iced::widget::{button, column, container, row, text, Column, Space};
 use iced::{
     alignment::{Horizontal, Vertical},
-    border, mouse, Color, Element, Length, Point, Rectangle, Renderer, Size, Theme,
+    border, Color, Element, Length, Point, Rectangle, Renderer, Size, Theme,
 };
 use std::collections::HashMap;
 

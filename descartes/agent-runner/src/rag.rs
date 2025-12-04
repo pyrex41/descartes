@@ -13,13 +13,10 @@ use crate::types::{Language, SemanticNode};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use lancedb::connection::Connection as LanceConnection;
-use lancedb::database::CreateTableMode;
-use lancedb::query::{ExecutableQuery, QueryBase};
-use ndarray::{Array1, Array2};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
@@ -585,6 +582,7 @@ pub struct VectorStore {
     connection: Option<LanceConnection>,
     db_path: PathBuf,
     table_name: String,
+    #[allow(dead_code)]
     dimension: usize,
 }
 

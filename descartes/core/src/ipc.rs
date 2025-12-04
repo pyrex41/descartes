@@ -2,11 +2,10 @@
 /// Supports multiple transports: Unix sockets, shared memory, stdin/stdout
 /// Includes pub/sub messaging, request/response protocol, and reliability features
 use async_trait::async_trait;
-use bincode;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -14,7 +13,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio::time::{sleep, timeout};
-use tracing::{debug, error, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 // ============================================================================
@@ -796,7 +795,7 @@ impl MessageBus {
     }
 
     /// Send a message through the bus
-    pub async fn send(&self, mut message: IpcMessage) -> Result<String, String> {
+    pub async fn send(&self, message: IpcMessage) -> Result<String, String> {
         // Check backpressure
         self.backpressure.check().await?;
 

@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use descartes_core::{
-    ScgTaskQueries, ScgTaskQueryBuilder, ScgTaskStorage, TaskPriority, TaskStatus,
+    ScgTaskQueryBuilder, ScgTaskStorage, TaskPriority, TaskStatus,
 };
 use serde_json::json;
 use std::path::PathBuf;

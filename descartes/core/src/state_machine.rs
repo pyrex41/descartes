@@ -8,7 +8,6 @@
 //! - State history and rollback capabilities
 //! - Support for concurrent multi-agent workflows
 
-use crate::traits::StateStore;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;

@@ -14,6 +14,7 @@ pub fn get_daemon_socket(config: &DescaratesConfig) -> PathBuf {
 }
 
 /// Check if daemon is running by checking if socket exists
+#[allow(dead_code)]
 pub fn is_daemon_running(config: &DescaratesConfig) -> bool {
     get_daemon_socket(config).exists()
 }

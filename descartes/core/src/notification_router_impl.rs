@@ -209,19 +209,19 @@ impl NotificationRouter for DefaultNotificationRouter {
 
     async fn send_notification(
         &self,
-        payload: NotificationPayload,
+        _payload: NotificationPayload,
     ) -> Result<Vec<NotificationSendResult>, String> {
         // Check rate limit
-        self.check_rate_limit(&payload).await?;
+        self.check_rate_limit(&_payload).await?;
 
         // Check for duplicates
-        if self.is_duplicate(&payload).await {
+        if self.is_duplicate(&_payload).await {
             return Ok(Vec::new());
         }
 
         // Find matching routing rules
         let rules = self.routing_rules.read().await;
-        let matching_rules: Vec<_> = rules.iter().filter(|r| r.matches(&payload)).collect();
+        let matching_rules: Vec<_> = rules.iter().filter(|r| r.matches(&_payload)).collect();
 
         let mut channels = Vec::new();
         for rule in matching_rules {
@@ -237,7 +237,7 @@ impl NotificationRouter for DefaultNotificationRouter {
             return Ok(Vec::new());
         }
 
-        self.send_to_channels(payload, channels).await
+        self.send_to_channels(_payload, channels).await
     }
 
     async fn send_to_channels(
@@ -303,7 +303,7 @@ impl NotificationRouter for DefaultNotificationRouter {
         Ok(stats.clone())
     }
 
-    async fn check_rate_limit(&self, payload: &NotificationPayload) -> Result<(), String> {
+    async fn check_rate_limit(&self, _payload: &NotificationPayload) -> Result<(), String> {
         self.prune_old_notifications().await;
 
         let config = self.rate_limit_config.read().await;

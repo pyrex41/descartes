@@ -11,7 +11,7 @@
 /// - Hover tooltips with type information
 /// - Code annotations and bookmarks
 use iced::widget::{
-    button, column, container, horizontal_space, row, scrollable, text, text_input, Column, Row,
+    button, column, container, horizontal_space, row, scrollable, text, text_input, Column,
     Space,
 };
 use iced::{Color, Element, Length, Theme};
@@ -573,7 +573,7 @@ fn view_single_file(state: &CodePreviewState) -> Element<CodePreviewMessage> {
     container(scrollable(content).height(Length::Fill))
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgb8(30, 30, 40).into()),
             border: iced::Border::default(),
             ..Default::default()

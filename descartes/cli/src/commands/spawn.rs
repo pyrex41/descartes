@@ -1,13 +1,35 @@
 use anyhow::Result;
 use colored::Colorize;
 use descartes_core::{
-    DescaratesConfig, Message, MessageRole, ModelBackend, ModelRequest, ProviderFactory,
+    default_sessions_dir, get_system_prompt, get_tools, DescaratesConfig, Message, MessageRole,
+    ModelBackend, ModelRequest, ProviderFactory, ToolLevel, TranscriptWriter,
 };
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::io::{self, BufRead};
+use std::path::PathBuf;
 use tracing::{info, warn};
+
+/// Parse tool level from string
+fn parse_tool_level(level: &str, no_spawn: bool) -> ToolLevel {
+    match level.to_lowercase().as_str() {
+        "minimal" => ToolLevel::Minimal,
+        "orchestrator" => {
+            if no_spawn {
+                // Sub-sessions cannot spawn their own sub-sessions
+                ToolLevel::Minimal
+            } else {
+                ToolLevel::Orchestrator
+            }
+        }
+        "readonly" => ToolLevel::ReadOnly,
+        _ => {
+            warn!("Unknown tool level '{}', defaulting to minimal", level);
+            ToolLevel::Minimal
+        }
+    }
+}
 
 pub async fn execute(
     config: &DescaratesConfig,
@@ -16,6 +38,9 @@ pub async fn execute(
     model: Option<&str>,
     system: Option<&str>,
     stream: bool,
+    tool_level: &str,
+    no_spawn: bool,
+    transcript_dir: Option<&str>,
 ) -> Result<()> {
     println!("{}", "Spawning agent...".green().bold());
     println!("  Task: {}", task.cyan());
@@ -27,9 +52,54 @@ pub async fn execute(
     println!("  Provider: {}", provider_name.yellow());
     println!("  Model: {}", model_name.yellow());
 
-    if let Some(sys) = system {
-        println!("  System: {}", sys);
+    // Parse tool level (with recursive prevention)
+    let level = parse_tool_level(tool_level, no_spawn);
+    let level_str = match level {
+        ToolLevel::Minimal => "minimal",
+        ToolLevel::Orchestrator => "orchestrator",
+        ToolLevel::ReadOnly => "readonly",
+    };
+    println!("  Tool level: {}", level_str.yellow());
+
+    if no_spawn {
+        println!("  {}", "(sub-session: spawn disabled)".dimmed());
     }
+
+    // Get tools for this level
+    let tools = get_tools(level);
+    println!(
+        "  Tools: {}",
+        tools
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+            .dimmed()
+    );
+
+    // Determine system prompt
+    let system_prompt = system
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| get_system_prompt(level).to_string());
+
+    // Initialize transcript writer
+    let sessions_dir = transcript_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(default_sessions_dir);
+
+    let mut transcript = TranscriptWriter::new(
+        &sessions_dir,
+        provider_name,
+        &model_name,
+        task,
+        None, // parent_session_id (set by orchestrator if this is a sub-session)
+        Some(level_str),
+    )?;
+
+    println!(
+        "  Transcript: {}",
+        transcript.path().display().to_string().dimmed()
+    );
 
     // Check for piped input
     let mut full_task = task.to_string();
@@ -49,43 +119,62 @@ pub async fn execute(
     // Create provider backend
     let backend = create_backend(config, provider_name, &model_name)?;
 
-    // Create model request
+    // Create model request with tools
     let messages = vec![Message {
         role: MessageRole::User,
         content: full_task.clone(),
     }];
+
+    // Log user message to transcript
+    transcript.add_user_message(&full_task);
 
     let request = ModelRequest {
         messages,
         model: model_name.clone(),
         max_tokens: Some(4096),
         temperature: Some(0.7),
-        system_prompt: system.map(|s| s.to_string()),
-        tools: None,
+        system_prompt: Some(system_prompt),
+        tools: Some(tools),
     };
 
     // Execute with streaming or non-streaming
-    if stream {
-        execute_streaming(&backend, request).await?;
+    let response_content = if stream {
+        execute_streaming(&backend, request).await?
     } else {
-        execute_non_streaming(&backend, request).await?;
-    }
+        execute_non_streaming(&backend, request).await?
+    };
+
+    // Log assistant response to transcript
+    transcript.add_assistant_message(&response_content);
+
+    // Save transcript
+    let transcript_path = transcript.save()?;
+    println!(
+        "\n{} {}",
+        "Transcript saved:".dimmed(),
+        transcript_path.display()
+    );
 
     println!("\n{}", "Agent execution completed.".green().bold());
 
     Ok(())
 }
 
-async fn execute_streaming(backend: &Box<dyn ModelBackend>, request: ModelRequest) -> Result<()> {
+async fn execute_streaming(
+    backend: &Box<dyn ModelBackend>,
+    request: ModelRequest,
+) -> Result<String> {
     println!("\n{}", "Streaming response:".green());
     println!("{}", "─".repeat(80).dimmed());
 
     let mut stream = backend.stream(request).await?;
+    let mut full_response = String::new();
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(response) => {
                 print!("{}", response.content);
+                full_response.push_str(&response.content);
                 use std::io::Write;
                 io::stdout().flush()?;
             }
@@ -97,13 +186,13 @@ async fn execute_streaming(backend: &Box<dyn ModelBackend>, request: ModelReques
     }
 
     println!("\n{}", "─".repeat(80).dimmed());
-    Ok(())
+    Ok(full_response)
 }
 
 async fn execute_non_streaming(
     backend: &Box<dyn ModelBackend>,
     request: ModelRequest,
-) -> Result<()> {
+) -> Result<String> {
     let spinner = ProgressBar::new_spinner();
     spinner.set_style(
         ProgressStyle::default_spinner()
@@ -126,7 +215,7 @@ async fn execute_non_streaming(
         println!("\nTokens used: {}", tokens.to_string().cyan());
     }
 
-    Ok(())
+    Ok(response.content)
 }
 
 pub fn create_backend(

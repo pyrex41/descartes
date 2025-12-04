@@ -1,32 +1,15 @@
-# Descartes: Composable AI Agent Orchestration System
+# Descartes: CLI-First AI Agent Orchestration
 
-**Version**: 0.1.0 - Phase 1: Foundation
+**Version**: 0.2.0 - Pi-Style Minimal Tooling
 
-Descartes is a production-grade Rust framework for building, deploying, and orchestrating multi-agent AI systems. It provides unified abstractions over multiple LLM backends (APIs, local models, CLI tools) and enables composable agent workflows at scale.
+Descartes is a Rust framework for building AI coding agents with minimal, observable tooling. Following [Pi's philosophy](https://marioslab.io/posts/pi/building-a-coding-agent/): "if you don't need it, don't build it."
 
-## Project Structure
+## Core Philosophy
 
-```
-descartes/
-├── core/                          # Core library with traits and providers
-│   ├── src/
-│   │   ├── lib.rs                # Library root
-│   │   ├── errors.rs             # Comprehensive error types
-│   │   ├── traits.rs             # Core trait definitions
-│   │   └── providers.rs          # ModelBackend implementations
-│   └── Cargo.toml
-├── cli/                           # Command-line interface
-│   ├── src/
-│   │   └── main.rs               # CLI entry point
-│   └── Cargo.toml
-├── gui/                           # Native GUI (Phase 3)
-│   ├── src/
-│   │   └── lib.rs                # Iced GUI skeleton
-│   └── Cargo.toml
-├── PROVIDER_DESIGN.md            # Comprehensive provider architecture
-├── PROVIDER_EXAMPLES.md          # Usage examples and patterns
-└── README.md                      # This file
-```
+- **Minimal Tools**: 4 core tools (read, write, edit, bash) are sufficient for effective coding agents
+- **Progressive Disclosure**: Additional capabilities via "skills" (CLI tools), not bloated MCP servers
+- **Observability**: All tool use goes through bash, fully visible in transcripts
+- **Recursive Prevention**: Sub-sessions cannot spawn their own sub-agents
 
 ## Quick Start
 
@@ -37,253 +20,267 @@ cd descartes
 cargo build --release
 ```
 
-### Running Tests
+### Running a Spawn
 
 ```bash
-cargo test -p descartes-core
-cargo test
+# Basic spawn with orchestrator tools
+descartes spawn --task "List all Rust files in this project"
+
+# Spawn with minimal tools (no sub-session spawning)
+descartes spawn --task "Fix the type error" --tool-level minimal
+
+# Pipe content to the agent
+cat error.log | descartes spawn --task "Analyze this error"
 ```
 
-### Using the CLI
+### Transcripts
+
+All sessions save transcripts to `.scud/sessions/` (or `~/.descartes/sessions/`):
 
 ```bash
-# Initialize a project
-cargo run --bin descartes -- init --name my-project
+# View recent transcripts
+ls -lt .scud/sessions/ | head
 
-# Spawn an agent
-cargo run --bin descartes -- spawn --task "Summarize this code" --provider anthropic
+# Transcripts are JSON with metadata and entries
+cat .scud/sessions/2025-12-03-10-30-00-abc12345.json | jq '.metadata'
 ```
 
-## Core Features (Phase 1: Foundation)
+## Project Structure
 
-### 1. Unified Model Backend Trait
+```
+descartes/
+├── core/                          # Core library
+│   └── src/
+│       ├── lib.rs                 # Library root
+│       ├── tools/                 # Minimal tool definitions
+│       │   ├── definitions.rs     # 5 tools: read, write, edit, bash, spawn_session
+│       │   ├── registry.rs        # ToolLevel enum and system prompts
+│       │   └── executors.rs       # Tool execution implementations
+│       ├── session_transcript.rs  # Transcript writer
+│       └── providers.rs           # ModelBackend implementations
+├── cli/                           # Command-line interface
+│   └── src/
+│       ├── main.rs               # CLI entry point with spawn command
+│       └── commands/spawn.rs     # Spawn implementation
+├── daemon/                        # Background daemon (optional)
+├── gui/                           # Native GUI (optional)
+├── docs/
+│   └── SKILLS.md                 # Skills pattern documentation
+└── examples/
+    └── skills/
+        └── web-search/           # Example skill implementation
+```
 
-The `ModelBackend` trait provides a single interface for all LLM providers:
+## Tool Levels
 
-```rust
-pub trait ModelBackend: Send + Sync {
-    fn name(&self) -> &str;
-    fn mode(&self) -> &ModelProviderMode;
-    async fn initialize(&mut self) -> AgentResult<()>;
-    async fn health_check(&self) -> AgentResult<bool>;
-    async fn complete(&self, request: ModelRequest) -> AgentResult<ModelResponse>;
-    async fn stream(...) -> AgentResult<...>;
-    async fn list_models(&self) -> AgentResult<Vec<String>>;
-    async fn estimate_tokens(&self, text: &str) -> AgentResult<usize>;
-    async fn shutdown(&mut self) -> AgentResult<()>;
+Descartes uses capability-based tool levels:
+
+| Level | Tools | Use Case |
+|-------|-------|----------|
+| **Minimal** | read, write, edit, bash | Sub-sessions, focused tasks |
+| **Orchestrator** | minimal + spawn_session | Top-level agents that delegate |
+| **ReadOnly** | read, bash | Exploration, planning |
+
+```bash
+# Orchestrator (default) - can spawn sub-sessions
+descartes spawn --task "Review and fix all type errors" --tool-level orchestrator
+
+# Minimal - cannot spawn sub-sessions
+descartes spawn --task "Fix this one function" --tool-level minimal
+
+# ReadOnly - exploration only
+descartes spawn --task "Explain how authentication works" --tool-level readonly
+```
+
+## Tools
+
+### Core Tools (Minimal Level)
+
+| Tool | Description |
+|------|-------------|
+| **read** | Read file contents with optional offset/limit for large files |
+| **write** | Write content to file, creating directories as needed |
+| **edit** | Surgical text replacement (old_text must match exactly) |
+| **bash** | Execute bash commands in working directory |
+
+### Orchestrator Tool
+
+| Tool | Description |
+|------|-------------|
+| **spawn_session** | Spawn a sub-session for delegated tasks |
+
+Sub-sessions are spawned with `--no-spawn --tool-level minimal`, preventing recursive agent spawning.
+
+## Spawn Command
+
+```bash
+descartes spawn [OPTIONS] --task <TASK>
+
+Options:
+  -t, --task <TASK>              Task or prompt for the agent (required)
+  -p, --provider <PROVIDER>      Model provider: anthropic, openai, ollama, deepseek, groq
+  -m, --model <MODEL>            Specific model to use
+  -s, --system <SYSTEM>          Custom system prompt
+      --stream                   Stream output in real-time (default: true)
+      --tool-level <LEVEL>       Tool level: minimal, orchestrator, readonly (default: orchestrator)
+      --no-spawn                 Prevent spawning sub-sessions (for recursive prevention)
+      --transcript-dir <DIR>     Custom transcript directory (default: .scud/sessions/)
+```
+
+## Skills Pattern
+
+Instead of MCP servers that inject 2000-5000 tokens into every session, Descartes uses "skills" - CLI tools invoked via bash:
+
+```bash
+# Agent discovers skill via system prompt or README
+# Agent uses bash to invoke the skill
+bash: web-search "rust async patterns"
+```
+
+See [docs/SKILLS.md](docs/SKILLS.md) for creating skills.
+
+**Context cost comparison:**
+| Approach | Context Cost | When Paid |
+|----------|-------------|-----------|
+| MCP Server | ~2000-5000 tokens | Every message |
+| Skill (CLI) | ~50-100 tokens | Only when used |
+
+## Session Transcripts
+
+Every session saves a JSON transcript:
+
+```json
+{
+  "metadata": {
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "started_at": "2025-12-03T10:30:00Z",
+    "ended_at": "2025-12-03T10:35:00Z",
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "task": "Fix the type error in main.rs",
+    "is_sub_session": false,
+    "tool_level": "orchestrator"
+  },
+  "entries": [
+    {"timestamp": "...", "role": "user", "content": "..."},
+    {"timestamp": "...", "role": "assistant", "content": "..."},
+    {"timestamp": "...", "role": "tool_call", "content": "...", "tool_name": "bash", "tool_id": "..."},
+    {"timestamp": "...", "role": "tool_result", "content": "...", "tool_id": "..."}
+  ]
 }
 ```
 
-### 2. Three Operational Modes
+## Providers
 
-#### API Mode
-Direct HTTP calls to commercial providers:
-- **OpenAI** (GPT-4, GPT-3.5-turbo)
-- **Anthropic** (Claude 3 family)
-- Extensible for: DeepSeek, Groq, etc.
+### Supported Providers
 
-#### Headless CLI Mode
-Spawn tools as child processes:
-- **Claude Code** CLI integration
-- **OpenCode** adaptation
-- Generic CLI wrapper for custom tools
+| Provider | Type | Configuration |
+|----------|------|---------------|
+| **Anthropic** | API | `ANTHROPIC_API_KEY` |
+| **OpenAI** | API | `OPENAI_API_KEY` |
+| **Ollama** | Local | `OLLAMA_ENDPOINT` (default: localhost:11434) |
+| **DeepSeek** | API | `DEEPSEEK_API_KEY` |
+| **Groq** | API | `GROQ_API_KEY` |
 
-#### Local Mode
-Connect to localhost services:
-- **Ollama** for local model inference
-- Extensible for: llama.cpp, vLLM, etc.
-
-### 3. Provider Factory Pattern
-
-```rust
-let mut provider = ProviderFactory::create("anthropic", config)?;
-provider.initialize().await?;
-let response = provider.complete(request).await?;
-```
-
-### 4. Comprehensive Error Handling
-
-Type-safe error handling with `thiserror`:
-- `ProviderError` for provider-specific issues
-- `AgentError` for orchestration issues
-- `StateStoreError` for persistence issues
-- `ContextError` for context loading issues
-
-## Architecture Highlights
-
-### Production-Ready Design
-- ✅ Async/await throughout (`tokio`, `async-trait`)
-- ✅ Type-safe abstractions (Rust trait system)
-- ✅ Comprehensive error handling
-- ✅ Zero unsafe code
-- ✅ Full test coverage (11 tests, 100% passing)
-
-### High-Performance
-- Zero-copy serialization ready (`rkyv` integration)
-- Shared memory IPC support (`ipmpsc`)
-- Custom allocator support (`mimalloc`)
-- Efficient HTTP client (`reqwest`)
-
-### Extensibility
-- Pluggable provider implementations
-- Trait-based abstraction over providers
-- Factory pattern for dynamic provider creation
-- Configuration-driven setup
-
-## Implemented Providers
-
-### API Providers (Fully Implemented)
-- ✅ **OpenAI**: Full HTTP client with authentication
-- ✅ **Anthropic**: Full HTTP client with Anthropic headers
-- Both support: model selection, token estimation, health checks
-
-### Headless CLI Adapters (Skeleton + Protocol Design)
-- ✅ **Claude Code**: Process spawning with JSON streaming
-- ✅ **Generic CLI**: Extensible adapter for any command
-- Protocol: JSON on stdin/stdout
-
-### Local Providers (Fully Implemented)
-- ✅ **Ollama**: HTTP API with model enumeration and timeouts
-
-## Testing
-
-Comprehensive unit tests covering:
-- Provider creation and initialization
-- Factory pattern with configuration validation
-- Error handling and missing API keys
-- Unknown provider rejection
-- Model enumeration
+### Configuration
 
 ```bash
-cargo test -p descartes-core
-# Result: 11 tests passed
-```
-
-## Configuration
-
-### Environment Variables
-
-```bash
-export OPENAI_API_KEY="sk-..."
+# Environment variables
 export ANTHROPIC_API_KEY="sk-ant-..."
-export OLLAMA_ENDPOINT="http://localhost:11434"
-export OLLAMA_TIMEOUT_SECS="300"
+export OPENAI_API_KEY="sk-..."
+
+# Or via config file (~/.descartes/config.toml)
+[providers]
+primary = "anthropic"
+
+[providers.anthropic]
+api_key = "sk-ant-..."
+model = "claude-3-5-sonnet-20241022"
 ```
 
-### Programmatic Configuration
+## System Prompts
 
-```rust
-use std::collections::HashMap;
+Each tool level has a ~200 token system prompt (not 10,000+ like Claude Code):
 
-let mut config = HashMap::new();
-config.insert("api_key".to_string(), "your-api-key".to_string());
-config.insert("endpoint".to_string(), "https://custom.endpoint".to_string());
+**Minimal prompt emphasizes:**
+- Using bash for file operations (ls, grep, find)
+- Reading files before editing
+- Edit requires exact text match
+- Being concise
 
-let provider = ProviderFactory::create("anthropic", config)?;
+**Orchestrator prompt adds:**
+- Using spawn_session for delegation
+- Sub-sessions stream output and save transcripts
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     descartes spawn                          │
+│  --task "..." --tool-level orchestrator                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Tool Registry                             │
+│  get_tools(ToolLevel::Orchestrator)                          │
+│  → [read, write, edit, bash, spawn_session]                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Model Backend                              │
+│  ProviderFactory::create("anthropic", config)                │
+│  → Sends request with tools to LLM                           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Tool Executors                              │
+│  execute_tool("bash", args, working_dir)                     │
+│  → Returns ToolResult { success, output, metadata }          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                Transcript Writer                             │
+│  Saves all messages and tool calls to JSON                   │
+│  → .scud/sessions/2025-12-03-10-30-00-abc12345.json         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Documentation
+## Development
 
-- **PROVIDER_DESIGN.md**: Comprehensive architecture and design decisions
-- **PROVIDER_EXAMPLES.md**: Practical usage examples for all providers
-- **API Documentation**: Auto-generated with `cargo doc --open`
+### Running Tests
 
-## Roadmap
+```bash
+# Core library tests (tools, transcripts)
+cargo test -p descartes-core --lib
 
-### Phase 1: Foundation (Current)
-- ✅ Core trait definitions
-- ✅ API provider implementations (OpenAI, Anthropic)
-- ✅ Headless CLI adapter architecture
-- ✅ Local provider (Ollama)
-- ✅ Provider factory pattern
-- ✅ Comprehensive testing
-- ⏳ Process management (Agent spawning)
-- ⏳ State persistence (SQLite)
-- ⏳ Context streaming
+# CLI tests
+cargo test -p descartes-cli
 
-### Phase 2: Composition
-- Message bus for inter-agent communication
-- Contract validation system
-- Session persistence
-- LSP server integration
-- Secrets management
+# All tests
+cargo test
+```
 
-### Phase 3: The Interface
-- Iced GUI framework integration
-- Visual DAG editor
-- Terminal matrix views
-- Live task monitoring
+### Adding a New Tool
 
-### Phase 4: Ecosystem
-- Plugin system (WASM-based)
-- Team collaboration features
-- Cloud sync (optional)
-- Production observability
+1. Add definition in `core/src/tools/definitions.rs`
+2. Add executor in `core/src/tools/executors.rs`
+3. Add to appropriate tool level in `core/src/tools/registry.rs`
+4. Export from `core/src/tools/mod.rs`
+5. Add tests
 
-## Contributing
+## References
 
-When adding new providers:
-
-1. Implement the `ModelBackend` trait
-2. Add proper error handling with context
-3. Include comprehensive tests
-4. Document configuration requirements
-5. Update `ProviderFactory::create()`
-6. Add usage examples to PROVIDER_EXAMPLES.md
-
-## Dependencies
-
-Core dependencies:
-- **tokio**: Async runtime
-- **async-trait**: Trait async support
-- **serde**: Serialization framework
-- **thiserror**: Error handling
-- **reqwest**: HTTP client
-- **sqlx**: Database access (prepared for Phase 2)
-- **clap**: CLI argument parsing
-
-Performance packages:
-- **mimalloc**: Custom allocator
-- **rkyv**: Zero-copy serialization (prepared)
-- **futures**: Stream utilities
-
-## Performance Characteristics
-
-### API Mode
-- Latency: 100-500ms (network round-trip)
-- Throughput: Provider rate-limited (RPM/TPM)
-- Memory: ~50MB per request
-
-### Headless Mode
-- Latency: 50ms + process execution
-- Throughput: Single process sequential
-- Memory: ~100-150MB per adapter
-
-### Local Mode
-- Latency: 10-100ms (network) or 1-10ms (memory)
-- Throughput: Limited by hardware
-- Memory: Entire model in RAM
-
-## Security
-
-- API keys stored in environment variables (never committed)
-- Secure HTTP (HTTPS) for all external calls
-- Input validation on process execution
-- Audit logging preparation
-- Secrets masking in logs (Phase 2)
+- [Pi: Building a Coding Agent](https://marioslab.io/posts/pi/building-a-coding-agent/) - Philosophy inspiration
+- [HumanLayer 12-Factor Agents](https://github.com/humanlayer/12-factor-agents) - Attach pattern inspiration
 
 ## License
 
 MIT
 
-## Support
-
-For issues, feature requests, or questions:
-1. Check PROVIDER_DESIGN.md for architecture details
-2. Review PROVIDER_EXAMPLES.md for usage patterns
-3. Run tests with `cargo test --nocapture` for diagnostics
-4. Open an issue with reproduction steps
-
 ---
 
-**Built with Rust. Designed for scale. Made for AI.**
+**Minimal tools. Maximum observability. No recursive agents.**

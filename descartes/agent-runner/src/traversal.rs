@@ -1,6 +1,6 @@
 /// AST traversal utilities for Tree-Sitter trees
 use crate::errors::{ParserError, ParserResult};
-use crate::types::{Language, SemanticNodeType};
+use crate::types::Language;
 use std::collections::VecDeque;
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Node, Tree};
@@ -39,6 +39,7 @@ pub struct AstTraversal<'a> {
     tree: &'a Tree,
     strategy: TraversalStrategy,
     max_depth: Option<usize>,
+    #[allow(dead_code)]
     language: Language,
 }
 
@@ -249,6 +250,7 @@ pub struct TreeStatistics {
 /// Query helper for selecting nodes using Tree-Sitter query language
 pub struct QueryHelper {
     query: tree_sitter::Query,
+    #[allow(dead_code)]
     language: Language,
 }
 

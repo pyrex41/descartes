@@ -8,7 +8,7 @@
 //! - Historical output replay
 //! - Session timeout handling
 
-use crate::attach_session::{AttachSessionInfo, AttachSessionManager, ClientType};
+use crate::attach_session::AttachSessionManager;
 use crate::errors::{DaemonError, DaemonResult};
 use descartes_core::attach_protocol::{
     AttachHandshake, AttachHandshakeResponse, AttachMessage, AttachMessageType, HistoricalOutput,
@@ -464,6 +464,7 @@ impl ClaudeCodeTuiHandler {
     }
 
     /// Handle a message from the Claude Code client
+    #[allow(dead_code)]
     async fn handle_client_message<W>(
         &self,
         msg: AttachMessage,

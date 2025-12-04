@@ -56,6 +56,7 @@ impl GuiStreamHandler {
     }
 
     /// Get a specific agent
+    #[allow(dead_code)]
     fn get_or_create_agent(&self, agent_id: Uuid) -> AgentRuntimeState {
         let mut agents = self.agents.lock().unwrap();
 
@@ -198,7 +199,6 @@ impl StreamHandler for GuiStreamHandler {
 
 /// Generate sample agent data for demonstration purposes
 pub fn generate_sample_agents() -> HashMap<Uuid, AgentRuntimeState> {
-    use chrono::Utc;
     use descartes_core::AgentProgress;
 
     let mut agents = HashMap::new();

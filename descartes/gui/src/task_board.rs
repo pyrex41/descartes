@@ -8,9 +8,9 @@
 use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::DescartesEvent;
 use iced::widget::{button, column, container, row, scrollable, text, Column, Row, Space};
-use iced::{alignment, color, Alignment, Color, Element, Length, Theme};
+use iced::{color, Alignment, Color, Element, Length, Theme};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use uuid::Uuid;
 
 /// State for the Task Board view
@@ -98,6 +98,7 @@ impl Default for TaskFilters {
 
 /// Task sorting settings
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum TaskSort {
     Priority,
     Complexity,
@@ -114,6 +115,7 @@ impl Default for TaskSort {
 
 /// Messages for task board interactions
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum TaskBoardMessage {
     /// Task was clicked
     TaskClicked(Uuid),
@@ -426,7 +428,7 @@ fn view_filters(state: &TaskBoardState) -> Element<TaskBoardMessage> {
     container(filters_row)
         .width(Length::Fill)
         .padding(10)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(color!(0x2a2a2a).into()),
             border: iced::Border {
                 width: 1.0,
@@ -610,7 +612,7 @@ fn view_task_card(task: Task, state: &TaskBoardState) -> Element<'static, TaskBo
         Some(
             container(text(format!("{} deps", task.dependencies.len())))
                 .padding(4)
-                .style(|theme: &Theme| container::Style {
+                .style(|_theme: &Theme| container::Style {
                     background: Some(color!(0x9b59b6).into()),
                     border: iced::Border {
                         width: 0.0,
@@ -657,7 +659,7 @@ fn view_task_card(task: Task, state: &TaskBoardState) -> Element<'static, TaskBo
     let card_button = button(card_content)
         .on_press(TaskBoardMessage::TaskClicked(task_id))
         .width(Length::Fill)
-        .style(move |theme: &Theme, status| {
+        .style(move |_theme: &Theme, _status| {
             let base_color = if is_selected {
                 color!(0x3a3a3a)
             } else {
@@ -696,7 +698,7 @@ fn view_priority_badge(priority: TaskPriority) -> Element<'static, TaskBoardMess
 
     container(text(label).size(10).color(color!(0xffffff)))
         .padding(4)
-        .style(move |theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(badge_color.into()),
             border: iced::Border {
                 width: 0.0,
@@ -720,7 +722,7 @@ fn view_complexity_badge(complexity: TaskComplexity) -> Element<'static, TaskBoa
 
     container(text(label).size(10).color(color!(0xffffff)))
         .padding(4)
-        .style(move |theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(badge_color.into()),
             border: iced::Border {
                 width: 0.0,

@@ -26,7 +26,7 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 use uuid::Uuid;
 
 /// Maximum buffer size for stdout/stderr streams (16KB)
-const STREAM_BUFFER_SIZE: usize = 16 * 1024;
+const _STREAM_BUFFER_SIZE: usize = 16 * 1024;
 
 /// Timeout for graceful shutdown before force kill (5 seconds)
 const SHUTDOWN_TIMEOUT_SECS: u64 = 5;
@@ -653,7 +653,7 @@ pub struct LocalAgentHandle {
     /// Recorded exit status (if the process has completed)
     exit_status: Option<ExitStatus>,
     /// Enable JSON streaming mode
-    json_streaming: bool,
+    _json_streaming: bool,
     /// Buffered stdout lines
     stdout_buffer: Arc<Mutex<mpsc::UnboundedReceiver<Vec<u8>>>>,
     /// Buffered stderr lines
@@ -701,7 +701,7 @@ impl LocalAgentHandle {
             stdin: Arc::new(Mutex::new(stdin)),
             status: AgentStatus::Running,
             exit_status: None,
-            json_streaming,
+            _json_streaming: json_streaming,
             stdout_buffer: Arc::new(Mutex::new(stdout_rx)),
             stderr_buffer: Arc::new(Mutex::new(stderr_rx)),
             _stdout_tx: stdout_tx,
@@ -820,7 +820,7 @@ impl LocalAgentHandle {
     }
 
     /// Send a signal to the process.
-    async fn send_signal(&mut self, signal: AgentSignal) -> AgentResult<()> {
+    async fn _send_signal(&mut self, signal: AgentSignal) -> AgentResult<()> {
         {
             let mut child = self.child.lock().await;
 
@@ -940,7 +940,7 @@ impl LocalAgentHandle {
     }
 
     /// Kill the process immediately.
-    async fn kill(&mut self) -> AgentResult<()> {
+    async fn _kill(&mut self) -> AgentResult<()> {
         {
             let mut child = self.child.lock().await;
             child.kill().await?;
@@ -954,7 +954,7 @@ impl LocalAgentHandle {
     }
 
     /// Wait for the process to complete.
-    async fn wait(&mut self) -> AgentResult<ExitStatus> {
+    async fn _wait(&mut self) -> AgentResult<ExitStatus> {
         let status = {
             let mut child = self.child.lock().await;
             child.wait().await?
@@ -971,7 +971,7 @@ impl LocalAgentHandle {
     }
 
     /// Write data to stdin.
-    async fn write_stdin(&mut self, data: &[u8]) -> AgentResult<()> {
+    async fn _write_stdin(&mut self, data: &[u8]) -> AgentResult<()> {
         let mut stdin = self.stdin.lock().await;
         stdin.write_all(data).await?;
         stdin.flush().await?;
@@ -979,13 +979,13 @@ impl LocalAgentHandle {
     }
 
     /// Read from stdout buffer (non-blocking).
-    async fn read_stdout(&mut self) -> AgentResult<Option<Vec<u8>>> {
+    async fn _read_stdout(&mut self) -> AgentResult<Option<Vec<u8>>> {
         let mut buffer = self.stdout_buffer.lock().await;
         Ok(buffer.try_recv().ok())
     }
 
     /// Read from stderr buffer (non-blocking).
-    async fn read_stderr(&mut self) -> AgentResult<Option<Vec<u8>>> {
+    async fn _read_stderr(&mut self) -> AgentResult<Option<Vec<u8>>> {
         let mut buffer = self.stderr_buffer.lock().await;
         Ok(buffer.try_recv().ok())
     }

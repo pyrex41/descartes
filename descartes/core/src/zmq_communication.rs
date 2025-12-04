@@ -40,11 +40,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
-use uuid::Uuid;
 use zeromq::{DealerSocket, RepSocket, ReqSocket, RouterSocket, Socket, SocketRecv, SocketSend};
 
 /// Maximum number of reconnection attempts before giving up
-const MAX_RECONNECT_ATTEMPTS: u32 = 10;
+const _MAX_RECONNECT_ATTEMPTS: u32 = 10;
 
 /// Initial reconnect delay (doubles on each attempt)
 const INITIAL_RECONNECT_DELAY_MS: u64 = 100;
@@ -88,6 +87,7 @@ pub struct ConnectionStats {
 
 /// Pending request for request/response correlation
 #[derive(Debug)]
+#[allow(dead_code)]
 struct PendingRequest {
     /// Request ID
     request_id: String,
@@ -125,6 +125,7 @@ pub struct ZmqConnection {
     /// Connection statistics
     stats: Arc<RwLock<ConnectionStats>>,
     /// Pending requests (for request/response correlation)
+    #[allow(dead_code)]
     pending_requests: Arc<Mutex<HashMap<String, PendingRequest>>>,
     /// Socket (wrapped in Arc<Mutex> for thread-safe access)
     socket: Arc<Mutex<Option<Box<dyn SocketWrapper>>>>,
@@ -549,7 +550,7 @@ impl ZmqConnection {
     }
 
     /// Clean up expired pending requests
-    async fn cleanup_expired_requests(&self) {
+    async fn _cleanup_expired_requests(&self) {
         let mut pending = self.pending_requests.lock().await;
         let now = Instant::now();
 

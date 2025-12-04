@@ -33,7 +33,7 @@ use crate::traits::{AgentConfig, AgentInfo, AgentStatus};
 use crate::zmq_agent_runner::{
     BatchControlCommand, BatchControlResponse, CommandResponse, ControlCommand, ControlCommandType,
     CustomActionRequest, HealthCheckRequest, HealthCheckResponse, ListAgentsRequest,
-    ListAgentsResponse, OutputQueryRequest, OutputQueryResponse, SpawnRequest, SpawnResponse,
+    OutputQueryRequest, OutputQueryResponse, SpawnRequest,
     StatusUpdate, ZmqAgentRunner, ZmqMessage, ZmqOutputStream, ZmqRunnerConfig,
 };
 use crate::zmq_communication::{SocketType, ZmqConnection, ZmqMessageRouter};
@@ -52,7 +52,7 @@ struct QueuedCommand {
     /// The message to send
     message: ZmqMessage,
     /// When the command was queued
-    queued_at: std::time::Instant,
+    _queued_at: std::time::Instant,
     /// Response channel
     response_tx: Arc<Mutex<Option<tokio::sync::oneshot::Sender<AgentResult<ZmqMessage>>>>>,
 }
@@ -64,14 +64,14 @@ pub struct ZmqClient {
     /// Configuration
     config: ZmqRunnerConfig,
     /// Message router for request/response correlation
-    router: Arc<ZmqMessageRouter>,
+    _router: Arc<ZmqMessageRouter>,
     /// Status update subscribers
     status_subscribers:
         Arc<RwLock<Vec<tokio::sync::mpsc::UnboundedSender<AgentResult<StatusUpdate>>>>>,
     /// Command queue for when disconnected
     command_queue: Arc<Mutex<VecDeque<QueuedCommand>>>,
     /// Maximum queue size (prevents unbounded growth during long disconnections)
-    max_queue_size: usize,
+    _max_queue_size: usize,
 }
 
 impl ZmqClient {
@@ -99,10 +99,10 @@ impl ZmqClient {
         Self {
             connection: Arc::new(Mutex::new(connection)),
             config,
-            router: Arc::new(ZmqMessageRouter::new()),
+            _router: Arc::new(ZmqMessageRouter::new()),
             status_subscribers: Arc::new(RwLock::new(Vec::new())),
             command_queue: Arc::new(Mutex::new(VecDeque::new())),
-            max_queue_size: 1000, // Default: queue up to 1000 commands
+            _max_queue_size: 1000, // Default: queue up to 1000 commands
         }
     }
 
@@ -118,10 +118,10 @@ impl ZmqClient {
         Self {
             connection: Arc::new(Mutex::new(connection)),
             config,
-            router: Arc::new(ZmqMessageRouter::new()),
+            _router: Arc::new(ZmqMessageRouter::new()),
             status_subscribers: Arc::new(RwLock::new(Vec::new())),
             command_queue: Arc::new(Mutex::new(VecDeque::new())),
-            max_queue_size: 1000, // Default: queue up to 1000 commands
+            _max_queue_size: 1000, // Default: queue up to 1000 commands
         }
     }
 
@@ -528,20 +528,20 @@ impl ZmqClient {
     }
 
     /// Queue a command for later execution (when disconnected)
-    async fn queue_command(&self, message: ZmqMessage) -> AgentResult<ZmqMessage> {
+    async fn _queue_command(&self, message: ZmqMessage) -> AgentResult<ZmqMessage> {
         let mut queue = self.command_queue.lock().await;
 
-        if queue.len() >= self.max_queue_size {
+        if queue.len() >= self._max_queue_size {
             return Err(AgentError::ExecutionError(format!(
                 "Command queue is full ({} commands). Cannot queue more commands.",
-                self.max_queue_size
+                self._max_queue_size
             )));
         }
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         let queued_cmd = QueuedCommand {
             message,
-            queued_at: std::time::Instant::now(),
+            _queued_at: std::time::Instant::now(),
             response_tx: Arc::new(Mutex::new(Some(tx))),
         };
 

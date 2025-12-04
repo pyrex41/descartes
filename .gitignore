@@ -1,3 +1,6 @@
 
 # BMAD-TM Lite
 descartes/target/
+
+# SCUD
+.scud/

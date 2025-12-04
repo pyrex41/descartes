@@ -7,11 +7,11 @@ use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
 pub async fn execute(name: Option<&str>, dir: Option<&Path>) -> Result<()> {
-    let project_name = name.unwrap_or("descartes-project");
+    let _project_name = name.unwrap_or("descartes-project");
 
     println!(
         "{}",
-        format!("Initializing Descartes project: {}", project_name)
+        format!("Initializing Descartes project: {}", _project_name)
             .green()
             .bold()
     );
@@ -47,7 +47,7 @@ pub async fn execute(name: Option<&str>, dir: Option<&Path>) -> Result<()> {
 
     // Step 3: Create default config
     pb.set_message("Creating default configuration...");
-    create_default_config(&base_dir, project_name)?;
+    create_default_config(&base_dir, _project_name)?;
     pb.inc(1);
 
     // Step 4: Set up thoughts directory
@@ -169,7 +169,7 @@ async fn initialize_database(base_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn create_default_config(base_dir: &Path, project_name: &str) -> Result<()> {
+fn create_default_config(base_dir: &Path, _project_name: &str) -> Result<()> {
     let config_path = base_dir.join("config.toml");
 
     if config_path.exists() {

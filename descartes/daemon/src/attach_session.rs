@@ -34,7 +34,7 @@
 //! ```
 
 use chrono::{DateTime, Utc};
-use descartes_core::{AttachToken, AttachTokenStore};
+use descartes_core::AttachTokenStore;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -498,7 +498,7 @@ impl AttachSessionManager {
                 "client_type": client_type.to_string(),
             }),
         };
-        self.event_bus.publish(DescartesEvent::AgentEvent(event));
+        self.event_bus.publish(DescartesEvent::AgentEvent(event)).await;
     }
 
     async fn emit_attach_connected(
@@ -517,7 +517,7 @@ impl AttachSessionManager {
                 "client_type": client_type.to_string(),
             }),
         };
-        self.event_bus.publish(DescartesEvent::AgentEvent(event));
+        self.event_bus.publish(DescartesEvent::AgentEvent(event)).await;
     }
 
     async fn emit_attach_disconnected(
@@ -538,7 +538,7 @@ impl AttachSessionManager {
                 "duration_secs": duration_secs,
             }),
         };
-        self.event_bus.publish(DescartesEvent::AgentEvent(event));
+        self.event_bus.publish(DescartesEvent::AgentEvent(event)).await;
     }
 }
 

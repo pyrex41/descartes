@@ -1,3 +1,4 @@
+#![allow(mismatched_lifetime_syntaxes)]
 /// Descartes Daemon: JSON-RPC 2.0 Server for Remote Agent Control
 /// Provides HTTP and WebSocket interfaces for managing agents, workflows, and state
 pub mod agent_monitor; // Phase 3:5.3 - Agent monitoring with RPC integration

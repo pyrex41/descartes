@@ -54,15 +54,15 @@ struct ManagedAgent {
     /// Agent information
     info: AgentInfo,
     /// Agent configuration used to spawn
-    config: AgentConfig,
+    _config: AgentConfig,
     /// Spawn timestamp
-    spawned_at: SystemTime,
+    _spawned_at: SystemTime,
     /// Request ID that spawned this agent
-    spawn_request_id: String,
+    _spawn_request_id: String,
     /// Output buffer for stdout
-    stdout_buffer: Arc<Mutex<Vec<u8>>>,
+    _stdout_buffer: Arc<Mutex<Vec<u8>>>,
     /// Output buffer for stderr
-    stderr_buffer: Arc<Mutex<Vec<u8>>>,
+    _stderr_buffer: Arc<Mutex<Vec<u8>>>,
     /// Last status update sent
     last_status_update: Arc<RwLock<Option<SystemTime>>>,
 }
@@ -410,11 +410,11 @@ impl ZmqAgentServer {
                         // Create managed agent entry
                         let managed = Arc::new(ManagedAgent {
                             info: info.clone(),
-                            config: request.config,
-                            spawned_at: SystemTime::now(),
-                            spawn_request_id: request.request_id.clone(),
-                            stdout_buffer: Arc::new(Mutex::new(Vec::new())),
-                            stderr_buffer: Arc::new(Mutex::new(Vec::new())),
+                            _config: request.config,
+                            _spawned_at: SystemTime::now(),
+                            _spawn_request_id: request.request_id.clone(),
+                            _stdout_buffer: Arc::new(Mutex::new(Vec::new())),
+                            _stderr_buffer: Arc::new(Mutex::new(Vec::new())),
                             last_status_update: Arc::new(RwLock::new(None)),
                         });
 

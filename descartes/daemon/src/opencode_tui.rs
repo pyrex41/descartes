@@ -8,7 +8,7 @@
 //! - Potential additional capabilities
 //! - Custom message types for OpenCode features
 
-use crate::attach_session::{AttachSessionManager, ClientType};
+use crate::attach_session::AttachSessionManager;
 use crate::claude_code_tui::{ClaudeCodeTuiConfig, OutputBuffer};
 use crate::errors::{DaemonError, DaemonResult};
 use descartes_core::attach_protocol::{
@@ -350,6 +350,7 @@ impl OpenCodeTuiHandler {
     }
 
     /// Handle a message from the OpenCode client
+    #[allow(dead_code)]
     async fn handle_client_message<W>(
         &self,
         msg: AttachMessage,

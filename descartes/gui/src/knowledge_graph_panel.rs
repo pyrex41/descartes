@@ -87,6 +87,7 @@ mod stub_types {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[allow(dead_code)]
     pub enum KnowledgeNodeType {
         Function,
         Method,
@@ -147,14 +148,14 @@ mod stub_types {
 
 #[cfg(not(feature = "agent-runner"))]
 use stub_types::{
-    KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, RelationshipType,
+    KnowledgeGraph, KnowledgeNodeType, RelationshipType,
 };
 
 use iced::widget::{
     button, canvas, checkbox, column, container, horizontal_space, pick_list, row, scrollable,
-    text, text_input, Canvas, Column, Row, Space,
+    text, text_input, Column, Space,
 };
-use iced::{mouse, Color, Element, Length, Point, Rectangle, Renderer, Size, Theme, Vector};
+use iced::{Color, Element, Length, Point, Rectangle, Size, Theme, Vector};
 use std::collections::{HashMap, HashSet};
 
 /// ============================================================================
@@ -357,6 +358,7 @@ impl std::fmt::Display for LayoutAlgorithm {
 
 /// Visualization modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum VisualizationMode {
     Graph,
     Tree,
@@ -375,6 +377,7 @@ impl VisualizationMode {
 
 /// Messages for the knowledge graph panel
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum KnowledgeGraphMessage {
     /// Load a knowledge graph
     GraphLoaded(KnowledgeGraph),
@@ -752,7 +755,7 @@ pub fn update(state: &mut KnowledgeGraphPanelState, message: KnowledgeGraphMessa
             if let Some(ref graph) = state.graph {
                 // Build call hierarchy (who calls this, and what it calls)
                 let mut hierarchy = Vec::new();
-                let mut current_path = vec![node_id.clone()];
+                let current_path = vec![node_id.clone()];
 
                 // Get callees (functions this calls)
                 for edge in graph.get_outgoing_edges(&node_id) {

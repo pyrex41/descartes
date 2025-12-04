@@ -1,7 +1,7 @@
 /// High-level parser interface for semantic code analysis
 use crate::errors::ParserResult;
 use crate::grammar::create_parser;
-use crate::semantic::{SemanticAnalysis, SemanticExtractor, SemanticStatistics};
+use crate::semantic::SemanticExtractor;
 use crate::traversal::AstTraversal;
 use crate::types::{Language, ParseResult, ParseStatistics, ParserConfig, SemanticNode};
 use std::collections::HashMap;

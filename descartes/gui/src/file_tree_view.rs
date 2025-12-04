@@ -64,6 +64,7 @@ mod stub_types {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[allow(dead_code)]
     pub enum FileNodeType {
         File,
         Directory,
@@ -71,6 +72,7 @@ mod stub_types {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[allow(dead_code)]
     pub enum Language {
         Rust,
         Python,
@@ -102,10 +104,10 @@ use stub_types::{FileNodeType, FileTree, FileTreeNode, Language};
 
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::{
-    button, column, container, row, scrollable, text, text_input, Column, Row, Space,
+    button, column, container, row, scrollable, text, text_input, Column, Space,
 };
 use iced::{Color, Element, Length, Theme};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// ============================================================================
 /// State Management
@@ -192,6 +194,7 @@ impl Default for FileTreeState {
 
 /// Sort order for file tree
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SortOrder {
     NameAsc,
     NameDesc,
@@ -203,6 +206,7 @@ pub enum SortOrder {
 
 /// Messages for the file tree view
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum FileTreeMessage {
     /// Load a file tree
     TreeLoaded(FileTree),

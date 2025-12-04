@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_tungstenite::{
     accept_async,
-    tungstenite::{Error as WsError, Message as WsMessage},
+    tungstenite::Message as WsMessage,
 };
 use tracing::{debug, error, info, warn};
 

@@ -1,5 +1,6 @@
 // Descartes: Composable AI Agent Orchestration System
 // Core library providing traits, providers, and orchestration utilities
+#![allow(mismatched_lifetime_syntaxes)]
 
 pub mod agent_history;
 pub mod attach;
@@ -44,6 +45,10 @@ pub mod zmq_server;
 // Session/workspace management
 pub mod session;
 pub mod session_manager;
+pub mod session_transcript;
+
+// Minimal tool definitions (Pi-style)
+pub mod tools;
 
 // Re-export commonly used types
 pub use errors::{
@@ -248,3 +253,14 @@ pub use session::{
 };
 
 pub use session_manager::FileSystemSessionManager;
+
+pub use tools::{
+    bash_tool, edit_tool, execute_bash, execute_edit, execute_read, execute_spawn_session,
+    execute_tool, execute_write, get_system_prompt, get_tools, minimal_system_prompt,
+    orchestrator_system_prompt, read_tool, readonly_system_prompt, spawn_session_tool, write_tool,
+    ToolLevel, ToolResult,
+};
+
+pub use session_transcript::{
+    default_sessions_dir, TranscriptEntry, TranscriptMetadata, TranscriptWriter,
+};

@@ -1069,7 +1069,7 @@ impl Debugger {
             // Check for breakpoints
             if let Some(bp) = self.state.check_breakpoints() {
                 let bp_clone = bp.clone();
-                drop(bp); // Release the borrow
+                let _ = bp; // Release the borrow
                 self.handle_breakpoint_hit(&bp_clone)?;
                 break;
             }
@@ -1126,7 +1126,7 @@ impl Debugger {
             // Check for breakpoints
             if let Some(bp) = self.state.check_breakpoints() {
                 let bp_clone = bp.clone();
-                drop(bp); // Release the borrow
+                let _ = bp; // Release the borrow
                 self.handle_breakpoint_hit(&bp_clone)?;
                 break;
             }
@@ -1170,7 +1170,7 @@ impl Debugger {
         if let Some(bp) = self.state.check_breakpoints() {
             let bp_id = bp.id;
             let bp_clone = bp.clone();
-            drop(bp); // Release the borrow
+            let _ = bp; // Release the borrow
             self.handle_breakpoint_hit(&bp_clone)?;
             return Ok(Some(bp_id));
         }

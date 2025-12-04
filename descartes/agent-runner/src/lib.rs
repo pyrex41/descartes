@@ -1,3 +1,4 @@
+#![allow(mismatched_lifetime_syntaxes)]
 // Descartes Agent Runner: Semantic Code Parsing and Orchestration
 // Part of the Descartes Multi-Agent AI Orchestration System
 //

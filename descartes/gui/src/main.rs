@@ -1,7 +1,10 @@
+#![allow(mismatched_lifetime_syntaxes)]
+#![allow(dead_code)]
+
 use iced::alignment::{Horizontal, Vertical};
 use iced::keyboard::{self, Key};
 use iced::widget::{button, column, container, row, text, Space};
-use iced::{window, Element, Event, Font, Length, Size, Theme};
+use iced::{window, Element, Event, Font, Length, Size};
 
 /// JetBrains Mono font - Regular weight (embedded at compile time)
 const JETBRAINS_MONO_REGULAR: &[u8] = include_bytes!("../fonts/JetBrainsMono-Regular.ttf");
@@ -109,6 +112,7 @@ enum ViewMode {
 
 /// Messages that drive the application
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum Message {
     /// Switch to a different view
     SwitchView(ViewMode),
@@ -193,7 +197,7 @@ impl DescartesGui {
                         self.rpc_client = Some(Arc::clone(&client));
 
                         // Create event handler
-                        let mut event_handler = EventHandler::default();
+                        let event_handler = EventHandler::default();
                         self.event_handler =
                             Some(Arc::new(tokio::sync::RwLock::new(event_handler)));
 
@@ -808,8 +812,8 @@ impl DescartesGui {
 
             iced::Subscription::run_with_id(
                 "daemon_events",
-                iced::stream::channel(100, move |mut output| {
-                    let event_handler_arc = event_handler_arc.clone();
+                iced::stream::channel(100, move |_output| {
+                    let _event_handler_arc = event_handler_arc.clone();
                     async move {
                         // This is a simplified subscription - in a real implementation,
                         // we would properly integrate with the EventHandler's subscription system
@@ -844,7 +848,7 @@ impl DescartesGui {
         .align_y(Vertical::Center);
 
         // Status indicator with modern pill design
-        let (status_color, status_bg, status_text) = if self.daemon_connected {
+        let (status_color, _status_bg, status_text) = if self.daemon_connected {
             (colors::SUCCESS, colors::SUCCESS_DIM, "Connected")
         } else {
             (colors::ERROR, colors::ERROR_DIM, "Disconnected")

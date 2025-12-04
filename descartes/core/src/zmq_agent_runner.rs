@@ -34,7 +34,7 @@ use crate::traits::{AgentConfig, AgentInfo, AgentStatus};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use uuid::Uuid;
 
 /// Message version for protocol compatibility checking

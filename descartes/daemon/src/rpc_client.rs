@@ -5,11 +5,6 @@
 
 use crate::errors::{DaemonError, DaemonResult};
 use crate::rpc_server::{ApprovalResult, TaskInfo};
-use jsonrpsee::core::client::ClientT;
-use jsonrpsee::core::ClientError;
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -24,6 +19,7 @@ pub struct RpcClientConfig {
     /// Request timeout in seconds
     pub timeout_secs: u64,
     /// Maximum number of retry attempts
+    #[allow(dead_code)]
     pub max_retries: u32,
 }
 
@@ -88,6 +84,7 @@ impl RpcClientConfig {
 pub struct UnixSocketRpcClient {
     socket_path: PathBuf,
     timeout: Duration,
+    #[allow(dead_code)]
     max_retries: u32,
 }
 

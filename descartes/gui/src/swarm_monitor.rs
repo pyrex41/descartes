@@ -18,7 +18,6 @@
 use descartes_core::{
     AgentProgress, AgentRuntimeState, RuntimeAgentError, RuntimeAgentStatus, StatusTransition,
 };
-use iced::widget::rule;
 use iced::widget::{
     button, column, container, progress_bar, row, scrollable, text, text_input, Space,
 };
@@ -844,7 +843,7 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
         .on_press(SwarmMonitorMessage::ToggleLiveUpdates);
 
     let live_updates_box = if state.live_updates_enabled {
-        container(live_updates_btn).style(|theme: &Theme| container::Style {
+        container(live_updates_btn).style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgb(0.3, 0.8, 0.3).into()),
             border: iced::Border {
                 width: 1.0,
@@ -868,7 +867,7 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
         .on_press(SwarmMonitorMessage::ToggleWebSocket);
 
     let websocket_box = if state.websocket_enabled {
-        container(websocket_btn).style(|theme: &Theme| container::Style {
+        container(websocket_btn).style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgb(0.3, 0.7, 0.9).into()),
             border: iced::Border {
                 width: 1.0,
@@ -885,7 +884,7 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
     let status_color = state.connection_status.color();
     let status_badge = container(text(state.connection_status.label()).size(11))
         .padding(6)
-        .style(move |theme: &Theme| container::Style {
+        .style(move |_theme: &Theme| container::Style {
             background: Some(status_color.scale_alpha(0.3).into()),
             border: iced::Border {
                 width: 1.0,
@@ -939,7 +938,7 @@ fn view_live_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMes
     container(controls_row)
         .padding(12)
         .width(Length::Fill)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgba(0.15, 0.15, 0.25, 0.6).into()),
             border: iced::Border {
                 width: 1.0,
@@ -989,7 +988,7 @@ fn view_statistics_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessa
 
     container(stats_row)
         .padding(15)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.5).into()),
             border: iced::Border {
                 width: 1.0,
@@ -1052,7 +1051,7 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
             if is_active {
                 container(btn)
-                    .style(|theme: &Theme| container::Style {
+                    .style(|_theme: &Theme| container::Style {
                         background: Some(Color::from_rgb(0.3, 0.5, 0.9).into()),
                         border: iced::Border {
                             width: 1.0,
@@ -1095,7 +1094,7 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
             if is_active {
                 container(btn)
-                    .style(|theme: &Theme| container::Style {
+                    .style(|_theme: &Theme| container::Style {
                         background: Some(Color::from_rgb(0.3, 0.7, 0.5).into()),
                         border: iced::Border {
                             width: 1.0,
@@ -1132,7 +1131,7 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
             if is_active {
                 container(btn)
-                    .style(|theme: &Theme| container::Style {
+                    .style(|_theme: &Theme| container::Style {
                         background: Some(Color::from_rgb(0.7, 0.5, 0.9).into()),
                         border: iced::Border {
                             width: 1.0,
@@ -1167,7 +1166,7 @@ fn view_control_panel(state: &SwarmMonitorState) -> Element<SwarmMonitorMessage>
 
     container(controls)
         .padding(15)
-        .style(|theme: &Theme| container::Style {
+        .style(|_theme: &Theme| container::Style {
             background: Some(Color::from_rgba(0.2, 0.2, 0.3, 0.3).into()),
             border: iced::Border {
                 width: 1.0,

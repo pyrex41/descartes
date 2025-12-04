@@ -1,14 +1,14 @@
 use anyhow::Result;
 use colored::Colorize;
 use descartes_core::DescaratesConfig;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result<()> {
     println!("{}", format!("Killing agent: {}", id).yellow().bold());
 
     // Parse UUID
-    let agent_id = Uuid::parse_str(id)
+    let _agent_id = Uuid::parse_str(id)
         .map_err(|_| anyhow::anyhow!("Invalid agent ID format. Expected UUID."))?;
 
     // Connect to database

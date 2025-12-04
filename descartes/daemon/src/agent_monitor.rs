@@ -46,7 +46,7 @@ use crate::events::{AgentEvent, AgentEventType, DescartesEvent, EventBus};
 use chrono::Utc;
 use descartes_core::{
     agent_state::{
-        AgentError, AgentProgress, AgentRuntimeState, AgentStateCollection, AgentStatistics,
+        AgentError, AgentProgress, AgentRuntimeState, AgentStateCollection,
         AgentStatus, AgentStreamMessage, LifecycleEvent, OutputStream,
     },
     agent_stream_parser::{AgentStreamParser, ParserConfig, StreamHandler, StreamResult},
@@ -468,7 +468,7 @@ impl StreamHandler for EventBusHandler {
         &mut self,
         agent_id: Uuid,
         status: AgentStatus,
-        timestamp: chrono::DateTime<Utc>,
+        _timestamp: chrono::DateTime<Utc>,
     ) {
         debug!("Agent {} status update: {}", agent_id, status);
 

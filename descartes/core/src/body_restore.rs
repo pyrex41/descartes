@@ -23,7 +23,7 @@
 /// 6. Post-restore verification
 use crate::errors::{StateStoreError, StateStoreResult};
 use async_trait::async_trait;
-use gix::{bstr::ByteSlice, objs::Kind, prelude::*, refs::transaction::PreviousValue};
+use gix::{bstr::ByteSlice, objs::Kind};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -395,7 +395,7 @@ impl BodyRestoreManager for GitBodyRestoreManager {
 
         // Check for changes in the index and working tree
         // This is a simplified check - in production you'd want more thorough status checking
-        let mut index = repo
+        let _index = repo
             .index()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to read index: {}", e)))?;
 
@@ -418,7 +418,7 @@ impl BodyRestoreManager for GitBodyRestoreManager {
             .try_into_commit()
             .map_err(|e| StateStoreError::DatabaseError(format!("HEAD is not a commit: {}", e)))?;
 
-        let head_tree_id = head_commit
+        let _head_tree_id = head_commit
             .tree_id()
             .map_err(|e| StateStoreError::DatabaseError(format!("Failed to get tree: {}", e)))?;
 

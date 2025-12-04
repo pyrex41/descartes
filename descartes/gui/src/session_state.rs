@@ -91,6 +91,7 @@ impl SessionState {
 
 /// Messages for session management
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum SessionMessage {
     /// Refresh/discover sessions
     RefreshSessions,

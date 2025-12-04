@@ -1,6 +1,5 @@
 /// Error types for the RPC daemon
 use serde_json::json;
-use std::fmt;
 use thiserror::Error;
 
 /// Result type for daemon operations

@@ -1,3 +1,6 @@
+#![allow(mismatched_lifetime_syntaxes)]
+#![allow(dead_code)]
+
 pub mod code_preview_panel;
 pub mod dag_canvas_interactions;
 pub mod dag_editor;

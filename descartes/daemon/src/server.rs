@@ -12,16 +12,18 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
 use serde_json::json;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{error, info};
 
 /// RPC Server
 #[derive(Clone)]
 pub struct RpcServer {
     config: DaemonConfig,
+    #[allow(dead_code)]
     handlers: Arc<RpcHandlers>,
+    #[allow(dead_code)]
     auth: Option<Arc<AuthManager>>,
     metrics: Arc<MetricsCollector>,
+    #[allow(dead_code)]
     pool: Arc<ConnectionPool>,
     rpc: Arc<JsonRpcServer>,
 }

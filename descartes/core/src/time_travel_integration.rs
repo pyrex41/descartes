@@ -29,14 +29,14 @@ use crate::agent_history::{
     AgentHistoryEvent, AgentHistoryStore, HistoryEventType, HistorySnapshot,
 };
 use crate::body_restore::{
-    BodyRestoreManager, CoordinatedRestore, GitBodyRestoreManager, RepositoryBackup,
+    BodyRestoreManager, GitBodyRestoreManager, RepositoryBackup,
     RestoreOptions as BodyRestoreOptions, RestoreResult as BodyRestoreResult,
 };
 use crate::brain_restore::{
-    compare_states, BrainRestore, BrainState, DefaultBrainRestore,
+    BrainRestore, BrainState, DefaultBrainRestore,
     RestoreOptions as BrainRestoreOptions, RestoreResult as BrainRestoreResult,
 };
-use crate::debugger::{BreakpointLocation, DebugCommand, Debugger, DebuggerState};
+use crate::debugger::BreakpointLocation;
 use crate::errors::{StateStoreError, StateStoreResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 // ============================================================================
@@ -557,7 +557,7 @@ pub struct DefaultRewindManager<S: AgentHistoryStore> {
     body_restore: Arc<GitBodyRestoreManager>,
 
     /// Repository path
-    repo_path: PathBuf,
+    _repo_path: PathBuf,
 
     /// Undo history (recent backups)
     undo_history: Arc<RwLock<Vec<RewindBackup>>>,
@@ -579,7 +579,7 @@ impl<S: AgentHistoryStore> DefaultRewindManager<S> {
         Ok(Self {
             brain_restore,
             body_restore,
-            repo_path,
+            _repo_path: repo_path,
             undo_history: Arc::new(RwLock::new(Vec::new())),
             max_undo_history,
         })

@@ -7,10 +7,8 @@ use chrono::Utc;
 use serde_json::{json, Value};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use sqlx::Row;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
 use uuid::Uuid;
 
 /// SQLite-backed state store implementation
@@ -19,13 +17,13 @@ pub struct SqliteStateStore {
     pool: SqlitePool,
 
     /// Path to the SQLite database file
-    db_path: PathBuf,
+    _db_path: PathBuf,
 
     /// Optional prefix for agent state keys
     key_prefix: Option<String>,
 
     /// Enable state compression
-    enable_compression: bool,
+    _enable_compression: bool,
 }
 
 /// Agent state snapshot for persistence
@@ -132,9 +130,9 @@ impl SqliteStateStore {
 
         Ok(SqliteStateStore {
             pool,
-            db_path,
+            _db_path: db_path,
             key_prefix: None,
-            enable_compression,
+            _enable_compression: enable_compression,
         })
     }
 
@@ -1040,7 +1038,7 @@ impl SqliteStateStore {
         F: for<'a> std::future::Future<Output = StateStoreResult<T>>,
     {
         // Start transaction
-        let mut tx = self.pool.begin().await.map_err(|e| {
+        let tx = self.pool.begin().await.map_err(|e| {
             StateStoreError::DatabaseError(format!("Failed to start transaction: {}", e))
         })?;
 

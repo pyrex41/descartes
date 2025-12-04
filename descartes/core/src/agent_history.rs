@@ -15,7 +15,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
-use sqlx::{ConnectOptions, Row};
+use sqlx::Row;
 use std::path::Path;
 use std::str::FromStr;
 use uuid::Uuid;

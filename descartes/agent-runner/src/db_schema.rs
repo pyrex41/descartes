@@ -2,7 +2,6 @@
 use crate::errors::ParserResult;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::Row;
-use std::path::Path;
 
 /// Database schema for semantic extraction
 pub const SCHEMA: &str = r#"

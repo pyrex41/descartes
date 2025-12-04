@@ -4,12 +4,11 @@
 //! providing user feedback, confirmations, and progress tracking.
 
 use descartes_core::{
-    AgentHistoryEvent, DefaultRewindManager, ResumeContext, RewindConfig, RewindConfirmation,
-    RewindManager, RewindPoint, RewindProgress, RewindResult, ValidationResult,
+    AgentHistoryEvent, RewindConfirmation,
+    RewindPoint, RewindProgress, RewindResult,
 };
 use iced::widget::{button, column, container, row, text, Column, Space};
 use iced::{alignment::Horizontal, Element, Length, Theme};
-use std::sync::Arc;
 
 // ============================================================================
 // MESSAGES
@@ -204,7 +203,7 @@ pub fn view_rewind_confirmation(confirmation: &RewindConfirmation) -> Element<Re
     )
     .width(Length::Fixed(500.0))
     .padding(25)
-    .style(|theme: &Theme| container::Style {
+    .style(|_theme: &Theme| container::Style {
         background: Some(iced::Background::Color(iced::Color::from_rgb(
             0.15, 0.15, 0.2,
         ))),
@@ -282,7 +281,7 @@ pub fn view_rewind_progress(progress: &RewindProgress) -> Element<RewindMessage>
     )
     .width(Length::Fixed(400.0))
     .padding(20)
-    .style(|theme: &Theme| container::Style {
+    .style(|_theme: &Theme| container::Style {
         background: Some(iced::Background::Color(iced::Color::from_rgb(
             0.15, 0.15, 0.2,
         ))),
@@ -389,7 +388,7 @@ pub fn view_rewind_result(result: &RewindResult) -> Element<RewindMessage> {
     )
     .width(Length::Fixed(450.0))
     .padding(20)
-    .style(|theme: &Theme| container::Style {
+    .style(|_theme: &Theme| container::Style {
         background: Some(iced::Background::Color(iced::Color::from_rgb(
             0.15, 0.15, 0.2,
         ))),

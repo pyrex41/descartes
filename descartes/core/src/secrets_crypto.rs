@@ -309,7 +309,7 @@ impl Aes256GcmProvider {
 /// Key manager for master key operations
 pub struct KeyManager {
     crypto_provider: Box<dyn CryptoProvider>,
-    cached_key: Option<Vec<u8>>,
+    _cached_key: Option<Vec<u8>>,
 }
 
 impl KeyManager {
@@ -317,7 +317,7 @@ impl KeyManager {
     pub fn new() -> Self {
         Self {
             crypto_provider: Box::new(Aes256GcmProvider::new()),
-            cached_key: None,
+            _cached_key: None,
         }
     }
 

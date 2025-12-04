@@ -4,10 +4,7 @@
 ///   cargo run --bin agent_runner_demo spawn <name> <backend> <task>
 ///   cargo run --bin agent_runner_demo list
 ///   cargo run --bin agent_runner_demo kill <id>
-use descartes_core::{
-    AgentConfig, AgentRunner, AgentSignal, GracefulShutdown, LocalProcessRunner,
-    ProcessRunnerConfig,
-};
+use descartes_core::{AgentConfig, AgentRunner, LocalProcessRunner, ProcessRunnerConfig};
 use std::collections::HashMap;
 use std::env;
 

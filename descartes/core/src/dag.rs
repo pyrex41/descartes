@@ -404,19 +404,19 @@ impl DAG {
             .cloned()
             .unwrap_or_default();
 
-        for edge_id in incoming.iter().chain(outgoing.iter()) {
-            if let Some(edge) = self.edges.get(edge_id) {
+        for _edge_id in incoming.iter().chain(outgoing.iter()) {
+            if let Some(edge) = self.edges.get(_edge_id) {
                 let from = edge.from_node_id;
                 let to = edge.to_node_id;
 
                 if let Some(out_edges) = self.adjacency_out.get_mut(&from) {
-                    out_edges.retain(|e| e != edge_id);
+                    out_edges.retain(|e| e != _edge_id);
                 }
                 if let Some(in_edges) = self.adjacency_in.get_mut(&to) {
-                    in_edges.retain(|e| e != edge_id);
+                    in_edges.retain(|e| e != _edge_id);
                 }
 
-                self.edges.remove(edge_id);
+                self.edges.remove(_edge_id);
             }
         }
 
@@ -722,17 +722,17 @@ impl DAG {
 
     fn find_cycles_dfs(
         &self,
-        node_id: Uuid,
+        _node_id: Uuid,
         visited: &mut HashSet<Uuid>,
         rec_stack: &mut HashSet<Uuid>,
         path: &mut Vec<Uuid>,
         cycles: &mut Vec<Vec<Uuid>>,
     ) {
-        visited.insert(node_id);
-        rec_stack.insert(node_id);
-        path.push(node_id);
+        visited.insert(_node_id);
+        rec_stack.insert(_node_id);
+        path.push(_node_id);
 
-        for successor in self.get_successors(node_id) {
+        for successor in self.get_successors(_node_id) {
             if !visited.contains(&successor) {
                 self.find_cycles_dfs(successor, visited, rec_stack, path, cycles);
             } else if rec_stack.contains(&successor) {
@@ -745,7 +745,7 @@ impl DAG {
         }
 
         path.pop();
-        rec_stack.remove(&node_id);
+        rec_stack.remove(&_node_id);
     }
 
     /// Validate that the graph is connected (all nodes reachable from start nodes)
@@ -1333,7 +1333,7 @@ impl DAGWithHistory {
                     // Undo add by removing
                     self.dag.remove_node(node.node_id)?;
                 }
-                DAGOperation::RemoveNode(node_id, node) => {
+                DAGOperation::RemoveNode(_node_id, node) => {
                     // Undo remove by adding back
                     self.dag.add_node(node)?;
                 }
@@ -1345,7 +1345,7 @@ impl DAGWithHistory {
                     // Undo add by removing
                     self.dag.remove_edge(edge.edge_id)?;
                 }
-                DAGOperation::RemoveEdge(edge_id, edge) => {
+                DAGOperation::RemoveEdge(_edge_id, edge) => {
                     // Undo remove by adding back
                     self.dag.add_edge(edge)?;
                 }

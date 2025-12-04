@@ -1,4 +1,6 @@
+#![allow(mismatched_lifetime_syntaxes)]
 /// Descartes CLI - Command-line interface for the orchestration system
+
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use descartes_core::{ConfigManager, DescaratesConfig};
@@ -67,6 +69,18 @@ enum Commands {
         /// Stream output in real-time
         #[arg(long, default_value = "true")]
         stream: bool,
+
+        /// Tool level: minimal, orchestrator, or readonly
+        #[arg(long, default_value = "orchestrator")]
+        tool_level: String,
+
+        /// Prevent spawning sub-sessions (used for recursive prevention)
+        #[arg(long, default_value = "false")]
+        no_spawn: bool,
+
+        /// Save transcript to this directory (default: .scud/sessions)
+        #[arg(long)]
+        transcript_dir: Option<String>,
     },
 
     /// List running agents
@@ -182,6 +196,9 @@ async fn main() -> anyhow::Result<()> {
             model,
             system,
             stream,
+            tool_level,
+            no_spawn,
+            transcript_dir,
         } => {
             let config = load_config(args.config.as_deref())?;
 
@@ -192,6 +209,9 @@ async fn main() -> anyhow::Result<()> {
                 model.as_deref(),
                 system.as_deref(),
                 stream,
+                &tool_level,
+                no_spawn,
+                transcript_dir.as_deref(),
             )
             .await?;
         }

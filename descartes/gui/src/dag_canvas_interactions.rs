@@ -14,15 +14,15 @@ use iced::mouse::{Button, ScrollDelta};
 /// - Zoom to cursor position
 /// - Smooth 60 FPS animations
 /// - Undo/redo integration
-use iced::{keyboard, mouse, Point, Rectangle, Vector};
+use iced::{Point, Rectangle, Vector};
 
-use descartes_core::dag::{DAGEdge, DAGNode, DAGOperation, EdgeType, Position, DAG};
-use std::collections::{HashMap, HashSet};
+use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, Position, DAG};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::dag_editor::{
-    point_in_node, screen_to_world, snap_to_grid, world_to_screen, CanvasState, DAGEditorState,
-    DragState, InteractionState, PanState, Tool, GRID_SIZE, MAX_ZOOM, MIN_ZOOM, NODE_HEIGHT,
+    point_in_node, screen_to_world, snap_to_grid, world_to_screen, DAGEditorState,
+    DragState, PanState, Tool, MAX_ZOOM, MIN_ZOOM, NODE_HEIGHT,
     NODE_WIDTH, ZOOM_STEP,
 };
 
