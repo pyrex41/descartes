@@ -212,6 +212,7 @@ pub async fn execute() -> Result<()> {
     // API Keys
     print_section("API Keys");
     let providers = [
+        ("XAI_API_KEY", "Grok (xAI)"),
         ("ANTHROPIC_API_KEY", "Anthropic"),
         ("OPENAI_API_KEY", "OpenAI"),
         ("DEEPSEEK_API_KEY", "DeepSeek"),
@@ -271,7 +272,7 @@ pub async fn execute() -> Result<()> {
         println!("\nTo get started:");
         println!(
             "  1. Set an API key: {}",
-            "export ANTHROPIC_API_KEY=sk-ant-...".cyan()
+            "export XAI_API_KEY=xai-...".cyan()
         );
         println!(
             "  2. Or start Ollama: {}",

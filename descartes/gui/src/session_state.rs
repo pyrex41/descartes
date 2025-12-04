@@ -111,6 +111,8 @@ pub enum SessionMessage {
     UpdateNewSessionPath(String),
     /// Create the new session
     CreateSession,
+    /// Focus the path input (for tab/enter navigation)
+    FocusPathInput,
     /// Session was created
     SessionCreated(Session),
     /// Archive a session
@@ -177,6 +179,9 @@ pub fn update(state: &mut SessionState, message: SessionMessage) {
         }
         SessionMessage::CreateSession => {
             state.loading = true;
+        }
+        SessionMessage::FocusPathInput => {
+            // Handled in main.rs - no state changes needed
         }
         SessionMessage::SessionCreated(session) => {
             state.sessions.push(session.clone());

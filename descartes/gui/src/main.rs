@@ -329,6 +329,29 @@ impl DescartesGui {
                         // Return a task that triggers ConnectDaemon after state update
                         iced::Task::done(Message::ConnectDaemon)
                     }
+                    SessionMessage::CreateSession => {
+                        // Get the session details from state
+                        let name = self.session_state.new_session_name.clone();
+                        let path = self.session_state.new_session_path.clone();
+
+                        if name.is_empty() || path.is_empty() {
+                            // Don't create if fields are empty
+                            return iced::Task::none();
+                        }
+
+                        // Create session asynchronously
+                        iced::Task::perform(
+                            create_session(name, path),
+                            |result| match result {
+                                Ok(session) => Message::Session(SessionMessage::SessionCreated(session)),
+                                Err(e) => Message::Session(SessionMessage::DaemonError(e)),
+                            },
+                        )
+                    }
+                    SessionMessage::FocusPathInput => {
+                        // Focus the path input field
+                        iced::widget::text_input::focus(iced::widget::text_input::Id::new("session-path"))
+                    }
                     _ => iced::Task::none(),
                 };
 
@@ -1981,7 +2004,8 @@ async fn spawn_daemon_for_session(mut session: descartes_core::Session) -> Resul
     let mut attempts = 0;
 
     while attempts < 30 {
-        if let Ok(resp) = client.get(&format!("{}/health", endpoint)).send().await {
+        // The daemon responds to GET on the root endpoint with server info
+        if let Ok(resp) = client.get(&endpoint).send().await {
             if resp.status().is_success() {
                 tracing::info!("Daemon started on port {} (PID: {})", http_port, pid);
 
@@ -2038,4 +2062,50 @@ async fn stop_daemon(endpoint: String, pid: Option<u32>) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Create a new session by initializing the workspace directory
+async fn create_session(name: String, path: String) -> Result<descartes_core::Session, String> {
+    use std::path::PathBuf;
+    use tokio::fs;
+
+    let workspace_path = PathBuf::from(&path);
+
+    // Ensure the workspace directory exists
+    if !workspace_path.exists() {
+        fs::create_dir_all(&workspace_path)
+            .await
+            .map_err(|e| format!("Failed to create workspace directory: {}", e))?;
+    }
+
+    // Create .scud directory for session data
+    let scud_path = workspace_path.join(".scud");
+    if !scud_path.exists() {
+        fs::create_dir_all(&scud_path)
+            .await
+            .map_err(|e| format!("Failed to create .scud directory: {}", e))?;
+    }
+
+    // Create sessions subdirectory for transcripts
+    let sessions_path = scud_path.join("sessions");
+    if !sessions_path.exists() {
+        fs::create_dir_all(&sessions_path)
+            .await
+            .map_err(|e| format!("Failed to create sessions directory: {}", e))?;
+    }
+
+    // Create the session object
+    let session = descartes_core::Session::new(name, workspace_path);
+
+    // Save session metadata
+    let metadata_path = session.metadata_path();
+    let metadata_json = serde_json::to_string_pretty(&session)
+        .map_err(|e| format!("Failed to serialize session: {}", e))?;
+    fs::write(&metadata_path, metadata_json)
+        .await
+        .map_err(|e| format!("Failed to write session metadata: {}", e))?;
+
+    tracing::info!("Created new session '{}' at {}", session.name, session.path.display());
+
+    Ok(session)
 }

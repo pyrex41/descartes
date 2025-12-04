@@ -13,7 +13,9 @@ mod state;
 
 /// Load configuration from the given path or default location
 fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
-    let manager = ConfigManager::load(config_path)?;
+    let mut manager = ConfigManager::load(config_path)?;
+    // Load environment variable overrides (API keys, etc.)
+    let _ = manager.load_from_env();
     Ok(manager.config().clone())
 }
 
