@@ -1,4 +1,5 @@
 pub mod attach;
+pub mod doctor;
 pub mod init;
 pub mod kill;
 pub mod logs;

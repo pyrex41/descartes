@@ -9,6 +9,7 @@ use crate::theme::{button_styles, colors, container_styles, fonts};
 use descartes_core::{Session, SessionStatus};
 use iced::alignment::Vertical;
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
+use iced::widget::text_input::Id as TextInputId;
 use iced::{Element, Length};
 
 /// Render the session selector dropdown in the header
@@ -339,7 +340,9 @@ fn view_create_session_dialog(state: &SessionState) -> Element<SessionMessage> {
             .color(colors::TEXT_SECONDARY),
         Space::with_height(4),
         text_input("my-project", &state.new_session_name)
+            .id(TextInputId::new("session-name"))
             .on_input(SessionMessage::UpdateNewSessionName)
+            .on_submit(SessionMessage::FocusPathInput)
             .padding([8, 12])
             .size(14),
         Space::with_height(12),
@@ -350,7 +353,9 @@ fn view_create_session_dialog(state: &SessionState) -> Element<SessionMessage> {
             .color(colors::TEXT_SECONDARY),
         Space::with_height(4),
         text_input("/path/to/workspace", &state.new_session_path)
+            .id(TextInputId::new("session-path"))
             .on_input(SessionMessage::UpdateNewSessionPath)
+            .on_submit(SessionMessage::CreateSession)
             .padding([8, 12])
             .size(14),
         Space::with_height(16),

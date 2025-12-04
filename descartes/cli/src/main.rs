@@ -1,7 +1,8 @@
 #![allow(mismatched_lifetime_syntaxes)]
-/// Descartes CLI - Command-line interface for the orchestration system
+//! Descartes CLI - Command-line interface for the orchestration system
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
 use colored::Colorize;
 use descartes_core::{ConfigManager, DescaratesConfig};
 use std::path::{Path, PathBuf};
@@ -12,16 +13,20 @@ mod state;
 
 /// Load configuration from the given path or default location
 fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
-    let manager = ConfigManager::load(config_path)?;
+    let mut manager = ConfigManager::load(config_path)?;
+    // Load environment variable overrides (API keys, etc.)
+    let _ = manager.load_from_env();
     Ok(manager.config().clone())
 }
 
-use commands::{attach, init, kill, logs, pause, plugins, ps, resume, spawn, tasks};
+use commands::{attach, doctor, init, kill, logs, pause, plugins, ps, resume, spawn, tasks};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
-#[command(about = "Composable AI Agent Orchestration System", long_about = None)]
-#[command(version = "0.1.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(about = "The anti-bloat AI coding agent")]
+#[command(long_about = "Descartes: 4 tools. Full observability. Zero MCP baggage.\n\nA minimal, observable framework for AI coding agents following the Pi philosophy:\n\"If you don't need it, don't build it.\"")]
+#[command(after_help = "Examples:\n  descartes spawn --task \"Fix the bug\"    Spawn an agent\n  descartes doctor                         Check system health\n  descartes ps                             List running agents\n\nDocumentation: https://github.com/anthropics/descartes")]
 struct Args {
     #[command(subcommand)]
     command: Commands,
@@ -163,6 +168,9 @@ enum Commands {
     /// Launch the GUI
     Gui,
 
+    /// Check system health and configuration
+    Doctor,
+
     /// Manage plugins
     #[command(subcommand)]
     Plugins(plugins::PluginCommands),
@@ -170,6 +178,13 @@ enum Commands {
     /// Manage tasks (uses SCG file storage)
     #[command(subcommand)]
     Tasks(tasks::TaskCommands),
+
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }
 
 #[tokio::main]
@@ -265,6 +280,10 @@ async fn main() -> anyhow::Result<()> {
             println!("{}", "Feature: Phase 3 - Iced UI (Planned)".yellow());
         }
 
+        Commands::Doctor => {
+            doctor::execute().await?;
+        }
+
         Commands::Plugins(cmd) => {
             plugins::execute(&cmd).await?;
         }
@@ -272,6 +291,12 @@ async fn main() -> anyhow::Result<()> {
         Commands::Tasks(cmd) => {
             // Tasks use project-local SCG storage, not config-based path
             tasks::execute(&cmd, None).await?;
+        }
+
+        Commands::Completions { shell } => {
+            let mut cmd = Args::command();
+            let name = cmd.get_name().to_string();
+            generate(shell, &mut cmd, name, &mut std::io::stdout());
         }
     }
 

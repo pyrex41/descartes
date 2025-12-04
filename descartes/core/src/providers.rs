@@ -269,6 +269,140 @@ impl ModelBackend for AnthropicProvider {
     }
 }
 
+/// Grok (xAI) provider using HTTP API (OpenAI-compatible).
+pub struct GrokProvider {
+    _mode: ModelProviderMode,
+    client: Option<reqwest::Client>,
+    available_models: Vec<String>,
+}
+
+impl GrokProvider {
+    /// Create a new Grok provider.
+    pub fn new(api_key: String, endpoint: Option<String>) -> Self {
+        let endpoint = endpoint.unwrap_or_else(|| "https://api.x.ai/v1".to_string());
+        Self {
+            _mode: ModelProviderMode::Api { endpoint, api_key },
+            client: None,
+            available_models: vec![
+                "grok-4-1-fast-reasoning".to_string(),
+                "grok-4-1-fast".to_string(),
+                "grok-4-1".to_string(),
+                "grok-3-latest".to_string(),
+            ],
+        }
+    }
+}
+
+#[async_trait]
+impl ModelBackend for GrokProvider {
+    fn name(&self) -> &str {
+        "grok"
+    }
+
+    fn mode(&self) -> &ModelProviderMode {
+        &self._mode
+    }
+
+    async fn initialize(&mut self) -> AgentResult<()> {
+        self.client = Some(reqwest::Client::new());
+        Ok(())
+    }
+
+    async fn health_check(&self) -> AgentResult<bool> {
+        if let Some(client) = &self.client {
+            if let ModelProviderMode::Api { endpoint, api_key } = &self._mode {
+                let resp = client
+                    .get(&format!("{}/models", endpoint))
+                    .bearer_auth(api_key)
+                    .send()
+                    .await;
+                Ok(resp.is_ok())
+            } else {
+                Ok(false)
+            }
+        } else {
+            Ok(false)
+        }
+    }
+
+    async fn complete(&self, request: ModelRequest) -> AgentResult<ModelResponse> {
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| ProviderError::BackendError("Client not initialized".to_string()))?;
+
+        if let ModelProviderMode::Api { endpoint, api_key } = &self._mode {
+            let payload = json!({
+                "model": request.model,
+                "messages": request.messages,
+                "max_tokens": request.max_tokens.unwrap_or(4096),
+                "temperature": request.temperature.unwrap_or(0.7),
+            });
+
+            let response = client
+                .post(&format!("{}/chat/completions", endpoint))
+                .bearer_auth(api_key)
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|e| ProviderError::ReqwestError(e))?;
+
+            if !response.status().is_success() {
+                return Err(ProviderError::ApiError(format!(
+                    "API request failed with status {}",
+                    response.status()
+                ))
+                .into());
+            }
+
+            let body = response
+                .json::<serde_json::Value>()
+                .await
+                .map_err(|e| ProviderError::ReqwestError(e))?;
+
+            let content = body
+                .get("choices")
+                .and_then(|c| c.get(0))
+                .and_then(|c| c.get("message"))
+                .and_then(|m| m.get("content"))
+                .and_then(|c| c.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            Ok(ModelResponse {
+                content,
+                finish_reason: FinishReason::Stop,
+                tokens_used: None,
+                tool_calls: None,
+            })
+        } else {
+            Err(ProviderError::BackendError("Invalid mode for Grok provider".to_string()).into())
+        }
+    }
+
+    async fn stream(
+        &self,
+        _request: ModelRequest,
+    ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<ModelResponse>> + Unpin + Send>>
+    {
+        Err(ProviderError::UnsupportedFeature("Streaming not yet implemented".to_string()).into())
+    }
+
+    async fn list_models(&self) -> AgentResult<Vec<String>> {
+        Ok(self.available_models.clone())
+    }
+
+    async fn estimate_tokens(&self, text: &str) -> AgentResult<usize> {
+        // Simple heuristic: ~4 chars per token
+        Ok((text.len() + 3) / 4)
+    }
+
+    async fn shutdown(&mut self) -> AgentResult<()> {
+        self.client = None;
+        Ok(())
+    }
+}
+
 /// ============================================================================
 /// HEADLESS MODE: Spawn CLI as child process
 /// ============================================================================
@@ -674,6 +808,16 @@ impl ProviderFactory {
                     .get("timeout_secs")
                     .and_then(|t| t.parse::<u64>().ok());
                 Ok(Box::new(OllamaProvider::new(endpoint, timeout)))
+            }
+            "grok" => {
+                let api_key = config
+                    .get("api_key")
+                    .ok_or_else(|| {
+                        ProviderError::ConfigError("Missing 'api_key' for Grok".to_string())
+                    })?
+                    .clone();
+                let endpoint = config.get("endpoint").cloned();
+                Ok(Box::new(GrokProvider::new(api_key, endpoint)))
             }
             "headless-cli" => {
                 let command = config

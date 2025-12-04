@@ -88,13 +88,17 @@ pub struct ProvidersConfig {
     #[serde(default)]
     pub groq: GroqConfig,
 
+    /// Grok (xAI) provider settings
+    #[serde(default)]
+    pub grok: GrokConfig,
+
     /// Custom provider endpoints (for proxy, self-hosted, etc.)
     #[serde(default)]
     pub custom: HashMap<String, CustomProviderConfig>,
 }
 
 fn default_primary_provider() -> String {
-    "anthropic".to_string()
+    "grok".to_string()
 }
 
 impl Default for ProvidersConfig {
@@ -106,6 +110,7 @@ impl Default for ProvidersConfig {
             ollama: OllamaConfig::default(),
             deepseek: DeepSeekConfig::default(),
             groq: GroqConfig::default(),
+            grok: GrokConfig::default(),
             custom: HashMap::new(),
         }
     }
@@ -464,6 +469,70 @@ fn default_groq_endpoint() -> String {
 
 fn default_groq_model() -> String {
     "mixtral-8x7b-32768".to_string()
+}
+
+/// Grok (xAI) provider configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrokConfig {
+    /// Whether Grok provider is enabled
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// API key (can be read from env: XAI_API_KEY)
+    #[serde(default)]
+    pub api_key: Option<String>,
+
+    /// API endpoint
+    #[serde(default = "default_grok_endpoint")]
+    pub endpoint: String,
+
+    /// Default model to use
+    #[serde(default = "default_grok_model")]
+    pub model: String,
+
+    /// Request timeout in seconds
+    #[serde(default = "default_timeout")]
+    pub timeout_secs: u64,
+
+    /// Max retries
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+
+    /// Retry backoff in milliseconds
+    #[serde(default = "default_retry_backoff_ms")]
+    pub retry_backoff_ms: u64,
+
+    /// Temperature for generation
+    #[serde(default = "default_temperature")]
+    pub temperature: f32,
+
+    /// Max tokens for generation
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens: usize,
+}
+
+impl Default for GrokConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            api_key: None,
+            endpoint: default_grok_endpoint(),
+            model: default_grok_model(),
+            timeout_secs: default_timeout(),
+            max_retries: default_max_retries(),
+            retry_backoff_ms: default_retry_backoff_ms(),
+            temperature: default_temperature(),
+            max_tokens: default_max_tokens(),
+        }
+    }
+}
+
+fn default_grok_endpoint() -> String {
+    "https://api.x.ai/v1".to_string()
+}
+
+fn default_grok_model() -> String {
+    "grok-4-1-fast-reasoning".to_string()
 }
 
 /// Custom provider configuration (for proxies, self-hosted, etc.)
@@ -1420,6 +1489,10 @@ impl ConfigManager {
 
         if let Ok(key) = std::env::var("GROQ_API_KEY") {
             self.config.providers.groq.api_key = Some(key);
+        }
+
+        if let Ok(key) = std::env::var("XAI_API_KEY") {
+            self.config.providers.grok.api_key = Some(key);
         }
 
         if let Ok(key) = std::env::var("DESCARTES_ENCRYPTION_KEY") {
