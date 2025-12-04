@@ -1,281 +1,304 @@
-# Descartes: CLI-First AI Agent Orchestration
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="Descartes" width="120">
+</p>
 
-**Version**: 0.2.0 - Pi-Style Minimal Tooling
+<h1 align="center">Descartes</h1>
 
-Descartes is a Rust framework for building AI coding agents with minimal, observable tooling. Following [Pi's philosophy](https://marioslab.io/posts/pi/building-a-coding-agent/): "if you don't need it, don't build it."
+<p align="center">
+  <strong>The anti-bloat AI coding agent.</strong><br>
+  4 tools. Full observability. Zero MCP baggage.
+</p>
 
-## Core Philosophy
+<p align="center">
+  <a href="#quickstart">Quickstart</a> •
+  <a href="#philosophy">Philosophy</a> •
+  <a href="#tools">Tools</a> •
+  <a href="#skills">Skills</a> •
+  <a href="docs/">Documentation</a>
+</p>
 
-- **Minimal Tools**: 4 core tools (read, write, edit, bash) are sufficient for effective coding agents
-- **Progressive Disclosure**: Additional capabilities via "skills" (CLI tools), not bloated MCP servers
-- **Observability**: All tool use goes through bash, fully visible in transcripts
-- **Recursive Prevention**: Sub-sessions cannot spawn their own sub-agents
+<p align="center">
+  <a href="https://github.com/anthropics/descartes/actions"><img src="https://img.shields.io/github/actions/workflow/status/anthropics/descartes/ci.yml?style=flat-square" alt="Build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <a href="https://crates.io/crates/descartes"><img src="https://img.shields.io/crates/v/descartes?style=flat-square" alt="Crates.io"></a>
+</p>
 
-## Quick Start
+---
 
-### Building
+> *"If you don't need it, don't build it."* — [Pi Philosophy](https://marioslab.io/posts/pi/building-a-coding-agent/)
 
-```bash
-cd descartes
-cargo build --release
-```
+## The Problem
 
-### Running a Spawn
+Modern AI coding agents are **bloated**:
 
-```bash
-# Basic spawn with orchestrator tools
-descartes spawn --task "List all Rust files in this project"
+- 🔴 **40+ tools** nobody uses
+- 🔴 **10,000+ token** system prompts
+- 🔴 **MCP servers** injecting 2-5k tokens *every single message*
+- 🔴 **Recursive agent spawning** chaos with no control
+- 🔴 **Opaque execution** — what did the agent actually do?
 
-# Spawn with minimal tools (no sub-session spawning)
-descartes spawn --task "Fix the type error" --tool-level minimal
+## The Solution
 
-# Pipe content to the agent
-cat error.log | descartes spawn --task "Analyze this error"
-```
+Descartes strips AI agents down to their essence:
 
-### Transcripts
+|                        | Bloated Agents | Descartes |
+|------------------------|----------------|-----------|
+| **Tools**              | 40+            | **4**     |
+| **System prompt**      | 10k tokens     | **200 tokens** |
+| **Per-message overhead** | 2-5k tokens  | **0**     |
+| **Recursive spawning** | Uncontrolled   | **Prevented** |
+| **Observability**      | Opaque         | **Full JSON transcripts** |
 
-All sessions save transcripts to `.scud/sessions/` (or `~/.descartes/sessions/`):
-
-```bash
-# View recent transcripts
-ls -lt .scud/sessions/ | head
-
-# Transcripts are JSON with metadata and entries
-cat .scud/sessions/2025-12-03-10-30-00-abc12345.json | jq '.metadata'
-```
-
-## Project Structure
-
-```
-descartes/
-├── core/                          # Core library
-│   └── src/
-│       ├── lib.rs                 # Library root
-│       ├── tools/                 # Minimal tool definitions
-│       │   ├── definitions.rs     # 5 tools: read, write, edit, bash, spawn_session
-│       │   ├── registry.rs        # ToolLevel enum and system prompts
-│       │   └── executors.rs       # Tool execution implementations
-│       ├── session_transcript.rs  # Transcript writer
-│       └── providers.rs           # ModelBackend implementations
-├── cli/                           # Command-line interface
-│   └── src/
-│       ├── main.rs               # CLI entry point with spawn command
-│       └── commands/spawn.rs     # Spawn implementation
-├── daemon/                        # Background daemon (optional)
-├── gui/                           # Native GUI (optional)
-├── docs/
-│   └── SKILLS.md                 # Skills pattern documentation
-└── examples/
-    └── skills/
-        └── web-search/           # Example skill implementation
-```
-
-## Tool Levels
-
-Descartes uses capability-based tool levels:
-
-| Level | Tools | Use Case |
-|-------|-------|----------|
-| **Minimal** | read, write, edit, bash | Sub-sessions, focused tasks |
-| **Orchestrator** | minimal + spawn_session | Top-level agents that delegate |
-| **ReadOnly** | read, bash | Exploration, planning |
+## Quickstart
 
 ```bash
-# Orchestrator (default) - can spawn sub-sessions
-descartes spawn --task "Review and fix all type errors" --tool-level orchestrator
+# Install
+cargo install descartes
 
-# Minimal - cannot spawn sub-sessions
-descartes spawn --task "Fix this one function" --tool-level minimal
+# Run your first agent
+descartes spawn --task "Fix the type error in main.rs"
 
-# ReadOnly - exploration only
-descartes spawn --task "Explain how authentication works" --tool-level readonly
+# Check system status
+descartes doctor
+
+# View what happened
+cat .scud/sessions/*.json | jq '.entries[-5:]'
 ```
 
-## Tools
+That's it. Watch it work. See every action in the transcript.
 
-### Core Tools (Minimal Level)
+## Philosophy
 
-| Tool | Description |
-|------|-------------|
-| **read** | Read file contents with optional offset/limit for large files |
-| **write** | Write content to file, creating directories as needed |
-| **edit** | Surgical text replacement (old_text must match exactly) |
-| **bash** | Execute bash commands in working directory |
+Descartes follows the **Pi philosophy** of minimal, observable tooling:
 
-### Orchestrator Tool
+### 1. Four Tools Are Enough
 
-| Tool | Description |
-|------|-------------|
-| **spawn_session** | Spawn a sub-session for delegated tasks |
-
-Sub-sessions are spawned with `--no-spawn --tool-level minimal`, preventing recursive agent spawning.
-
-## Spawn Command
-
-```bash
-descartes spawn [OPTIONS] --task <TASK>
-
-Options:
-  -t, --task <TASK>              Task or prompt for the agent (required)
-  -p, --provider <PROVIDER>      Model provider: anthropic, openai, ollama, deepseek, groq
-  -m, --model <MODEL>            Specific model to use
-  -s, --system <SYSTEM>          Custom system prompt
-      --stream                   Stream output in real-time (default: true)
-      --tool-level <LEVEL>       Tool level: minimal, orchestrator, readonly (default: orchestrator)
-      --no-spawn                 Prevent spawning sub-sessions (for recursive prevention)
-      --transcript-dir <DIR>     Custom transcript directory (default: .scud/sessions/)
+```
+read   → Read file contents
+write  → Write file contents
+edit   → Surgical text replacement
+bash   → Execute any command
 ```
 
-## Skills Pattern
+With `bash`, your agent can run *any* CLI tool. No need to wrap everything in a custom tool definition.
 
-Instead of MCP servers that inject 2000-5000 tokens into every session, Descartes uses "skills" - CLI tools invoked via bash:
+### 2. Skills, Not MCP Servers
+
+MCP servers inject **2,000-5,000 tokens** into every message, whether used or not.
+
+Descartes uses **skills** — CLI tools invoked via bash:
 
 ```bash
-# Agent discovers skill via system prompt or README
-# Agent uses bash to invoke the skill
+# Agent discovers the skill exists, then calls it
 bash: web-search "rust async patterns"
 ```
 
-See [docs/SKILLS.md](docs/SKILLS.md) for creating skills.
-
-**Context cost comparison:**
 | Approach | Context Cost | When Paid |
 |----------|-------------|-----------|
-| MCP Server | ~2000-5000 tokens | Every message |
-| Skill (CLI) | ~50-100 tokens | Only when used |
+| MCP Server | ~2,000-5,000 tokens | Every message |
+| **Skill** | ~50-100 tokens | Only when used |
 
-## Session Transcripts
+### 3. Full Observability
 
-Every session saves a JSON transcript:
+Every session produces a JSON transcript:
 
 ```json
 {
   "metadata": {
     "session_id": "550e8400-e29b-41d4-a716-446655440000",
-    "started_at": "2025-12-03T10:30:00Z",
-    "ended_at": "2025-12-03T10:35:00Z",
     "provider": "anthropic",
-    "model": "claude-3-5-sonnet",
-    "task": "Fix the type error in main.rs",
-    "is_sub_session": false,
+    "model": "claude-sonnet-4-20250514",
     "tool_level": "orchestrator"
   },
   "entries": [
-    {"timestamp": "...", "role": "user", "content": "..."},
-    {"timestamp": "...", "role": "assistant", "content": "..."},
-    {"timestamp": "...", "role": "tool_call", "content": "...", "tool_name": "bash", "tool_id": "..."},
-    {"timestamp": "...", "role": "tool_result", "content": "...", "tool_id": "..."}
+    {"role": "user", "content": "Fix the bug..."},
+    {"role": "tool_call", "tool_name": "read", "args": {"path": "src/main.rs"}},
+    {"role": "tool_result", "content": "...file contents..."},
+    {"role": "assistant", "content": "I found the issue..."}
   ]
 }
 ```
 
-## Providers
+### 4. Controlled Delegation
 
-### Supported Providers
+Orchestrator agents can spawn sub-sessions, but sub-sessions **cannot spawn their own children**:
 
-| Provider | Type | Configuration |
-|----------|------|---------------|
-| **Anthropic** | API | `ANTHROPIC_API_KEY` |
-| **OpenAI** | API | `OPENAI_API_KEY` |
-| **Ollama** | Local | `OLLAMA_ENDPOINT` (default: localhost:11434) |
-| **DeepSeek** | API | `DEEPSEEK_API_KEY` |
-| **Groq** | API | `GROQ_API_KEY` |
+```
+Orchestrator (can spawn)
+    └── Sub-session (cannot spawn) ✓
+         └── Sub-sub-session ✗ BLOCKED
+```
 
-### Configuration
+No recursive agent explosions.
+
+## Tools
+
+### Tool Levels
+
+| Level | Tools | Use Case |
+|-------|-------|----------|
+| **Orchestrator** | read, write, edit, bash, spawn_session | Top-level agents that delegate |
+| **Minimal** | read, write, edit, bash | Focused tasks, sub-sessions |
+| **ReadOnly** | read, bash | Exploration, planning, analysis |
+
+### Core Tools
+
+| Tool | Description |
+|------|-------------|
+| `read` | Read file with optional offset/limit for large files |
+| `write` | Write content, creating directories as needed |
+| `edit` | Replace exact text matches (surgical edits) |
+| `bash` | Execute any command in working directory |
+
+### Orchestrator Tool
+
+| Tool | Description |
+|------|-------------|
+| `spawn_session` | Delegate a task to a sub-agent |
+
+## Skills
+
+Skills are CLI tools that agents invoke via bash. They cost tokens only when used.
+
+**Example: Web Search Skill**
+
+```bash
+# In .descartes/skills/web-search
+#!/bin/bash
+curl -s "https://api.search.com?q=$1" | jq '.results[].title'
+```
+
+**Agent usage:**
+```
+bash: .descartes/skills/web-search "rust error handling best practices"
+```
+
+See [docs/SKILLS.md](docs/SKILLS.md) for creating custom skills.
+
+## Commands
+
+```bash
+descartes spawn     # Spawn an agent with a task
+descartes ps        # List running agents
+descartes kill      # Terminate an agent
+descartes pause     # Pause an agent
+descartes resume    # Resume a paused agent
+descartes attach    # Get credentials to attach external TUI
+descartes logs      # View agent logs
+descartes doctor    # Check system health
+descartes init      # Initialize a new project
+```
+
+### Spawn Options
+
+```bash
+descartes spawn --task "Your task here" \
+  --provider anthropic \           # anthropic, openai, ollama, deepseek, groq
+  --model claude-sonnet-4-20250514 \
+  --tool-level orchestrator \      # orchestrator, minimal, readonly
+  --no-spawn \                     # Prevent sub-session spawning
+  --transcript-dir ./logs          # Custom transcript location
+```
+
+## Configuration
 
 ```bash
 # Environment variables
 export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENAI_API_KEY="sk-..."
 
-# Or via config file (~/.descartes/config.toml)
+# Or config file (~/.descartes/config.toml)
+```
+
+```toml
 [providers]
 primary = "anthropic"
 
 [providers.anthropic]
 api_key = "sk-ant-..."
-model = "claude-3-5-sonnet-20241022"
+model = "claude-sonnet-4-20250514"
 ```
 
-## System Prompts
+## Providers
 
-Each tool level has a ~200 token system prompt (not 10,000+ like Claude Code):
-
-**Minimal prompt emphasizes:**
-- Using bash for file operations (ls, grep, find)
-- Reading files before editing
-- Edit requires exact text match
-- Being concise
-
-**Orchestrator prompt adds:**
-- Using spawn_session for delegation
-- Sub-sessions stream output and save transcripts
+| Provider | Type | Configuration |
+|----------|------|---------------|
+| **Anthropic** | Cloud | `ANTHROPIC_API_KEY` |
+| **OpenAI** | Cloud | `OPENAI_API_KEY` |
+| **DeepSeek** | Cloud | `DEEPSEEK_API_KEY` |
+| **Groq** | Cloud | `GROQ_API_KEY` |
+| **Ollama** | Local | `OLLAMA_ENDPOINT` (default: localhost:11434) |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     descartes spawn                          │
-│  --task "..." --tool-level orchestrator                      │
+│  descartes spawn --task "..." --tool-level orchestrator     │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Tool Registry                             │
-│  get_tools(ToolLevel::Orchestrator)                          │
-│  → [read, write, edit, bash, spawn_session]                  │
+│  Tool Registry                                              │
+│  → Returns [read, write, edit, bash, spawn_session]         │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Model Backend                              │
-│  ProviderFactory::create("anthropic", config)                │
-│  → Sends request with tools to LLM                           │
+│  Model Backend (Anthropic/OpenAI/Ollama/...)                │
+│  → Streaming conversation with tool calls                   │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Tool Executors                              │
-│  execute_tool("bash", args, working_dir)                     │
-│  → Returns ToolResult { success, output, metadata }          │
+│  Tool Executors                                             │
+│  → Execute tools, return results                            │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                Transcript Writer                             │
-│  Saves all messages and tool calls to JSON                   │
-│  → .scud/sessions/2025-12-03-10-30-00-abc12345.json         │
+│  Transcript Writer                                          │
+│  → .scud/sessions/2025-12-04-session-abc123.json           │
 └─────────────────────────────────────────────────────────────┘
+```
+
+## Project Structure
+
+```
+descartes/
+├── core/           # Core library (tools, providers, transcripts)
+├── cli/            # Command-line interface
+├── daemon/         # Background RPC server (optional)
+├── gui/            # Native GUI with Iced (optional)
+└── docs/           # Documentation
 ```
 
 ## Development
 
-### Running Tests
-
 ```bash
-# Core library tests (tools, transcripts)
-cargo test -p descartes-core --lib
+# Build
+cargo build --release
 
-# CLI tests
-cargo test -p descartes-cli
-
-# All tests
+# Test
 cargo test
+
+# Run from source
+cargo run -p descartes-cli -- spawn --task "Hello world"
 ```
 
-### Adding a New Tool
+## Comparison
 
-1. Add definition in `core/src/tools/definitions.rs`
-2. Add executor in `core/src/tools/executors.rs`
-3. Add to appropriate tool level in `core/src/tools/registry.rs`
-4. Export from `core/src/tools/mod.rs`
-5. Add tests
+| Feature | Claude Code | Aider | Descartes |
+|---------|-------------|-------|-----------|
+| Tools | 40+ | 10+ | **4** |
+| System prompt | 10k+ tokens | 5k+ tokens | **200 tokens** |
+| Extensibility | MCP (heavy) | Custom (complex) | **Skills (simple)** |
+| Observability | Limited | Logs | **Full transcripts** |
+| Recursive control | None | None | **Built-in** |
 
 ## References
 
-- [Pi: Building a Coding Agent](https://marioslab.io/posts/pi/building-a-coding-agent/) - Philosophy inspiration
-- [HumanLayer 12-Factor Agents](https://github.com/humanlayer/12-factor-agents) - Attach pattern inspiration
+- [Pi: Building a Coding Agent](https://marioslab.io/posts/pi/building-a-coding-agent/) — Philosophy inspiration
+- [12-Factor Agents](https://github.com/humanlayer/12-factor-agents) — Design principles
 
 ## License
 
@@ -283,4 +306,6 @@ MIT
 
 ---
 
-**Minimal tools. Maximum observability. No recursive agents.**
+<p align="center">
+  <strong>Minimal tools. Maximum observability. No recursive agents.</strong>
+</p>

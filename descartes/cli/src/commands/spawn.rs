@@ -42,6 +42,13 @@ pub async fn execute(
     no_spawn: bool,
     transcript_dir: Option<&str>,
 ) -> Result<()> {
+    // Slick header
+    println!();
+    println!("{}", "┌─ descartes ─────────────────────────────────────┐".cyan());
+    println!("{}", "│  4 tools. Full observability. Zero bloat.      │".cyan());
+    println!("{}", "└─────────────────────────────────────────────────┘".cyan());
+    println!();
+
     println!("{}", "Spawning agent...".green().bold());
     println!("  Task: {}", task.cyan());
 
@@ -139,9 +146,9 @@ pub async fn execute(
 
     // Execute with streaming or non-streaming
     let response_content = if stream {
-        execute_streaming(&backend, request).await?
+        execute_streaming(backend.as_ref(), request).await?
     } else {
-        execute_non_streaming(&backend, request).await?
+        execute_non_streaming(backend.as_ref(), request).await?
     };
 
     // Log assistant response to transcript
@@ -161,7 +168,7 @@ pub async fn execute(
 }
 
 async fn execute_streaming(
-    backend: &Box<dyn ModelBackend>,
+    backend: &dyn ModelBackend,
     request: ModelRequest,
 ) -> Result<String> {
     println!("\n{}", "Streaming response:".green());
@@ -190,7 +197,7 @@ async fn execute_streaming(
 }
 
 async fn execute_non_streaming(
-    backend: &Box<dyn ModelBackend>,
+    backend: &dyn ModelBackend,
     request: ModelRequest,
 ) -> Result<String> {
     let spinner = ProgressBar::new_spinner();
@@ -230,8 +237,25 @@ pub fn create_backend(
 
     match provider {
         "anthropic" => {
-            if let Some(ref api_key) = config.providers.anthropic.api_key {
-                provider_config.insert("api_key".to_string(), api_key.clone());
+            match &config.providers.anthropic.api_key {
+                Some(api_key) if !api_key.is_empty() => {
+                    provider_config.insert("api_key".to_string(), api_key.clone());
+                }
+                _ => {
+                    eprintln!();
+                    eprintln!("{}", "✗ Anthropic API key not configured".red().bold());
+                    eprintln!();
+                    eprintln!("  To fix, set your API key:");
+                    eprintln!("    {}", "export ANTHROPIC_API_KEY=sk-ant-...".cyan());
+                    eprintln!();
+                    eprintln!("  Or add to ~/.descartes/config.toml:");
+                    eprintln!("    {}", "[providers.anthropic]".dimmed());
+                    eprintln!("    {}", "api_key = \"sk-ant-...\"".dimmed());
+                    eprintln!();
+                    eprintln!("  Get your key at: {}", "https://console.anthropic.com".cyan());
+                    eprintln!();
+                    anyhow::bail!("Anthropic API key not configured");
+                }
             }
             provider_config.insert(
                 "endpoint".to_string(),
@@ -239,8 +263,21 @@ pub fn create_backend(
             );
         }
         "openai" => {
-            if let Some(ref api_key) = config.providers.openai.api_key {
-                provider_config.insert("api_key".to_string(), api_key.clone());
+            match &config.providers.openai.api_key {
+                Some(api_key) if !api_key.is_empty() => {
+                    provider_config.insert("api_key".to_string(), api_key.clone());
+                }
+                _ => {
+                    eprintln!();
+                    eprintln!("{}", "✗ OpenAI API key not configured".red().bold());
+                    eprintln!();
+                    eprintln!("  To fix, set your API key:");
+                    eprintln!("    {}", "export OPENAI_API_KEY=sk-...".cyan());
+                    eprintln!();
+                    eprintln!("  Get your key at: {}", "https://platform.openai.com/api-keys".cyan());
+                    eprintln!();
+                    anyhow::bail!("OpenAI API key not configured");
+                }
             }
             provider_config.insert(
                 "endpoint".to_string(),
@@ -254,8 +291,19 @@ pub fn create_backend(
             );
         }
         "deepseek" => {
-            if let Some(ref api_key) = config.providers.deepseek.api_key {
-                provider_config.insert("api_key".to_string(), api_key.clone());
+            match &config.providers.deepseek.api_key {
+                Some(api_key) if !api_key.is_empty() => {
+                    provider_config.insert("api_key".to_string(), api_key.clone());
+                }
+                _ => {
+                    eprintln!();
+                    eprintln!("{}", "✗ DeepSeek API key not configured".red().bold());
+                    eprintln!();
+                    eprintln!("  To fix, set your API key:");
+                    eprintln!("    {}", "export DEEPSEEK_API_KEY=...".cyan());
+                    eprintln!();
+                    anyhow::bail!("DeepSeek API key not configured");
+                }
             }
             provider_config.insert(
                 "endpoint".to_string(),
@@ -263,8 +311,21 @@ pub fn create_backend(
             );
         }
         "groq" => {
-            if let Some(ref api_key) = config.providers.groq.api_key {
-                provider_config.insert("api_key".to_string(), api_key.clone());
+            match &config.providers.groq.api_key {
+                Some(api_key) if !api_key.is_empty() => {
+                    provider_config.insert("api_key".to_string(), api_key.clone());
+                }
+                _ => {
+                    eprintln!();
+                    eprintln!("{}", "✗ Groq API key not configured".red().bold());
+                    eprintln!();
+                    eprintln!("  To fix, set your API key:");
+                    eprintln!("    {}", "export GROQ_API_KEY=...".cyan());
+                    eprintln!();
+                    eprintln!("  Get your key at: {}", "https://console.groq.com".cyan());
+                    eprintln!();
+                    anyhow::bail!("Groq API key not configured");
+                }
             }
             provider_config.insert(
                 "endpoint".to_string(),
@@ -272,6 +333,16 @@ pub fn create_backend(
             );
         }
         _ => {
+            eprintln!();
+            eprintln!("{}", format!("✗ Unknown provider: {}", provider).red().bold());
+            eprintln!();
+            eprintln!("  Available providers:");
+            eprintln!("    {} - Claude models", "anthropic".cyan());
+            eprintln!("    {} - GPT models", "openai".cyan());
+            eprintln!("    {} - Local models", "ollama".cyan());
+            eprintln!("    {} - DeepSeek models", "deepseek".cyan());
+            eprintln!("    {} - Fast inference", "groq".cyan());
+            eprintln!();
             anyhow::bail!("Unknown provider: {}", provider);
         }
     }
