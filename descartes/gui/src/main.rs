@@ -105,7 +105,6 @@ enum ViewMode {
     SwarmMonitor,
     Debugger,
     DagEditor,
-    ContextBrowser,
     FileBrowser,
     KnowledgeGraph,
 }
@@ -190,8 +189,18 @@ impl DescartesGui {
                 self.status_message = Some("Connecting to daemon...".to_string());
                 self.connection_error = None;
 
+                // Use active session's daemon endpoint if available, otherwise default
+                let endpoint = self
+                    .session_state
+                    .active_session()
+                    .and_then(|s| s.daemon_info.as_ref())
+                    .map(|d| d.http_endpoint.clone())
+                    .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
+
+                tracing::info!("Using daemon endpoint: {}", endpoint);
+
                 // Create RPC client
-                match GuiRpcClient::default() {
+                match GuiRpcClient::new(&endpoint) {
                     Ok(client) => {
                         let client = Arc::new(client);
                         self.rpc_client = Some(Arc::clone(&client));
@@ -260,8 +269,71 @@ impl DescartesGui {
                 iced::Task::none()
             }
             Message::Session(msg) => {
+                use session_state::SessionMessage;
+
+                // Handle async operations before updating state
+                let task = match &msg {
+                    SessionMessage::SelectSession(id) => {
+                        // When selecting a session, auto-start daemon if not running
+                        if let Some(session) = self.session_state.sessions.iter().find(|s| s.id == *id) {
+                            if session.daemon_info.is_none() || session.status != descartes_core::SessionStatus::Active {
+                                let session_clone = session.clone();
+                                return iced::Task::perform(
+                                    spawn_daemon_for_session(session_clone),
+                                    |result| match result {
+                                        Ok(session) => Message::Session(SessionMessage::DaemonStarted(session)),
+                                        Err(e) => Message::Session(SessionMessage::DaemonError(e)),
+                                    },
+                                );
+                            }
+                        }
+                        iced::Task::none()
+                    }
+                    SessionMessage::StartDaemon(id) => {
+                        if let Some(session) = self.session_state.sessions.iter().find(|s| s.id == *id) {
+                            let session_clone = session.clone();
+                            iced::Task::perform(
+                                spawn_daemon_for_session(session_clone),
+                                |result| match result {
+                                    Ok(session) => Message::Session(SessionMessage::DaemonStarted(session)),
+                                    Err(e) => Message::Session(SessionMessage::DaemonError(e)),
+                                },
+                            )
+                        } else {
+                            iced::Task::none()
+                        }
+                    }
+                    SessionMessage::StopDaemon(id) => {
+                        if let Some(session) = self.session_state.sessions.iter().find(|s| s.id == *id) {
+                            if let Some(ref daemon_info) = session.daemon_info {
+                                let endpoint = daemon_info.http_endpoint.clone();
+                                let pid = daemon_info.pid;
+                                let session_id = *id;
+                                iced::Task::perform(
+                                    stop_daemon(endpoint, pid),
+                                    move |result| match result {
+                                        Ok(_) => Message::Session(SessionMessage::DaemonStopped(session_id)),
+                                        Err(e) => Message::Session(SessionMessage::DaemonError(e)),
+                                    },
+                                )
+                            } else {
+                                iced::Task::none()
+                            }
+                        } else {
+                            iced::Task::none()
+                        }
+                    }
+                    SessionMessage::DaemonStarted(_) => {
+                        // Auto-connect to the newly started daemon
+                        self.status_message = Some("Daemon started! Connecting...".to_string());
+                        // Return a task that triggers ConnectDaemon after state update
+                        iced::Task::done(Message::ConnectDaemon)
+                    }
+                    _ => iced::Task::none(),
+                };
+
                 session_state::update(&mut self.session_state, msg);
-                iced::Task::none()
+                task
             }
             Message::TimeTravel(tt_msg) => {
                 time_travel::update(&mut self.time_travel_state, tt_msg);
@@ -920,15 +992,14 @@ impl DescartesGui {
     fn view_navigation(&self) -> Element<Message> {
         // Navigation items with icons
         let nav_items = vec![
-            (ViewMode::Sessions, "\u{2726}", "Sessions"),  // ✦
+            (ViewMode::Sessions, "\u{25C6}", "Sessions"),    // ◆
             (ViewMode::Dashboard, "\u{2302}", "Dashboard"),  // ⌂
-            (ViewMode::TaskBoard, "\u{2630}", "Tasks"),  // ☰
-            (ViewMode::SwarmMonitor, "\u{25CE}", "Swarm"),  // ◎
-            (ViewMode::Debugger, "\u{23F1}", "Debugger"),  // ⏱
+            (ViewMode::TaskBoard, "\u{2630}", "Tasks"),      // ☰
+            (ViewMode::SwarmMonitor, "\u{25CE}", "Agents"),  // ◎
+            (ViewMode::Debugger, "\u{23F1}", "Debugger"),    // ⏱
             (ViewMode::DagEditor, "\u{25C7}", "Workflows"),  // ◇
-            (ViewMode::ContextBrowser, "\u{25C8}", "Context"),  // ◈
-            (ViewMode::FileBrowser, "\u{25A4}", "Files"),  // ▤
-            (ViewMode::KnowledgeGraph, "\u{25C9}", "Graph"),  // ◉
+            (ViewMode::FileBrowser, "\u{25A4}", "Files"),    // ▤
+            (ViewMode::KnowledgeGraph, "\u{25C9}", "Graph"), // ◉
         ];
 
         let buttons: Vec<Element<Message>> = nav_items
@@ -999,7 +1070,6 @@ impl DescartesGui {
             ViewMode::SwarmMonitor => self.view_swarm_monitor(),
             ViewMode::Debugger => self.view_debugger(),
             ViewMode::DagEditor => self.view_dag_editor(),
-            ViewMode::ContextBrowser => self.view_context_browser(),
             ViewMode::FileBrowser => self.view_file_browser(),
             ViewMode::KnowledgeGraph => self.view_knowledge_graph(),
         };
@@ -1231,38 +1301,138 @@ impl DescartesGui {
         }
     }
 
-    /// Swarm Monitor view (placeholder)
+    /// Swarm Monitor view - shows active session and daemon status
     fn view_swarm_monitor(&self) -> Element<Message> {
-        let title = text("Swarm Monitor")
+        let title = text("Agent Monitor")
             .size(28)
             .color(colors::TEXT_PRIMARY);
 
-        let subtitle = text("Visualize active agents and their status")
+        let subtitle = text("Active sessions and daemon status")
             .size(14)
             .color(colors::TEXT_SECONDARY);
 
-        // Placeholder content
-        let placeholder_card = container(
-            column![
-                text("◎").size(32).color(colors::TEXT_MUTED),
-                Space::with_height(12),
-                text("No active agents").size(16).color(colors::TEXT_PRIMARY),
-                Space::with_height(4),
-                text("Spawn an agent to see it here").size(12).color(colors::TEXT_MUTED),
-            ]
+        // Session status card
+        let session_card = if let Some(session) = self.session_state.active_session() {
+            let (status_icon, status_color, status_text) = match session.status {
+                descartes_core::SessionStatus::Active => ("●", colors::SUCCESS, "Active"),
+                descartes_core::SessionStatus::Starting => ("◐", colors::WARNING, "Starting"),
+                descartes_core::SessionStatus::Stopping => ("◐", colors::WARNING, "Stopping"),
+                descartes_core::SessionStatus::Inactive => ("○", colors::TEXT_MUTED, "Inactive"),
+                descartes_core::SessionStatus::Error => ("●", colors::ERROR, "Error"),
+                descartes_core::SessionStatus::Archived => ("○", colors::TEXT_MUTED, "Archived"),
+            };
+
+            let daemon_info = if let Some(ref info) = session.daemon_info {
+                column![
+                    row![
+                        text("Endpoint:").size(12).color(colors::TEXT_MUTED),
+                        Space::with_width(8),
+                        text(&info.http_endpoint).size(12).color(colors::PRIMARY),
+                    ],
+                    row![
+                        text("PID:").size(12).color(colors::TEXT_MUTED),
+                        Space::with_width(8),
+                        text(info.pid.map(|p| p.to_string()).unwrap_or_else(|| "N/A".to_string()))
+                            .size(12)
+                            .color(colors::TEXT_SECONDARY),
+                    ],
+                    row![
+                        text("Started:").size(12).color(colors::TEXT_MUTED),
+                        Space::with_width(8),
+                        text(info.started_at.format("%H:%M:%S").to_string())
+                            .size(12)
+                            .color(colors::TEXT_SECONDARY),
+                    ],
+                ]
+                .spacing(4)
+            } else {
+                column![
+                    text("No daemon running").size(12).color(colors::TEXT_MUTED),
+                    Space::with_height(4),
+                    text("Select a session to start daemon").size(11).color(colors::TEXT_MUTED),
+                ]
+            };
+
+            container(
+                column![
+                    // Session header
+                    row![
+                        text("◆").size(20).color(colors::PRIMARY),
+                        Space::with_width(12),
+                        column![
+                            text(&session.name).size(18).color(colors::TEXT_PRIMARY),
+                            text(session.path.display().to_string())
+                                .size(11)
+                                .color(colors::TEXT_MUTED),
+                        ],
+                        Space::with_width(Length::Fill),
+                        row![
+                            text(status_icon).size(12).color(status_color),
+                            Space::with_width(6),
+                            text(status_text).size(12).color(status_color),
+                        ],
+                    ]
+                    .align_y(Vertical::Center),
+                    Space::with_height(16),
+                    // Daemon info
+                    container(daemon_info)
+                        .padding(12)
+                        .width(Length::Fill)
+                        .style(container_styles::card),
+                    Space::with_height(16),
+                    // Connection status
+                    row![
+                        text("GUI Connection:").size(12).color(colors::TEXT_MUTED),
+                        Space::with_width(8),
+                        text(if self.daemon_connected { "●" } else { "○" })
+                            .size(12)
+                            .color(if self.daemon_connected { colors::SUCCESS } else { colors::TEXT_MUTED }),
+                        Space::with_width(4),
+                        text(if self.daemon_connected { "Connected" } else { "Disconnected" })
+                            .size(12)
+                            .color(if self.daemon_connected { colors::SUCCESS } else { colors::TEXT_MUTED }),
+                    ],
+                ]
+            )
+            .padding(20)
+            .width(Length::Fill)
+            .style(container_styles::panel)
+        } else {
+            // No active session
+            container(
+                column![
+                    text("◎").size(32).color(colors::TEXT_MUTED),
+                    Space::with_height(12),
+                    text("No active session").size(16).color(colors::TEXT_PRIMARY),
+                    Space::with_height(4),
+                    text("Select a session from the Sessions view").size(12).color(colors::TEXT_MUTED),
+                ]
+                .align_x(Horizontal::Center)
+            )
+            .padding(40)
+            .width(Length::Fill)
+            .style(container_styles::panel)
             .align_x(Horizontal::Center)
-        )
-        .padding(40)
-        .width(Length::Fill)
-        .style(container_styles::panel)
-        .align_x(Horizontal::Center);
+        };
+
+        // Stats row
+        let (active, inactive, _archived) = self.session_state.status_counts();
+        let stats_row = row![
+            self.view_stat_card("Active".to_string(), active.to_string(), "●".to_string(), colors::SUCCESS),
+            Space::with_width(12),
+            self.view_stat_card("Inactive".to_string(), inactive.to_string(), "○".to_string(), colors::TEXT_MUTED),
+            Space::with_width(12),
+            self.view_stat_card("Events".to_string(), self.recent_events.len().to_string(), "◈".to_string(), colors::INFO),
+        ];
 
         column![
             title,
             Space::with_height(4),
             subtitle,
             Space::with_height(24),
-            placeholder_card,
+            stats_row,
+            Space::with_height(16),
+            session_card,
         ]
         .spacing(0)
         .into()
@@ -1334,58 +1504,6 @@ impl DescartesGui {
             // Map DAG editor messages to main messages
             dag_editor::view(&self.dag_editor_state).map(Message::DAGEditor)
         }
-    }
-
-    /// Context Browser view (placeholder)
-    fn view_context_browser(&self) -> Element<Message> {
-        let title = text("Context Browser")
-            .size(28)
-            .color(colors::TEXT_PRIMARY);
-
-        let subtitle = text("Browse and manage agent execution context")
-            .size(14)
-            .color(colors::TEXT_SECONDARY);
-
-        let features = vec![
-            ("◈", "View current agent state"),
-            ("◇", "Browse variable bindings"),
-            ("▤", "Inspect memory contents"),
-            ("⌕", "Search through context history"),
-            ("↗", "Export context snapshots"),
-        ];
-
-        let feature_list: Vec<Element<Message>> = features
-            .into_iter()
-            .map(|(icon, text_str)| {
-                row![
-                    text(icon).size(14).color(colors::TEXT_MUTED),
-                    Space::with_width(12),
-                    text(text_str).size(13).color(colors::TEXT_SECONDARY),
-                ]
-                .align_y(Vertical::Center)
-                .into()
-            })
-            .collect();
-
-        let coming_soon = container(
-            column![
-                text("Coming Soon").size(12).color(colors::WARNING),
-                Space::with_height(16),
-                column(feature_list).spacing(12),
-            ]
-        )
-        .padding(20)
-        .style(container_styles::panel);
-
-        column![
-            title,
-            Space::with_height(4),
-            subtitle,
-            Space::with_height(24),
-            coming_soon,
-        ]
-        .spacing(0)
-        .into()
     }
 
     /// File Browser view
@@ -1812,4 +1930,112 @@ impl DescartesGui {
         );
         tracing::warn!("Knowledge graph generation not available without agent-runner feature");
     }
+}
+
+/// Spawn a daemon for a session
+async fn spawn_daemon_for_session(mut session: descartes_core::Session) -> Result<descartes_core::Session, String> {
+    use std::process::{Command, Stdio};
+    use tokio::time::{sleep, Duration};
+
+    // Use a port based on session ID to avoid conflicts
+    let port_offset = (session.id.as_u128() % 100) as u16;
+    let http_port = 8080 + port_offset;
+    let ws_port = 8180 + port_offset;
+
+    let workspace_path = &session.path;
+    let config_path = workspace_path.join("config.toml");
+
+    tracing::info!(
+        "Starting daemon for session {} on port {}",
+        session.name,
+        http_port
+    );
+
+    // Build daemon command
+    let mut cmd = Command::new("descartes-daemon");
+    cmd.arg("--http-port")
+        .arg(http_port.to_string())
+        .arg("--ws-port")
+        .arg(ws_port.to_string())
+        .arg("--workdir")
+        .arg(workspace_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    if config_path.exists() {
+        cmd.arg("--config").arg(&config_path);
+    }
+
+    let child = cmd.spawn().map_err(|e| {
+        format!(
+            "Failed to spawn daemon: {}. Is descartes-daemon in PATH?",
+            e
+        )
+    })?;
+
+    let pid = child.id();
+
+    // Wait for daemon to be ready
+    let endpoint = format!("http://127.0.0.1:{}", http_port);
+    let client = reqwest::Client::new();
+    let mut attempts = 0;
+
+    while attempts < 30 {
+        if let Ok(resp) = client.get(&format!("{}/health", endpoint)).send().await {
+            if resp.status().is_success() {
+                tracing::info!("Daemon started on port {} (PID: {})", http_port, pid);
+
+                session.status = descartes_core::SessionStatus::Active;
+                session.daemon_info = Some(descartes_core::DaemonInfo {
+                    pid: Some(pid),
+                    http_endpoint: endpoint,
+                    ws_endpoint: Some(format!("ws://127.0.0.1:{}", ws_port)),
+                    started_at: chrono::Utc::now(),
+                });
+                session.last_accessed = Some(chrono::Utc::now());
+
+                return Ok(session);
+            }
+        }
+        sleep(Duration::from_millis(100)).await;
+        attempts += 1;
+    }
+
+    Err("Daemon failed to become healthy within timeout (3s)".to_string())
+}
+
+/// Stop a daemon
+async fn stop_daemon(endpoint: String, pid: Option<u32>) -> Result<(), String> {
+    // Try graceful shutdown via HTTP
+    let client = reqwest::Client::new();
+    if let Err(e) = client
+        .post(&format!("{}/shutdown", endpoint))
+        .send()
+        .await
+    {
+        tracing::warn!("Graceful shutdown failed: {}, trying kill", e);
+
+        // Fall back to kill if we have PID
+        if let Some(pid) = pid {
+            #[cfg(unix)]
+            {
+                use nix::sys::signal::{kill, Signal};
+                use nix::unistd::Pid;
+
+                kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
+                    .map_err(|e| format!("Failed to kill daemon: {}", e))?;
+            }
+            #[cfg(not(unix))]
+            {
+                return Err(format!(
+                    "Cannot kill daemon on non-Unix system, PID: {}",
+                    pid
+                ));
+            }
+        } else {
+            return Err("No PID available for daemon".to_string());
+        }
+    }
+
+    Ok(())
 }

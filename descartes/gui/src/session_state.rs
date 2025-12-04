@@ -123,8 +123,14 @@ pub enum SessionMessage {
     SessionDeleted(Uuid),
     /// Start daemon for a session
     StartDaemon(Uuid),
+    /// Daemon started successfully
+    DaemonStarted(Session),
     /// Stop daemon for a session
     StopDaemon(Uuid),
+    /// Daemon stopped successfully
+    DaemonStopped(Uuid),
+    /// Daemon operation failed
+    DaemonError(String),
     /// Update search filter
     UpdateSearch(String),
     /// Toggle include archived
@@ -200,8 +206,27 @@ pub fn update(state: &mut SessionState, message: SessionMessage) {
         SessionMessage::StartDaemon(_id) => {
             state.loading = true;
         }
+        SessionMessage::DaemonStarted(session) => {
+            // Update session in list with new daemon info
+            if let Some(existing) = state.sessions.iter_mut().find(|s| s.id == session.id) {
+                *existing = session.clone();
+            }
+            state.active_session_id = Some(session.id);
+            state.loading = false;
+        }
         SessionMessage::StopDaemon(_id) => {
             state.loading = true;
+        }
+        SessionMessage::DaemonStopped(id) => {
+            if let Some(session) = state.sessions.iter_mut().find(|s| s.id == id) {
+                session.status = SessionStatus::Inactive;
+                session.daemon_info = None;
+            }
+            state.loading = false;
+        }
+        SessionMessage::DaemonError(err) => {
+            state.error = Some(err);
+            state.loading = false;
         }
         SessionMessage::UpdateSearch(search) => {
             state.filter.search = search;

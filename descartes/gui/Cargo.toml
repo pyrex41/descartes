@@ -24,6 +24,10 @@ uuid = { workspace = true }
 # GUI framework
 iced = { version = "0.13", features = ["debug", "tokio", "advanced", "canvas"] }
 futures = "0.3"
+reqwest = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29", features = ["signal"] }
 
 [[bin]]
 name = "descartes-gui"

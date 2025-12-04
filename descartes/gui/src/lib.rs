@@ -62,19 +62,3 @@ pub use time_travel_integration::{
 };
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-/// Placeholder for Iced GUI implementation
-pub struct DescarterGui;
-
-impl DescarterGui {
-    /// Create a new GUI instance
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for DescarterGui {
-    fn default() -> Self {
-        Self::new()
-    }
-}
