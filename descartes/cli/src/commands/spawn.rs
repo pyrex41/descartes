@@ -24,6 +24,8 @@ fn parse_tool_level(level: &str, no_spawn: bool) -> ToolLevel {
             }
         }
         "readonly" => ToolLevel::ReadOnly,
+        "researcher" => ToolLevel::Researcher,
+        "planner" => ToolLevel::Planner,
         _ => {
             warn!("Unknown tool level '{}', defaulting to minimal", level);
             ToolLevel::Minimal
@@ -65,6 +67,8 @@ pub async fn execute(
         ToolLevel::Minimal => "minimal",
         ToolLevel::Orchestrator => "orchestrator",
         ToolLevel::ReadOnly => "readonly",
+        ToolLevel::Researcher => "researcher",
+        ToolLevel::Planner => "planner",
     };
     println!("  Tool level: {}", level_str.yellow());
 

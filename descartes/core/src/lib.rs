@@ -2,6 +2,7 @@
 // Core library providing traits, providers, and orchestration utilities
 #![allow(mismatched_lifetime_syntaxes)]
 
+pub mod agent_definitions;
 pub mod agent_history;
 pub mod attach;
 pub mod attach_protocol;
@@ -37,6 +38,7 @@ pub mod scg_task_storage;
 pub mod thoughts;
 pub mod time_travel_integration;
 pub mod traits;
+pub mod workflow_commands;
 pub mod zmq_agent_runner;
 pub mod zmq_client;
 pub mod zmq_communication;
@@ -172,8 +174,17 @@ pub use swarm_parser::{
 };
 
 pub use thoughts::{
-    StorageStatistics, ThoughtMetadata, ThoughtsConfig, ThoughtsError, ThoughtsResult,
-    ThoughtsStorage,
+    parse_markdown_with_frontmatter, MarkdownDocument, StorageStatistics, ThoughtMetadata,
+    ThoughtsConfig, ThoughtsError, ThoughtsResult, ThoughtsStorage, PLANS_DIR, RESEARCH_DIR,
+};
+
+pub use agent_definitions::{
+    AgentDefinition, AgentDefinitionError, AgentDefinitionLoader, AgentDefinitionResult,
+};
+
+pub use workflow_commands::{
+    get_workflow, list_workflows, prepare_workflow, StepResult, WorkflowCommand, WorkflowContext,
+    WorkflowError, WorkflowExecutionResult, WorkflowRegistry, WorkflowResult, WorkflowStep,
 };
 
 pub use debugger::{
@@ -257,8 +268,8 @@ pub use session_manager::FileSystemSessionManager;
 pub use tools::{
     bash_tool, edit_tool, execute_bash, execute_edit, execute_read, execute_spawn_session,
     execute_tool, execute_write, get_system_prompt, get_tools, minimal_system_prompt,
-    orchestrator_system_prompt, read_tool, readonly_system_prompt, spawn_session_tool, write_tool,
-    ToolLevel, ToolResult,
+    orchestrator_system_prompt, planner_system_prompt, read_tool, readonly_system_prompt,
+    researcher_system_prompt, spawn_session_tool, write_tool, ToolLevel, ToolResult,
 };
 
 pub use session_transcript::{
