@@ -18,6 +18,12 @@ pub enum ToolLevel {
     /// Read-only tools: read, bash (with restrictions)
     /// Used for exploration/planning without modifications
     ReadOnly,
+    /// Researcher tools: read, bash (read-only)
+    /// Specialized for codebase research with focused prompts
+    Researcher,
+    /// Planner tools: read, bash, write (to thoughts only)
+    /// Used for planning and documentation tasks
+    Planner,
 }
 
 /// Get the tools for a given capability level.
@@ -34,6 +40,15 @@ pub fn get_tools(level: ToolLevel) -> Vec<Tool> {
         ToolLevel::ReadOnly => vec![
             read_tool(),
             bash_tool(), // For ls, grep, find, git status, etc.
+        ],
+        ToolLevel::Researcher => vec![
+            read_tool(),
+            bash_tool(), // Same as ReadOnly but with researcher-focused prompt
+        ],
+        ToolLevel::Planner => vec![
+            read_tool(),
+            write_tool(), // Can write to thoughts/plans
+            bash_tool(),
         ],
     }
 }
@@ -95,12 +110,49 @@ Guidelines:
 - Be concise in your responses"#
 }
 
+/// Get researcher system prompt for codebase research tasks.
+pub fn researcher_system_prompt() -> &'static str {
+    r#"You are a codebase researcher. Your role is to explore and understand code structure, patterns, and implementations.
+
+Available tools:
+- read: Read file contents
+- bash: Execute bash commands (read-only: ls, grep, find, git)
+
+Guidelines:
+- Use bash for file discovery: ls, find, grep, git log
+- Use read to examine file contents in detail
+- Focus on finding patterns, understanding architecture
+- Document your findings clearly
+- Report file locations and code snippets when relevant
+- Be thorough but efficient in your exploration"#
+}
+
+/// Get planner system prompt for planning and documentation tasks.
+pub fn planner_system_prompt() -> &'static str {
+    r#"You are a planning assistant. Your role is to create implementation plans and documentation.
+
+Available tools:
+- read: Read file contents
+- write: Write files (use for plans and documentation)
+- bash: Execute bash commands (read-only operations)
+
+Guidelines:
+- Use bash for understanding current state: ls, grep, find, git
+- Use read to examine existing code and documentation
+- Use write to create plans and documentation files
+- Focus on clear, actionable implementation steps
+- Consider dependencies and order of operations
+- Be specific about file locations and changes needed"#
+}
+
 /// Get the appropriate system prompt for a tool level.
 pub fn get_system_prompt(level: ToolLevel) -> &'static str {
     match level {
         ToolLevel::Minimal => minimal_system_prompt(),
         ToolLevel::Orchestrator => orchestrator_system_prompt(),
         ToolLevel::ReadOnly => readonly_system_prompt(),
+        ToolLevel::Researcher => researcher_system_prompt(),
+        ToolLevel::Planner => planner_system_prompt(),
     }
 }
 
@@ -147,10 +199,35 @@ mod tests {
     }
 
     #[test]
+    fn test_researcher_tools() {
+        let tools = get_tools(ToolLevel::Researcher);
+        assert_eq!(tools.len(), 2);
+
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"read"));
+        assert!(names.contains(&"bash"));
+        assert!(!names.contains(&"write"));
+    }
+
+    #[test]
+    fn test_planner_tools() {
+        let tools = get_tools(ToolLevel::Planner);
+        assert_eq!(tools.len(), 3);
+
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"read"));
+        assert!(names.contains(&"write"));
+        assert!(names.contains(&"bash"));
+        assert!(!names.contains(&"edit"));
+    }
+
+    #[test]
     fn test_system_prompts_not_empty() {
         assert!(!minimal_system_prompt().is_empty());
         assert!(!orchestrator_system_prompt().is_empty());
         assert!(!readonly_system_prompt().is_empty());
+        assert!(!researcher_system_prompt().is_empty());
+        assert!(!planner_system_prompt().is_empty());
     }
 
     #[test]
@@ -161,6 +238,8 @@ mod tests {
             orchestrator_system_prompt()
         );
         assert_eq!(get_system_prompt(ToolLevel::ReadOnly), readonly_system_prompt());
+        assert_eq!(get_system_prompt(ToolLevel::Researcher), researcher_system_prompt());
+        assert_eq!(get_system_prompt(ToolLevel::Planner), planner_system_prompt());
     }
 
     #[test]
@@ -173,5 +252,17 @@ mod tests {
     fn test_minimal_prompt_no_spawn() {
         let prompt = minimal_system_prompt();
         assert!(!prompt.contains("spawn_session"));
+    }
+
+    #[test]
+    fn test_researcher_prompt_mentions_codebase() {
+        let prompt = researcher_system_prompt();
+        assert!(prompt.contains("codebase"));
+    }
+
+    #[test]
+    fn test_planner_prompt_mentions_plans() {
+        let prompt = planner_system_prompt();
+        assert!(prompt.contains("plan"));
     }
 }

@@ -7,7 +7,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
+
+use crate::agent_definitions::AgentDefinitionLoader;
+use crate::tools::ToolLevel;
 
 /// Result of a tool execution.
 #[derive(Debug, Clone)]
@@ -349,6 +352,17 @@ pub fn execute_bash(args: &Value, working_dir: &Path) -> ToolResult {
     }
 }
 
+/// Convert a ToolLevel to its CLI string representation.
+fn tool_level_to_string(level: ToolLevel) -> &'static str {
+    match level {
+        ToolLevel::Minimal => "minimal",
+        ToolLevel::Orchestrator => "orchestrator",
+        ToolLevel::ReadOnly => "readonly",
+        ToolLevel::Researcher => "researcher",
+        ToolLevel::Planner => "planner",
+    }
+}
+
 /// Execute the `spawn_session` tool.
 /// This spawns a sub-session with --no-spawn to prevent recursive spawning.
 pub fn execute_spawn_session(
@@ -378,6 +392,35 @@ pub fn execute_spawn_session(
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
+    // Check for agent parameter and load agent definition if specified
+    let agent_name = args.get("agent").and_then(|v| v.as_str());
+    let (tool_level, system_prompt) = if let Some(name) = agent_name {
+        match AgentDefinitionLoader::new() {
+            Ok(loader) => match loader.load_agent(name) {
+                Ok(agent) => {
+                    info!(
+                        "Using agent definition: {} (tool_level: {:?})",
+                        agent.name, agent.tool_level
+                    );
+                    (
+                        tool_level_to_string(agent.tool_level),
+                        Some(agent.system_prompt),
+                    )
+                }
+                Err(e) => {
+                    warn!("Failed to load agent '{}': {}, using defaults", name, e);
+                    ("minimal", None)
+                }
+            },
+            Err(e) => {
+                warn!("Failed to initialize agent loader: {}, using defaults", e);
+                ("minimal", None)
+            }
+        }
+    } else {
+        ("minimal", None)
+    };
+
     // Find descartes binary
     let bin_path = descartes_bin
         .map(|p| p.to_path_buf())
@@ -385,8 +428,8 @@ pub fn execute_spawn_session(
         .unwrap_or_else(|| PathBuf::from("descartes"));
 
     info!(
-        "Spawning sub-session with task: {} (provider: {})",
-        task, provider
+        "Spawning sub-session with task: {} (provider: {}, tool_level: {}, agent: {:?})",
+        task, provider, tool_level, agent_name
     );
 
     // Build command with --no-spawn to prevent recursive spawning
@@ -398,11 +441,16 @@ pub fn execute_spawn_session(
         .arg(provider)
         .arg("--no-spawn") // Critical: prevents sub-sessions from spawning their own sub-sessions
         .arg("--tool-level")
-        .arg("minimal") // Sub-sessions get minimal tools
+        .arg(tool_level)
         .current_dir(working_dir)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // Pass custom system prompt if agent was loaded
+    if let Some(prompt) = &system_prompt {
+        cmd.arg("--system").arg(prompt);
+    }
 
     if let Some(output) = output_file {
         cmd.arg("--transcript-dir").arg(output);
@@ -424,17 +472,22 @@ pub fn execute_spawn_session(
                 result.push_str(&stderr);
             }
 
+            let mut metadata: HashMap<String, String> = [
+                ("task".to_string(), task.to_string()),
+                ("provider".to_string(), provider.to_string()),
+                ("tool_level".to_string(), tool_level.to_string()),
+            ]
+            .into_iter()
+            .collect();
+
+            if let Some(name) = agent_name {
+                metadata.insert("agent".to_string(), name.to_string());
+            }
+
             ToolResult {
                 success: output.status.success(),
                 output: result,
-                metadata: Some(
-                    [
-                        ("task".to_string(), task.to_string()),
-                        ("provider".to_string(), provider.to_string()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
+                metadata: Some(metadata),
             }
         }
         Err(e) => ToolResult {

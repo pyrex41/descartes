@@ -11,11 +11,17 @@
 /// - Support for categorizing thoughts via tags/folders
 /// - Project-specific symlink management to global thoughts
 /// - Atomic operations for safe concurrent access
+use std::collections::HashMap;
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tracing::{debug, info, warn};
+
+/// Subdirectory for research output documents
+pub const RESEARCH_DIR: &str = "research";
+/// Subdirectory for implementation plans
+pub const PLANS_DIR: &str = "plans";
 
 /// Errors that can occur during thoughts operations
 #[derive(Error, Debug)]
@@ -137,6 +143,8 @@ impl ThoughtsStorage {
             self.config.global_root.join("projects"),
             self.config.global_root.join("categories"),
             self.config.global_root.join(".metadata"),
+            self.config.global_root.join(RESEARCH_DIR),
+            self.config.global_root.join(PLANS_DIR),
         ];
 
         for subdir in subdirs {
@@ -462,6 +470,115 @@ impl ThoughtsStorage {
     pub fn config(&self) -> &ThoughtsConfig {
         &self.config
     }
+
+    // ========== Research/Plans File Operations ==========
+
+    /// Get the research directory path
+    pub fn research_dir(&self) -> PathBuf {
+        self.config.global_root.join(RESEARCH_DIR)
+    }
+
+    /// Get the plans directory path
+    pub fn plans_dir(&self) -> PathBuf {
+        self.config.global_root.join(PLANS_DIR)
+    }
+
+    /// Save a research document to the research directory.
+    ///
+    /// Returns the full path to the saved file.
+    pub fn save_research(&self, filename: &str, content: &str) -> ThoughtsResult<PathBuf> {
+        self.save_to_subdir(RESEARCH_DIR, filename, content)
+    }
+
+    /// Save a plan document to the plans directory.
+    ///
+    /// Returns the full path to the saved file.
+    pub fn save_plan(&self, filename: &str, content: &str) -> ThoughtsResult<PathBuf> {
+        self.save_to_subdir(PLANS_DIR, filename, content)
+    }
+
+    /// Save a file to a subdirectory.
+    fn save_to_subdir(&self, subdir: &str, filename: &str, content: &str) -> ThoughtsResult<PathBuf> {
+        let dir_path = self.config.global_root.join(subdir);
+        self.create_directory(&dir_path)?;
+
+        let file_path = dir_path.join(filename);
+        fs::write(&file_path, content)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = fs::Permissions::from_mode(self.config.file_permissions);
+            fs::set_permissions(&file_path, perms)?;
+        }
+
+        info!("Saved {} to {:?}", filename, file_path);
+        Ok(file_path)
+    }
+
+    /// List all research documents.
+    ///
+    /// Returns paths to all markdown files in the research directory.
+    pub fn list_research(&self) -> ThoughtsResult<Vec<PathBuf>> {
+        self.list_files_in_subdir(RESEARCH_DIR)
+    }
+
+    /// List all plan documents.
+    ///
+    /// Returns paths to all markdown files in the plans directory.
+    pub fn list_plans(&self) -> ThoughtsResult<Vec<PathBuf>> {
+        self.list_files_in_subdir(PLANS_DIR)
+    }
+
+    /// List files in a subdirectory.
+    fn list_files_in_subdir(&self, subdir: &str) -> ThoughtsResult<Vec<PathBuf>> {
+        let dir_path = self.config.global_root.join(subdir);
+        let mut files = Vec::new();
+
+        if !dir_path.exists() {
+            return Ok(files);
+        }
+
+        for entry in fs::read_dir(&dir_path)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() {
+                files.push(path);
+            }
+        }
+
+        // Sort by filename for consistent ordering
+        files.sort();
+        debug!("Found {} files in {}", files.len(), subdir);
+        Ok(files)
+    }
+
+    /// Load a research document by filename.
+    pub fn load_research(&self, filename: &str) -> ThoughtsResult<String> {
+        self.load_from_subdir(RESEARCH_DIR, filename)
+    }
+
+    /// Load a plan document by filename.
+    pub fn load_plan(&self, filename: &str) -> ThoughtsResult<String> {
+        self.load_from_subdir(PLANS_DIR, filename)
+    }
+
+    /// Load a file from a subdirectory.
+    fn load_from_subdir(&self, subdir: &str, filename: &str) -> ThoughtsResult<String> {
+        let file_path = self.config.global_root.join(subdir).join(filename);
+
+        if !file_path.exists() {
+            return Err(ThoughtsError::InvalidPath(format!(
+                "File not found: {:?}",
+                file_path
+            )));
+        }
+
+        let content = fs::read_to_string(&file_path)?;
+        debug!("Loaded {} from {:?}", filename, file_path);
+        Ok(content)
+    }
 }
 
 impl Default for ThoughtsStorage {
@@ -481,10 +598,121 @@ pub struct StorageStatistics {
     pub tags: std::collections::HashMap<String, usize>,
 }
 
+// ========== Markdown Frontmatter Parsing ==========
+
+/// A parsed markdown document with YAML frontmatter.
+#[derive(Debug, Clone)]
+pub struct MarkdownDocument {
+    /// Key-value pairs from the YAML frontmatter
+    pub frontmatter: HashMap<String, String>,
+    /// The markdown content (everything after the frontmatter)
+    pub content: String,
+}
+
+impl MarkdownDocument {
+    /// Create a new MarkdownDocument with empty frontmatter
+    pub fn new(content: String) -> Self {
+        Self {
+            frontmatter: HashMap::new(),
+            content,
+        }
+    }
+
+    /// Get a frontmatter value by key
+    pub fn get(&self, key: &str) -> Option<&String> {
+        self.frontmatter.get(key)
+    }
+
+    /// Get a frontmatter value as a list (comma-separated or YAML array)
+    pub fn get_list(&self, key: &str) -> Vec<String> {
+        self.frontmatter
+            .get(key)
+            .map(|v| {
+                // Handle YAML array format: [item1, item2]
+                let trimmed = v.trim();
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    let inner = &trimmed[1..trimmed.len() - 1];
+                    inner
+                        .split(',')
+                        .map(|s| s.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect()
+                } else {
+                    // Handle comma-separated format
+                    v.split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect()
+                }
+            })
+            .unwrap_or_default()
+    }
+}
+
+/// Parse a markdown string with YAML frontmatter.
+///
+/// The frontmatter must be enclosed between `---` markers at the start of the document.
+///
+/// # Example
+/// ```ignore
+/// let content = r#"---
+/// title: My Document
+/// tags: [a, b, c]
+/// ---
+///
+/// # Content here
+/// "#;
+/// let doc = parse_markdown_with_frontmatter(content)?;
+/// assert_eq!(doc.get("title"), Some(&"My Document".to_string()));
+/// ```
+pub fn parse_markdown_with_frontmatter(content: &str) -> ThoughtsResult<MarkdownDocument> {
+    let trimmed = content.trim_start();
+
+    // Check if document starts with frontmatter
+    if !trimmed.starts_with("---") {
+        return Ok(MarkdownDocument::new(content.to_string()));
+    }
+
+    // Find the closing ---
+    let after_first = &trimmed[3..];
+    let closing_idx = after_first.find("\n---");
+
+    match closing_idx {
+        Some(idx) => {
+            let frontmatter_str = &after_first[..idx].trim();
+            let content_start = idx + 4; // Skip the \n---
+            let remaining = &after_first[content_start..];
+
+            // Parse the YAML frontmatter (simple key: value format)
+            let mut frontmatter = HashMap::new();
+            for line in frontmatter_str.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+
+                if let Some(colon_pos) = line.find(':') {
+                    let key = line[..colon_pos].trim().to_string();
+                    let value = line[colon_pos + 1..].trim().to_string();
+                    frontmatter.insert(key, value);
+                }
+            }
+
+            Ok(MarkdownDocument {
+                frontmatter,
+                content: remaining.trim_start_matches('\n').to_string(),
+            })
+        }
+        None => {
+            // No closing ---, treat as no frontmatter
+            Ok(MarkdownDocument::new(content.to_string()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use tempfile::TempDir;
 
     fn create_test_storage() -> (ThoughtsStorage, TempDir) {
@@ -685,5 +913,138 @@ mod tests {
         let cleared = storage.clear_all().unwrap();
         assert_eq!(cleared, 1);
         assert_eq!(storage.list_thoughts().unwrap().len(), 0);
+    }
+
+    // ========== Tests for Research/Plans ==========
+
+    #[test]
+    fn test_initialize_creates_research_and_plans_dirs() {
+        let (storage, _temp) = create_test_storage();
+
+        assert!(storage.config.global_root.join(RESEARCH_DIR).exists());
+        assert!(storage.config.global_root.join(PLANS_DIR).exists());
+    }
+
+    #[test]
+    fn test_save_and_load_research() {
+        let (storage, _temp) = create_test_storage();
+
+        let content = "# Research Document\n\nThis is research content.";
+        let path = storage.save_research("test-research.md", content).unwrap();
+
+        assert!(path.exists());
+        assert!(path.to_string_lossy().contains(RESEARCH_DIR));
+
+        let loaded = storage.load_research("test-research.md").unwrap();
+        assert_eq!(loaded, content);
+    }
+
+    #[test]
+    fn test_save_and_load_plan() {
+        let (storage, _temp) = create_test_storage();
+
+        let content = "# Implementation Plan\n\n## Phase 1\n\nDo stuff.";
+        let path = storage.save_plan("test-plan.md", content).unwrap();
+
+        assert!(path.exists());
+        assert!(path.to_string_lossy().contains(PLANS_DIR));
+
+        let loaded = storage.load_plan("test-plan.md").unwrap();
+        assert_eq!(loaded, content);
+    }
+
+    #[test]
+    fn test_list_research() {
+        let (storage, _temp) = create_test_storage();
+
+        storage.save_research("research-1.md", "Content 1").unwrap();
+        storage.save_research("research-2.md", "Content 2").unwrap();
+
+        let files = storage.list_research().unwrap();
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_list_plans() {
+        let (storage, _temp) = create_test_storage();
+
+        storage.save_plan("plan-1.md", "Plan 1").unwrap();
+        storage.save_plan("plan-2.md", "Plan 2").unwrap();
+        storage.save_plan("plan-3.md", "Plan 3").unwrap();
+
+        let files = storage.list_plans().unwrap();
+        assert_eq!(files.len(), 3);
+    }
+
+    // ========== Tests for Markdown Frontmatter Parsing ==========
+
+    #[test]
+    fn test_parse_frontmatter_basic() {
+        let content = r#"---
+title: My Document
+author: Test Author
+---
+
+# Content
+
+Some markdown content here.
+"#;
+
+        let doc = parse_markdown_with_frontmatter(content).unwrap();
+        assert_eq!(doc.get("title"), Some(&"My Document".to_string()));
+        assert_eq!(doc.get("author"), Some(&"Test Author".to_string()));
+        assert!(doc.content.contains("# Content"));
+        assert!(doc.content.contains("Some markdown content here."));
+    }
+
+    #[test]
+    fn test_parse_frontmatter_with_list() {
+        let content = r#"---
+name: test-agent
+tags: [research, codebase, planning]
+---
+
+Agent system prompt here.
+"#;
+
+        let doc = parse_markdown_with_frontmatter(content).unwrap();
+        assert_eq!(doc.get("name"), Some(&"test-agent".to_string()));
+
+        let tags = doc.get_list("tags");
+        assert_eq!(tags.len(), 3);
+        assert!(tags.contains(&"research".to_string()));
+        assert!(tags.contains(&"codebase".to_string()));
+        assert!(tags.contains(&"planning".to_string()));
+    }
+
+    #[test]
+    fn test_parse_no_frontmatter() {
+        let content = "# Just Content\n\nNo frontmatter here.";
+
+        let doc = parse_markdown_with_frontmatter(content).unwrap();
+        assert!(doc.frontmatter.is_empty());
+        assert_eq!(doc.content, content);
+    }
+
+    #[test]
+    fn test_parse_unclosed_frontmatter() {
+        let content = "---\ntitle: Unclosed\n\n# Content";
+
+        let doc = parse_markdown_with_frontmatter(content).unwrap();
+        // Treat as no frontmatter if closing --- is missing
+        assert!(doc.frontmatter.is_empty());
+    }
+
+    #[test]
+    fn test_get_list_comma_separated() {
+        let content = r#"---
+tags: a, b, c
+---
+content
+"#;
+
+        let doc = parse_markdown_with_frontmatter(content).unwrap();
+        let tags = doc.get_list("tags");
+        assert_eq!(tags, vec!["a", "b", "c"]);
     }
 }

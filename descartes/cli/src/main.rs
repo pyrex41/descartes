@@ -19,7 +19,7 @@ fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
     Ok(manager.config().clone())
 }
 
-use commands::{attach, doctor, init, kill, logs, pause, plugins, ps, resume, spawn, tasks};
+use commands::{attach, doctor, init, kill, logs, pause, plugins, ps, resume, spawn, tasks, workflow};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -179,6 +179,10 @@ enum Commands {
     #[command(subcommand)]
     Tasks(tasks::TaskCommands),
 
+    /// Run workflow commands (research, plan, implement)
+    #[command(subcommand)]
+    Workflow(workflow::WorkflowCommands),
+
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for
@@ -291,6 +295,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Tasks(cmd) => {
             // Tasks use project-local SCG storage, not config-based path
             tasks::execute(&cmd, None).await?;
+        }
+
+        Commands::Workflow(cmd) => {
+            workflow::execute(&cmd).await?;
         }
 
         Commands::Completions { shell } => {

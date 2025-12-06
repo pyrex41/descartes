@@ -153,6 +153,13 @@ pub fn spawn_session_tool() -> Tool {
         }),
     );
     properties.insert(
+        "agent".to_string(),
+        json!({
+            "type": "string",
+            "description": "Agent definition to use (e.g., 'codebase-locator', 'researcher'). If specified, uses the agent's system prompt and tool level."
+        }),
+    );
+    properties.insert(
         "provider".to_string(),
         json!({
             "type": "string",
@@ -178,7 +185,7 @@ pub fn spawn_session_tool() -> Tool {
 
     Tool {
         name: "spawn_session".to_string(),
-        description: "Spawn a sub-session to handle a specific task. The sub-session's output streams to this session. Sub-sessions cannot spawn their own sub-sessions (no recursive agents). Use for code review, research, or delegating focused tasks.".to_string(),
+        description: "Spawn a sub-session to handle a specific task. The sub-session's output streams to this session. Sub-sessions cannot spawn their own sub-sessions (no recursive agents). Use for code review, research, or delegating focused tasks. Optionally specify an agent definition to use specialized prompts and tool configurations.".to_string(),
         parameters: ToolParameters {
             required: vec!["task".to_string()],
             properties,
@@ -233,5 +240,6 @@ mod tests {
         assert!(tool.parameters.properties.contains_key("provider"));
         assert!(tool.parameters.properties.contains_key("output_file"));
         assert!(tool.parameters.properties.contains_key("attachable"));
+        assert!(tool.parameters.properties.contains_key("agent"));
     }
 }
