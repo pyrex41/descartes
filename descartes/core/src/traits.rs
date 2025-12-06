@@ -595,8 +595,6 @@ pub fn task_to_scud(task: &Task) -> ScudTask {
         updated_at: Some(chrono::DateTime::from_timestamp(task.updated_at, 0)
             .map(|dt| dt.to_rfc3339())
             .unwrap_or(now)),
-        locked_by: None,
-        locked_at: None,
     }
 }
 
