@@ -67,6 +67,73 @@ cat .scud/sessions/*.json | jq '.entries[-5:]'
 
 That's it. Watch it work. See every action in the transcript.
 
+## What Descartes Actually Does
+
+Descartes is a **CLI tool that runs AI agents**. You give it a task, it spawns an agent, the agent uses tools to complete the task, and you get a full transcript of everything that happened.
+
+```
+You                          Descartes                       AI Model
+ │                              │                               │
+ │  "Fix the bug in auth.rs"   │                               │
+ │─────────────────────────────>│                               │
+ │                              │   [task + 4 tools available]  │
+ │                              │──────────────────────────────>│
+ │                              │                               │
+ │                              │   tool_call: read auth.rs     │
+ │                              │<──────────────────────────────│
+ │                              │                               │
+ │                              │   [file contents]             │
+ │                              │──────────────────────────────>│
+ │                              │                               │
+ │                              │   tool_call: edit auth.rs     │
+ │                              │<──────────────────────────────│
+ │                              │                               │
+ │  [streams output to you]    │                               │
+ │<─────────────────────────────│                               │
+ │                              │                               │
+ │  [transcript saved to disk] │                               │
+ │<─────────────────────────────│                               │
+```
+
+**That's it.** Descartes is the loop that:
+1. Sends your task to an AI model
+2. Gives the model 4 tools (read, write, edit, bash)
+3. Executes tool calls and returns results
+4. Streams the conversation to your terminal
+5. Saves everything to a JSON transcript
+
+## When to Use What
+
+| Situation | Command | Tool Level |
+|-----------|---------|------------|
+| **Quick fix** — "fix this bug" | `descartes spawn --task "..."` | orchestrator (default) |
+| **Exploration** — "explain this code" | `descartes spawn --task "..." --tool-level readonly` | readonly |
+| **Focused work** — no sub-agents | `descartes spawn --task "..." --tool-level minimal` | minimal |
+| **Check what's running** | `descartes ps` | — |
+| **See what an agent did** | `descartes logs <id>` | — |
+| **Kill a runaway agent** | `descartes kill <id>` | — |
+| **Verify your setup works** | `descartes doctor` | — |
+
+### Tool Levels Explained
+
+**orchestrator** (default) — Full power. Can spawn sub-agents to delegate work.
+```bash
+descartes spawn --task "Refactor the auth module"
+# Agent might spawn sub-sessions for different files
+```
+
+**minimal** — Same tools, but cannot spawn sub-agents. Use when you want focused work.
+```bash
+descartes spawn --task "Fix line 42 in auth.rs" --tool-level minimal
+# Agent works alone, no delegation
+```
+
+**readonly** — Can only read files and run bash. Cannot modify anything.
+```bash
+descartes spawn --task "Explain how the auth flow works" --tool-level readonly
+# Safe exploration, no changes to your code
+```
+
 ## Philosophy
 
 Descartes follows the **Pi philosophy** of minimal, observable tooling:
@@ -177,27 +244,36 @@ See [docs/SKILLS.md](docs/SKILLS.md) for creating custom skills.
 
 ## Commands
 
+### Essential (daily use)
+
 ```bash
-descartes spawn     # Spawn an agent with a task
-descartes ps        # List running agents
-descartes kill      # Terminate an agent
-descartes pause     # Pause an agent
-descartes resume    # Resume a paused agent
-descartes attach    # Get credentials to attach external TUI
-descartes logs      # View agent logs
-descartes doctor    # Check system health
-descartes init      # Initialize a new project
+descartes spawn --task "..."   # Run an agent
+descartes ps                   # What's running?
+descartes logs <id>            # What did it do?
+descartes kill <id>            # Stop it
+descartes doctor               # Is my setup working?
 ```
 
 ### Spawn Options
 
 ```bash
-descartes spawn --task "Your task here" \
-  --provider anthropic \           # anthropic, openai, ollama, deepseek, groq
-  --model claude-sonnet-4-20250514 \
-  --tool-level orchestrator \      # orchestrator, minimal, readonly
-  --no-spawn \                     # Prevent sub-session spawning
-  --transcript-dir ./logs          # Custom transcript location
+# Minimal — just the task
+descartes spawn --task "Fix the bug in main.rs"
+
+# With options
+descartes spawn --task "Refactor auth" \
+  --provider anthropic \              # anthropic, openai, ollama, deepseek, groq
+  --model claude-sonnet-4-20250514 \  # specific model
+  --tool-level minimal                # orchestrator, minimal, readonly
+```
+
+### Other Commands
+
+```bash
+descartes pause <id>    # Pause an agent
+descartes resume <id>   # Resume a paused agent
+descartes attach <id>   # Attach external TUI client
+descartes init          # Initialize project directory
 ```
 
 ## Configuration
@@ -228,6 +304,47 @@ model = "claude-sonnet-4-20250514"
 | **DeepSeek** | Cloud | `DEEPSEEK_API_KEY` |
 | **Groq** | Cloud | `GROQ_API_KEY` |
 | **Ollama** | Local | `OLLAMA_ENDPOINT` (default: localhost:11434) |
+
+## Common Workflows
+
+### Fix a Bug
+```bash
+descartes spawn --task "Fix the null pointer exception in src/parser.rs:142"
+# Watch it work, check the transcript when done
+```
+
+### Understand Code Before Changing It
+```bash
+descartes spawn --task "Explain how the authentication middleware works" --tool-level readonly
+# Safe exploration — agent can read but not modify
+```
+
+### Refactor with Delegation
+```bash
+descartes spawn --task "Refactor the database module to use connection pooling"
+# Orchestrator level (default) — agent can spawn sub-agents for different files
+```
+
+### Quick Local Testing (No API Key)
+```bash
+# Start Ollama first
+ollama serve
+
+# Use a local model
+descartes spawn --task "Add error handling to main.rs" --provider ollama --model llama3
+```
+
+### Check What Happened
+```bash
+# See recent activity
+descartes logs
+
+# Full transcript as JSON
+cat .scud/sessions/*.json | jq '.'
+
+# Just the tool calls
+cat .scud/sessions/*.json | jq '.entries[] | select(.role == "tool_call")'
+```
 
 ## Architecture
 
@@ -266,11 +383,19 @@ model = "claude-sonnet-4-20250514"
 ```
 descartes/
 ├── core/           # Core library (tools, providers, transcripts)
-├── cli/            # Command-line interface
+├── cli/            # Command-line interface ← start here
 ├── daemon/         # Background RPC server (optional)
 ├── gui/            # Native GUI with Iced (optional)
 └── docs/           # Documentation
 ```
+
+### What You Need
+
+**Just the CLI** — Most users only need `descartes`. Install it, set an API key, run agents.
+
+**Optional: Daemon** — Long-running background service for persistent sessions and RPC access. Only needed if you're building integrations or want agents to survive terminal closure.
+
+**Optional: GUI** — Native desktop app for visual monitoring, session management, and debugging. Useful for complex multi-agent workflows, but not required for daily use.
 
 ## Development
 
