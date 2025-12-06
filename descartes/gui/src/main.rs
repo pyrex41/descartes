@@ -14,6 +14,11 @@ const JETBRAINS_MONO_MEDIUM: &[u8] = include_bytes!("../fonts/JetBrainsMono-Medi
 const JETBRAINS_MONO_BOLD: &[u8] = include_bytes!("../fonts/JetBrainsMono-Bold.ttf");
 use std::sync::Arc;
 
+mod chat_graph_layout;
+mod chat_graph_state;
+mod chat_graph_view;
+mod chat_state;
+mod chat_view;
 mod dag_canvas_interactions;
 mod dag_editor;
 mod event_handler;
@@ -86,6 +91,10 @@ struct DescartesGui {
     file_tree_state: FileTreeState,
     /// Knowledge graph panel state
     knowledge_graph_panel_state: KnowledgeGraphPanelState,
+    /// Chat interface state
+    chat_state: chat_state::ChatState,
+    /// Chat graph view state
+    chat_graph_state: chat_graph_state::ChatGraphState,
     /// RPC client (wrapped in Arc for cloning)
     rpc_client: Option<Arc<GuiRpcClient>>,
     /// Event handler
@@ -101,6 +110,7 @@ struct DescartesGui {
 enum ViewMode {
     Sessions,
     Dashboard,
+    Chat,
     TaskBoard,
     SwarmMonitor,
     Debugger,
@@ -135,6 +145,10 @@ enum Message {
     FileTree(FileTreeMessage),
     /// Knowledge graph panel message
     KnowledgeGraph(KnowledgeGraphMessage),
+    /// Chat interface message
+    Chat(chat_state::ChatMessage),
+    /// Chat graph view message
+    ChatGraph(chat_graph_state::ChatGraphMessage),
     /// Load sample history data for demo
     LoadSampleHistory,
     /// Load sample tasks for demo
@@ -166,6 +180,8 @@ impl DescartesGui {
             dag_editor_state: DAGEditorState::default(),
             file_tree_state: FileTreeState::default(),
             knowledge_graph_panel_state: KnowledgeGraphPanelState::default(),
+            chat_state: chat_state::ChatState::new(),
+            chat_graph_state: chat_graph_state::ChatGraphState::new(),
             rpc_client: None,
             event_handler: None,
             recent_events: Vec::new(),
@@ -378,6 +394,71 @@ impl DescartesGui {
                 knowledge_graph_panel::update(&mut self.knowledge_graph_panel_state, msg);
                 iced::Task::none()
             }
+            Message::Chat(msg) => {
+                use chat_state::ChatMessage as ChatMsg;
+
+                let task = match &msg {
+                    ChatMsg::SubmitPrompt => {
+                        // Get prompt before updating state
+                        let prompt = self.chat_state.prompt_input.clone();
+                        if prompt.trim().is_empty() {
+                            return iced::Task::none();
+                        }
+
+                        // Get working directory from active session or use current dir
+                        let working_dir = self
+                            .session_state
+                            .active_session()
+                            .map(|s| s.path.display().to_string())
+                            .or_else(|| self.chat_state.working_directory.clone())
+                            .unwrap_or_else(|| ".".to_string());
+
+                        // Update chat state with working directory if from session
+                        if self.chat_state.working_directory.is_none() {
+                            if let Some(session) = self.session_state.active_session() {
+                                self.chat_state.working_directory = Some(session.path.display().to_string());
+                            }
+                        }
+
+                        // Spawn async task to run Claude Code
+                        iced::Task::perform(
+                            run_claude_code(prompt, working_dir),
+                            |result| match result {
+                                Ok(response) => Message::Chat(ChatMsg::ResponseComplete(response)),
+                                Err(e) => Message::Chat(ChatMsg::Error(e)),
+                            },
+                        )
+                    }
+                    _ => iced::Task::none(),
+                };
+
+                chat_state::update(&mut self.chat_state, msg);
+
+                // Rebuild graph if visible
+                if self.chat_graph_state.show_graph_view {
+                    self.rebuild_chat_graph();
+                }
+
+                task
+            }
+            Message::ChatGraph(msg) => {
+                // Rebuild graph when toggling view on or explicitly requested
+                let should_rebuild = match &msg {
+                    chat_graph_state::ChatGraphMessage::ToggleView => {
+                        !self.chat_graph_state.show_graph_view // Will be toggled to true
+                    }
+                    chat_graph_state::ChatGraphMessage::RebuildGraph => true,
+                    _ => false,
+                };
+
+                chat_graph_state::update(&mut self.chat_graph_state, msg);
+
+                if should_rebuild {
+                    self.rebuild_chat_graph();
+                }
+
+                iced::Task::none()
+            }
             Message::LoadSampleHistory => {
                 tracing::info!("Loading sample history data");
                 self.load_sample_history();
@@ -417,6 +498,35 @@ impl DescartesGui {
                 iced::Task::none()
             }
         }
+    }
+
+    /// Rebuild the chat graph from current chat state
+    fn rebuild_chat_graph(&mut self) {
+        use chat_graph_state::ChatGraphNode;
+
+        self.chat_graph_state.clear();
+
+        let mut last_node_id: Option<uuid::Uuid> = None;
+
+        for msg in &self.chat_state.messages {
+            let mut node = match msg.role {
+                chat_state::ChatRole::User => ChatGraphNode::user(msg.content.clone()),
+                chat_state::ChatRole::Assistant => ChatGraphNode::assistant(msg.content.clone()),
+                chat_state::ChatRole::System => continue, // Skip system messages
+            };
+
+            // Link to previous node as parent
+            if let Some(parent_id) = last_node_id {
+                node.parent = Some(parent_id);
+            }
+
+            let node_id = node.id;
+            self.chat_graph_state.add_node(node);
+            last_node_id = Some(node_id);
+        }
+
+        // Compute layout
+        chat_graph_layout::compute_layout(&mut self.chat_graph_state);
     }
 
     /// Load sample history data for demonstration
@@ -1017,6 +1127,7 @@ impl DescartesGui {
         let nav_items = vec![
             (ViewMode::Sessions, "\u{25C6}", "Sessions"),    // ◆
             (ViewMode::Dashboard, "\u{2302}", "Dashboard"),  // ⌂
+            (ViewMode::Chat, "\u{2709}", "Chat"),            // ✉
             (ViewMode::TaskBoard, "\u{2630}", "Tasks"),      // ☰
             (ViewMode::SwarmMonitor, "\u{25CE}", "Agents"),  // ◎
             (ViewMode::Debugger, "\u{23F1}", "Debugger"),    // ⏱
@@ -1089,6 +1200,7 @@ impl DescartesGui {
         let content = match self.current_view {
             ViewMode::Sessions => self.view_sessions(),
             ViewMode::Dashboard => self.view_dashboard(),
+            ViewMode::Chat => self.view_chat(),
             ViewMode::TaskBoard => self.view_task_board(),
             ViewMode::SwarmMonitor => self.view_swarm_monitor(),
             ViewMode::Debugger => self.view_debugger(),
@@ -1108,6 +1220,30 @@ impl DescartesGui {
     fn view_sessions(&self) -> Element<Message> {
         session_selector::view_sessions_panel(&self.session_state)
             .map(Message::Session)
+    }
+
+    /// Chat view - full session Claude Code integration
+    fn view_chat(&self) -> Element<Message> {
+        if self.chat_graph_state.show_graph_view {
+            // Show graph view
+            chat_graph_view::view(&self.chat_graph_state).map(Message::ChatGraph)
+        } else {
+            // Show linear view with toggle button in header
+            let toggle_btn = chat_graph_view::view_toggle_button(self.chat_graph_state.show_graph_view)
+                .map(Message::ChatGraph);
+
+            let chat_content = chat_view::view(&self.chat_state).map(Message::Chat);
+
+            column![
+                row![
+                    Space::with_width(Length::Fill),
+                    toggle_btn,
+                ]
+                .padding([8, 16]),
+                chat_content,
+            ]
+            .into()
+        }
     }
 
     /// Dashboard view
@@ -1980,8 +2116,7 @@ async fn spawn_daemon_for_session(mut session: descartes_core::Session) -> Resul
         .arg(http_port.to_string())
         .arg("--ws-port")
         .arg(ws_port.to_string())
-        .arg("--workdir")
-        .arg(workspace_path)
+        .current_dir(workspace_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -2108,4 +2243,109 @@ async fn create_session(name: String, path: String) -> Result<descartes_core::Se
     tracing::info!("Created new session '{}' at {}", session.name, session.path.display());
 
     Ok(session)
+}
+
+/// Run Claude Code CLI with a prompt and return the response
+///
+/// This function wraps the Claude Code CLI to provide full session capabilities,
+/// including file editing, bash execution, web search, and multi-turn context.
+async fn run_claude_code(prompt: String, working_dir: String) -> Result<String, String> {
+    use std::process::Stdio;
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::process::Command;
+
+    tracing::info!(
+        "Running Claude Code in directory: {} with prompt: {}",
+        working_dir,
+        prompt.chars().take(50).collect::<String>()
+    );
+
+    // Check if claude is available
+    let claude_path = which::which("claude").map_err(|_| {
+        "Claude Code CLI not found. Please install it with: npm install -g @anthropic/claude-code".to_string()
+    })?;
+
+    tracing::debug!("Found claude at: {:?}", claude_path);
+
+    // Run claude with the prompt in non-interactive mode
+    // Using --print flag for single-shot output mode
+    let mut cmd = Command::new(claude_path);
+    cmd.arg("--print")  // Single-shot mode - outputs response and exits
+        .arg(&prompt)
+        .current_dir(&working_dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null());  // Prevent interactive mode
+
+    let mut child = cmd.spawn().map_err(|e| {
+        format!("Failed to spawn Claude Code process: {}", e)
+    })?;
+
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
+
+    // Read output
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    let mut stderr_reader = BufReader::new(stderr).lines();
+
+    let mut output = String::new();
+    let mut error_output = String::new();
+
+    // Read stdout and stderr concurrently
+    loop {
+        tokio::select! {
+            line = stdout_reader.next_line() => {
+                match line {
+                    Ok(Some(line)) => {
+                        if !output.is_empty() {
+                            output.push('\n');
+                        }
+                        output.push_str(&line);
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        tracing::warn!("Error reading stdout: {}", e);
+                        break;
+                    }
+                }
+            }
+            line = stderr_reader.next_line() => {
+                match line {
+                    Ok(Some(line)) => {
+                        if !error_output.is_empty() {
+                            error_output.push('\n');
+                        }
+                        error_output.push_str(&line);
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        tracing::warn!("Error reading stderr: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    // Wait for process to complete
+    let status = child.wait().await.map_err(|e| {
+        format!("Failed to wait for Claude Code process: {}", e)
+    })?;
+
+    if !status.success() {
+        let error_msg = if !error_output.is_empty() {
+            error_output
+        } else if !output.is_empty() {
+            output
+        } else {
+            format!("Claude Code exited with status: {}", status)
+        };
+        return Err(error_msg);
+    }
+
+    if output.is_empty() {
+        return Err("Claude Code returned empty response".to_string());
+    }
+
+    tracing::info!("Claude Code completed successfully ({} chars)", output.len());
+    Ok(output)
 }
