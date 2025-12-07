@@ -246,18 +246,18 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Pause { id, force } => {
-            let config = load_config(args.config.as_deref())?;
-            pause::execute(&config, &id, force).await?;
+            // Daemon auto-starts when needed, config not required
+            pause::execute(&id, force).await?;
         }
 
         Commands::Resume { id } => {
-            let config = load_config(args.config.as_deref())?;
-            resume::execute(&config, &id).await?;
+            // Daemon auto-starts when needed, config not required
+            resume::execute(&id).await?;
         }
 
         Commands::Attach { id, client, json, launch } => {
-            let config = load_config(args.config.as_deref())?;
-            attach::execute(&config, &id, &client, json, launch).await?;
+            // Daemon auto-starts when needed, config not required
+            attach::execute(&id, &client, json, launch).await?;
         }
 
         Commands::Logs {
@@ -298,7 +298,8 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Workflow(cmd) => {
-            workflow::execute(&cmd).await?;
+            let config = load_config(args.config.as_deref())?;
+            workflow::execute(&cmd, &config).await?;
         }
 
         Commands::Completions { shell } => {

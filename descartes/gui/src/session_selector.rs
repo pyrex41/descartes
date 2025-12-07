@@ -220,27 +220,16 @@ fn view_session_card(session: &Session, is_active: bool) -> Element<SessionMessa
         .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_else(|| "Never".to_string());
 
-    // Action buttons based on status
+    // Action buttons - daemon is global, so we just show select/delete actions
     let actions = match session.status {
-        SessionStatus::Inactive => {
+        SessionStatus::Inactive | SessionStatus::Active => {
             row![button(
-                text("Start")
+                text("Select")
                     .size(11)
                     .font(fonts::MONO)
-                    .color(colors::SUCCESS)
+                    .color(colors::PRIMARY)
             )
-            .on_press(SessionMessage::StartDaemon(session.id))
-            .padding([4, 8])
-            .style(button_styles::secondary),]
-        }
-        SessionStatus::Active => {
-            row![button(
-                text("Stop")
-                    .size(11)
-                    .font(fonts::MONO)
-                    .color(colors::WARNING)
-            )
-            .on_press(SessionMessage::StopDaemon(session.id))
+            .on_press(SessionMessage::SelectSession(session.id))
             .padding([4, 8])
             .style(button_styles::secondary),]
         }

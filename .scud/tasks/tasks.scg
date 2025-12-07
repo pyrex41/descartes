@@ -1,0 +1,387 @@
+# SCUD Graph v1
+# Phase: codelayer
+
+@meta {
+  name codelayer
+  updated 2025-12-06T21:10:47.023020+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Add subdirectory support to ThoughtsStorage | X | 3 | H
+1.1 | Add subdirectory constants and ensure directory creation | P | 0 | H
+1.2 | Implement save methods for research and plans | P | 0 | H
+1.3 | Implement list methods for research and plans | P | 0 | H
+2 | Add markdown frontmatter parsing | P | 2 | H
+3 | Create AgentDefinition struct and loader | X | 5 | H
+3.1 | Define AgentDefinition struct | P | 0 | H
+3.2 | Create AgentDefinitionLoader struct | P | 0 | M
+3.3 | Implement load_agent and list_agents methods | P | 0 | M
+3.4 | Add unit tests for loader functionality | P | 0 | L
+4 | Add new ToolLevel variants | X | 3 | H
+4.1 | Extend ToolLevel enum | P | 0 | H
+4.2 | Update get_tools() method | P | 0 | H
+4.3 | Add system prompts | P | 0 | M
+5 | Wire up agent loader in lib.rs | P | 1 | H
+6 | Create default agent markdown files | P | 2 | H
+7 | Add default agent installation logic | X | 3 | H
+7.1 | Ensure target directory exists | P | 0 | H
+7.2 | Implement ensure_default_agents function | P | 0 | H
+7.3 | Integrate and verify in AgentDefinitionLoader | P | 0 | H
+8 | Integrate agent definitions with spawn_session | X | 5 | H
+8.1 | Modify function signature | P | 0 | H
+8.2 | Implement agent definition loading | P | 0 | H
+8.3 | Integrate agent properties | P | 0 | H
+8.4 | Test and verify integration | P | 0 | M
+9 | Update spawn_session tool definition | P | 2 | H
+10 | Create workflow command definitions | X | 5 | M
+10.1 | Create workflow_commands.rs and define WorkflowCommand struct | P | 0 | H
+10.2 | Implement research_codebase command | P | 0 | H
+10.3 | Implement create_plan command | P | 0 | H
+10.4 | Implement implement_plan command | P | 0 | H
+
+@edges
+# dependent -> dependency
+1.2 -> 1.1
+1.3 -> 1.1
+2 -> 1
+3 -> 2
+3.2 -> 3.1
+3.3 -> 3.2
+3.4 -> 3.3
+4 -> 3
+4.2 -> 4.1
+4.3 -> 4.1
+5 -> 3
+6 -> 4
+7 -> 6
+7.2 -> 7.1
+7.3 -> 7.2
+8 -> 5
+8 -> 7
+8.2 -> 8.1
+8.3 -> 8.2
+8.4 -> 8.3
+9 -> 8
+10 -> 9
+10.2 -> 10.1
+10.3 -> 10.1
+10.4 -> 10.1
+
+@parents
+# parent: subtasks...
+1: 1.1, 1.2, 1.3
+3: 3.1, 3.2, 3.3, 3.4
+4: 4.1, 4.2, 4.3
+7: 7.1, 7.2, 7.3
+8: 8.1, 8.2, 8.3, 8.4
+10: 10.1, 10.2, 10.3, 10.4
+
+@details
+1 | description |
+  Add constants for RESEARCH_DIR and PLANS_DIR, implement save_research, save_plan, list_research, and list_plans methods in thoughts.rs, and ensure directories are created in initialize(). Success: ThoughtsStorage can save and list files in research and plans subdirectories.
+1.1 | description |
+  Add RESEARCH_DIR and PLANS_DIR constants to thoughts.rs. Modify the initialize() method to create these subdirectories if they do not exist.
+1.2 | description |
+  Implement save_research and save_plan methods in thoughts.rs to save files into the respective subdirectories.
+1.3 | description |
+  Implement list_research and list_plans methods in thoughts.rs to list files in the respective subdirectories.
+2 | description |
+  Create MarkdownDocument struct and parse_markdown_with_frontmatter function in thoughts.rs to support YAML frontmatter. Success: Function correctly parses frontmatter and content from markdown strings, verified by unit tests.
+3 | description |
+  Define AgentDefinition struct in new agent_definitions.rs file, create AgentDefinitionLoader with load_agent and list_agents methods. Success: Loader can load and list agent definitions from ~/.descartes/agents/, tested via unit tests.
+3.1 | description |
+  Create the agent_definitions.rs file and define the AgentDefinition struct with appropriate fields (e.g., name, description, etc.) based on requirements.
+3.2 | description |
+  Implement the AgentDefinitionLoader struct in the same file, including initialization and basic setup to handle the ~/.descartes/agents/ directory.
+3.3 | description |
+  Add the load_agent method to load a single agent definition from file and list_agents to list all available definitions in the directory.
+3.4 | description |
+  Write unit tests to verify that the loader can successfully load and list agent definitions, including mock data in the directory.
+4 | description |
+  Extend ToolLevel enum with Researcher and Planner variants in registry.rs, update get_tools() method, and add corresponding system prompts. Success: New tool levels are defined and integrated without breaking existing functionality.
+4.1 | description |
+  Add Researcher and Planner variants to the ToolLevel enum in registry.rs, ensuring the enum is extended without breaking existing functionality.
+4.2 | description |
+  Modify the get_tools() method in registry.rs to handle the new Researcher and Planner variants, integrating them appropriately.
+4.3 | description |
+  Define and add corresponding system prompts for the Researcher and Planner tool levels in registry.rs.
+5 | description |
+  Add pub mod agent_definitions; and re-export AgentDefinition and AgentDefinitionLoader in lib.rs. Success: Module compiles and exports are accessible, verified by cargo check.
+6 | description |
+  Create five markdown files (codebase-locator.md, etc.) in descartes/agents/ with frontmatter and system prompts. Success: Files are created in the correct directory structure with proper content.
+7 | description |
+  Implement ensure_default_agents() in agent_definitions.rs to copy bundled agents to ~/.descartes/agents/ if not present, called from AgentDefinitionLoader::new(). Success: Default agents are installed on first run, verified by manual test.
+7.1 | description |
+  Add logic to create the ~/.descartes/agents/ directory if it doesn't exist, as a prerequisite for copying agents.
+7.2 | description |
+  Implement the ensure_default_agents() function in agent_definitions.rs to copy bundled agents to the target directory only if they are not already present.
+7.3 | description |
+  Call ensure_default_agents() from AgentDefinitionLoader::new() and perform a manual test to verify default agents are installed on first run.
+8 | description |
+  Modify execute_spawn_session in executor.rs to accept an agent parameter, load AgentDefinition, and use its system prompt and tool level. Success: spawn_session can use agent names to configure sessions correctly.
+8.1 | description |
+  Update the execute_spawn_session function signature in executor.rs to accept an agent parameter (e.g., agent name or ID).
+8.2 | description |
+  Add logic to load the AgentDefinition based on the provided agent parameter, ensuring it retrieves the correct agent data.
+8.3 | description |
+  Modify the spawn_session logic to use the loaded AgentDefinition's system prompt and tool level for configuring the session.
+8.4 | description |
+  Test the modified execute_spawn_session to ensure it correctly uses agent names to configure sessions, including edge cases and error handling.
+9 | description |
+  Add agent parameter to spawn_session_tool() properties in definitions.rs with JSON schema. Success: Tool definition includes agent parameter, verified by cargo test.
+10 | description |
+  Define WorkflowCommand struct in new workflow_commands.rs and implement research_codebase, create_plan, and implement_plan commands with step sequences. Success: Workflow commands are defined and can be invoked, tested manually in CLI/TUI.
+10.1 | description |
+  Create a new file named workflow_commands.rs and define the WorkflowCommand struct with necessary fields and traits for workflow command definitions.
+10.2 | description |
+  Implement the research_codebase command within the WorkflowCommand struct, including its step sequences and logic.
+10.3 | description |
+  Implement the create_plan command within the WorkflowCommand struct, including its step sequences and logic.
+10.4 | description |
+  Implement the implement_plan command within the WorkflowCommand struct, including its step sequences and logic.
+
+---
+
+# SCUD Graph v1
+# Phase: opencode
+
+@meta {
+  name opencode
+  updated 2025-12-06T21:10:47.023183+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Implement core attach API endpoint | X | 5 | H
+1.1 | Define request and response schemas | P | 0 | H
+1.2 | Implement verification and security logic | P | 0 | H
+1.3 | Implement the RPC endpoint | P | 0 | H
+1.4 | Add tests and documentation | P | 0 | M
+2 | Add CLI attach command | X | 3 | H
+2.1 | Define CLI command structure and argument parsing | P | 0 | H
+2.2 | Implement attach API call and error handling | P | 0 | H
+2.3 | Test command integration and error scenarios | P | 0 | M
+3 | Implement local OpenCode launch | X | 5 | H
+3.1 | Modify CLI Command Structure | P | 0 | H
+3.2 | Set Up Environment Variables | P | 0 | H
+3.3 | Implement Process Spawning | P | 0 | H
+3.4 | Test and Verify Implementation | P | 0 | M
+4 | Develop remote attach helper script | X | 5 | H
+4.1 | Create SSH Connection Script | P | 0 | H
+4.2 | Implement Environment Export and Launch Logic | P | 0 | H
+4.3 | Package Script with CLI | P | 0 | M
+4.4 | Test and Validate PTY Forwarding | P | 0 | M
+5 | Integrate session metadata display | X | 8 | M
+5.1 | Define session metadata schema | P | 0 | H
+5.2 | Implement metadata retrieval logic | P | 0 | H
+5.3 | Extend OpenCode UI for side panel display | P | 0 | H
+5.4 | Add detach banner functionality | P | 0 | H
+5.5 | Test and document integration | P | 0 | M
+6 | Add command hooks in OpenCode | X | 5 | M
+6.1 | Define Socket Interface for Descartes Daemon | P | 0 | H
+6.2 | Implement Core Logic for Commands | P | 0 | H
+6.3 | Add Command Hooks in OpenCode | P | 0 | H
+6.4 | Test and Validate Commands | P | 0 | M
+7 | Implement resilience features | X | 8 | M
+7.1 | Define state preservation schema | P | 0 | H
+7.2 | Implement heartbeat ping mechanism | P | 0 | H
+7.3 | Add auto-retry on unexpected exits | P | 0 | H
+7.4 | Handle cleanup on heartbeat loss | P | 0 | H
+7.5 | Integrate and test resilience features | P | 0 | H
+8 | Add observability and telemetry | X | 5 | L
+8.1 | Define Telemetry Schemas and Metrics Structure | P | 0 | H
+8.2 | Integrate Metrics Collection | P | 0 | H
+8.3 | Implement Structured Logging | P | 0 | M
+8.4 | Add User Satisfaction Prompts and Performance Verification | P | 0 | M
+9 | Handle technical considerations | X | 8 | H
+9.1 | Define attach_manifest.json schema and models | P | 0 | H
+9.2 | Implement PTY bridging | P | 0 | H
+9.3 | Implement file synchronization checks | P | 0 | H
+9.4 | Implement token handling and security | P | 0 | H
+9.5 | Integrate feature flag and cross-setup functionality | P | 0 | H
+10 | Develop documentation and testing | X | 5 | M
+10.1 | Identify and outline attach flows and use cases | P | 0 | H
+10.2 | Create user guides and compatibility matrix | P | 0 | H
+10.3 | Develop support playbooks | P | 0 | M
+10.4 | Write unit and integration tests for attach flows | P | 0 | H
+
+@edges
+# dependent -> dependency
+1.2 -> 1.1
+1.3 -> 1.1
+1.3 -> 1.2
+1.4 -> 1.3
+2 -> 1
+2.2 -> 2.1
+2.3 -> 2.2
+3 -> 2
+3.2 -> 3.1
+3.3 -> 3.2
+3.4 -> 3.3
+4 -> 2
+4.2 -> 4.1
+4.3 -> 4.2
+4.4 -> 4.3
+5 -> 3
+5 -> 4
+5.2 -> 5.1
+5.3 -> 5.2
+5.4 -> 5.3
+5.5 -> 5.4
+6 -> 1
+6 -> 5
+6.2 -> 6.1
+6.3 -> 6.2
+6.4 -> 6.3
+7 -> 6
+7.2 -> 7.1
+7.3 -> 7.1
+7.3 -> 7.2
+7.4 -> 7.2
+7.5 -> 7.3
+7.5 -> 7.4
+8 -> 7
+8.2 -> 8.1
+8.3 -> 8.1
+8.4 -> 8.2
+8.4 -> 8.3
+9 -> 3
+9 -> 4
+9.2 -> 9.1
+9.3 -> 9.1
+9.4 -> 9.1
+9.5 -> 9.2
+9.5 -> 9.3
+9.5 -> 9.4
+10 -> 1
+10 -> 2
+10 -> 3
+10 -> 4
+10 -> 5
+10 -> 6
+10 -> 7
+10 -> 8
+10 -> 9
+10.2 -> 10.1
+10.3 -> 10.1
+10.4 -> 10.1
+
+@parents
+# parent: subtasks...
+1: 1.1, 1.2, 1.3, 1.4
+2: 2.1, 2.2, 2.3
+3: 3.1, 3.2, 3.3, 3.4
+4: 4.1, 4.2, 4.3, 4.4
+5: 5.1, 5.2, 5.3, 5.4, 5.5
+6: 6.1, 6.2, 6.3, 6.4
+7: 7.1, 7.2, 7.3, 7.4, 7.5
+8: 8.1, 8.2, 8.3, 8.4
+9: 9.1, 9.2, 9.3, 9.4, 9.5
+10: 10.1, 10.2, 10.3, 10.4
+
+@details
+1 | description |
+  Create the `agent.attach.opencode` RPC endpoint in the Descartes daemon to handle attach requests, returning a token and connection spec. This endpoint must verify agent pause state and enforce security controls. Success criteria: Endpoint responds correctly to valid requests and rejects unauthorized ones.
+1.1 | description |
+  Create the data models for the attach request (e.g., agent ID, credentials) and response (token and connection spec) in the Descartes daemon, ensuring they align with RPC standards.
+1.2 | description |
+  Develop the core logic to verify the agent's pause state and enforce security controls (e.g., authentication, authorization) for attach requests.
+1.3 | description |
+  Add the `agent.attach.opencode` RPC endpoint to the Descartes daemon, integrating the verification logic to handle requests, return token and spec for valid attaches, and reject unauthorized ones.
+1.4 | description |
+  Write unit and integration tests for the endpoint to verify correct responses to valid/invalid requests, and document the endpoint usage and API details.
+2 | description |
+  Extend the Descartes CLI to include `descartes agents attach opencode <agent-id> [--ssh user@host]` command. It should call the attach API, handle errors, and prepare for launch. Success criteria: Command parses arguments correctly and initiates attach flow without errors.
+2.1 | description |
+  Add the 'attach opencode' subcommand to the CLI with required <agent-id> argument and optional [--ssh user@host] flag, ensuring proper argument validation and parsing.
+2.2 | description |
+  Integrate the call to the attach API within the command logic, including handling of API responses, errors, and preparation for launch flow.
+2.3 | description |
+  Verify that the command parses arguments correctly, initiates the attach flow without errors, and handles edge cases through unit and integration tests.
+3 | description |
+  Modify the CLI to spawn the OpenCode binary locally with environment variables for attach sockets, repo root, and token. Ensure the process is launched in attached mode. Success criteria: Local attach command successfully starts OpenCode with the correct environment.
+3.1 | description |
+  Update the CLI to recognize and parse the local attach command, ensuring it can accept necessary parameters like repo root and token.
+3.2 | description |
+  Implement code to set environment variables for attach sockets, repo root, and token based on CLI inputs.
+3.3 | description |
+  Add logic to spawn the OpenCode binary locally using the configured environment variables and ensure it runs in attached mode.
+3.4 | description |
+  Create unit tests and integration tests to verify the local attach command starts OpenCode with correct environment, meeting success criteria.
+4 | description |
+  Create a helper script for remote launches that SSHs into the host, exports environment variables, and launches OpenCode. Package it with the CLI for SSH workflows. Success criteria: Script executes successfully on remote hosts with proper PTY forwarding.
+4.1 | description |
+  Write the initial script that establishes an SSH connection to the remote host, ensuring basic setup for remote execution.
+4.2 | description |
+  Add functionality to the script to export necessary environment variables and launch OpenCode on the remote host.
+4.3 | description |
+  Integrate the helper script into the CLI package for SSH workflows, ensuring it can be invoked as part of the CLI.
+4.4 | description |
+  Test the script on remote hosts to ensure successful execution with proper PTY forwarding and meet the success criteria.
+5 | description |
+  Implement logic to provide agent summary, pending tasks, and attach instructions in the OpenCode side panel, including a detach banner. This requires extending OpenCode's UI integration. Success criteria: Metadata displays correctly upon attach in OpenCode.
+5.1 | description |
+  Create or extend data models/schemas to represent agent summary, pending tasks, attach instructions, and detach banner state in the session metadata structure.
+5.2 | description |
+  Develop backend logic to fetch or compute agent summary, pending tasks, and attach instructions based on session data.
+5.3 | description |
+  Integrate UI components into OpenCode's side panel to display the session metadata (agent summary, pending tasks, attach instructions) upon attach.
+5.4 | description |
+  Implement the detach banner in the OpenCode side panel, including logic for detachment and UI updates.
+5.5 | description |
+  Write unit tests for metadata logic, integration tests for UI display, and update documentation for the new features, ensuring success criteria are met.
+6 | description |
+  Implement `/descartes log` and `/descartes resume` commands within OpenCode to append notes to logs and resume sessions. These should interact with Descartes daemon via sockets. Success criteria: Commands execute and update agent state appropriately.
+6.1 | description |
+  Research and define the socket communication protocol and interface to interact with the Descartes daemon, including message formats for appending logs and resuming sessions.
+6.2 | description |
+  Develop the core logic functions to handle appending notes to logs and resuming sessions by sending appropriate socket messages to the Descartes daemon and updating agent state.
+6.3 | description |
+  Integrate the /descartes log and /descartes resume commands into OpenCode's command system, wiring them to the core logic functions for execution.
+6.4 | description |
+  Test the commands to ensure they execute correctly, interact with the daemon via sockets, and update agent state as per success criteria.
+7 | description |
+  Add heartbeat pings, auto-retry on unexpected exits, and state preservation. Ensure cleanup on heartbeat loss. Success criteria: Sessions remain stable and recoverable after interruptions.
+7.1 | description |
+  Create a schema or model to define how session state will be serialized and stored for recovery purposes.
+7.2 | description |
+  Develop the core logic for sending and receiving heartbeat pings between components to detect active sessions.
+7.3 | description |
+  Implement logic to automatically retry failed operations or reconnect after unexpected exits, using the state preservation schema.
+7.4 | description |
+  Add functionality to detect heartbeat loss and perform necessary cleanup, ensuring sessions are properly terminated and resources released.
+7.5 | description |
+  Integrate all resilience components, add unit and integration tests to verify sessions remain stable and recoverable after interruptions, and document the implementation.
+8 | description |
+  Integrate metrics for attachment attempts, success rates, and events, plus structured logging for auditing. Include user satisfaction prompts post-detach. Success criteria: Telemetry data is collected and accessible without performance impact.
+8.1 | description |
+  Create schemas for metrics (attachment attempts, success rates, events) and structured logging formats for auditing. Ensure they are designed to avoid performance overhead.
+8.2 | description |
+  Implement collection of metrics for attachment attempts, success rates, and events in the relevant code paths, using the defined schemas.
+8.3 | description |
+  Add structured logging for auditing purposes across the application, ensuring it integrates with the telemetry schemas without impacting performance.
+8.4 | description |
+  Integrate user satisfaction prompts post-detach and conduct tests to verify that telemetry data is collected and accessible without performance impact.
+9 | description |
+  Implement PTY bridging, file sync checks, token handling, and `attach_manifest.json` for extensibility. Add feature flag `feature.attach.opencode`. Success criteria: Attachments work across local/remote setups with security and sync validations.
+9.1 | description |
+  Create the schema for attach_manifest.json to support extensibility, including models for parsing and validating the manifest structure.
+9.2 | description |
+  Develop PTY bridging functionality to enable pseudo-terminal attachment for interactive sessions in attachments.
+9.3 | description |
+  Add logic for file sync checks, including validation mechanisms to ensure files are in sync across local and remote setups.
+9.4 | description |
+  Handle token management for secure access, including validation and error handling for security in attachment processes.
+9.5 | description |
+  Add the feature.attach.opencode flag, integrate all components (PTY, sync, tokens, manifest) for local/remote setups, and ensure attachments work with validations; include unit and integration tests.
+10 | description |
+  Create user guides, compatibility matrix, and support playbooks. Write unit and integration tests for all attach flows. Success criteria: Documentation covers all use cases, and tests pass for prototype, beta, and GA milestones.
+10.1 | description |
+  Analyze all attach flows in the system and outline the use cases they support, including any edge cases or milestones (prototype, beta, GA). This provides the foundation for documentation and testing.
+10.2 | description |
+  Develop user guides that cover all outlined use cases and a compatibility matrix detailing supported environments and versions.
+10.3 | description |
+  Write support playbooks for troubleshooting and maintenance related to the attach flows, ensuring coverage of all use cases.
+10.4 | description |
+  Implement unit tests for individual components of attach flows and integration tests for end-to-end scenarios, ensuring tests pass for prototype, beta, and GA milestones.

@@ -4,7 +4,7 @@
 //! session discovery and persistence.
 
 use crate::session::{
-    DaemonInfo, Session, SessionDiscoveryConfig, SessionError, SessionManager, SessionStatus,
+    Session, SessionDiscoveryConfig, SessionError, SessionManager, SessionStatus,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -17,8 +17,11 @@ use uuid::Uuid;
 
 /// Filesystem-based session manager
 ///
-/// Discovers sessions by scanning configured directories for `.scud/` directories
-/// or `config.toml` files. Manages session metadata and daemon lifecycle.
+/// Discovers sessions by scanning configured directories for `.descartes/` or `.scud/`
+/// directories. Manages session metadata persistence.
+///
+/// Note: The daemon is now global and managed separately via `daemon_launcher`.
+/// Sessions no longer spawn their own daemon instances.
 pub struct FileSystemSessionManager {
     /// Configuration for session discovery
     config: SessionDiscoveryConfig,
@@ -28,12 +31,6 @@ pub struct FileSystemSessionManager {
     active_session_id: Arc<RwLock<Option<Uuid>>>,
     /// Path to persist global session metadata
     metadata_path: PathBuf,
-    /// Base port for daemon HTTP endpoints
-    base_http_port: u16,
-    /// Base port for daemon WebSocket endpoints
-    base_ws_port: u16,
-    /// Port offset counter for multiple daemons
-    port_offset: Arc<RwLock<u16>>,
 }
 
 impl FileSystemSessionManager {
@@ -44,23 +41,16 @@ impl FileSystemSessionManager {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             active_session_id: Arc::new(RwLock::new(None)),
             metadata_path,
-            base_http_port: 8080,
-            base_ws_port: 8081,
-            port_offset: Arc::new(RwLock::new(0)),
         }
-    }
-
-    /// Create with custom port configuration
-    pub fn with_ports(mut self, http_port: u16, ws_port: u16) -> Self {
-        self.base_http_port = http_port;
-        self.base_ws_port = ws_port;
-        self
     }
 
     /// Check if a directory is a valid Descartes workspace
     fn is_workspace(&self, path: &Path) -> bool {
-        // Check for .scud/ directory or config.toml
-        path.join(".scud").exists() || path.join("config.toml").exists()
+        // Check for .descartes/ directory (new format), .scud/ directory (backward compat),
+        // or config.toml
+        path.join(".descartes").exists()
+            || path.join(".scud").exists()
+            || path.join("config.toml").exists()
     }
 
     /// Scan a directory for workspaces
@@ -102,10 +92,10 @@ impl FileSystemSessionManager {
 
     /// Load session metadata from a workspace directory
     fn load_session_from_path(&self, path: &Path) -> Option<Session> {
-        // Try to load from .scud/session.json if it exists
-        let session_file = path.join(".scud/session.json");
-        if session_file.exists() {
-            if let Ok(content) = std::fs::read_to_string(&session_file) {
+        // Try to load from .descartes/session.json first (new format)
+        let descartes_session_file = path.join(".descartes/session.json");
+        if descartes_session_file.exists() {
+            if let Ok(content) = std::fs::read_to_string(&descartes_session_file) {
                 if let Ok(mut session) = serde_json::from_str::<Session>(&content) {
                     // Update path in case it was moved
                     session.path = path.to_path_buf();
@@ -114,7 +104,19 @@ impl FileSystemSessionManager {
             }
         }
 
-        // Create session metadata from directory info
+        // Fall back to .scud/session.json for backward compatibility
+        let scud_session_file = path.join(".scud/session.json");
+        if scud_session_file.exists() {
+            if let Ok(content) = std::fs::read_to_string(&scud_session_file) {
+                if let Ok(mut session) = serde_json::from_str::<Session>(&content) {
+                    // Update path in case it was moved
+                    session.path = path.to_path_buf();
+                    return Some(session);
+                }
+            }
+        }
+
+        // Create session metadata from directory info if workspace exists but no metadata
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -140,9 +142,9 @@ impl FileSystemSessionManager {
 
     /// Save session metadata to disk
     fn save_session_metadata(&self, session: &Session) -> Result<(), SessionError> {
-        let scud_dir = session.scud_path();
-        if !scud_dir.exists() {
-            std::fs::create_dir_all(&scud_dir)?;
+        let descartes_dir = session.descartes_path();
+        if !descartes_dir.exists() {
+            std::fs::create_dir_all(&descartes_dir)?;
         }
 
         let session_file = session.metadata_path();
@@ -185,22 +187,6 @@ impl FileSystemSessionManager {
         std::fs::write(&self.metadata_path, content)?;
 
         Ok(())
-    }
-
-    /// Get the next available port offset
-    async fn get_next_port_offset(&self) -> u16 {
-        let mut offset = self.port_offset.write().await;
-        let current = *offset;
-        *offset += 1;
-        current
-    }
-
-    /// Check if a daemon is healthy
-    async fn check_daemon_health(&self, endpoint: &str) -> bool {
-        match reqwest::get(&format!("{}/health", endpoint)).await {
-            Ok(resp) => resp.status().is_success(),
-            Err(_) => false,
-        }
     }
 }
 
@@ -259,19 +245,19 @@ impl SessionManager for FileSystemSessionManager {
             return Err(SessionError::AlreadyExists(path.to_path_buf()));
         }
 
-        // Create directory structure
+        // Create directory structure using .descartes (new format)
         std::fs::create_dir_all(path)?;
-        std::fs::create_dir_all(path.join(".scud/tasks"))?;
+        std::fs::create_dir_all(path.join(".descartes/sessions"))?;
         std::fs::create_dir_all(path.join("data"))?;
         std::fs::create_dir_all(path.join("thoughts"))?;
         std::fs::create_dir_all(path.join("logs"))?;
 
-        // Create empty tasks.json
-        let tasks_file = path.join(".scud/tasks/tasks.json");
-        std::fs::write(&tasks_file, "{}")?;
+        // Create empty sessions.json for session tracking
+        let sessions_file = path.join(".descartes/sessions/sessions.json");
+        std::fs::write(&sessions_file, "[]")?;
 
-        // Create workflow-state.json
-        let workflow_file = path.join(".scud/workflow-state.json");
+        // Create workflow-state.json in .descartes
+        let workflow_file = path.join(".descartes/workflow-state.json");
         std::fs::write(
             &workflow_file,
             r#"{"active_epic": null, "updated_at": null}"#,
@@ -299,10 +285,6 @@ impl SessionManager for FileSystemSessionManager {
     }
 
     async fn archive_session(&self, id: &Uuid) -> Result<(), SessionError> {
-        // Stop daemon if running
-        let _ = self.stop_daemon(id).await;
-
-        // Update session status
         let mut cache = self.sessions.write().await;
         if let Some(session) = cache.get_mut(id) {
             session.status = SessionStatus::Archived;
@@ -316,9 +298,6 @@ impl SessionManager for FileSystemSessionManager {
     }
 
     async fn delete_session(&self, id: &Uuid, delete_files: bool) -> Result<(), SessionError> {
-        // Stop daemon first
-        let _ = self.stop_daemon(id).await;
-
         let mut cache = self.sessions.write().await;
         if let Some(session) = cache.remove(id) {
             if delete_files {
@@ -338,89 +317,6 @@ impl SessionManager for FileSystemSessionManager {
             Ok(())
         } else {
             Err(SessionError::NotFound(*id))
-        }
-    }
-
-    async fn start_daemon(&self, id: &Uuid) -> Result<DaemonInfo, SessionError> {
-        let mut cache = self.sessions.write().await;
-        let session = cache
-            .get_mut(id)
-            .ok_or_else(|| SessionError::NotFound(*id))?;
-
-        // Check if already running
-        if let Some(ref daemon_info) = session.daemon_info {
-            if self.check_daemon_health(&daemon_info.http_endpoint).await {
-                return Ok(daemon_info.clone());
-            }
-        }
-
-        // Get next port offset
-        let port_offset = self.get_next_port_offset().await;
-        let http_port = self.base_http_port + port_offset;
-        let ws_port = self.base_ws_port + port_offset;
-
-        // Update session status
-        session.status = SessionStatus::Starting;
-        drop(cache); // Release lock before spawning
-
-        // Spawn daemon process
-        let workspace_path = {
-            let cache = self.sessions.read().await;
-            cache.get(id).unwrap().path.clone()
-        };
-
-        let result = self
-            .spawn_daemon(&workspace_path, http_port, ws_port)
-            .await;
-
-        // Update session based on result
-        let mut cache = self.sessions.write().await;
-        if let Some(session) = cache.get_mut(id) {
-            match result {
-                Ok(daemon_info) => {
-                    session.status = SessionStatus::Active;
-                    session.daemon_info = Some(daemon_info.clone());
-                    session.last_accessed = Some(Utc::now());
-                    self.save_session_metadata(session)?;
-                    Ok(daemon_info)
-                }
-                Err(e) => {
-                    session.status = SessionStatus::Error;
-                    self.save_session_metadata(session)?;
-                    Err(e)
-                }
-            }
-        } else {
-            Err(SessionError::NotFound(*id))
-        }
-    }
-
-    async fn stop_daemon(&self, id: &Uuid) -> Result<(), SessionError> {
-        let mut cache = self.sessions.write().await;
-        let session = cache
-            .get_mut(id)
-            .ok_or_else(|| SessionError::NotFound(*id))?;
-
-        if let Some(ref daemon_info) = session.daemon_info {
-            session.status = SessionStatus::Stopping;
-
-            // Try graceful shutdown via HTTP
-            if let Err(e) = self.graceful_shutdown(&daemon_info.http_endpoint).await {
-                warn!("Graceful shutdown failed: {}, trying kill", e);
-
-                // Fall back to kill if we have PID
-                if let Some(pid) = daemon_info.pid {
-                    self.kill_daemon(pid)?;
-                }
-            }
-
-            session.status = SessionStatus::Inactive;
-            session.daemon_info = None;
-            self.save_session_metadata(session)?;
-            info!("Stopped daemon for session: {}", session.name);
-            Ok(())
-        } else {
-            Err(SessionError::DaemonNotRunning(*id))
         }
     }
 
@@ -460,108 +356,8 @@ impl SessionManager for FileSystemSessionManager {
     }
 
     async fn refresh_session(&self, id: &Uuid) -> Result<Option<Session>, SessionError> {
-        let mut cache = self.sessions.write().await;
-        if let Some(session) = cache.get_mut(id) {
-            // Check if daemon is still running
-            if let Some(ref daemon_info) = session.daemon_info {
-                if !self.check_daemon_health(&daemon_info.http_endpoint).await {
-                    session.status = SessionStatus::Inactive;
-                    session.daemon_info = None;
-                }
-            }
-            Ok(Some(session.clone()))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-impl FileSystemSessionManager {
-    /// Spawn a daemon process for a workspace
-    async fn spawn_daemon(
-        &self,
-        workspace_path: &Path,
-        http_port: u16,
-        ws_port: u16,
-    ) -> Result<DaemonInfo, SessionError> {
-        use std::process::{Command, Stdio};
-        use tokio::time::{sleep, Duration};
-
-        let config_path = workspace_path.join("config.toml");
-
-        // Build daemon command
-        let mut cmd = Command::new("descartes-daemon");
-        cmd.arg("--http-port")
-            .arg(http_port.to_string())
-            .arg("--ws-port")
-            .arg(ws_port.to_string())
-            .arg("--workdir")
-            .arg(workspace_path)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-
-        if config_path.exists() {
-            cmd.arg("--config").arg(&config_path);
-        }
-
-        let child = cmd
-            .spawn()
-            .map_err(|e| SessionError::DaemonStartFailed(e.to_string()))?;
-
-        let pid = child.id();
-
-        // Wait for daemon to be ready
-        let endpoint = format!("http://127.0.0.1:{}", http_port);
-        let mut attempts = 0;
-        while attempts < 30 {
-            if self.check_daemon_health(&endpoint).await {
-                info!("Daemon started on port {} (PID: {})", http_port, pid);
-                return Ok(DaemonInfo {
-                    pid: Some(pid),
-                    http_endpoint: endpoint,
-                    ws_endpoint: Some(format!("ws://127.0.0.1:{}", ws_port)),
-                    started_at: Utc::now(),
-                });
-            }
-            sleep(Duration::from_millis(100)).await;
-            attempts += 1;
-        }
-
-        Err(SessionError::DaemonStartFailed(
-            "Daemon failed to become healthy within timeout".to_string(),
-        ))
-    }
-
-    /// Send graceful shutdown request to daemon
-    async fn graceful_shutdown(&self, endpoint: &str) -> Result<(), SessionError> {
-        let client = reqwest::Client::new();
-        client
-            .post(&format!("{}/shutdown", endpoint))
-            .send()
-            .await
-            .map_err(|e| SessionError::DaemonStopFailed(e.to_string()))?;
-        Ok(())
-    }
-
-    /// Kill daemon by PID
-    fn kill_daemon(&self, pid: u32) -> Result<(), SessionError> {
-        #[cfg(unix)]
-        {
-            use nix::sys::signal::{kill, Signal};
-            use nix::unistd::Pid;
-
-            kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
-                .map_err(|e| SessionError::DaemonStopFailed(e.to_string()))?;
-        }
-
-        #[cfg(not(unix))]
-        {
-            return Err(SessionError::DaemonStopFailed(
-                "Process termination not yet supported on this platform".to_string(),
-            ));
-        }
-
-        Ok(())
+        let cache = self.sessions.read().await;
+        Ok(cache.get(id).cloned())
     }
 }
 
@@ -590,8 +386,8 @@ mod tests {
 
         assert_eq!(session.name, "Test Project");
         assert_eq!(session.status, SessionStatus::Inactive);
-        assert!(session_path.join(".scud").exists());
-        assert!(session_path.join(".scud/tasks/tasks.json").exists());
+        assert!(session_path.join(".descartes").exists());
+        assert!(session_path.join(".descartes/sessions/sessions.json").exists());
     }
 
     #[tokio::test]
@@ -684,10 +480,27 @@ mod tests {
         // Not a workspace initially
         assert!(!manager.is_workspace(temp_dir.path()));
 
-        // Create .scud directory
-        std::fs::create_dir_all(temp_dir.path().join(".scud")).expect("Failed to create .scud");
+        // Create .descartes directory (new format)
+        std::fs::create_dir_all(temp_dir.path().join(".descartes")).expect("Failed to create .descartes");
 
         // Now it's a workspace
+        assert!(manager.is_workspace(temp_dir.path()));
+    }
+
+    #[test]
+    fn test_is_workspace_backward_compat() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let config = SessionDiscoveryConfig::default();
+        let manager =
+            FileSystemSessionManager::new(config, temp_dir.path().join("sessions.json"));
+
+        // Not a workspace initially
+        assert!(!manager.is_workspace(temp_dir.path()));
+
+        // Create .scud directory (old format - should still work for backward compatibility)
+        std::fs::create_dir_all(temp_dir.path().join(".scud")).expect("Failed to create .scud");
+
+        // Should be detected as a workspace for backward compatibility
         assert!(manager.is_workspace(temp_dir.path()));
     }
 }

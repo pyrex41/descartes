@@ -1,0 +1,24 @@
+{
+  "entries": [
+    {
+      "content": "Hello world",
+      "role": "user",
+      "timestamp": "2025-12-04T17:38:54.390439Z"
+    },
+    {
+      "content": "Hello! What's up? 🚀",
+      "role": "assistant",
+      "timestamp": "2025-12-04T17:38:56.151052Z"
+    }
+  ],
+  "metadata": {
+    "ended_at": "2025-12-04T17:38:56.151055Z",
+    "is_sub_session": false,
+    "model": "grok-4-1-fast-reasoning",
+    "provider": "grok",
+    "session_id": "2e34c742-948b-474b-aff9-d7b0c0ee42bb",
+    "started_at": "2025-12-04T17:38:54.376376Z",
+    "task": "Hello world",
+    "tool_level": "orchestrator"
+  }
+}

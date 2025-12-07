@@ -1086,9 +1086,9 @@ mod tests {
 
         let mut store = SqliteStateStore {
             pool,
-            db_path: std::path::PathBuf::from(":memory:"),
+            _db_path: std::path::PathBuf::from(":memory:"),
             key_prefix: None,
-            enable_compression: false,
+            _enable_compression: false,
         };
         store.initialize().await.unwrap();
         store

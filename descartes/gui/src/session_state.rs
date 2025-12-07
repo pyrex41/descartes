@@ -113,6 +113,8 @@ pub enum SessionMessage {
     CreateSession,
     /// Focus the path input (for tab/enter navigation)
     FocusPathInput,
+    /// Focus the name input (for shift+tab navigation)
+    FocusNameInput,
     /// Session was created
     SessionCreated(Session),
     /// Archive a session
@@ -166,7 +168,10 @@ pub fn update(state: &mut SessionState, message: SessionMessage) {
         SessionMessage::ShowCreateDialog => {
             state.show_create_dialog = true;
             state.new_session_name = String::new();
-            state.new_session_path = String::new();
+            // Default to current working directory
+            state.new_session_path = std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default();
         }
         SessionMessage::HideCreateDialog => {
             state.show_create_dialog = false;
@@ -181,6 +186,9 @@ pub fn update(state: &mut SessionState, message: SessionMessage) {
             state.loading = true;
         }
         SessionMessage::FocusPathInput => {
+            // Handled in main.rs - no state changes needed
+        }
+        SessionMessage::FocusNameInput => {
             // Handled in main.rs - no state changes needed
         }
         SessionMessage::SessionCreated(session) => {
@@ -225,7 +233,7 @@ pub fn update(state: &mut SessionState, message: SessionMessage) {
         SessionMessage::DaemonStopped(id) => {
             if let Some(session) = state.sessions.iter_mut().find(|s| s.id == id) {
                 session.status = SessionStatus::Inactive;
-                session.daemon_info = None;
+                // Note: daemon_info is deprecated - daemon is now global
             }
             state.loading = false;
         }

@@ -1,0 +1,782 @@
+{
+  "opencode": {
+    "name": "opencode",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Implement core attach API endpoint",
+        "description": "Create the `agent.attach.opencode` RPC endpoint in the Descartes daemon to handle attach requests, returning a token and connection spec. This endpoint must verify agent pause state and enforce security controls. Success criteria: Endpoint responds correctly to valid requests and rejects unauthorized ones.",
+        "status": "expanded",
+        "complexity": 5,
+        "priority": "high",
+        "dependencies": [],
+        "subtasks": [
+          "1.1",
+          "1.2",
+          "1.3",
+          "1.4"
+        ],
+        "created_at": "2025-11-26T23:41:01.129750+00:00",
+        "updated_at": "2025-11-26T23:41:14.486601+00:00"
+      },
+      {
+        "id": "2",
+        "title": "Add CLI attach command",
+        "description": "Extend the Descartes CLI to include `descartes agents attach opencode <agent-id> [--ssh user@host]` command. It should call the attach API, handle errors, and prepare for launch. Success criteria: Command parses arguments correctly and initiates attach flow without errors.",
+        "status": "expanded",
+        "complexity": 3,
+        "priority": "high",
+        "dependencies": [
+          "1"
+        ],
+        "subtasks": [
+          "2.1",
+          "2.2",
+          "2.3"
+        ],
+        "created_at": "2025-11-26T23:41:01.129907+00:00",
+        "updated_at": "2025-11-26T23:41:14.487105+00:00"
+      },
+      {
+        "id": "3",
+        "title": "Implement local OpenCode launch",
+        "description": "Modify the CLI to spawn the OpenCode binary locally with environment variables for attach sockets, repo root, and token. Ensure the process is launched in attached mode. Success criteria: Local attach command successfully starts OpenCode with the correct environment.",
+        "status": "expanded",
+        "complexity": 5,
+        "priority": "high",
+        "dependencies": [
+          "2"
+        ],
+        "subtasks": [
+          "3.1",
+          "3.2",
+          "3.3",
+          "3.4"
+        ],
+        "created_at": "2025-11-26T23:41:01.129908+00:00",
+        "updated_at": "2025-11-26T23:41:14.486517+00:00"
+      },
+      {
+        "id": "4",
+        "title": "Develop remote attach helper script",
+        "description": "Create a helper script for remote launches that SSHs into the host, exports environment variables, and launches OpenCode. Package it with the CLI for SSH workflows. Success criteria: Script executes successfully on remote hosts with proper PTY forwarding.",
+        "status": "expanded",
+        "complexity": 5,
+        "priority": "high",
+        "dependencies": [
+          "2"
+        ],
+        "subtasks": [
+          "4.1",
+          "4.2",
+          "4.3",
+          "4.4"
+        ],
+        "created_at": "2025-11-26T23:41:01.129909+00:00",
+        "updated_at": "2025-11-26T23:41:14.487089+00:00"
+      },
+      {
+        "id": "5",
+        "title": "Integrate session metadata display",
+        "description": "Implement logic to provide agent summary, pending tasks, and attach instructions in the OpenCode side panel, including a detach banner. This requires extending OpenCode's UI integration. Success criteria: Metadata displays correctly upon attach in OpenCode.",
+        "status": "expanded",
+        "complexity": 8,
+        "priority": "medium",
+        "dependencies": [
+          "3",
+          "4"
+        ],
+        "subtasks": [
+          "5.1",
+          "5.2",
+          "5.3",
+          "5.4",
+          "5.5"
+        ],
+        "created_at": "2025-11-26T23:41:01.129910+00:00",
+        "updated_at": "2025-11-26T23:41:14.487066+00:00"
+      },
+      {
+        "id": "6",
+        "title": "Add command hooks in OpenCode",
+        "description": "Implement `/descartes log` and `/descartes resume` commands within OpenCode to append notes to logs and resume sessions. These should interact with Descartes daemon via sockets. Success criteria: Commands execute and update agent state appropriately.",
+        "status": "expanded",
+        "complexity": 5,
+        "priority": "medium",
+        "dependencies": [
+          "1",
+          "5"
+        ],
+        "subtasks": [
+          "6.1",
+          "6.2",
+          "6.3",
+          "6.4"
+        ],
+        "created_at": "2025-11-26T23:41:01.129911+00:00",
+        "updated_at": "2025-11-26T23:41:14.487245+00:00"
+      },
+      {
+        "id": "7",
+        "title": "Implement resilience features",
+        "description": "Add heartbeat pings, auto-retry on unexpected exits, and state preservation. Ensure cleanup on heartbeat loss. Success criteria: Sessions remain stable and recoverable after interruptions.",
+        "status": "expanded",
+        "complexity": 8,
+        "priority": "medium",
+        "dependencies": [
+          "6"
+        ],
+        "subtasks": [
+          "7.1",
+          "7.2",
+          "7.3",
+          "7.4",
+          "7.5"
+        ],
+        "created_at": "2025-11-26T23:41:01.129912+00:00",
+        "updated_at": "2025-11-26T23:41:14.487225+00:00"
+      },
+      {
+        "id": "8",
+        "title": "Add observability and telemetry",
+        "description": "Integrate metrics for attachment attempts, success rates, and events, plus structured logging for auditing. Include user satisfaction prompts post-detach. Success criteria: Telemetry data is collected and accessible without performance impact.",
+        "status": "expanded",
+        "complexity": 5,
+        "priority": "low",
+        "dependencies": [
+          "7"
+        ],
+        "subtasks": [
+          "8.1",
+          "8.2",
+          "8.3",
+          "8.4"
+        ],
+        "created_at": "2025-11-26T23:41:01.129912+00:00",
+        "updated_at": "2025-11-26T23:41:14.487282+00:00"
+      },
+      {
+        "id": "9",
+        "title": "Handle technical considerations",
+        "description": "Implement PTY bridging, file sync checks, token handling, and `attach_manifest.json` for extensibility. Add feature flag `feature.attach.opencode`. Success criteria: Attachments work across local/remote setups with security and sync validations.",
+        "status": "expanded",
+        "complexity": 8,
+        "priority": "high",
+        "dependencies": [
+          "3",
+          "4"
+        ],
+        "subtasks": [
+          "9.1",
+          "9.2",
+          "9.3",
+          "9.4",
+          "9.5"
+        ],
+        "created_at": "2025-11-26T23:41:01.129915+00:00",
+        "updated_at": "2025-11-26T23:41:14.487499+00:00"
+      },
+      {
+        "id": "10",
+        "title": "Develop documentation and testing",
+        "description": "Create user guides, compatibility matrix, and support playbooks. Write unit and integration tests for all attach flows. Success criteria: Documentation covers all use cases, and tests pass for prototype, beta, and GA milestones.",
+        "status": "expanded",
+        "complexity": 5,
+        "priority": "medium",
+        "dependencies": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9"
+        ],
+        "subtasks": [
+          "10.1",
+          "10.2",
+          "10.3",
+          "10.4"
+        ],
+        "created_at": "2025-11-26T23:41:01.129916+00:00",
+        "updated_at": "2025-11-26T23:41:14.487393+00:00"
+      },
+      {
+        "id": "3.1",
+        "title": "Modify CLI Command Structure",
+        "description": "Update the CLI to recognize and parse the local attach command, ensuring it can accept necessary parameters like repo root and token.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "3",
+        "created_at": "2025-11-26T23:41:14.486494+00:00",
+        "updated_at": "2025-11-26T23:41:14.486494+00:00"
+      },
+      {
+        "id": "3.2",
+        "title": "Set Up Environment Variables",
+        "description": "Implement code to set environment variables for attach sockets, repo root, and token based on CLI inputs.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "3.1"
+        ],
+        "parent_id": "3",
+        "created_at": "2025-11-26T23:41:14.486504+00:00",
+        "updated_at": "2025-11-26T23:41:14.486504+00:00"
+      },
+      {
+        "id": "3.3",
+        "title": "Implement Process Spawning",
+        "description": "Add logic to spawn the OpenCode binary locally using the configured environment variables and ensure it runs in attached mode.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "3.2"
+        ],
+        "parent_id": "3",
+        "created_at": "2025-11-26T23:41:14.486509+00:00",
+        "updated_at": "2025-11-26T23:41:14.486509+00:00"
+      },
+      {
+        "id": "3.4",
+        "title": "Test and Verify Implementation",
+        "description": "Create unit tests and integration tests to verify the local attach command starts OpenCode with correct environment, meeting success criteria.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "3.3"
+        ],
+        "parent_id": "3",
+        "created_at": "2025-11-26T23:41:14.486513+00:00",
+        "updated_at": "2025-11-26T23:41:14.486513+00:00"
+      },
+      {
+        "id": "1.1",
+        "title": "Define request and response schemas",
+        "description": "Create the data models for the attach request (e.g., agent ID, credentials) and response (token and connection spec) in the Descartes daemon, ensuring they align with RPC standards.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "1",
+        "created_at": "2025-11-26T23:41:14.486523+00:00",
+        "updated_at": "2025-11-26T23:41:14.486523+00:00"
+      },
+      {
+        "id": "1.2",
+        "title": "Implement verification and security logic",
+        "description": "Develop the core logic to verify the agent's pause state and enforce security controls (e.g., authentication, authorization) for attach requests.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "1.1"
+        ],
+        "parent_id": "1",
+        "created_at": "2025-11-26T23:41:14.486589+00:00",
+        "updated_at": "2025-11-26T23:41:14.486589+00:00"
+      },
+      {
+        "id": "1.3",
+        "title": "Implement the RPC endpoint",
+        "description": "Add the `agent.attach.opencode` RPC endpoint to the Descartes daemon, integrating the verification logic to handle requests, return token and spec for valid attaches, and reject unauthorized ones.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "1.1",
+          "1.2"
+        ],
+        "parent_id": "1",
+        "created_at": "2025-11-26T23:41:14.486594+00:00",
+        "updated_at": "2025-11-26T23:41:14.486594+00:00"
+      },
+      {
+        "id": "1.4",
+        "title": "Add tests and documentation",
+        "description": "Write unit and integration tests for the endpoint to verify correct responses to valid/invalid requests, and document the endpoint usage and API details.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "1.3"
+        ],
+        "parent_id": "1",
+        "created_at": "2025-11-26T23:41:14.486598+00:00",
+        "updated_at": "2025-11-26T23:41:14.486598+00:00"
+      },
+      {
+        "id": "5.1",
+        "title": "Define session metadata schema",
+        "description": "Create or extend data models/schemas to represent agent summary, pending tasks, attach instructions, and detach banner state in the session metadata structure.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "5",
+        "created_at": "2025-11-26T23:41:14.486606+00:00",
+        "updated_at": "2025-11-26T23:41:14.486606+00:00"
+      },
+      {
+        "id": "5.2",
+        "title": "Implement metadata retrieval logic",
+        "description": "Develop backend logic to fetch or compute agent summary, pending tasks, and attach instructions based on session data.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "5.1"
+        ],
+        "parent_id": "5",
+        "created_at": "2025-11-26T23:41:14.486610+00:00",
+        "updated_at": "2025-11-26T23:41:14.486610+00:00"
+      },
+      {
+        "id": "5.3",
+        "title": "Extend OpenCode UI for side panel display",
+        "description": "Integrate UI components into OpenCode's side panel to display the session metadata (agent summary, pending tasks, attach instructions) upon attach.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "5.2"
+        ],
+        "parent_id": "5",
+        "created_at": "2025-11-26T23:41:14.486614+00:00",
+        "updated_at": "2025-11-26T23:41:14.486614+00:00"
+      },
+      {
+        "id": "5.4",
+        "title": "Add detach banner functionality",
+        "description": "Implement the detach banner in the OpenCode side panel, including logic for detachment and UI updates.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "5.3"
+        ],
+        "parent_id": "5",
+        "created_at": "2025-11-26T23:41:14.486618+00:00",
+        "updated_at": "2025-11-26T23:41:14.486618+00:00"
+      },
+      {
+        "id": "5.5",
+        "title": "Test and document integration",
+        "description": "Write unit tests for metadata logic, integration tests for UI display, and update documentation for the new features, ensuring success criteria are met.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "5.4"
+        ],
+        "parent_id": "5",
+        "created_at": "2025-11-26T23:41:14.487036+00:00",
+        "updated_at": "2025-11-26T23:41:14.487036+00:00"
+      },
+      {
+        "id": "4.1",
+        "title": "Create SSH Connection Script",
+        "description": "Write the initial script that establishes an SSH connection to the remote host, ensuring basic setup for remote execution.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "4",
+        "created_at": "2025-11-26T23:41:14.487073+00:00",
+        "updated_at": "2025-11-26T23:41:14.487073+00:00"
+      },
+      {
+        "id": "4.2",
+        "title": "Implement Environment Export and Launch Logic",
+        "description": "Add functionality to the script to export necessary environment variables and launch OpenCode on the remote host.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "4.1"
+        ],
+        "parent_id": "4",
+        "created_at": "2025-11-26T23:41:14.487077+00:00",
+        "updated_at": "2025-11-26T23:41:14.487077+00:00"
+      },
+      {
+        "id": "4.3",
+        "title": "Package Script with CLI",
+        "description": "Integrate the helper script into the CLI package for SSH workflows, ensuring it can be invoked as part of the CLI.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "4.2"
+        ],
+        "parent_id": "4",
+        "created_at": "2025-11-26T23:41:14.487081+00:00",
+        "updated_at": "2025-11-26T23:41:14.487081+00:00"
+      },
+      {
+        "id": "4.4",
+        "title": "Test and Validate PTY Forwarding",
+        "description": "Test the script on remote hosts to ensure successful execution with proper PTY forwarding and meet the success criteria.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "4.3"
+        ],
+        "parent_id": "4",
+        "created_at": "2025-11-26T23:41:14.487086+00:00",
+        "updated_at": "2025-11-26T23:41:14.487086+00:00"
+      },
+      {
+        "id": "2.1",
+        "title": "Define CLI command structure and argument parsing",
+        "description": "Add the 'attach opencode' subcommand to the CLI with required <agent-id> argument and optional [--ssh user@host] flag, ensuring proper argument validation and parsing.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "2",
+        "created_at": "2025-11-26T23:41:14.487094+00:00",
+        "updated_at": "2025-11-26T23:41:14.487094+00:00"
+      },
+      {
+        "id": "2.2",
+        "title": "Implement attach API call and error handling",
+        "description": "Integrate the call to the attach API within the command logic, including handling of API responses, errors, and preparation for launch flow.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "2.1"
+        ],
+        "parent_id": "2",
+        "created_at": "2025-11-26T23:41:14.487098+00:00",
+        "updated_at": "2025-11-26T23:41:14.487098+00:00"
+      },
+      {
+        "id": "2.3",
+        "title": "Test command integration and error scenarios",
+        "description": "Verify that the command parses arguments correctly, initiates the attach flow without errors, and handles edge cases through unit and integration tests.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "2.2"
+        ],
+        "parent_id": "2",
+        "created_at": "2025-11-26T23:41:14.487102+00:00",
+        "updated_at": "2025-11-26T23:41:14.487102+00:00"
+      },
+      {
+        "id": "7.1",
+        "title": "Define state preservation schema",
+        "description": "Create a schema or model to define how session state will be serialized and stored for recovery purposes.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "7",
+        "created_at": "2025-11-26T23:41:14.487110+00:00",
+        "updated_at": "2025-11-26T23:41:14.487110+00:00"
+      },
+      {
+        "id": "7.2",
+        "title": "Implement heartbeat ping mechanism",
+        "description": "Develop the core logic for sending and receiving heartbeat pings between components to detect active sessions.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "7.1"
+        ],
+        "parent_id": "7",
+        "created_at": "2025-11-26T23:41:14.487113+00:00",
+        "updated_at": "2025-11-26T23:41:14.487113+00:00"
+      },
+      {
+        "id": "7.3",
+        "title": "Add auto-retry on unexpected exits",
+        "description": "Implement logic to automatically retry failed operations or reconnect after unexpected exits, using the state preservation schema.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "7.1",
+          "7.2"
+        ],
+        "parent_id": "7",
+        "created_at": "2025-11-26T23:41:14.487212+00:00",
+        "updated_at": "2025-11-26T23:41:14.487212+00:00"
+      },
+      {
+        "id": "7.4",
+        "title": "Handle cleanup on heartbeat loss",
+        "description": "Add functionality to detect heartbeat loss and perform necessary cleanup, ensuring sessions are properly terminated and resources released.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "7.2"
+        ],
+        "parent_id": "7",
+        "created_at": "2025-11-26T23:41:14.487217+00:00",
+        "updated_at": "2025-11-26T23:41:14.487217+00:00"
+      },
+      {
+        "id": "7.5",
+        "title": "Integrate and test resilience features",
+        "description": "Integrate all resilience components, add unit and integration tests to verify sessions remain stable and recoverable after interruptions, and document the implementation.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "7.3",
+          "7.4"
+        ],
+        "parent_id": "7",
+        "created_at": "2025-11-26T23:41:14.487221+00:00",
+        "updated_at": "2025-11-26T23:41:14.487221+00:00"
+      },
+      {
+        "id": "6.1",
+        "title": "Define Socket Interface for Descartes Daemon",
+        "description": "Research and define the socket communication protocol and interface to interact with the Descartes daemon, including message formats for appending logs and resuming sessions.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "6",
+        "created_at": "2025-11-26T23:41:14.487230+00:00",
+        "updated_at": "2025-11-26T23:41:14.487230+00:00"
+      },
+      {
+        "id": "6.2",
+        "title": "Implement Core Logic for Commands",
+        "description": "Develop the core logic functions to handle appending notes to logs and resuming sessions by sending appropriate socket messages to the Descartes daemon and updating agent state.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "6.1"
+        ],
+        "parent_id": "6",
+        "created_at": "2025-11-26T23:41:14.487234+00:00",
+        "updated_at": "2025-11-26T23:41:14.487234+00:00"
+      },
+      {
+        "id": "6.3",
+        "title": "Add Command Hooks in OpenCode",
+        "description": "Integrate the /descartes log and /descartes resume commands into OpenCode's command system, wiring them to the core logic functions for execution.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "6.2"
+        ],
+        "parent_id": "6",
+        "created_at": "2025-11-26T23:41:14.487238+00:00",
+        "updated_at": "2025-11-26T23:41:14.487238+00:00"
+      },
+      {
+        "id": "6.4",
+        "title": "Test and Validate Commands",
+        "description": "Test the commands to ensure they execute correctly, interact with the daemon via sockets, and update agent state as per success criteria.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "6.3"
+        ],
+        "parent_id": "6",
+        "created_at": "2025-11-26T23:41:14.487241+00:00",
+        "updated_at": "2025-11-26T23:41:14.487241+00:00"
+      },
+      {
+        "id": "8.1",
+        "title": "Define Telemetry Schemas and Metrics Structure",
+        "description": "Create schemas for metrics (attachment attempts, success rates, events) and structured logging formats for auditing. Ensure they are designed to avoid performance overhead.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "8",
+        "created_at": "2025-11-26T23:41:14.487249+00:00",
+        "updated_at": "2025-11-26T23:41:14.487249+00:00"
+      },
+      {
+        "id": "8.2",
+        "title": "Integrate Metrics Collection",
+        "description": "Implement collection of metrics for attachment attempts, success rates, and events in the relevant code paths, using the defined schemas.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "8.1"
+        ],
+        "parent_id": "8",
+        "created_at": "2025-11-26T23:41:14.487253+00:00",
+        "updated_at": "2025-11-26T23:41:14.487253+00:00"
+      },
+      {
+        "id": "8.3",
+        "title": "Implement Structured Logging",
+        "description": "Add structured logging for auditing purposes across the application, ensuring it integrates with the telemetry schemas without impacting performance.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "8.1"
+        ],
+        "parent_id": "8",
+        "created_at": "2025-11-26T23:41:14.487275+00:00",
+        "updated_at": "2025-11-26T23:41:14.487275+00:00"
+      },
+      {
+        "id": "8.4",
+        "title": "Add User Satisfaction Prompts and Performance Verification",
+        "description": "Integrate user satisfaction prompts post-detach and conduct tests to verify that telemetry data is collected and accessible without performance impact.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "8.2",
+          "8.3"
+        ],
+        "parent_id": "8",
+        "created_at": "2025-11-26T23:41:14.487278+00:00",
+        "updated_at": "2025-11-26T23:41:14.487278+00:00"
+      },
+      {
+        "id": "10.1",
+        "title": "Identify and outline attach flows and use cases",
+        "description": "Analyze all attach flows in the system and outline the use cases they support, including any edge cases or milestones (prototype, beta, GA). This provides the foundation for documentation and testing.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "10",
+        "created_at": "2025-11-26T23:41:14.487376+00:00",
+        "updated_at": "2025-11-26T23:41:14.487376+00:00"
+      },
+      {
+        "id": "10.2",
+        "title": "Create user guides and compatibility matrix",
+        "description": "Develop user guides that cover all outlined use cases and a compatibility matrix detailing supported environments and versions.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "10.1"
+        ],
+        "parent_id": "10",
+        "created_at": "2025-11-26T23:41:14.487382+00:00",
+        "updated_at": "2025-11-26T23:41:14.487382+00:00"
+      },
+      {
+        "id": "10.3",
+        "title": "Develop support playbooks",
+        "description": "Write support playbooks for troubleshooting and maintenance related to the attach flows, ensuring coverage of all use cases.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "medium",
+        "dependencies": [
+          "10.1"
+        ],
+        "parent_id": "10",
+        "created_at": "2025-11-26T23:41:14.487385+00:00",
+        "updated_at": "2025-11-26T23:41:14.487385+00:00"
+      },
+      {
+        "id": "10.4",
+        "title": "Write unit and integration tests for attach flows",
+        "description": "Implement unit tests for individual components of attach flows and integration tests for end-to-end scenarios, ensuring tests pass for prototype, beta, and GA milestones.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "10.1"
+        ],
+        "parent_id": "10",
+        "created_at": "2025-11-26T23:41:14.487389+00:00",
+        "updated_at": "2025-11-26T23:41:14.487389+00:00"
+      },
+      {
+        "id": "9.1",
+        "title": "Define attach_manifest.json schema and models",
+        "description": "Create the schema for attach_manifest.json to support extensibility, including models for parsing and validating the manifest structure.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [],
+        "parent_id": "9",
+        "created_at": "2025-11-26T23:41:14.487397+00:00",
+        "updated_at": "2025-11-26T23:41:14.487397+00:00"
+      },
+      {
+        "id": "9.2",
+        "title": "Implement PTY bridging",
+        "description": "Develop PTY bridging functionality to enable pseudo-terminal attachment for interactive sessions in attachments.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "9.1"
+        ],
+        "parent_id": "9",
+        "created_at": "2025-11-26T23:41:14.487401+00:00",
+        "updated_at": "2025-11-26T23:41:14.487401+00:00"
+      },
+      {
+        "id": "9.3",
+        "title": "Implement file synchronization checks",
+        "description": "Add logic for file sync checks, including validation mechanisms to ensure files are in sync across local and remote setups.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "9.1"
+        ],
+        "parent_id": "9",
+        "created_at": "2025-11-26T23:41:14.487487+00:00",
+        "updated_at": "2025-11-26T23:41:14.487487+00:00"
+      },
+      {
+        "id": "9.4",
+        "title": "Implement token handling and security",
+        "description": "Handle token management for secure access, including validation and error handling for security in attachment processes.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "9.1"
+        ],
+        "parent_id": "9",
+        "created_at": "2025-11-26T23:41:14.487491+00:00",
+        "updated_at": "2025-11-26T23:41:14.487491+00:00"
+      },
+      {
+        "id": "9.5",
+        "title": "Integrate feature flag and cross-setup functionality",
+        "description": "Add the feature.attach.opencode flag, integrate all components (PTY, sync, tokens, manifest) for local/remote setups, and ensure attachments work with validations; include unit and integration tests.",
+        "status": "pending",
+        "complexity": 0,
+        "priority": "high",
+        "dependencies": [
+          "9.2",
+          "9.3",
+          "9.4"
+        ],
+        "parent_id": "9",
+        "created_at": "2025-11-26T23:41:14.487495+00:00",
+        "updated_at": "2025-11-26T23:41:14.487495+00:00"
+      }
+    ]
+  }
+}

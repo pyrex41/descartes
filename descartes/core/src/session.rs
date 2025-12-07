@@ -11,6 +11,9 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// Represents a Descartes workspace/session
+///
+/// Note: The daemon is now global (not per-session), but `daemon_info` is kept
+/// for backwards compatibility when deserializing old session.json files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     /// Unique session ID
@@ -25,7 +28,9 @@ pub struct Session {
     pub last_accessed: Option<DateTime<Utc>>,
     /// Session status
     pub status: SessionStatus,
-    /// Daemon connection info (if running)
+    /// Daemon connection info (deprecated - kept for backwards compatibility)
+    /// The daemon is now global; use `daemon_launcher` module for connection info.
+    #[serde(skip_serializing, default)]
     pub daemon_info: Option<DaemonInfo>,
 }
 
@@ -43,9 +48,12 @@ impl Session {
         }
     }
 
-    /// Check if the session's daemon is running
+    /// Check if the session is active
+    ///
+    /// Note: This now only checks session status, not daemon status.
+    /// The daemon is global and managed separately via `daemon_launcher`.
     pub fn is_running(&self) -> bool {
-        matches!(self.status, SessionStatus::Active | SessionStatus::Starting)
+        matches!(self.status, SessionStatus::Active)
     }
 
     /// Check if the session is archived
@@ -53,14 +61,19 @@ impl Session {
         matches!(self.status, SessionStatus::Archived)
     }
 
-    /// Get the path to the .scud directory
+    /// Get the path to the .descartes directory (primary session storage)
+    pub fn descartes_path(&self) -> PathBuf {
+        self.path.join(".descartes")
+    }
+
+    /// Get the path to the .scud directory (for SCUD CLI plugin compatibility)
     pub fn scud_path(&self) -> PathBuf {
         self.path.join(".scud")
     }
 
     /// Get the path to the session metadata file
     pub fn metadata_path(&self) -> PathBuf {
-        self.scud_path().join("session.json")
+        self.descartes_path().join("session.json")
     }
 }
 
@@ -194,17 +207,11 @@ pub trait SessionManager: Send + Sync {
     /// Create a new session/workspace
     async fn create_session(&self, name: &str, path: &Path) -> Result<Session, SessionError>;
 
-    /// Archive a session (stop daemon, mark as archived)
+    /// Archive a session (mark as archived)
     async fn archive_session(&self, id: &Uuid) -> Result<(), SessionError>;
 
     /// Delete a session permanently
     async fn delete_session(&self, id: &Uuid, delete_files: bool) -> Result<(), SessionError>;
-
-    /// Start daemon for a session
-    async fn start_daemon(&self, id: &Uuid) -> Result<DaemonInfo, SessionError>;
-
-    /// Stop daemon for a session
-    async fn stop_daemon(&self, id: &Uuid) -> Result<(), SessionError>;
 
     /// Get the currently active session
     async fn get_active_session(&self) -> Result<Option<Session>, SessionError>;
@@ -212,7 +219,7 @@ pub trait SessionManager: Send + Sync {
     /// Set the active session
     async fn set_active_session(&self, id: &Uuid) -> Result<(), SessionError>;
 
-    /// Refresh a single session's status (check if daemon is still running, etc.)
+    /// Refresh a single session's status
     async fn refresh_session(&self, id: &Uuid) -> Result<Option<Session>, SessionError>;
 }
 
@@ -267,8 +274,9 @@ mod tests {
     fn test_session_paths() {
         let session = Session::new("test".to_string(), PathBuf::from("/home/user/project"));
 
+        assert_eq!(session.descartes_path(), PathBuf::from("/home/user/project/.descartes"));
         assert_eq!(session.scud_path(), PathBuf::from("/home/user/project/.scud"));
-        assert_eq!(session.metadata_path(), PathBuf::from("/home/user/project/.scud/session.json"));
+        assert_eq!(session.metadata_path(), PathBuf::from("/home/user/project/.descartes/session.json"));
     }
 
     #[test]

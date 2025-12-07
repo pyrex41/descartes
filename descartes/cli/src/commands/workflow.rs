@@ -6,9 +6,13 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use descartes_core::{
-    get_workflow, list_workflows, prepare_workflow, WorkflowContext,
+    execute_workflow as run_workflow, get_workflow, list_workflows, prepare_workflow,
+    DescaratesConfig, ProviderFactory, WorkflowContext, WorkflowExecutorConfig,
 };
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tracing::info;
 
 #[derive(Subcommand, Debug)]
 pub enum WorkflowCommands {
@@ -29,6 +33,10 @@ pub enum WorkflowCommands {
         /// Working directory (defaults to current directory)
         #[arg(short, long)]
         dir: Option<PathBuf>,
+
+        /// Use a headless CLI adapter (claude-code, opencode)
+        #[arg(long)]
+        adapter: Option<String>,
     },
 
     /// Create an implementation plan
@@ -45,6 +53,10 @@ pub enum WorkflowCommands {
         /// Working directory (defaults to current directory)
         #[arg(short, long)]
         dir: Option<PathBuf>,
+
+        /// Use a headless CLI adapter (claude-code, opencode)
+        #[arg(long)]
+        adapter: Option<String>,
     },
 
     /// Implement a plan from thoughts/plans/
@@ -57,6 +69,10 @@ pub enum WorkflowCommands {
         /// Working directory (defaults to current directory)
         #[arg(short, long)]
         dir: Option<PathBuf>,
+
+        /// Use a headless CLI adapter (claude-code, opencode)
+        #[arg(long)]
+        adapter: Option<String>,
     },
 
     /// Show details about a specific workflow
@@ -66,17 +82,17 @@ pub enum WorkflowCommands {
     },
 }
 
-pub async fn execute(cmd: &WorkflowCommands) -> Result<()> {
+pub async fn execute(cmd: &WorkflowCommands, config: &DescaratesConfig) -> Result<()> {
     match cmd {
         WorkflowCommands::List => execute_list().await,
-        WorkflowCommands::Research { topic, context, dir } => {
-            execute_workflow("research_codebase", topic, context.as_deref(), dir.clone()).await
+        WorkflowCommands::Research { topic, context, dir, adapter } => {
+            execute_workflow_run("research_codebase", topic, context.as_deref(), dir.clone(), adapter.as_deref(), config).await
         }
-        WorkflowCommands::Plan { topic, context, dir } => {
-            execute_workflow("create_plan", topic, context.as_deref(), dir.clone()).await
+        WorkflowCommands::Plan { topic, context, dir, adapter } => {
+            execute_workflow_run("create_plan", topic, context.as_deref(), dir.clone(), adapter.as_deref(), config).await
         }
-        WorkflowCommands::Implement { plan, dir } => {
-            execute_implement(plan, dir.clone()).await
+        WorkflowCommands::Implement { plan, dir, adapter } => {
+            execute_implement(plan, dir.clone(), adapter.as_deref(), config).await
         }
         WorkflowCommands::Info { name } => execute_info(name).await,
     }
@@ -114,11 +130,13 @@ async fn execute_list() -> Result<()> {
     Ok(())
 }
 
-async fn execute_workflow(
+async fn execute_workflow_run(
     workflow_name: &str,
     topic: &str,
     context: Option<&str>,
     dir: Option<PathBuf>,
+    adapter: Option<&str>,
+    config: &DescaratesConfig,
 ) -> Result<()> {
     println!();
     println!(
@@ -171,36 +189,81 @@ async fn execute_workflow(
 
     println!("{}", "─".repeat(50).dimmed());
     println!();
-    println!(
-        "{}",
-        "To execute this workflow, run each step using:".dimmed()
-    );
+    println!("{}", "Executing workflow...".green().bold());
     println!();
 
-    for (step, task) in &prepared_steps {
+    // Create backend - use adapter if specified, otherwise use primary provider
+    let (provider_name, model, mut backend) = if let Some(adapter_name) = adapter {
+        println!("  Using adapter: {}", adapter_name.cyan());
+        let backend = create_adapter_backend(adapter_name)?;
+        (adapter_name.to_string(), "default".to_string(), backend)
+    } else {
+        let provider_name = &config.providers.primary;
+        let backend = create_backend(config, provider_name)?;
+        let model = get_model_for_provider(config, provider_name)?;
+        (provider_name.clone(), model, backend)
+    };
+    backend.initialize().await?;
+
+    info!("Using provider: {}, model: {}", provider_name, model);
+
+    let exec_config = WorkflowExecutorConfig {
+        provider: provider_name.clone(),
+        model,
+        max_parallel: 3,
+        save_outputs: true,
+    };
+
+    // Execute workflow
+    let results = run_workflow(
+        prepared_steps,
+        &wf_context,
+        Arc::from(backend),
+        &exec_config,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Workflow execution failed: {}", e))?;
+
+    // Display results
+    println!("{}", "─".repeat(50).dimmed());
+    println!();
+    println!("{}", "Workflow Results:".green().bold());
+    println!();
+
+    let mut all_success = true;
+    for result in &results {
+        let status = if result.success {
+            "✓".green()
+        } else {
+            all_success = false;
+            "✗".red()
+        };
         println!(
-            "  {}",
-            format!(
-                "descartes spawn --task \"{}\" --tool-level {} --agent {}",
-                truncate_task(task, 50),
-                get_tool_level_for_agent(&step.agent),
-                step.agent
-            )
-            .cyan()
+            "  {} {} ({}ms)",
+            status,
+            result.step_name,
+            result.duration_ms
         );
+        if let Some(path) = &result.saved_to {
+            println!("    Output: {}", path.display().to_string().yellow());
+        }
+        if let Some(error) = &result.error {
+            println!("    Error: {}", error.red());
+        }
     }
 
     println!();
-    println!(
-        "{}",
-        "Note: Full workflow automation coming in a future release!".yellow()
-    );
+    if all_success {
+        println!("{}", "Workflow completed successfully!".green().bold());
+    } else {
+        println!("{}", "Workflow completed with errors.".yellow().bold());
+    }
     println!();
 
     Ok(())
 }
 
-async fn execute_implement(plan: &str, dir: Option<PathBuf>) -> Result<()> {
+async fn execute_implement(plan: &str, dir: Option<PathBuf>, _adapter: Option<&str>, _config: &DescaratesConfig) -> Result<()> {
     println!();
     println!(
         "{}",
@@ -317,4 +380,95 @@ fn get_tool_level_for_agent(agent: &str) -> &'static str {
         "planner" => "planner",
         _ => "minimal",
     }
+}
+
+/// Create a model backend for the given provider
+fn create_backend(
+    config: &DescaratesConfig,
+    provider: &str,
+) -> Result<Box<dyn descartes_core::ModelBackend + Send + Sync>> {
+    let mut provider_config: HashMap<String, String> = HashMap::new();
+
+    match provider {
+        "anthropic" => {
+            if let Some(api_key) = &config.providers.anthropic.api_key {
+                if !api_key.is_empty() {
+                    provider_config.insert("api_key".to_string(), api_key.clone());
+                }
+            }
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.anthropic.endpoint.clone(),
+            );
+        }
+        "openai" => {
+            if let Some(api_key) = &config.providers.openai.api_key {
+                if !api_key.is_empty() {
+                    provider_config.insert("api_key".to_string(), api_key.clone());
+                }
+            }
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.openai.endpoint.clone(),
+            );
+        }
+        "ollama" => {
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.ollama.endpoint.clone(),
+            );
+        }
+        "grok" => {
+            if let Some(api_key) = &config.providers.grok.api_key {
+                if !api_key.is_empty() {
+                    provider_config.insert("api_key".to_string(), api_key.clone());
+                }
+            }
+            provider_config.insert(
+                "endpoint".to_string(),
+                config.providers.grok.endpoint.clone(),
+            );
+        }
+        _ => {
+            anyhow::bail!("Unknown provider: {}", provider);
+        }
+    }
+
+    let backend = ProviderFactory::create(provider, provider_config)?;
+    Ok(backend)
+}
+
+/// Get the model for a provider from config
+fn get_model_for_provider(config: &DescaratesConfig, provider: &str) -> Result<String> {
+    match provider {
+        "anthropic" => Ok(config.providers.anthropic.model.clone()),
+        "openai" => Ok(config.providers.openai.model.clone()),
+        "ollama" => Ok(config.providers.ollama.model.clone()),
+        "grok" => Ok(config.providers.grok.model.clone()),
+        _ => anyhow::bail!("Unknown provider: {}", provider),
+    }
+}
+
+/// Create a headless CLI adapter backend
+fn create_adapter_backend(
+    adapter_name: &str,
+) -> Result<Box<dyn descartes_core::ModelBackend + Send + Sync>> {
+    let mut provider_config: HashMap<String, String> = HashMap::new();
+
+    match adapter_name {
+        "claude-code" | "claude" => {
+            provider_config.insert("command".to_string(), "claude".to_string());
+        }
+        "opencode" => {
+            provider_config.insert("command".to_string(), "opencode".to_string());
+        }
+        _ => {
+            // Treat as generic command
+            provider_config.insert("command".to_string(), adapter_name.to_string());
+        }
+    }
+
+    // Use headless-cli provider for CLI adapters
+    let backend = ProviderFactory::create("headless-cli", provider_config)?;
+    Ok(backend)
 }

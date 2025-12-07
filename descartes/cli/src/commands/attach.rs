@@ -6,7 +6,6 @@
 
 use anyhow::Result;
 use colored::Colorize;
-use descartes_core::DescaratesConfig;
 use std::process::Command;
 use tracing::info;
 use uuid::Uuid;
@@ -14,7 +13,6 @@ use uuid::Uuid;
 use crate::rpc;
 
 pub async fn execute(
-    config: &DescaratesConfig,
     id: &str,
     client_type: &str,
     output_json: bool,
@@ -38,8 +36,8 @@ pub async fn execute(
         id
     );
 
-    // Connect to daemon
-    let client = rpc::connect_or_bail(config).await?;
+    // Connect to daemon (auto-starts if needed)
+    let client = rpc::connect_with_autostart().await?;
 
     // Call attach.request RPC (daemon expects positional array: [agent_id, client_type])
     let result = rpc::call_method(

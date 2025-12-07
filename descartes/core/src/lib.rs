@@ -35,10 +35,12 @@ pub mod state_store;
 pub mod swarm_parser;
 pub mod task_queries;
 pub mod scg_task_storage;
+pub mod scud_plugin;
 pub mod thoughts;
 pub mod time_travel_integration;
 pub mod traits;
 pub mod workflow_commands;
+pub mod workflow_executor;
 pub mod zmq_agent_runner;
 pub mod zmq_client;
 pub mod zmq_communication;
@@ -48,6 +50,9 @@ pub mod zmq_server;
 pub mod session;
 pub mod session_manager;
 pub mod session_transcript;
+
+// Daemon lifecycle management
+pub mod daemon_launcher;
 
 // Minimal tool definitions (Pi-style)
 pub mod tools;
@@ -187,6 +192,17 @@ pub use workflow_commands::{
     WorkflowError, WorkflowExecutionResult, WorkflowRegistry, WorkflowResult, WorkflowStep,
 };
 
+pub use workflow_executor::{
+    execute_step, execute_workflow, StepExecutionResult, WorkflowExecutionError,
+    WorkflowExecutorConfig,
+};
+
+pub use scud_plugin::{
+    detect_workspace_type, ensure_scud_dir, has_scud, is_dual_workspace, read_scud_tasks,
+    read_scud_workflow_state, scud_available, scud_dir, scud_tasks_file, scud_version,
+    scud_workflow_state_file, sync_tasks_to_scud, WorkspaceType,
+};
+
 pub use debugger::{
     run_with_debugging,
     Breakpoint,
@@ -264,6 +280,11 @@ pub use session::{
 };
 
 pub use session_manager::FileSystemSessionManager;
+
+pub use daemon_launcher::{
+    daemon_http_endpoint, daemon_socket_path, daemon_ws_endpoint, ensure_daemon_running,
+    is_daemon_running, DEFAULT_HTTP_PORT, DEFAULT_WS_PORT,
+};
 
 pub use tools::{
     bash_tool, edit_tool, execute_bash, execute_edit, execute_read, execute_spawn_session,

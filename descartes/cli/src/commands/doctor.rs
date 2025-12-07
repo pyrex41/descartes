@@ -111,13 +111,13 @@ fn check_api_key(env_var: &str) -> (Status, String) {
 
 /// Check daemon status
 fn check_daemon() -> (Status, String) {
-    // Try to connect to the daemon on default port
+    // Check if global daemon is running on the default port
     match std::net::TcpStream::connect_timeout(
-        &"127.0.0.1:8080".parse().unwrap(),
+        &format!("127.0.0.1:{}", descartes_core::DEFAULT_HTTP_PORT).parse().unwrap(),
         std::time::Duration::from_millis(500),
     ) {
-        Ok(_) => (Status::Ok, "running on port 8080".to_string()),
-        Err(_) => (Status::NotConfigured, "not running".to_string()),
+        Ok(_) => (Status::Ok, format!("running on port {} (auto-starts when needed)", descartes_core::DEFAULT_HTTP_PORT)),
+        Err(_) => (Status::NotConfigured, "not running (will auto-start when needed)".to_string()),
     }
 }
 

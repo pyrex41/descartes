@@ -68,7 +68,7 @@ fn main() -> iced::Result {
         .font(JETBRAINS_MONO_BOLD)
         // Set JetBrains Mono as the default font
         .default_font(Font::with_name("JetBrains Mono"))
-        .run_with(|| (DescartesGui::new(), iced::Task::none()))
+        .run_with(DescartesGui::new)
 }
 
 /// Main application state
@@ -168,9 +168,9 @@ enum Message {
 }
 
 impl DescartesGui {
-    /// Create a new application instance
-    fn new() -> Self {
-        Self {
+    /// Create a new application instance with startup task
+    fn new() -> (Self, iced::Task<Message>) {
+        let app = Self {
             current_view: ViewMode::Dashboard,
             daemon_connected: false,
             connection_error: None,
@@ -186,9 +186,25 @@ impl DescartesGui {
             event_handler: None,
             recent_events: Vec::new(),
             status_message: Some(
-                "Welcome to Descartes GUI! Select a session or connect to the daemon.".to_string(),
+                "Starting up... connecting to daemon.".to_string(),
             ),
-        }
+        };
+
+        // Auto-start daemon and connect on startup
+        let startup_task = iced::Task::perform(
+            async {
+                // Ensure daemon is running (starts if needed)
+                descartes_core::ensure_daemon_running().await
+                    .map_err(|e| format!("Failed to start daemon: {}", e))?;
+                Ok::<(), String>(())
+            },
+            |result| match result {
+                Ok(()) => Message::ConnectDaemon,
+                Err(e) => Message::ShowError(e),
+            },
+        );
+
+        (app, startup_task)
     }
 }
 
@@ -205,14 +221,8 @@ impl DescartesGui {
                 self.status_message = Some("Connecting to daemon...".to_string());
                 self.connection_error = None;
 
-                // Use active session's daemon endpoint if available, otherwise default
-                let endpoint = self
-                    .session_state
-                    .active_session()
-                    .and_then(|s| s.daemon_info.as_ref())
-                    .map(|d| d.http_endpoint.clone())
-                    .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
-
+                // Use the global daemon endpoint
+                let endpoint = descartes_core::daemon_http_endpoint();
                 tracing::info!("Using daemon endpoint: {}", endpoint);
 
                 // Create RPC client
@@ -289,61 +299,10 @@ impl DescartesGui {
 
                 // Handle async operations before updating state
                 let task = match &msg {
-                    SessionMessage::SelectSession(id) => {
-                        // When selecting a session, auto-start daemon if not running
-                        if let Some(session) = self.session_state.sessions.iter().find(|s| s.id == *id) {
-                            if session.daemon_info.is_none() || session.status != descartes_core::SessionStatus::Active {
-                                let session_clone = session.clone();
-                                return iced::Task::perform(
-                                    spawn_daemon_for_session(session_clone),
-                                    |result| match result {
-                                        Ok(session) => Message::Session(SessionMessage::DaemonStarted(session)),
-                                        Err(e) => Message::Session(SessionMessage::DaemonError(e)),
-                                    },
-                                );
-                            }
-                        }
+                    SessionMessage::SelectSession(_id) => {
+                        // Session selection is now instant - daemon is global
+                        // Just update state, no daemon spawning needed
                         iced::Task::none()
-                    }
-                    SessionMessage::StartDaemon(id) => {
-                        if let Some(session) = self.session_state.sessions.iter().find(|s| s.id == *id) {
-                            let session_clone = session.clone();
-                            iced::Task::perform(
-                                spawn_daemon_for_session(session_clone),
-                                |result| match result {
-                                    Ok(session) => Message::Session(SessionMessage::DaemonStarted(session)),
-                                    Err(e) => Message::Session(SessionMessage::DaemonError(e)),
-                                },
-                            )
-                        } else {
-                            iced::Task::none()
-                        }
-                    }
-                    SessionMessage::StopDaemon(id) => {
-                        if let Some(session) = self.session_state.sessions.iter().find(|s| s.id == *id) {
-                            if let Some(ref daemon_info) = session.daemon_info {
-                                let endpoint = daemon_info.http_endpoint.clone();
-                                let pid = daemon_info.pid;
-                                let session_id = *id;
-                                iced::Task::perform(
-                                    stop_daemon(endpoint, pid),
-                                    move |result| match result {
-                                        Ok(_) => Message::Session(SessionMessage::DaemonStopped(session_id)),
-                                        Err(e) => Message::Session(SessionMessage::DaemonError(e)),
-                                    },
-                                )
-                            } else {
-                                iced::Task::none()
-                            }
-                        } else {
-                            iced::Task::none()
-                        }
-                    }
-                    SessionMessage::DaemonStarted(_) => {
-                        // Auto-connect to the newly started daemon
-                        self.status_message = Some("Daemon started! Connecting...".to_string());
-                        // Return a task that triggers ConnectDaemon after state update
-                        iced::Task::done(Message::ConnectDaemon)
                     }
                     SessionMessage::CreateSession => {
                         // Get the session details from state
@@ -1481,34 +1440,35 @@ impl DescartesGui {
                 descartes_core::SessionStatus::Archived => ("○", colors::TEXT_MUTED, "Archived"),
             };
 
-            let daemon_info = if let Some(ref info) = session.daemon_info {
+            // Global daemon info (daemon is now shared across all sessions)
+            let daemon_info = if self.daemon_connected {
                 column![
                     row![
                         text("Endpoint:").size(12).color(colors::TEXT_MUTED),
                         Space::with_width(8),
-                        text(&info.http_endpoint).size(12).color(colors::PRIMARY),
+                        text(descartes_core::daemon_http_endpoint()).size(12).color(colors::PRIMARY),
                     ],
                     row![
-                        text("PID:").size(12).color(colors::TEXT_MUTED),
+                        text("WebSocket:").size(12).color(colors::TEXT_MUTED),
                         Space::with_width(8),
-                        text(info.pid.map(|p| p.to_string()).unwrap_or_else(|| "N/A".to_string()))
+                        text(descartes_core::daemon_ws_endpoint())
                             .size(12)
                             .color(colors::TEXT_SECONDARY),
                     ],
                     row![
-                        text("Started:").size(12).color(colors::TEXT_MUTED),
+                        text("Status:").size(12).color(colors::TEXT_MUTED),
                         Space::with_width(8),
-                        text(info.started_at.format("%H:%M:%S").to_string())
+                        text("Running (global)")
                             .size(12)
-                            .color(colors::TEXT_SECONDARY),
+                            .color(colors::SUCCESS),
                     ],
                 ]
                 .spacing(4)
             } else {
                 column![
-                    text("No daemon running").size(12).color(colors::TEXT_MUTED),
+                    text("Daemon not connected").size(12).color(colors::TEXT_MUTED),
                     Space::with_height(4),
-                    text("Select a session to start daemon").size(11).color(colors::TEXT_MUTED),
+                    text("Click 'Connect' in the header to connect").size(11).color(colors::TEXT_MUTED),
                 ]
             };
 
@@ -2089,114 +2049,6 @@ impl DescartesGui {
         );
         tracing::warn!("Knowledge graph generation not available without agent-runner feature");
     }
-}
-
-/// Spawn a daemon for a session
-async fn spawn_daemon_for_session(mut session: descartes_core::Session) -> Result<descartes_core::Session, String> {
-    use std::process::{Command, Stdio};
-    use tokio::time::{sleep, Duration};
-
-    // Use a port based on session ID to avoid conflicts
-    let port_offset = (session.id.as_u128() % 100) as u16;
-    let http_port = 8080 + port_offset;
-    let ws_port = 8180 + port_offset;
-
-    let workspace_path = &session.path;
-    let config_path = workspace_path.join("config.toml");
-
-    tracing::info!(
-        "Starting daemon for session {} on port {}",
-        session.name,
-        http_port
-    );
-
-    // Build daemon command
-    let mut cmd = Command::new("descartes-daemon");
-    cmd.arg("--http-port")
-        .arg(http_port.to_string())
-        .arg("--ws-port")
-        .arg(ws_port.to_string())
-        .current_dir(workspace_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    if config_path.exists() {
-        cmd.arg("--config").arg(&config_path);
-    }
-
-    let child = cmd.spawn().map_err(|e| {
-        format!(
-            "Failed to spawn daemon: {}. Is descartes-daemon in PATH?",
-            e
-        )
-    })?;
-
-    let pid = child.id();
-
-    // Wait for daemon to be ready
-    let endpoint = format!("http://127.0.0.1:{}", http_port);
-    let client = reqwest::Client::new();
-    let mut attempts = 0;
-
-    while attempts < 30 {
-        // The daemon responds to GET on the root endpoint with server info
-        if let Ok(resp) = client.get(&endpoint).send().await {
-            if resp.status().is_success() {
-                tracing::info!("Daemon started on port {} (PID: {})", http_port, pid);
-
-                session.status = descartes_core::SessionStatus::Active;
-                session.daemon_info = Some(descartes_core::DaemonInfo {
-                    pid: Some(pid),
-                    http_endpoint: endpoint,
-                    ws_endpoint: Some(format!("ws://127.0.0.1:{}", ws_port)),
-                    started_at: chrono::Utc::now(),
-                });
-                session.last_accessed = Some(chrono::Utc::now());
-
-                return Ok(session);
-            }
-        }
-        sleep(Duration::from_millis(100)).await;
-        attempts += 1;
-    }
-
-    Err("Daemon failed to become healthy within timeout (3s)".to_string())
-}
-
-/// Stop a daemon
-async fn stop_daemon(endpoint: String, pid: Option<u32>) -> Result<(), String> {
-    // Try graceful shutdown via HTTP
-    let client = reqwest::Client::new();
-    if let Err(e) = client
-        .post(&format!("{}/shutdown", endpoint))
-        .send()
-        .await
-    {
-        tracing::warn!("Graceful shutdown failed: {}, trying kill", e);
-
-        // Fall back to kill if we have PID
-        if let Some(pid) = pid {
-            #[cfg(unix)]
-            {
-                use nix::sys::signal::{kill, Signal};
-                use nix::unistd::Pid;
-
-                kill(Pid::from_raw(pid as i32), Signal::SIGTERM)
-                    .map_err(|e| format!("Failed to kill daemon: {}", e))?;
-            }
-            #[cfg(not(unix))]
-            {
-                return Err(format!(
-                    "Cannot kill daemon on non-Unix system, PID: {}",
-                    pid
-                ));
-            }
-        } else {
-            return Err("No PID available for daemon".to_string());
-        }
-    }
-
-    Ok(())
 }
 
 /// Create a new session by initializing the workspace directory

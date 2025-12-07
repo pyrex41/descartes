@@ -655,6 +655,7 @@ impl Default for ZmqMessageRouter {
 mod tests {
     use super::*;
     use crate::zmq_agent_runner::{HealthCheckRequest, HealthCheckResponse};
+    use uuid::Uuid;
 
     #[test]
     fn test_connection_state() {

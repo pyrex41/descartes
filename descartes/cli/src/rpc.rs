@@ -2,27 +2,30 @@
 //!
 //! This module provides helper functions for connecting to the daemon
 //! and making RPC calls from CLI commands.
+//!
+//! The daemon is now global (single instance per user) and auto-starts when needed.
 
 use anyhow::Result;
 use descartes_core::DescaratesConfig;
 use descartes_daemon::{UnixSocketRpcClient, UnixSocketRpcClientBuilder};
 use std::path::PathBuf;
 
-/// Get the daemon socket path from config
+/// Get the daemon socket path from config (deprecated - use global daemon)
+#[allow(dead_code)]
 pub fn get_daemon_socket(config: &DescaratesConfig) -> PathBuf {
     PathBuf::from(format!("{}/run/daemon.sock", config.storage.base_path))
 }
 
-/// Check if daemon is running by checking if socket exists
+/// Check if daemon is running by checking if socket exists (deprecated)
 #[allow(dead_code)]
-pub fn is_daemon_running(config: &DescaratesConfig) -> bool {
-    get_daemon_socket(config).exists()
+pub fn is_daemon_running(_config: &DescaratesConfig) -> bool {
+    descartes_core::daemon_socket_path().exists()
 }
 
-/// Connect to daemon or bail with helpful error
+/// Connect to daemon or bail with helpful error (deprecated)
 ///
-/// This is the primary entry point for CLI commands that need to
-/// communicate with the daemon.
+/// This function is deprecated. Use `connect_with_autostart()` instead.
+#[allow(dead_code)]
 pub async fn connect_or_bail(config: &DescaratesConfig) -> Result<UnixSocketRpcClient> {
     let socket_path = get_daemon_socket(config);
 
@@ -45,6 +48,37 @@ pub async fn connect_or_bail(config: &DescaratesConfig) -> Result<UnixSocketRpcC
         anyhow::anyhow!(
             "Failed to connect to daemon at {:?}: {}\n\
              Make sure the daemon is running with 'descartes daemon'.",
+            socket_path,
+            e
+        )
+    })?;
+
+    Ok(client)
+}
+
+/// Connect to daemon, auto-starting if necessary
+///
+/// This is the primary entry point for CLI commands that need to
+/// communicate with the daemon. The daemon is global (shared across sessions).
+pub async fn connect_with_autostart() -> Result<UnixSocketRpcClient> {
+    // Ensure daemon is running (starts if needed)
+    descartes_core::ensure_daemon_running()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to start daemon: {}", e))?;
+
+    let socket_path = descartes_core::daemon_socket_path();
+
+    let client = UnixSocketRpcClientBuilder::new()
+        .socket_path(socket_path.clone())
+        .timeout(30)
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to create RPC client: {}", e))?;
+
+    // Test connection
+    client.test_connection().await.map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to connect to daemon at {:?}: {}\n\
+             The daemon may have failed to start. Check logs.",
             socket_path,
             e
         )

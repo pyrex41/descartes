@@ -6,13 +6,12 @@
 
 use anyhow::Result;
 use colored::Colorize;
-use descartes_core::DescaratesConfig;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::rpc;
 
-pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result<()> {
+pub async fn execute(id: &str, force: bool) -> Result<()> {
     let mode = if force { "forced (SIGSTOP)" } else { "cooperative" };
     println!(
         "{}",
@@ -27,8 +26,8 @@ pub async fn execute(config: &DescaratesConfig, id: &str, force: bool) -> Result
 
     info!("Connecting to daemon to pause agent {}", id);
 
-    // Connect to daemon
-    let client = rpc::connect_or_bail(config).await?;
+    // Connect to daemon (auto-starts if needed)
+    let client = rpc::connect_with_autostart().await?;
 
     // Call pause RPC (daemon expects positional array: [agent_id, force])
     let result = rpc::call_method(

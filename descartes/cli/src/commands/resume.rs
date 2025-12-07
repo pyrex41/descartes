@@ -6,13 +6,12 @@
 
 use anyhow::Result;
 use colored::Colorize;
-use descartes_core::DescaratesConfig;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::rpc;
 
-pub async fn execute(config: &DescaratesConfig, id: &str) -> Result<()> {
+pub async fn execute(id: &str) -> Result<()> {
     println!("{}", format!("Resuming agent: {}", id).yellow().bold());
 
     // Parse UUID to validate format
@@ -21,8 +20,8 @@ pub async fn execute(config: &DescaratesConfig, id: &str) -> Result<()> {
 
     info!("Connecting to daemon to resume agent {}", id);
 
-    // Connect to daemon
-    let client = rpc::connect_or_bail(config).await?;
+    // Connect to daemon (auto-starts if needed)
+    let client = rpc::connect_with_autostart().await?;
 
     // Call resume RPC (daemon expects positional array: [agent_id])
     let result = rpc::call_method(
