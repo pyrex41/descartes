@@ -23,6 +23,10 @@ pub struct ServerConfig {
     pub ws_addr: String,
     /// WebSocket server port
     pub ws_port: u16,
+    /// ZMQ PUB socket bind address
+    pub pub_addr: String,
+    /// ZMQ PUB socket port for streaming chat output
+    pub pub_port: u16,
     /// Request timeout in seconds
     pub request_timeout_secs: u64,
     /// Max connections
@@ -37,9 +41,11 @@ impl Default for ServerConfig {
     fn default() -> Self {
         ServerConfig {
             http_addr: "127.0.0.1".to_string(),
-            http_port: 8080,
+            http_port: 19280, // Match daemon_launcher.rs DEFAULT_HTTP_PORT
             ws_addr: "127.0.0.1".to_string(),
-            ws_port: 8081,
+            ws_port: 19380, // Match daemon_launcher.rs DEFAULT_WS_PORT
+            pub_addr: "0.0.0.0".to_string(),
+            pub_port: 19480,
             request_timeout_secs: 30,
             max_connections: 1000,
             enable_metrics: true,
