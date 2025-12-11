@@ -62,6 +62,7 @@ zeromq = "0.4"
 rmp-serde = "1.1"  # MessagePack for efficient serialization
 base64 = "0.22"  # Base64 encoding for binary data
 tokio-stream = "0.1"  # Stream utilities for async
+which = "7.0"  # CLI detection
 
 # Plugin System
 wasmtime = "14.0"
@@ -74,8 +75,13 @@ nix = { version = "0.29", features = ["signal"] }
 tokio = { workspace = true, features = ["full"] }
 tempfile = "3.8"
 wat = "1.0"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
 name = "main"
 path = "benches/main.rs"
+harness = false
+
+[[bench]]
+name = "zmq_benchmarks"
 harness = false

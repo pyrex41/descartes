@@ -212,6 +212,7 @@ impl Default for RpcHandlers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[tokio::test]
     async fn test_agent_spawn() {

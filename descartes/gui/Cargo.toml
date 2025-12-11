@@ -7,12 +7,10 @@ license.workspace = true
 
 [features]
 default = []
-agent-runner = ["dep:descartes_agent_runner"]
 
 [dependencies]
 descartes-core = { path = "../core" }
 descartes-daemon = { path = "../daemon" }
-descartes_agent_runner = { package = "agent-runner", path = "../agent-runner", optional = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -26,6 +24,10 @@ iced = { version = "0.13", features = ["debug", "tokio", "advanced", "canvas"] }
 futures = "0.3"
 reqwest = { workspace = true }
 which = "6.0"
+
+# ZMQ for streaming chat output
+zeromq = "0.4"
+tokio-stream = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["signal"] }

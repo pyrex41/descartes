@@ -7,14 +7,9 @@
 /// - Allows file selection and interaction
 /// - Provides filtering and search capabilities
 /// - Integrates with the FileTree data model
-#[cfg(feature = "agent-runner")]
-use descartes_agent_runner::knowledge_graph::{FileNodeType, FileTree, FileTreeNode};
-#[cfg(feature = "agent-runner")]
-use descartes_agent_runner::types::Language;
 
-// Stub types when agent-runner feature is not enabled
-#[cfg(not(feature = "agent-runner"))]
-mod stub_types {
+// Stub types for file tree functionality (agent-runner feature removed)
+pub mod stub_types {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -99,8 +94,7 @@ mod stub_types {
     }
 }
 
-#[cfg(not(feature = "agent-runner"))]
-use stub_types::{FileNodeType, FileTree, FileTreeNode, Language};
+pub use stub_types::{FileNodeType, FileTree, FileTreeNode, Language};
 
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::{

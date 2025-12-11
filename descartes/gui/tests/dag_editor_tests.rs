@@ -401,7 +401,7 @@ fn test_toggle_selection() {
 #[test]
 fn test_add_node_at_position() {
     let mut state = DAGEditorState::new();
-    let position = Point::new(200.0, 300.0);
+    let position = Position::new(200.0, 300.0);
 
     let initial_count = state.dag.nodes.len();
     update(&mut state, DAGEditorMessage::AddNode(position));
@@ -606,7 +606,7 @@ fn test_statistics_after_modifications() {
     // Add another node
     update(
         &mut state,
-        DAGEditorMessage::AddNode(Point::new(100.0, 100.0)),
+        DAGEditorMessage::AddNode(Position::new(100.0, 100.0)),
     );
 
     // Statistics should be updated automatically

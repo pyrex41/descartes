@@ -11,11 +11,11 @@
 //! - Animation performance (60 FPS)
 
 use descartes_core::{
-    AgentError, AgentFilter, AgentProgress, AgentRuntimeState, AgentStatus, GroupingMode, SortMode,
+    AgentProgress, AgentRuntimeState, RuntimeAgentError, RuntimeAgentStatus as AgentStatus,
 };
 use descartes_gui::swarm_monitor::{
-    update, AgentEvent, ConnectionStatus, PerformanceStats, SwarmMonitorMessage, SwarmMonitorState,
-    FRAME_TIME_BUDGET_MS, TARGET_FPS,
+    update, AgentEvent, AgentFilter, ConnectionStatus, GroupingMode, PerformanceStats,
+    SortMode, SwarmMonitorMessage, SwarmMonitorState, FRAME_TIME_BUDGET_MS, TARGET_FPS,
 };
 use std::collections::HashMap;
 use std::time::Instant;
@@ -200,10 +200,10 @@ fn test_failure_event() {
     state.update_agent(agent);
 
     // Send failure event
-    let error = AgentError::new("TEST_ERROR".to_string(), "Test error message".to_string());
+    let error = RuntimeAgentError::new("TEST_ERROR".to_string(), "Test error message".to_string());
     let event = AgentEvent::AgentFailed {
         agent_id,
-        error: error.clone(),
+        error,
     };
     state.handle_agent_event(event);
 

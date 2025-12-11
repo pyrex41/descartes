@@ -193,9 +193,9 @@ pub fn benchmark_all_to_all(config: ConcurrencyConfig) -> ConcurrencyResults {
 
     // Simulate all agents sending to all other agents
     for _ in 0..messages_per_pair {
-        for _ in 0..config.agent_count {
-            for _ in 0..config.agent_count {
-                if _ != 0 {
+        for sender in 0..config.agent_count {
+            for receiver in 0..config.agent_count {
+                if sender != receiver {
                     // Don't send to self
                     let _ = payload.clone();
                 }

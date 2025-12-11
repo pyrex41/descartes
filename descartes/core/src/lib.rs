@@ -11,6 +11,9 @@ pub mod agent_state;
 pub mod agent_stream_parser;
 pub mod body_restore;
 pub mod brain_restore;
+pub mod channel_bridge;
+pub mod claude_backend;
+pub mod cli_backend;
 pub mod config;
 pub mod config_loader;
 pub mod config_migration;
@@ -20,7 +23,6 @@ pub mod dag_swarm_export;
 pub mod dag_toml;
 pub mod debugger;
 pub mod errors;
-pub mod ipc;
 pub mod lease;
 pub mod lease_manager;
 pub mod notification_router_impl;
@@ -123,11 +125,10 @@ pub use notifications::{
 
 pub use notification_router_impl::DefaultNotificationRouter;
 
-pub use ipc::{
-    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MemoryTransport,
-    MessageBus, MessageBusConfig, MessageBusStats, MessageHandler, MessageRouter, MessageTransport,
-    MessageType, RequestResponseTracker, RoutingRule as IpcRoutingRule, UnixSocketTransport,
-};
+pub use channel_bridge::{ChannelBridge, InternalMessage};
+
+pub use cli_backend::{ChatSessionConfig, ChatSessionHandle, CliBackend, StreamChunk};
+pub use claude_backend::ClaudeBackend;
 
 pub use lease::{
     Lease, LeaseAcquisitionRequest, LeaseAcquisitionResponse, LeaseManager, LeaseReleaseRequest,

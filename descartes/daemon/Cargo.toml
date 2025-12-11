@@ -45,6 +45,9 @@ prometheus = "0.13"
 
 # OpenAPI schema generation (we'll generate manually)
 
+# ZeroMQ for streaming
+zeromq = "0.4"
+
 # Additional utilities
 bytes = "1.5"
 parking_lot = "0.12"

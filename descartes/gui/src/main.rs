@@ -30,6 +30,7 @@ mod session_state;
 mod task_board;
 mod theme;
 mod time_travel;
+mod zmq_subscriber;
 
 use theme::{colors, container_styles, button_styles, humanlayer_theme};
 
@@ -379,7 +380,50 @@ impl DescartesGui {
                             }
                         }
 
-                        // Spawn async task to run Claude Code
+                        // If we have a daemon connection and no active session, create one via RPC
+                        // Use the two-phase approach: create session, subscribe, then send prompt
+                        if self.daemon_connected && self.chat_state.daemon_session_id.is_none() {
+                            if let Some(ref client) = self.rpc_client {
+                                let client = client.clone();
+                                let wd = working_dir.clone();
+                                let pending_prompt = prompt.clone();
+                                return iced::Task::perform(
+                                    async move {
+                                        create_daemon_chat_session(client, wd).await
+                                    },
+                                    move |result| match result {
+                                        Ok((session_id, pub_endpoint)) => {
+                                            // Return SessionCreated with the pending prompt
+                                            // This will trigger subscription, then SendPendingPrompt
+                                            Message::Chat(ChatMsg::SessionCreated {
+                                                session_id,
+                                                pub_endpoint,
+                                                pending_prompt: pending_prompt.clone(),
+                                            })
+                                        }
+                                        Err(e) => Message::Chat(ChatMsg::Error(e)),
+                                    },
+                                );
+                            }
+                        }
+
+                        // If we have an active daemon session, send prompt via RPC
+                        if let Some(session_id) = self.chat_state.daemon_session_id {
+                            if let Some(ref client) = self.rpc_client {
+                                let client = client.clone();
+                                return iced::Task::perform(
+                                    async move {
+                                        send_daemon_prompt(client, session_id, prompt).await
+                                    },
+                                    |result| match result {
+                                        Ok(()) => Message::Chat(ChatMsg::PromptSent),
+                                        Err(e) => Message::Chat(ChatMsg::Error(e)),
+                                    },
+                                );
+                            }
+                        }
+
+                        // Fallback: Spawn async task to run Claude Code directly (legacy mode)
                         iced::Task::perform(
                             run_claude_code(prompt, working_dir),
                             |result| match result {
@@ -387,6 +431,73 @@ impl DescartesGui {
                                 Err(e) => Message::Chat(ChatMsg::Error(e)),
                             },
                         )
+                    }
+                    ChatMsg::UpgradeToAgent => {
+                        // Upgrade to agent mode via RPC
+                        if let Some(session_id) = self.chat_state.daemon_session_id {
+                            if let Some(ref client) = self.rpc_client {
+                                let client = client.clone();
+                                return iced::Task::perform(
+                                    async move {
+                                        upgrade_to_agent(client, session_id).await
+                                    },
+                                    |result| match result {
+                                        Ok(()) => Message::Chat(ChatMsg::UpgradedToAgent),
+                                        Err(e) => Message::Chat(ChatMsg::Error(e)),
+                                    },
+                                );
+                            }
+                        }
+                        iced::Task::none()
+                    }
+                    ChatMsg::SessionCreated { session_id, pub_endpoint, pending_prompt } => {
+                        // Session created - store info (triggers subscription) and return delayed task
+                        // to send the pending prompt after subscription has time to establish
+                        tracing::info!(
+                            "Session {} created, will send prompt after subscription ready",
+                            session_id
+                        );
+
+                        // Update state first (this enables the ZMQ subscription)
+                        chat_state::update(&mut self.chat_state, ChatMsg::SessionCreated {
+                            session_id: session_id.clone(),
+                            pub_endpoint: pub_endpoint.clone(),
+                            pending_prompt: pending_prompt.clone(),
+                        });
+
+                        // Return a delayed task that triggers SendPendingPrompt
+                        // Small delay (100ms) to allow subscription to establish
+                        return iced::Task::perform(
+                            async {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                            },
+                            |_| Message::Chat(ChatMsg::SendPendingPrompt),
+                        );
+                    }
+                    ChatMsg::SendPendingPrompt => {
+                        // Send the pending prompt to start the CLI
+                        if let Some(pending) = self.chat_state.pending_prompt.take() {
+                            if let Some(session_id) = self.chat_state.daemon_session_id {
+                                if let Some(ref client) = self.rpc_client {
+                                    let client = client.clone();
+                                    tracing::info!(
+                                        "Sending pending prompt to session {}: {}",
+                                        session_id,
+                                        pending.chars().take(50).collect::<String>()
+                                    );
+                                    return iced::Task::perform(
+                                        async move {
+                                            send_daemon_prompt(client, session_id, pending).await
+                                        },
+                                        |result| match result {
+                                            Ok(()) => Message::Chat(ChatMsg::PromptSent),
+                                            Err(e) => Message::Chat(ChatMsg::Error(e)),
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                        iced::Task::none()
                     }
                     _ => iced::Task::none(),
                 };
@@ -994,7 +1105,22 @@ impl DescartesGui {
             iced::Subscription::none()
         };
 
-        iced::Subscription::batch(vec![keyboard_sub, event_sub])
+        // ZMQ subscription for chat streaming
+        let zmq_sub = if let (Some(endpoint), Some(session_id)) = (
+            &self.chat_state.pub_endpoint,
+            self.chat_state.daemon_session_id,
+        ) {
+            zmq_subscriber::chat_subscription(
+                endpoint.clone(),
+                session_id,
+                |chunk| Message::Chat(chat_state::ChatMessage::StreamChunk(chunk)),
+                |e| Message::Chat(chat_state::ChatMessage::Error(e)),
+            )
+        } else {
+            iced::Subscription::none()
+        };
+
+        iced::Subscription::batch(vec![keyboard_sub, event_sub, zmq_sub])
     }
 
     /// Render the header bar
@@ -1657,83 +1783,10 @@ impl DescartesGui {
         }
     }
 
-    /// Load sample file tree for demonstration
-    #[cfg(feature = "agent-runner")]
+    /// Load sample file tree for demonstration (stub - feature pending)
     fn load_sample_file_tree(&mut self) {
-        use descartes_agent_runner::file_tree_builder::FileTreeBuilder;
-        use std::path::PathBuf;
-
-        // Get the current project directory
-        let project_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-
-        tracing::info!("Loading file tree from: {:?}", project_dir);
-
-        // Create file tree builder
-        let mut builder = FileTreeBuilder::new();
-
-        // Scan the directory
-        match builder.scan_directory(&project_dir) {
-            Ok(tree) => {
-                tracing::info!(
-                    "File tree loaded: {} files, {} directories",
-                    tree.file_count,
-                    tree.directory_count
-                );
-
-                // Add some sample knowledge links to demonstrate the feature
-                // In a real application, these would come from actual code analysis
-                self.add_sample_knowledge_links_to_tree(&tree);
-
-                // Update the file tree state
-                file_tree_view::update(
-                    &mut self.file_tree_state,
-                    FileTreeMessage::TreeLoaded(tree),
-                );
-
-                self.status_message = Some("File tree loaded successfully!".to_string());
-            }
-            Err(e) => {
-                tracing::error!("Failed to load file tree: {}", e);
-                self.status_message = Some(format!("Failed to load file tree: {}", e));
-            }
-        }
-    }
-
-    /// Load sample file tree for demonstration (stub without agent-runner feature)
-    #[cfg(not(feature = "agent-runner"))]
-    fn load_sample_file_tree(&mut self) {
-        self.status_message =
-            Some("File tree feature requires the 'agent-runner' feature to be enabled".to_string());
-        tracing::warn!("File tree loading not available without agent-runner feature");
-    }
-
-    /// Add sample knowledge links to the tree for demonstration
-    #[cfg(feature = "agent-runner")]
-    fn add_sample_knowledge_links_to_tree(
-        &mut self,
-        _tree: &descartes_agent_runner::knowledge_graph::FileTree,
-    ) {
-        // This is a demonstration function that adds sample knowledge links
-        // In a real application, these would come from actual code analysis
-
-        // For now, we'll add deterministic knowledge links to Rust files
-        // to show how the badges appear in the UI
-        if let Some(tree_state) = &mut self.file_tree_state.tree {
-            let mut counter = 0u32;
-            for (_, node) in tree_state.nodes.iter_mut() {
-                // Add knowledge links to some Rust files
-                if let Some(lang) = &node.metadata.language {
-                    if matches!(lang, descartes_agent_runner::types::Language::Rust) {
-                        // Deterministically add 0-5 knowledge links based on counter
-                        let link_count = (counter % 6) as usize;
-                        for i in 0..link_count {
-                            node.add_knowledge_link(format!("demo-link-{}-{}", counter, i));
-                        }
-                        counter = counter.wrapping_add(1);
-                    }
-                }
-            }
-        }
+        self.status_message = Some("File browser feature coming soon".to_string());
+        tracing::info!("File tree loading requested - feature pending implementation");
     }
 
     /// Knowledge Graph view
@@ -1792,262 +1845,17 @@ impl DescartesGui {
         }
     }
 
-    /// Load sample knowledge graph for demonstration
-    #[cfg(feature = "agent-runner")]
+    /// Load sample knowledge graph for demonstration (stub - feature pending)
     fn load_sample_knowledge_graph(&mut self) {
-        use descartes_agent_runner::knowledge_graph::{
-            FileReference, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType,
-            RelationshipType,
-        };
-        use std::path::PathBuf;
-
-        let mut graph = KnowledgeGraph::new();
-
-        // Create sample nodes representing a small codebase
-        // Module: main
-        let mut main_module = KnowledgeNode::new(
-            KnowledgeNodeType::Module,
-            "main".to_string(),
-            "main".to_string(),
-        );
-        main_module.description = Some("Main application module".to_string());
-        main_module.add_file_reference(FileReference {
-            file_node_id: "main-file".to_string(),
-            file_path: PathBuf::from("src/main.rs"),
-            line_range: (1, 50),
-            column_range: None,
-            is_definition: true,
-        });
-        let main_module_id = graph.add_node(main_module);
-
-        // Function: main
-        let mut main_fn = KnowledgeNode::new(
-            KnowledgeNodeType::Function,
-            "main".to_string(),
-            "main::main".to_string(),
-        );
-        main_fn.description = Some("Application entry point".to_string());
-        main_fn.signature = Some("fn main()".to_string());
-        main_fn.parent_id = Some(main_module_id.clone());
-        main_fn.add_file_reference(FileReference {
-            file_node_id: "main-file".to_string(),
-            file_path: PathBuf::from("src/main.rs"),
-            line_range: (10, 15),
-            column_range: Some((0, 10)),
-            is_definition: true,
-        });
-        let main_fn_id = graph.add_node(main_fn);
-
-        // Function: initialize
-        let mut init_fn = KnowledgeNode::new(
-            KnowledgeNodeType::Function,
-            "initialize".to_string(),
-            "main::initialize".to_string(),
-        );
-        init_fn.description = Some("Initialize application state".to_string());
-        init_fn.signature = Some("fn initialize() -> AppState".to_string());
-        init_fn.return_type = Some("AppState".to_string());
-        init_fn.parent_id = Some(main_module_id.clone());
-        init_fn.add_file_reference(FileReference {
-            file_node_id: "main-file".to_string(),
-            file_path: PathBuf::from("src/main.rs"),
-            line_range: (20, 30),
-            column_range: Some((0, 15)),
-            is_definition: true,
-        });
-        let init_fn_id = graph.add_node(init_fn);
-
-        // Class: AppState
-        let mut app_state = KnowledgeNode::new(
-            KnowledgeNodeType::Class,
-            "AppState".to_string(),
-            "app::AppState".to_string(),
-        );
-        app_state.description = Some("Application state container".to_string());
-        app_state.add_file_reference(FileReference {
-            file_node_id: "app-file".to_string(),
-            file_path: PathBuf::from("src/app.rs"),
-            line_range: (5, 20),
-            column_range: None,
-            is_definition: true,
-        });
-        let app_state_id = graph.add_node(app_state);
-
-        // Method: new
-        let mut new_method = KnowledgeNode::new(
-            KnowledgeNodeType::Method,
-            "new".to_string(),
-            "app::AppState::new".to_string(),
-        );
-        new_method.description = Some("Create new AppState instance".to_string());
-        new_method.signature = Some("fn new() -> Self".to_string());
-        new_method.return_type = Some("Self".to_string());
-        new_method.parent_id = Some(app_state_id.clone());
-        new_method.add_file_reference(FileReference {
-            file_node_id: "app-file".to_string(),
-            file_path: PathBuf::from("src/app.rs"),
-            line_range: (22, 27),
-            column_range: Some((4, 15)),
-            is_definition: true,
-        });
-        let new_method_id = graph.add_node(new_method);
-
-        // Module: utils
-        let mut utils_module = KnowledgeNode::new(
-            KnowledgeNodeType::Module,
-            "utils".to_string(),
-            "utils".to_string(),
-        );
-        utils_module.description = Some("Utility functions".to_string());
-        utils_module.add_file_reference(FileReference {
-            file_node_id: "utils-file".to_string(),
-            file_path: PathBuf::from("src/utils.rs"),
-            line_range: (1, 100),
-            column_range: None,
-            is_definition: true,
-        });
-        let utils_module_id = graph.add_node(utils_module);
-
-        // Function: helper
-        let mut helper_fn = KnowledgeNode::new(
-            KnowledgeNodeType::Function,
-            "helper".to_string(),
-            "utils::helper".to_string(),
-        );
-        helper_fn.description = Some("Helper utility function".to_string());
-        helper_fn.signature = Some("fn helper(data: &str) -> String".to_string());
-        helper_fn.parameters = vec!["data: &str".to_string()];
-        helper_fn.return_type = Some("String".to_string());
-        helper_fn.parent_id = Some(utils_module_id.clone());
-        helper_fn.add_file_reference(FileReference {
-            file_node_id: "utils-file".to_string(),
-            file_path: PathBuf::from("src/utils.rs"),
-            line_range: (10, 15),
-            column_range: Some((0, 10)),
-            is_definition: true,
-        });
-        let helper_fn_id = graph.add_node(helper_fn);
-
-        // Create relationships
-        graph.add_edge(KnowledgeEdge::new(
-            main_fn_id.clone(),
-            init_fn_id.clone(),
-            RelationshipType::Calls,
-        ));
-
-        graph.add_edge(KnowledgeEdge::new(
-            init_fn_id.clone(),
-            new_method_id.clone(),
-            RelationshipType::Calls,
-        ));
-
-        graph.add_edge(KnowledgeEdge::new(
-            init_fn_id.clone(),
-            app_state_id.clone(),
-            RelationshipType::Uses,
-        ));
-
-        graph.add_edge(KnowledgeEdge::new(
-            main_fn_id.clone(),
-            helper_fn_id.clone(),
-            RelationshipType::Calls,
-        ));
-
-        graph.add_edge(KnowledgeEdge::new(
-            new_method_id.clone(),
-            app_state_id.clone(),
-            RelationshipType::DefinedIn,
-        ));
-
-        tracing::info!(
-            "Sample knowledge graph loaded: {} nodes, {} edges",
-            graph.nodes.len(),
-            graph.edges.len()
-        );
-
-        // Update the knowledge graph panel state
-        knowledge_graph_panel::update(
-            &mut self.knowledge_graph_panel_state,
-            KnowledgeGraphMessage::GraphLoaded(graph),
-        );
-
-        self.status_message = Some("Sample knowledge graph loaded successfully!".to_string());
+        self.status_message = Some("Knowledge graph feature coming soon".to_string());
+        tracing::info!("Knowledge graph loading requested - feature pending implementation");
     }
 
-    /// Load sample knowledge graph for demonstration (stub without agent-runner feature)
-    #[cfg(not(feature = "agent-runner"))]
-    fn load_sample_knowledge_graph(&mut self) {
-        self.status_message = Some(
-            "Knowledge graph feature requires the 'agent-runner' feature to be enabled".to_string(),
-        );
-        tracing::warn!("Knowledge graph loading not available without agent-runner feature");
-    }
-
-    /// Generate knowledge graph from the current file tree
-    #[cfg(feature = "agent-runner")]
+    /// Generate knowledge graph from the current file tree (stub - feature pending)
     fn generate_knowledge_graph_from_file_tree(&mut self) {
-        if self.file_tree_state.tree.is_none() {
-            self.status_message = Some("No file tree loaded. Load a file tree first.".to_string());
-            return;
-        }
-
-        use descartes_agent_runner::knowledge_graph_overlay::KnowledgeGraphOverlay;
-
-        let mut file_tree = self.file_tree_state.tree.clone().unwrap();
-
-        tracing::info!("Generating knowledge graph from file tree");
-
-        match KnowledgeGraphOverlay::new() {
-            Ok(mut overlay) => {
-                match overlay.generate_and_link(&mut file_tree) {
-                    Ok(knowledge_graph) => {
-                        tracing::info!(
-                            "Knowledge graph generated: {} nodes, {} edges",
-                            knowledge_graph.nodes.len(),
-                            knowledge_graph.edges.len()
-                        );
-
-                        // Update file tree state with links
-                        self.file_tree_state.tree = Some(file_tree);
-
-                        // Update knowledge graph panel
-                        knowledge_graph_panel::update(
-                            &mut self.knowledge_graph_panel_state,
-                            KnowledgeGraphMessage::GraphLoaded(knowledge_graph),
-                        );
-
-                        self.status_message = Some(format!(
-                            "Knowledge graph generated successfully! {} entities extracted.",
-                            self.knowledge_graph_panel_state
-                                .graph
-                                .as_ref()
-                                .unwrap()
-                                .nodes
-                                .len()
-                        ));
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to generate knowledge graph: {}", e);
-                        self.status_message =
-                            Some(format!("Failed to generate knowledge graph: {}", e));
-                    }
-                }
-            }
-            Err(e) => {
-                tracing::error!("Failed to create knowledge graph overlay: {}", e);
-                self.status_message = Some(format!("Failed to create overlay: {}", e));
-            }
-        }
-    }
-
-    /// Generate knowledge graph from the current file tree (stub without agent-runner feature)
-    #[cfg(not(feature = "agent-runner"))]
-    fn generate_knowledge_graph_from_file_tree(&mut self) {
-        self.status_message = Some(
-            "Knowledge graph generation requires the 'agent-runner' feature to be enabled"
-                .to_string(),
-        );
-        tracing::warn!("Knowledge graph generation not available without agent-runner feature");
+        self.status_message =
+            Some("Knowledge graph generation feature coming soon".to_string());
+        tracing::info!("Knowledge graph generation requested - feature pending implementation");
     }
 }
 
@@ -2200,4 +2008,156 @@ async fn run_claude_code(prompt: String, working_dir: String) -> Result<String, 
 
     tracing::info!("Claude Code completed successfully ({} chars)", output.len());
     Ok(output)
+}
+
+/// Create a chat session via daemon RPC (without starting CLI)
+///
+/// Calls chat.create RPC method and returns the session ID and PUB endpoint.
+/// The caller should then:
+/// 1. Set up ZMQ subscription with the session_id
+/// 2. Call send_daemon_prompt to start the CLI and streaming
+async fn create_daemon_chat_session(
+    client: Arc<GuiRpcClient>,
+    working_dir: String,
+) -> Result<(Uuid, String), String> {
+    use serde_json::json;
+
+    tracing::info!(
+        "Creating daemon chat session in {} (CLI not yet started)",
+        working_dir,
+    );
+
+    let response = client
+        .client()
+        .call(
+            "chat.create",
+            Some(json!({
+                "working_dir": working_dir,
+                "enable_thinking": true,
+                "thinking_level": "normal",
+            })),
+        )
+        .await
+        .map_err(|e| format!("RPC call failed: {}", e))?;
+
+    let session_id: Uuid = response["session_id"]
+        .as_str()
+        .ok_or("Missing session_id in response")?
+        .parse()
+        .map_err(|_| "Invalid session_id format")?;
+
+    let pub_endpoint = response["pub_endpoint"]
+        .as_str()
+        .ok_or("Missing pub_endpoint in response")?
+        .to_string();
+
+    tracing::info!(
+        "Created daemon chat session {} at {} (ready for subscription)",
+        session_id,
+        pub_endpoint
+    );
+
+    Ok((session_id, pub_endpoint))
+}
+
+/// Start a chat session via daemon RPC (legacy - starts CLI immediately)
+///
+/// Calls chat.start RPC method and returns the session ID and PUB endpoint.
+/// Note: This has a race condition - prefer create_daemon_chat_session + send_daemon_prompt
+async fn start_daemon_chat_session(
+    client: Arc<GuiRpcClient>,
+    working_dir: String,
+    initial_prompt: String,
+) -> Result<(Uuid, String), String> {
+    use serde_json::json;
+
+    tracing::info!(
+        "Starting daemon chat session in {} with prompt: {}",
+        working_dir,
+        initial_prompt.chars().take(50).collect::<String>()
+    );
+
+    let response = client
+        .client()
+        .call(
+            "chat.start",
+            Some(json!({
+                "working_dir": working_dir,
+                "enable_thinking": true,
+                "thinking_level": "normal",
+                "initial_prompt": initial_prompt,
+            })),
+        )
+        .await
+        .map_err(|e| format!("RPC call failed: {}", e))?;
+
+    let session_id: Uuid = response["session_id"]
+        .as_str()
+        .ok_or("Missing session_id in response")?
+        .parse()
+        .map_err(|_| "Invalid session_id format")?;
+
+    let pub_endpoint = response["pub_endpoint"]
+        .as_str()
+        .ok_or("Missing pub_endpoint in response")?
+        .to_string();
+
+    tracing::info!(
+        "Started daemon chat session {} at {}",
+        session_id,
+        pub_endpoint
+    );
+
+    Ok((session_id, pub_endpoint))
+}
+
+/// Send a prompt to an existing daemon chat session
+async fn send_daemon_prompt(
+    client: Arc<GuiRpcClient>,
+    session_id: Uuid,
+    prompt: String,
+) -> Result<(), String> {
+    use serde_json::json;
+
+    tracing::info!(
+        "Sending prompt to session {}: {}",
+        session_id,
+        prompt.chars().take(50).collect::<String>()
+    );
+
+    client
+        .client()
+        .call(
+            "chat.prompt",
+            Some(json!({
+                "session_id": session_id.to_string(),
+                "prompt": prompt,
+            })),
+        )
+        .await
+        .map_err(|e| format!("RPC call failed: {}", e))?;
+
+    Ok(())
+}
+
+/// Upgrade a chat session to agent mode via daemon RPC
+async fn upgrade_to_agent(client: Arc<GuiRpcClient>, session_id: Uuid) -> Result<(), String> {
+    use serde_json::json;
+
+    tracing::info!("Upgrading session {} to agent mode", session_id);
+
+    client
+        .client()
+        .call(
+            "chat.upgrade_to_agent",
+            Some(json!({
+                "session_id": session_id.to_string(),
+            })),
+        )
+        .await
+        .map_err(|e| format!("RPC call failed: {}", e))?;
+
+    tracing::info!("Session {} upgraded to agent mode", session_id);
+
+    Ok(())
 }

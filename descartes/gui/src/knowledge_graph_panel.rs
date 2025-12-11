@@ -11,14 +11,9 @@
 /// - Relationship type filtering
 /// - Visual node clustering
 /// - Export capabilities
-#[cfg(feature = "agent-runner")]
-use descartes_agent_runner::knowledge_graph::{
-    KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeType, RelationshipType,
-};
 
-// Stub types when agent-runner feature is not enabled
-#[cfg(not(feature = "agent-runner"))]
-mod stub_types {
+// Stub types for knowledge graph functionality (agent-runner feature removed)
+pub mod stub_types {
     use std::collections::HashMap;
 
     #[derive(Debug, Clone)]
@@ -146,10 +141,7 @@ mod stub_types {
     }
 }
 
-#[cfg(not(feature = "agent-runner"))]
-use stub_types::{
-    KnowledgeGraph, KnowledgeNodeType, RelationshipType,
-};
+pub use stub_types::{KnowledgeGraph, KnowledgeNodeType, RelationshipType};
 
 use iced::widget::{
     button, canvas, checkbox, column, container, horizontal_space, pick_list, row, scrollable,

@@ -1,6 +1,7 @@
 //! Chat interface view component
 //!
 //! Provides a chat UI for interacting with Claude Code in full session mode.
+//! Supports streaming output with thinking blocks displayed distinctively.
 
 use crate::chat_state::{ChatMessage, ChatMessageEntry, ChatRole, ChatState};
 use crate::theme::{button_styles, colors, container_styles, fonts};
@@ -8,6 +9,22 @@ use iced::alignment::Vertical;
 use iced::widget::text_input::Id as TextInputId;
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
 use iced::{Element, Length};
+
+/// Color for thinking blocks (semi-transparent purple/blue)
+const THINKING_COLOR: iced::Color = iced::Color {
+    r: 0.6,
+    g: 0.5,
+    b: 0.8,
+    a: 1.0,
+};
+
+/// Background color for thinking blocks
+const THINKING_BG: iced::Color = iced::Color {
+    r: 0.1,
+    g: 0.1,
+    b: 0.15,
+    a: 1.0,
+};
 
 /// Render the chat view
 pub fn view(state: &ChatState) -> Element<ChatMessage> {
@@ -61,11 +78,46 @@ pub fn view(state: &ChatState) -> Element<ChatMessage> {
         .align_y(Vertical::Center)
     };
 
+    // Mode indicator and upgrade button
+    let mode_section = if state.daemon_session_id.is_some() {
+        if state.mode == "agent" {
+            // Already in agent mode
+            container(
+                row![
+                    text("⚡").size(10).color(colors::SUCCESS),
+                    Space::with_width(4),
+                    text("Agent Mode").size(11).color(colors::SUCCESS),
+                ]
+                .align_y(Vertical::Center),
+            )
+            .padding([4, 8])
+        } else {
+            // In chat mode, offer upgrade
+            container(
+                button(
+                    row![
+                        text("⚡").size(10).color(colors::PRIMARY),
+                        Space::with_width(4),
+                        text("Upgrade to Agent").size(11).color(colors::PRIMARY),
+                    ]
+                    .align_y(Vertical::Center),
+                )
+                .on_press(ChatMessage::UpgradeToAgent)
+                .padding([4, 8])
+                .style(button_styles::secondary),
+            )
+        }
+    } else {
+        container(Space::with_width(0))
+    };
+
     let controls_row = row![
         session_status,
         Space::with_width(24),
         workdir_display,
         Space::with_width(Length::Fill),
+        mode_section,
+        Space::with_width(12),
         button(
             text("Clear")
                 .size(12)
@@ -161,7 +213,7 @@ pub fn view(state: &ChatState) -> Element<ChatMessage> {
     };
 
     // Loading indicator
-    let loading_indicator = if state.loading {
+    let loading_indicator = if state.loading && !state.is_streaming {
         container(
             row![
                 text("◐").size(14).color(colors::PRIMARY),
@@ -174,6 +226,73 @@ pub fn view(state: &ChatState) -> Element<ChatMessage> {
             .align_y(Vertical::Center),
         )
         .padding([8, 0])
+    } else {
+        container(Space::with_height(0))
+    };
+
+    // Streaming content display (real-time output)
+    let streaming_section = if state.is_streaming
+        && (!state.streaming_text.is_empty() || !state.streaming_thinking.is_empty())
+    {
+        let mut content: Vec<Element<ChatMessage>> = vec![];
+
+        // Show thinking block first if present
+        if !state.streaming_thinking.is_empty() {
+            content.push(
+                container(
+                    column![
+                        row![
+                            text("💭").size(12),
+                            Space::with_width(6),
+                            text("Thinking...").size(11).color(THINKING_COLOR),
+                        ]
+                        .align_y(Vertical::Center),
+                        Space::with_height(4),
+                        text(&state.streaming_thinking)
+                            .size(12)
+                            .font(fonts::MONO)
+                            .color(THINKING_COLOR),
+                    ]
+                    .spacing(4),
+                )
+                .padding(8)
+                .width(Length::Fill)
+                .style(container_styles::panel)
+                .into(),
+            );
+        }
+
+        // Show streaming text if present
+        if !state.streaming_text.is_empty() {
+            content.push(
+                container(
+                    column![
+                        row![
+                            text("◎").size(12).color(colors::SUCCESS),
+                            Space::with_width(6),
+                            text("Claude").size(11).color(colors::SUCCESS),
+                            Space::with_width(6),
+                            text("▌").size(12).color(colors::PRIMARY), // Cursor
+                        ]
+                        .align_y(Vertical::Center),
+                        Space::with_height(4),
+                        text(&state.streaming_text)
+                            .size(14)
+                            .font(fonts::MONO)
+                            .color(colors::TEXT_PRIMARY),
+                    ]
+                    .spacing(4),
+                )
+                .padding(12)
+                .width(Length::Fill)
+                .style(container_styles::panel)
+                .into(),
+            );
+        }
+
+        container(column(content).spacing(8))
+            .padding([8, 0])
+            .width(Length::Fill)
     } else {
         container(Space::with_height(0))
     };
@@ -226,6 +345,7 @@ pub fn view(state: &ChatState) -> Element<ChatMessage> {
         Space::with_height(12),
         messages_area,
         Space::with_height(8),
+        streaming_section,
         error_section,
         loading_indicator,
         Space::with_height(8),
@@ -253,13 +373,11 @@ fn view_message(msg: &ChatMessageEntry) -> Element<ChatMessage> {
 
     let timestamp = msg.timestamp.format("%H:%M:%S").to_string();
 
-    // Format content - handle potential markdown/code blocks
-    let content_text = text(&msg.content)
-        .size(14)
-        .font(fonts::MONO)
-        .color(colors::TEXT_PRIMARY);
+    // Build content column with optional thinking block
+    let mut content_parts: Vec<Element<ChatMessage>> = vec![];
 
-    let content = column![
+    // Header row
+    content_parts.push(
         row![
             text(icon).size(12).color(role_color),
             Space::with_width(8),
@@ -270,10 +388,51 @@ fn view_message(msg: &ChatMessageEntry) -> Element<ChatMessage> {
             Space::with_width(Length::Fill),
             text(timestamp).size(10).color(colors::TEXT_MUTED),
         ]
-        .align_y(Vertical::Center),
-        Space::with_height(8),
-        content_text,
-    ];
+        .align_y(Vertical::Center)
+        .into(),
+    );
+
+    content_parts.push(Space::with_height(8).into());
+
+    // Thinking block (if present for assistant messages)
+    if let Some(ref thinking) = msg.thinking {
+        if !thinking.is_empty() {
+            content_parts.push(
+                container(
+                    column![
+                        row![
+                            text("💭").size(10),
+                            Space::with_width(4),
+                            text("Thinking").size(10).color(THINKING_COLOR),
+                        ]
+                        .align_y(Vertical::Center),
+                        Space::with_height(4),
+                        text(thinking)
+                            .size(11)
+                            .font(fonts::MONO)
+                            .color(THINKING_COLOR),
+                    ]
+                    .spacing(2),
+                )
+                .padding(8)
+                .width(Length::Fill)
+                .style(container_styles::panel)
+                .into(),
+            );
+            content_parts.push(Space::with_height(8).into());
+        }
+    }
+
+    // Main content
+    content_parts.push(
+        text(&msg.content)
+            .size(14)
+            .font(fonts::MONO)
+            .color(colors::TEXT_PRIMARY)
+            .into(),
+    );
+
+    let content = column(content_parts);
 
     // Use different styles for different roles
     match msg.role {

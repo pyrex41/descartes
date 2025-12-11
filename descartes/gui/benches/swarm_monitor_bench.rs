@@ -7,7 +7,7 @@
 //! - Batch updates
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use descartes_core::{AgentProgress, AgentRuntimeState, AgentStatus};
+use descartes_core::{AgentProgress, AgentRuntimeState, RuntimeAgentStatus as AgentStatus};
 use descartes_gui::swarm_monitor::{AgentEvent, SwarmMonitorState};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -190,7 +190,7 @@ fn bench_animation_tick(c: &mut Criterion) {
                 // Benchmark animation tick
                 b.iter(|| {
                     state.tick_animation();
-                    black_box(&state)
+                    black_box(&state);
                 });
             },
         );
@@ -229,7 +229,7 @@ fn bench_event_processing(c: &mut Criterion) {
                         };
                         state.handle_agent_event(black_box(event));
                     }
-                    black_box(&state)
+                    black_box(&state);
                 });
             },
         );
@@ -384,7 +384,7 @@ fn bench_60fps_simulation(c: &mut Criterion) {
                     for _ in 0..60 {
                         state.tick_animation();
                     }
-                    black_box(&state)
+                    black_box(&state);
                 });
             },
         );

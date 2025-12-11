@@ -39,6 +39,14 @@ struct Args {
     )]
     ws_port: Option<u16>,
 
+    /// ZMQ PUB socket port for streaming
+    #[arg(
+        long,
+        value_name = "PORT",
+        help = "ZMQ PUB socket port for streaming chat output (default: 19480)"
+    )]
+    pub_port: Option<u16>,
+
     /// Enable authentication
     #[arg(long, help = "Enable JWT authentication")]
     enable_auth: bool,
@@ -108,6 +116,9 @@ async fn main() -> anyhow::Result<()> {
     if let Some(port) = args.ws_port {
         config.server.ws_port = port;
     }
+    if let Some(port) = args.pub_port {
+        config.server.pub_port = port;
+    }
 
     if args.enable_auth {
         config.auth.enabled = true;
@@ -123,11 +134,13 @@ async fn main() -> anyhow::Result<()> {
     config.validate()?;
 
     info!(
-        "Server configuration: HTTP {}:{}, WebSocket {}:{}",
+        "Server configuration: HTTP {}:{}, WebSocket {}:{}, ZMQ PUB {}:{}",
         config.server.http_addr,
         config.server.http_port,
         config.server.ws_addr,
-        config.server.ws_port
+        config.server.ws_port,
+        config.server.pub_addr,
+        config.server.pub_port
     );
 
     if config.auth.enabled {

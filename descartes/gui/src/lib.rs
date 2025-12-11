@@ -6,9 +6,7 @@ pub mod dag_canvas_interactions;
 pub mod dag_editor;
 pub mod debugger_ui;
 pub mod event_handler;
-#[cfg(feature = "agent-runner")]
 pub mod file_tree_view;
-#[cfg(feature = "agent-runner")]
 pub mod knowledge_graph_panel;
 /// Descartes GUI - Native cross-platform interface using Iced
 /// Phase 3 implementation
@@ -16,6 +14,7 @@ pub mod rpc_client;
 pub mod rpc_unix_client; // Unix socket RPC client (preferred for local IPC)
 pub mod swarm_handler; // Stream handler for swarm events
 pub mod swarm_monitor; // Live swarm monitoring UI (phase 3:5.5)
+pub mod zmq_subscriber; // ZMQ SUB client for chat streaming
 pub mod task_board;
 pub mod time_travel;
 pub mod time_travel_integration;
@@ -29,16 +28,16 @@ pub use dag_editor::{
     update as dag_editor_update, view as dag_editor_view, DAGEditorMessage, DAGEditorState, Tool,
 };
 pub use event_handler::EventHandler;
-#[cfg(feature = "agent-runner")]
 pub use file_tree_view::{
     get_selected_node, get_selected_path, is_node_visible, update as file_tree_update,
-    view as file_tree_view, FileTreeMessage, FileTreeState, SortOrder,
+    view as file_tree_view, FileNodeType, FileTree, FileTreeMessage, FileTreeNode, FileTreeState,
+    Language, SortOrder,
 };
-#[cfg(feature = "agent-runner")]
 pub use knowledge_graph_panel::{
     get_node_color, get_node_icon, update as knowledge_graph_panel_update,
-    view as knowledge_graph_panel_view, KnowledgeGraphMessage, KnowledgeGraphPanelState,
-    LayoutAlgorithm, VisualizationMode,
+    view as knowledge_graph_panel_view, KnowledgeGraph, KnowledgeGraphMessage,
+    KnowledgeGraphPanelState, KnowledgeNodeType, LayoutAlgorithm, RelationshipType,
+    VisualizationMode,
 };
 pub use rpc_client::GuiRpcClient;
 pub use rpc_unix_client::GuiUnixRpcClient;
@@ -60,5 +59,6 @@ pub use time_travel_integration::{
     is_rewind_safe, slider_selection_to_rewind_point, update_rewind, view_rewind_confirmation,
     view_rewind_controls, view_rewind_progress, view_rewind_result, RewindMessage, RewindState,
 };
+pub use zmq_subscriber::{chat_subscription, subscribe_to_session};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
