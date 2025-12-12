@@ -1,6 +1,6 @@
 //! SCG-based Task Event Emitter - File watching and event emission for SCG task files
 //!
-//! This module watches the .scud/tasks/tasks.json file for changes and emits
+//! This module watches the .scud/tasks/tasks.scg file for changes and emits
 //! events when tasks are created, updated, or deleted.
 //!
 //! Features:
@@ -116,7 +116,7 @@ impl ScgTaskEventEmitter {
     /// Returns a handle that must be kept alive
     pub async fn start_watching(&mut self) -> anyhow::Result<()> {
         let project_root = self.storage.project_root().to_path_buf();
-        let tasks_file = project_root.join(".scud/tasks/tasks.json");
+        let tasks_file = project_root.join(".scud/tasks/tasks.scg");
 
         if !tasks_file.exists() {
             if self.config.verbose_logging {
@@ -146,10 +146,10 @@ impl ScgTaskEventEmitter {
                             | notify::EventKind::Create(_)
                             | notify::EventKind::Remove(_)
                     ) {
-                        // Check if it's the tasks.json file
+                        // Check if it's the tasks.scg file
                         if event.paths.iter().any(|p| {
                             p.file_name()
-                                .map(|n| n == "tasks.json")
+                                .map(|n| n == "tasks.scg")
                                 .unwrap_or(false)
                         }) {
                             let _ = tx_clone.blocking_send(());
@@ -402,9 +402,9 @@ mod tests {
         let scud_dir = temp_dir.path().join(".scud/tasks");
         std::fs::create_dir_all(&scud_dir).expect("Failed to create scud dir");
 
-        // Create empty tasks.json
-        let tasks_file = scud_dir.join("tasks.json");
-        std::fs::write(&tasks_file, "{}").expect("Failed to create tasks.json");
+        // Create empty tasks.scg
+        let tasks_file = scud_dir.join("tasks.scg");
+        std::fs::write(&tasks_file, "").expect("Failed to create tasks.scg");
 
         // Create workflow-state.json
         let workflow_file = temp_dir.path().join(".scud/workflow-state.json");

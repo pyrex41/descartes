@@ -30,9 +30,9 @@ pub fn has_scud(workspace: &Path) -> bool {
     scud_dir(workspace).exists()
 }
 
-/// Get the SCUD tasks file path
+/// Get the SCUD tasks file path (SCG format)
 pub fn scud_tasks_file(workspace: &Path) -> PathBuf {
-    scud_dir(workspace).join("tasks").join("tasks.json")
+    scud_dir(workspace).join("tasks").join("tasks.scg")
 }
 
 /// Get the SCUD workflow state file path
@@ -42,13 +42,15 @@ pub fn scud_workflow_state_file(workspace: &Path) -> PathBuf {
 
 /// Sync Descartes tasks to SCUD (write-only plugin)
 ///
-/// This writes tasks in SCUD-compatible JSON format to the SCUD tasks file.
+/// This writes tasks in SCUD-compatible SCG format to the SCUD tasks file.
 /// This is a one-way sync - Descartes writes, SCUD reads.
-pub fn sync_tasks_to_scud(workspace: &Path, tasks_json: &str) -> std::io::Result<()> {
+/// NOTE: This function expects scg_content to already be in SCG format.
+/// Use the `scud` crate's serialization functions to generate proper SCG content.
+pub fn sync_tasks_to_scud(workspace: &Path, scg_content: &str) -> std::io::Result<()> {
     let scud_tasks = scud_tasks_file(workspace);
     if let Some(parent) = scud_tasks.parent() {
         if parent.exists() {
-            std::fs::write(scud_tasks, tasks_json)?;
+            std::fs::write(scud_tasks, scg_content)?;
         }
     }
     Ok(())
@@ -64,7 +66,8 @@ pub fn read_scud_workflow_state(workspace: &Path) -> Option<String> {
 
 /// Read SCUD tasks (read-only)
 ///
-/// Returns the tasks JSON if it exists, None otherwise.
+/// Returns the tasks in SCG format if the file exists, None otherwise.
+/// Use the `scud` crate's parsing functions to parse the SCG content.
 pub fn read_scud_tasks(workspace: &Path) -> Option<String> {
     let tasks_file = scud_tasks_file(workspace);
     std::fs::read_to_string(tasks_file).ok()
@@ -195,7 +198,7 @@ mod tests {
         let workspace = PathBuf::from("/home/user/project");
         assert_eq!(
             scud_tasks_file(&workspace),
-            PathBuf::from("/home/user/project/.scud/tasks/tasks.json")
+            PathBuf::from("/home/user/project/.scud/tasks/tasks.scg")
         );
     }
 
