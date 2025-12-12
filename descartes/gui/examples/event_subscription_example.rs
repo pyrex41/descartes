@@ -123,7 +123,7 @@ impl App {
             Message::Connect => {
                 tracing::info!("Connecting to event stream...");
                 self.connected = true;
-                self.event_handler.connect()
+                self.event_handler.connect().discard()
             }
             Message::Disconnect => {
                 tracing::info!("Disconnecting from event stream...");
@@ -135,6 +135,7 @@ impl App {
                 Task::future(async move {
                     handler.disconnect().await;
                 })
+                .discard()
             }
             Message::EventReceived(event) => {
                 tracing::debug!("Event received: {:?}", event);
@@ -242,9 +243,13 @@ impl App {
 
         let scrollable_events = scrollable(events_view);
 
-        let main_view = column![header, event_count.padding(20), scrollable_events]
-            .spacing(0)
-            .padding(0);
+        let main_view = column![
+            header,
+            container(event_count).padding(20),
+            scrollable_events
+        ]
+        .spacing(0)
+        .padding(0);
 
         container(main_view)
             .width(Length::Fill)

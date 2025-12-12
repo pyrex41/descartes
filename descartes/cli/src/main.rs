@@ -19,7 +19,7 @@ fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
     Ok(manager.config().clone())
 }
 
-use commands::{attach, doctor, init, kill, logs, pause, plugins, ps, resume, spawn, tasks, workflow};
+use commands::{attach, doctor, init, kill, logs, pause, ps, resume, spawn, tasks, workflow};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -171,10 +171,6 @@ enum Commands {
     /// Check system health and configuration
     Doctor,
 
-    /// Manage plugins
-    #[command(subcommand)]
-    Plugins(plugins::PluginCommands),
-
     /// Manage tasks (uses SCG file storage)
     #[command(subcommand)]
     Tasks(tasks::TaskCommands),
@@ -286,10 +282,6 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Doctor => {
             doctor::execute().await?;
-        }
-
-        Commands::Plugins(cmd) => {
-            plugins::execute(&cmd).await?;
         }
 
         Commands::Tasks(cmd) => {

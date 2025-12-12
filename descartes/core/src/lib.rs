@@ -11,6 +11,9 @@ pub mod agent_state;
 pub mod agent_stream_parser;
 pub mod body_restore;
 pub mod brain_restore;
+pub mod channel_bridge;
+pub mod claude_backend;
+pub mod cli_backend;
 pub mod config;
 pub mod config_loader;
 pub mod config_migration;
@@ -20,12 +23,8 @@ pub mod dag_swarm_export;
 pub mod dag_toml;
 pub mod debugger;
 pub mod errors;
-pub mod ipc;
 pub mod lease;
 pub mod lease_manager;
-pub mod notification_router_impl;
-pub mod notifications;
-pub mod plugins;
 pub mod providers;
 pub mod secrets;
 pub mod secrets_crypto;
@@ -114,20 +113,10 @@ pub use zmq_client::ZmqClient;
 
 pub use zmq_server::{ServerStats, ZmqAgentServer, ZmqServerConfig};
 
-pub use notifications::{
-    ChannelStats, EventTypeStats, NotificationAdapter, NotificationChannel, NotificationError,
-    NotificationEventType, NotificationPayload, NotificationPayloadBuilder, NotificationRouter,
-    NotificationSendResult, NotificationStats, RateLimitConfig, RetryConfig, RoutingRule, Severity,
-    TemplateContext,
-};
+pub use channel_bridge::{ChannelBridge, InternalMessage};
 
-pub use notification_router_impl::DefaultNotificationRouter;
-
-pub use ipc::{
-    BackpressureConfig, BackpressureController, DeadLetterQueue, IpcMessage, MemoryTransport,
-    MessageBus, MessageBusConfig, MessageBusStats, MessageHandler, MessageRouter, MessageTransport,
-    MessageType, RequestResponseTracker, RoutingRule as IpcRoutingRule, UnixSocketTransport,
-};
+pub use cli_backend::{ChatSessionConfig, ChatSessionHandle, CliBackend, StreamChunk};
+pub use claude_backend::ClaudeBackend;
 
 pub use lease::{
     Lease, LeaseAcquisitionRequest, LeaseAcquisitionResponse, LeaseManager, LeaseReleaseRequest,
@@ -148,7 +137,7 @@ pub use scg_task_storage::{
 
 pub use config::{
     AgentBehaviorConfig, AnthropicConfig, ConfigManager, DeepSeekConfig, DescaratesConfig,
-    FeaturesConfig, GroqConfig, LoggingConfig, NotificationsConfig, OllamaConfig, OpenAiConfig,
+    FeaturesConfig, GroqConfig, LoggingConfig, OllamaConfig, OpenAiConfig,
     ProvidersConfig, SecurityConfig, StorageConfig,
 };
 

@@ -1,4 +1,4 @@
-use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, Position, DAG};
+use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, Position};
 use descartes_gui::dag_canvas_interactions::*;
 /// Tests for DAG Editor Drag-and-Drop Interactions
 ///
@@ -11,7 +11,7 @@ use descartes_gui::dag_canvas_interactions::*;
 /// - Undo/redo operations
 use descartes_gui::dag_editor::*;
 use iced::mouse::ScrollDelta;
-use iced::{keyboard, mouse, Point, Vector};
+use iced::{keyboard, mouse, Point};
 use uuid::Uuid;
 
 // ============================================================================
@@ -47,7 +47,6 @@ fn get_node_ids(state: &DAGEditorState) -> Vec<Uuid> {
 #[test]
 fn test_single_node_drag() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
     let node_id = node_ids[0];
 
@@ -58,7 +57,6 @@ fn test_single_node_drag() {
     let click_pos = Point::new(130.0, 130.0);
     let result = handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         click_pos,
         keyboard::Modifiers::default(),
@@ -69,10 +67,10 @@ fn test_single_node_drag() {
 
     // Drag to new position
     let drag_pos = Point::new(200.0, 200.0);
-    handle_mouse_move(&mut state, &mut extended, drag_pos);
+    handle_mouse_move(&mut state, drag_pos);
 
     // Release
-    handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, drag_pos);
+    handle_mouse_release(&mut state, mouse::Button::Left, drag_pos);
 
     // Check that node moved
     let final_pos = state.dag.get_node(node_id).unwrap().position;
@@ -83,14 +81,12 @@ fn test_single_node_drag() {
 #[test]
 fn test_multi_node_drag() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
 
     // Select first node
     let click_pos1 = Point::new(130.0, 130.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         click_pos1,
         keyboard::Modifiers::default(),
@@ -100,7 +96,6 @@ fn test_multi_node_drag() {
     let click_pos2 = Point::new(330.0, 130.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         click_pos2,
         keyboard::Modifiers::CTRL,
@@ -117,10 +112,10 @@ fn test_multi_node_drag() {
 
     // Drag
     let drag_pos = Point::new(400.0, 200.0);
-    handle_mouse_move(&mut state, &mut extended, drag_pos);
+    handle_mouse_move(&mut state, drag_pos);
 
     // Release
-    handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, drag_pos);
+    handle_mouse_release(&mut state, mouse::Button::Left, drag_pos);
 
     // Check that both nodes moved
     let final_positions: Vec<_> = node_ids
@@ -139,7 +134,6 @@ fn test_multi_node_drag() {
 fn test_drag_with_snap_to_grid() {
     let mut state = create_test_state();
     state.snap_to_grid = true;
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
     let node_id = node_ids[0];
 
@@ -147,7 +141,6 @@ fn test_drag_with_snap_to_grid() {
     let click_pos = Point::new(130.0, 130.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         click_pos,
         keyboard::Modifiers::default(),
@@ -155,8 +148,8 @@ fn test_drag_with_snap_to_grid() {
 
     // Drag to position that's not on grid
     let drag_pos = Point::new(237.5, 183.7);
-    handle_mouse_move(&mut state, &mut extended, drag_pos);
-    handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, drag_pos);
+    handle_mouse_move(&mut state, drag_pos);
+    handle_mouse_release(&mut state, mouse::Button::Left, drag_pos);
 
     // Check that position was snapped to grid
     let final_pos = state.dag.get_node(node_id).unwrap().position;
@@ -173,7 +166,6 @@ fn test_drag_with_snap_to_grid() {
 fn test_edge_creation_via_drag() {
     let mut state = create_test_state();
     state.tool = Tool::AddEdge;
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
 
     let from_node = node_ids[0];
@@ -183,7 +175,6 @@ fn test_edge_creation_via_drag() {
     let from_pos = Point::new(130.0, 130.0);
     let result = handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         from_pos,
         keyboard::Modifiers::default(),
@@ -193,15 +184,15 @@ fn test_edge_creation_via_drag() {
         result,
         Some(InteractionResult::EdgeCreationStarted(_))
     ));
-    assert!(extended.edge_creation.is_some());
+    assert!(state.extended_interaction.edge_creation.is_some());
 
     // Drag to target node
     let to_pos = Point::new(330.0, 130.0);
-    handle_mouse_move(&mut state, &mut extended, to_pos);
+    handle_mouse_move(&mut state, to_pos);
 
     // Release on target node
     let initial_edge_count = state.dag.edges.len();
-    handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, to_pos);
+    handle_mouse_release(&mut state, mouse::Button::Left, to_pos);
 
     // Check that edge was created
     assert_eq!(state.dag.edges.len(), initial_edge_count + 1);
@@ -216,7 +207,6 @@ fn test_edge_creation_via_drag() {
 fn test_edge_creation_cycle_prevention() {
     let mut state = create_test_state();
     state.tool = Tool::AddEdge;
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
 
     // Create edge A -> B
@@ -227,17 +217,16 @@ fn test_edge_creation_cycle_prevention() {
     let from_pos = Point::new(330.0, 130.0); // Node B
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         from_pos,
         keyboard::Modifiers::default(),
     );
 
     let to_pos = Point::new(130.0, 130.0); // Node A
-    handle_mouse_move(&mut state, &mut extended, to_pos);
+    handle_mouse_move(&mut state, to_pos);
 
     let initial_edge_count = state.dag.edges.len();
-    let result = handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, to_pos);
+    let result = handle_mouse_release(&mut state, mouse::Button::Left, to_pos);
 
     // Edge should not be created (would create cycle)
     assert!(matches!(
@@ -251,23 +240,21 @@ fn test_edge_creation_cycle_prevention() {
 fn test_edge_creation_self_loop_prevention() {
     let mut state = create_test_state();
     state.tool = Tool::AddEdge;
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
 
     // Try to create edge from node to itself
     let pos = Point::new(130.0, 130.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         pos,
         keyboard::Modifiers::default(),
     );
 
-    handle_mouse_move(&mut state, &mut extended, pos);
+    handle_mouse_move(&mut state, pos);
 
     let initial_edge_count = state.dag.edges.len();
-    handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, pos);
+    handle_mouse_release(&mut state, mouse::Button::Left, pos);
 
     // Edge should not be created (self-loop)
     assert_eq!(state.dag.edges.len(), initial_edge_count);
@@ -280,26 +267,24 @@ fn test_edge_creation_self_loop_prevention() {
 #[test]
 fn test_box_selection() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
 
     // Start box selection in empty area
     let start_pos = Point::new(50.0, 50.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         start_pos,
         keyboard::Modifiers::default(),
     );
 
-    assert!(extended.box_selection.is_some());
+    assert!(state.extended_interaction.box_selection.is_some());
 
     // Drag to encompass multiple nodes
     let end_pos = Point::new(350.0, 250.0);
-    handle_mouse_move(&mut state, &mut extended, end_pos);
+    handle_mouse_move(&mut state, end_pos);
 
     // Release
-    handle_mouse_release(&mut state, &mut extended, mouse::Button::Left, end_pos);
+    handle_mouse_release(&mut state, mouse::Button::Left, end_pos);
 
     // Check that nodes within box were selected
     assert!(!state.interaction.selected_nodes.is_empty());
@@ -308,14 +293,12 @@ fn test_box_selection() {
 #[test]
 fn test_ctrl_click_multi_select() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
 
     // Click first node
     let pos1 = Point::new(130.0, 130.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         pos1,
         keyboard::Modifiers::default(),
@@ -327,7 +310,6 @@ fn test_ctrl_click_multi_select() {
     let pos2 = Point::new(330.0, 130.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         pos2,
         keyboard::Modifiers::CTRL,
@@ -338,7 +320,6 @@ fn test_ctrl_click_multi_select() {
     // Ctrl+click first node again to deselect
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         pos1,
         keyboard::Modifiers::CTRL,
@@ -351,12 +332,10 @@ fn test_ctrl_click_multi_select() {
 #[test]
 fn test_select_all_keyboard_shortcut() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
 
     // Press Ctrl+A
     let result = handle_key_press(
         &mut state,
-        &mut extended,
         keyboard::Key::Character("a".into()),
         keyboard::Modifiers::CTRL,
     );
@@ -375,7 +354,6 @@ fn test_select_all_keyboard_shortcut() {
 #[test]
 fn test_middle_mouse_pan() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
 
     let initial_offset = state.canvas_state.offset;
 
@@ -383,7 +361,6 @@ fn test_middle_mouse_pan() {
     let start_pos = Point::new(400.0, 300.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Middle,
         start_pos,
         keyboard::Modifiers::default(),
@@ -393,14 +370,14 @@ fn test_middle_mouse_pan() {
 
     // Drag
     let drag_pos = Point::new(300.0, 200.0);
-    handle_mouse_move(&mut state, &mut extended, drag_pos);
+    handle_mouse_move(&mut state, drag_pos);
 
     // Check that offset changed
     assert_ne!(state.canvas_state.offset.x, initial_offset.x);
     assert_ne!(state.canvas_state.offset.y, initial_offset.y);
 
     // Release
-    handle_mouse_release(&mut state, &mut extended, mouse::Button::Middle, drag_pos);
+    handle_mouse_release(&mut state, mouse::Button::Middle, drag_pos);
 
     assert!(state.interaction.pan_state.is_none());
 }
@@ -409,7 +386,6 @@ fn test_middle_mouse_pan() {
 fn test_pan_tool() {
     let mut state = create_test_state();
     state.tool = Tool::Pan;
-    let mut extended = ExtendedInteractionState::default();
 
     let initial_offset = state.canvas_state.offset;
 
@@ -417,14 +393,13 @@ fn test_pan_tool() {
     let start_pos = Point::new(400.0, 300.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         start_pos,
         keyboard::Modifiers::default(),
     );
 
     let drag_pos = Point::new(300.0, 200.0);
-    handle_mouse_move(&mut state, &mut extended, drag_pos);
+    handle_mouse_move(&mut state, drag_pos);
 
     // Offset should change
     assert_ne!(state.canvas_state.offset.x, initial_offset.x);
@@ -520,7 +495,7 @@ fn test_undo_node_addition() {
     let position = Position::new(400.0, 400.0);
     update(
         &mut state,
-        DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)),
+        DAGEditorMessage::AddNode(position),
     );
 
     assert_eq!(state.dag.nodes.len(), initial_count + 1);
@@ -583,7 +558,7 @@ fn test_redo_operations() {
     let position = Position::new(400.0, 400.0);
     update(
         &mut state,
-        DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)),
+        DAGEditorMessage::AddNode(position),
     );
 
     // Undo
@@ -598,13 +573,12 @@ fn test_redo_operations() {
 #[test]
 fn test_keyboard_undo_redo_shortcuts() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
 
     // Add a node
     let position = Position::new(400.0, 400.0);
     update(
         &mut state,
-        DAGEditorMessage::AddNode(Point::new(position.x as f32, position.y as f32)),
+        DAGEditorMessage::AddNode(position),
     );
 
     let count_after_add = state.dag.nodes.len();
@@ -612,7 +586,6 @@ fn test_keyboard_undo_redo_shortcuts() {
     // Press Ctrl+Z to undo
     let result = handle_key_press(
         &mut state,
-        &mut extended,
         keyboard::Key::Character("z".into()),
         keyboard::Modifiers::CTRL,
     );
@@ -622,7 +595,6 @@ fn test_keyboard_undo_redo_shortcuts() {
     // Press Ctrl+Shift+Z to redo
     let result = handle_key_press(
         &mut state,
-        &mut extended,
         keyboard::Key::Character("z".into()),
         keyboard::Modifiers::CTRL | keyboard::Modifiers::SHIFT,
     );
@@ -637,7 +609,6 @@ fn test_keyboard_undo_redo_shortcuts() {
 #[test]
 fn test_delete_key() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
     let node_ids = get_node_ids(&state);
 
     // Select a node
@@ -648,7 +619,6 @@ fn test_delete_key() {
     // Press Delete key
     handle_key_press(
         &mut state,
-        &mut extended,
         keyboard::Key::Named(keyboard::key::Named::Delete),
         keyboard::Modifiers::default(),
     );
@@ -659,10 +629,9 @@ fn test_delete_key() {
 #[test]
 fn test_escape_cancels_operations() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
 
     // Start edge creation
-    extended.edge_creation = Some(EdgeCreation {
+    state.extended_interaction.edge_creation = Some(EdgeCreation {
         from_node: Uuid::new_v4(),
         current_pos: Point::new(0.0, 0.0),
         hover_target: None,
@@ -672,7 +641,6 @@ fn test_escape_cancels_operations() {
     // Press Escape
     let result = handle_key_press(
         &mut state,
-        &mut extended,
         keyboard::Key::Named(keyboard::key::Named::Escape),
         keyboard::Modifiers::default(),
     );
@@ -681,7 +649,7 @@ fn test_escape_cancels_operations() {
         result,
         Some(InteractionResult::OperationCancelled)
     ));
-    assert!(extended.edge_creation.is_none());
+    assert!(state.extended_interaction.edge_creation.is_none());
 }
 
 // ============================================================================
@@ -699,8 +667,6 @@ fn test_drag_large_selection() {
         state.dag.add_node(node).unwrap();
     }
 
-    let mut extended = ExtendedInteractionState::default();
-
     // Select all nodes
     state.interaction.selected_nodes = state.dag.nodes.keys().copied().collect();
 
@@ -708,7 +674,6 @@ fn test_drag_large_selection() {
     let start_pos = Point::new(100.0, 100.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         start_pos,
         keyboard::Modifiers::default(),
@@ -716,7 +681,7 @@ fn test_drag_large_selection() {
 
     // Perform drag operation
     let drag_pos = Point::new(200.0, 200.0);
-    handle_mouse_move(&mut state, &mut extended, drag_pos);
+    handle_mouse_move(&mut state, drag_pos);
 
     // All selected nodes should have moved
     assert!(state.interaction.drag_state.is_some());
@@ -733,20 +698,18 @@ fn test_drag_large_selection() {
 #[test]
 fn test_click_on_empty_canvas() {
     let mut state = create_test_state();
-    let mut extended = ExtendedInteractionState::default();
 
     // Click on empty area
     let pos = Point::new(1000.0, 1000.0);
     handle_mouse_press(
         &mut state,
-        &mut extended,
         mouse::Button::Left,
         pos,
         keyboard::Modifiers::default(),
     );
 
     // Should start box selection
-    assert!(extended.box_selection.is_some());
+    assert!(state.extended_interaction.box_selection.is_some());
 }
 
 #[test]

@@ -24,6 +24,8 @@ pub mod server;
 pub mod task_event_emitter;
 pub mod scg_task_event_emitter; // SCG file-based task event emitter
 pub mod types;
+pub mod zmq_publisher; // ZMQ PUB socket for streaming chat output
+pub mod chat_manager; // Chat session management
 
 // Re-export commonly used types
 pub use agent_monitor::{AgentMonitor, AgentMonitorConfig, HealthSummary, MonitorStats};
@@ -55,6 +57,8 @@ pub use scg_task_event_emitter::{
     ScgTaskEventEmitter, ScgTaskEventEmitterConfig,
 };
 pub use types::{RpcRequest, RpcResponse};
+pub use zmq_publisher::ZmqPublisher;
+pub use chat_manager::{ChatManager, ChatSessionInfo};
 
 /// Daemon version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

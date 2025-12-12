@@ -7,6 +7,8 @@ use crate::metrics::MetricsCollector;
 use crate::pool::ConnectionPool;
 use crate::rpc::JsonRpcServer;
 use crate::types::*;
+use crate::chat_manager::ChatManager;
+use crate::zmq_publisher::ZmqPublisher;
 use hyper::header::AUTHORIZATION;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
@@ -26,6 +28,9 @@ pub struct RpcServer {
     #[allow(dead_code)]
     pool: Arc<ConnectionPool>,
     rpc: Arc<JsonRpcServer>,
+    /// ZMQ PUB socket for streaming chat output (initialized lazily in run())
+    #[allow(dead_code)]
+    publisher: Option<Arc<ZmqPublisher>>,
 }
 
 impl RpcServer {
@@ -56,7 +61,18 @@ impl RpcServer {
             metrics,
             pool,
             rpc,
+            publisher: None, // Initialized in run()
         })
+    }
+
+    /// Get a reference to the ZMQ publisher (if running)
+    pub fn publisher(&self) -> Option<Arc<ZmqPublisher>> {
+        self.publisher.clone()
+    }
+
+    /// Get the server config
+    pub fn config(&self) -> &DaemonConfig {
+        &self.config
     }
 
     /// Start the HTTP server
@@ -130,18 +146,49 @@ impl RpcServer {
 
     /// Run the server
     pub async fn run(&self) -> DaemonResult<()> {
+        // Initialize ZMQ publisher and chat manager
+        let publisher = match ZmqPublisher::new(
+            &self.config.server.pub_addr,
+            self.config.server.pub_port,
+        )
+        .await
+        {
+            Ok(pub_socket) => {
+                info!(
+                    "ZMQ PUB socket listening on {}",
+                    pub_socket.endpoint()
+                );
+                Some(Arc::new(pub_socket))
+            }
+            Err(e) => {
+                error!("Failed to start ZMQ publisher: {}", e);
+                None
+            }
+        };
+
+        // Create chat manager if publisher is available
+        if let Some(ref pub_socket) = publisher {
+            let chat_manager = Arc::new(ChatManager::new(pub_socket.clone()));
+            self.rpc.set_chat_manager(chat_manager).await;
+            info!("Chat manager initialized");
+        }
+
+        // Update self with publisher (for access by handlers)
+        let mut server = self.clone();
+        server.publisher = publisher;
+
         // Start HTTP server
-        let server = self.clone();
+        let http_server = server.clone();
         let http_handle = tokio::spawn(async move {
-            if let Err(e) = server.start_http().await {
+            if let Err(e) = http_server.start_http().await {
                 error!("HTTP server error: {:?}", e);
             }
         });
 
         // Start metrics endpoint
-        let server = self.clone();
+        let metrics_server = server.clone();
         let metrics_handle = tokio::spawn(async move {
-            if let Err(e) = server.start_metrics().await {
+            if let Err(e) = metrics_server.start_metrics().await {
                 error!("Metrics server error: {:?}", e);
             }
         });

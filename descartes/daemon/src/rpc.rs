@@ -1,19 +1,25 @@
 /// JSON-RPC 2.0 server implementation
 use crate::auth::{AuthContext, AuthManager};
+use crate::chat_manager::ChatManager;
 use crate::errors::{DaemonError, DaemonResult};
 use crate::handlers::RpcHandlers;
 use crate::metrics::MetricsCollector;
 use crate::types::*;
+use descartes_core::ChatSessionConfig;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio::sync::RwLock;
 use tracing::{debug, error, info};
+use uuid::Uuid;
 
 /// JSON-RPC Server
 pub struct JsonRpcServer {
     handlers: Arc<RpcHandlers>,
     auth: Option<Arc<AuthManager>>,
     metrics: Arc<MetricsCollector>,
+    /// Chat manager (set when server starts with ZMQ publisher)
+    chat_manager: Arc<RwLock<Option<Arc<ChatManager>>>>,
 }
 
 impl JsonRpcServer {
@@ -27,7 +33,14 @@ impl JsonRpcServer {
             handlers,
             auth,
             metrics,
+            chat_manager: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Set the chat manager (called when ZMQ publisher is initialized)
+    pub async fn set_chat_manager(&self, manager: Arc<ChatManager>) {
+        let mut chat = self.chat_manager.write().await;
+        *chat = Some(manager);
     }
 
     /// Process a JSON-RPC request
@@ -65,6 +78,13 @@ impl JsonRpcServer {
             "state.query" => self.call_state_query(request.params, auth_context).await,
             "system.health" => self.call_system_health(request.params, auth_context).await,
             "system.metrics" => self.call_system_metrics(request.params, auth_context).await,
+            // Chat methods
+            "chat.create" => self.call_chat_create(request.params, auth_context).await,
+            "chat.start" => self.call_chat_start(request.params, auth_context).await,
+            "chat.prompt" => self.call_chat_prompt(request.params, auth_context).await,
+            "chat.stop" => self.call_chat_stop(request.params, auth_context).await,
+            "chat.list" => self.call_chat_list(request.params, auth_context).await,
+            "chat.upgrade_to_agent" => self.call_chat_upgrade_to_agent(request.params, auth_context).await,
             _ => Err(DaemonError::MethodNotFound(method.clone())),
         };
 
@@ -235,6 +255,215 @@ impl JsonRpcServer {
             .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
     }
 
+    // Chat RPC methods
+
+    /// Create a new chat session without starting the CLI
+    /// Method: "chat.create"
+    /// Params: { "working_dir": string, "enable_thinking": bool, "thinking_level": string }
+    /// Returns: { "session_id": string, "pub_endpoint": string, "topic": string }
+    ///
+    /// The client should:
+    /// 1. Call chat.create to get session_id
+    /// 2. Subscribe to ZMQ topic "chat/{session_id}"
+    /// 3. Call chat.prompt with the initial prompt to start the CLI
+    async fn call_chat_create(
+        &self,
+        params: Option<Value>,
+        _auth: AuthContext,
+    ) -> DaemonResult<Value> {
+        let chat_manager = self.chat_manager.read().await;
+        let manager = chat_manager.as_ref()
+            .ok_or_else(|| DaemonError::ServerError("Chat not available - ZMQ publisher not initialized".to_string()))?;
+
+        let params = params.unwrap_or_else(|| Value::Object(Default::default()));
+
+        let working_dir = params.get("working_dir")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".")
+            .to_string();
+
+        let enable_thinking = params.get("enable_thinking")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        let thinking_level = params.get("thinking_level")
+            .and_then(|v| v.as_str())
+            .unwrap_or("normal")
+            .to_string();
+
+        let config = ChatSessionConfig {
+            working_dir,
+            initial_prompt: String::new(), // No initial prompt - will be sent via chat.prompt
+            enable_thinking,
+            thinking_level,
+            ..Default::default()
+        };
+
+        // Create session without starting CLI
+        let session_id = manager.create_session(config);
+
+        Ok(serde_json::json!({
+            "session_id": session_id.to_string(),
+            "pub_endpoint": manager.pub_endpoint(),
+            "topic": format!("chat/{}", session_id),
+        }))
+    }
+
+    /// Start a new chat session (legacy - starts CLI immediately)
+    /// Method: "chat.start"
+    /// Params: { "working_dir": string, "enable_thinking": bool, "thinking_level": string }
+    /// Returns: { "session_id": string, "pub_endpoint": string, "topic": string }
+    ///
+    /// Note: For proper streaming, prefer chat.create + chat.prompt flow
+    async fn call_chat_start(
+        &self,
+        params: Option<Value>,
+        _auth: AuthContext,
+    ) -> DaemonResult<Value> {
+        let chat_manager = self.chat_manager.read().await;
+        let manager = chat_manager.as_ref()
+            .ok_or_else(|| DaemonError::ServerError("Chat not available - ZMQ publisher not initialized".to_string()))?;
+
+        let params = params.unwrap_or_else(|| Value::Object(Default::default()));
+
+        let working_dir = params.get("working_dir")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".")
+            .to_string();
+
+        let enable_thinking = params.get("enable_thinking")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        let thinking_level = params.get("thinking_level")
+            .and_then(|v| v.as_str())
+            .unwrap_or("normal")
+            .to_string();
+
+        let initial_prompt = params.get("initial_prompt")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let config = ChatSessionConfig {
+            working_dir,
+            initial_prompt,
+            enable_thinking,
+            thinking_level,
+            ..Default::default()
+        };
+
+        let session_id = manager.start_session(config).await
+            .map_err(|e| DaemonError::ServerError(e))?;
+
+        Ok(serde_json::json!({
+            "session_id": session_id.to_string(),
+            "pub_endpoint": manager.pub_endpoint(),
+            "topic": format!("chat/{}", session_id),
+        }))
+    }
+
+    /// Send prompt to chat session
+    /// Method: "chat.prompt"
+    /// Params: { "session_id": string, "prompt": string }
+    async fn call_chat_prompt(
+        &self,
+        params: Option<Value>,
+        _auth: AuthContext,
+    ) -> DaemonResult<Value> {
+        let chat_manager = self.chat_manager.read().await;
+        let manager = chat_manager.as_ref()
+            .ok_or_else(|| DaemonError::ServerError("Chat not available".to_string()))?;
+
+        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+
+        let session_id: Uuid = params.get("session_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| DaemonError::InvalidRequest("session_id required".to_string()))?
+            .parse()
+            .map_err(|_| DaemonError::InvalidRequest("Invalid session_id".to_string()))?;
+
+        let prompt = params.get("prompt")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| DaemonError::InvalidRequest("prompt required".to_string()))?
+            .to_string();
+
+        manager.send_prompt(session_id, prompt).await
+            .map_err(|e| DaemonError::ServerError(e))?;
+
+        Ok(serde_json::json!({"success": true}))
+    }
+
+    /// Stop chat session
+    /// Method: "chat.stop"
+    /// Params: { "session_id": string }
+    async fn call_chat_stop(
+        &self,
+        params: Option<Value>,
+        _auth: AuthContext,
+    ) -> DaemonResult<Value> {
+        let chat_manager = self.chat_manager.read().await;
+        let manager = chat_manager.as_ref()
+            .ok_or_else(|| DaemonError::ServerError("Chat not available".to_string()))?;
+
+        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+
+        let session_id: Uuid = params.get("session_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| DaemonError::InvalidRequest("session_id required".to_string()))?
+            .parse()
+            .map_err(|_| DaemonError::InvalidRequest("Invalid session_id".to_string()))?;
+
+        manager.stop_session(session_id).await
+            .map_err(|e| DaemonError::ServerError(e))?;
+
+        Ok(serde_json::json!({"success": true}))
+    }
+
+    /// List chat sessions
+    /// Method: "chat.list"
+    async fn call_chat_list(
+        &self,
+        _params: Option<Value>,
+        _auth: AuthContext,
+    ) -> DaemonResult<Value> {
+        let chat_manager = self.chat_manager.read().await;
+        let manager = chat_manager.as_ref()
+            .ok_or_else(|| DaemonError::ServerError("Chat not available".to_string()))?;
+
+        let sessions = manager.list_sessions();
+
+        Ok(serde_json::json!({
+            "sessions": sessions,
+        }))
+    }
+
+    /// Upgrade chat to agent mode
+    /// Method: "chat.upgrade_to_agent"
+    /// Params: { "session_id": string }
+    async fn call_chat_upgrade_to_agent(
+        &self,
+        params: Option<Value>,
+        _auth: AuthContext,
+    ) -> DaemonResult<Value> {
+        let chat_manager = self.chat_manager.read().await;
+        let manager = chat_manager.as_ref()
+            .ok_or_else(|| DaemonError::ServerError("Chat not available".to_string()))?;
+
+        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+
+        let session_id: Uuid = params.get("session_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| DaemonError::InvalidRequest("session_id required".to_string()))?
+            .parse()
+            .map_err(|_| DaemonError::InvalidRequest("Invalid session_id".to_string()))?;
+
+        manager.upgrade_to_agent(session_id)
+            .map_err(|e| DaemonError::ServerError(e))?;
+
+        Ok(serde_json::json!({"success": true, "mode": "agent"}))
+    }
+
     /// Handle batch requests (JSON-RPC 2.0)
     pub async fn process_batch(&self, requests: Vec<RpcRequest>) -> Vec<RpcResponse> {
         let mut responses = Vec::new();
@@ -252,6 +481,7 @@ impl JsonRpcServer {
 mod tests {
     use super::*;
     use crate::config::AuthConfig;
+    use serde_json::json;
 
     #[tokio::test]
     async fn test_invalid_jsonrpc_version() {

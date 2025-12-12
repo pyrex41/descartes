@@ -127,7 +127,7 @@ impl ExecutionState {
 // ============================================================================
 
 /// A snapshot of agent thought state for debugging
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThoughtSnapshot {
     /// Unique identifier for the thought
     pub thought_id: String,
@@ -204,7 +204,7 @@ impl ThoughtSnapshot {
 // ============================================================================
 
 /// Represents a single frame in the call stack
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CallFrame {
     /// Unique identifier for this frame
     pub frame_id: Uuid,
@@ -259,7 +259,7 @@ impl CallFrame {
 // ============================================================================
 
 /// Current execution context for debugging
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DebugContext {
     /// Agent being debugged
     pub agent_id: Uuid,
@@ -409,7 +409,7 @@ impl fmt::Display for BreakpointLocation {
 // ============================================================================
 
 /// Represents a debugger breakpoint
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Breakpoint {
     /// Unique breakpoint identifier
     pub id: Uuid,
@@ -522,7 +522,7 @@ impl Breakpoint {
 // ============================================================================
 
 /// Main debugger state structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DebuggerState {
     /// Whether debug mode is enabled
     pub debug_mode: bool,
@@ -730,7 +730,7 @@ impl DebuggerState {
 // ============================================================================
 
 /// A snapshot of execution state at a point in time
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DebugSnapshot {
     /// Step number when snapshot was taken
     pub step_number: u64,
@@ -756,7 +756,7 @@ pub struct DebugSnapshot {
 // ============================================================================
 
 /// Commands for controlling the debugger
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum DebugCommand {
     /// Enable debug mode
@@ -849,7 +849,7 @@ pub enum DebugEvent {
 // ============================================================================
 
 /// Statistics about a debug session
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DebugStatistics {
     /// Total debug sessions started
     pub sessions_started: u64,
