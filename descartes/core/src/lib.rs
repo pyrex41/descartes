@@ -25,9 +25,6 @@ pub mod debugger;
 pub mod errors;
 pub mod lease;
 pub mod lease_manager;
-pub mod notification_router_impl;
-pub mod notifications;
-pub mod plugins;
 pub mod providers;
 pub mod secrets;
 pub mod secrets_crypto;
@@ -116,15 +113,6 @@ pub use zmq_client::ZmqClient;
 
 pub use zmq_server::{ServerStats, ZmqAgentServer, ZmqServerConfig};
 
-pub use notifications::{
-    ChannelStats, EventTypeStats, NotificationAdapter, NotificationChannel, NotificationError,
-    NotificationEventType, NotificationPayload, NotificationPayloadBuilder, NotificationRouter,
-    NotificationSendResult, NotificationStats, RateLimitConfig, RetryConfig, RoutingRule, Severity,
-    TemplateContext,
-};
-
-pub use notification_router_impl::DefaultNotificationRouter;
-
 pub use channel_bridge::{ChannelBridge, InternalMessage};
 
 pub use cli_backend::{ChatSessionConfig, ChatSessionHandle, CliBackend, StreamChunk};
@@ -149,7 +137,7 @@ pub use scg_task_storage::{
 
 pub use config::{
     AgentBehaviorConfig, AnthropicConfig, ConfigManager, DeepSeekConfig, DescaratesConfig,
-    FeaturesConfig, GroqConfig, LoggingConfig, NotificationsConfig, OllamaConfig, OpenAiConfig,
+    FeaturesConfig, GroqConfig, LoggingConfig, OllamaConfig, OpenAiConfig,
     ProvidersConfig, SecurityConfig, StorageConfig,
 };
 

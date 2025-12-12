@@ -22,8 +22,6 @@ mod chat_view;
 mod dag_canvas_interactions;
 mod dag_editor;
 mod event_handler;
-mod file_tree_view;
-mod knowledge_graph_panel;
 mod rpc_client;
 mod session_selector;
 mod session_state;
@@ -39,8 +37,6 @@ use dag_editor::{DAGEditorMessage, DAGEditorState};
 use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::DescartesEvent;
 use event_handler::EventHandler;
-use file_tree_view::{FileTreeMessage, FileTreeState};
-use knowledge_graph_panel::{KnowledgeGraphMessage, KnowledgeGraphPanelState};
 use rpc_client::GuiRpcClient;
 use session_state::{SessionMessage, SessionState};
 use task_board::{KanbanBoard, TaskBoardMessage, TaskBoardState};
@@ -88,10 +84,6 @@ struct DescartesGui {
     task_board_state: TaskBoardState,
     /// DAG editor state
     dag_editor_state: DAGEditorState,
-    /// File tree view state
-    file_tree_state: FileTreeState,
-    /// Knowledge graph panel state
-    knowledge_graph_panel_state: KnowledgeGraphPanelState,
     /// Chat interface state
     chat_state: chat_state::ChatState,
     /// Chat graph view state
@@ -116,8 +108,6 @@ enum ViewMode {
     SwarmMonitor,
     Debugger,
     DagEditor,
-    FileBrowser,
-    KnowledgeGraph,
 }
 
 /// Messages that drive the application
@@ -142,10 +132,6 @@ enum Message {
     TaskBoard(TaskBoardMessage),
     /// DAG editor message
     DAGEditor(DAGEditorMessage),
-    /// File tree view message
-    FileTree(FileTreeMessage),
-    /// Knowledge graph panel message
-    KnowledgeGraph(KnowledgeGraphMessage),
     /// Chat interface message
     Chat(chat_state::ChatMessage),
     /// Chat graph view message
@@ -156,12 +142,6 @@ enum Message {
     LoadSampleTasks,
     /// Load sample DAG for demo
     LoadSampleDAG,
-    /// Load sample file tree for demo
-    LoadSampleFileTree,
-    /// Load sample knowledge graph for demo
-    LoadSampleKnowledgeGraph,
-    /// Generate knowledge graph from file tree
-    GenerateKnowledgeGraph,
     /// Clear status message
     ClearStatus,
     /// Show error message
@@ -179,8 +159,6 @@ impl DescartesGui {
             time_travel_state: TimeTravelState::default(),
             task_board_state: TaskBoardState::default(),
             dag_editor_state: DAGEditorState::default(),
-            file_tree_state: FileTreeState::default(),
-            knowledge_graph_panel_state: KnowledgeGraphPanelState::default(),
             chat_state: chat_state::ChatState::new(),
             chat_graph_state: chat_graph_state::ChatGraphState::new(),
             rpc_client: None,
@@ -344,14 +322,6 @@ impl DescartesGui {
             }
             Message::DAGEditor(msg) => {
                 dag_editor::update(&mut self.dag_editor_state, msg);
-                iced::Task::none()
-            }
-            Message::FileTree(msg) => {
-                file_tree_view::update(&mut self.file_tree_state, msg);
-                iced::Task::none()
-            }
-            Message::KnowledgeGraph(msg) => {
-                knowledge_graph_panel::update(&mut self.knowledge_graph_panel_state, msg);
                 iced::Task::none()
             }
             Message::Chat(msg) => {
@@ -542,21 +512,6 @@ impl DescartesGui {
             Message::LoadSampleDAG => {
                 tracing::info!("Loading sample DAG data");
                 self.load_sample_dag();
-                iced::Task::none()
-            }
-            Message::LoadSampleFileTree => {
-                tracing::info!("Loading sample file tree data");
-                self.load_sample_file_tree();
-                iced::Task::none()
-            }
-            Message::LoadSampleKnowledgeGraph => {
-                tracing::info!("Loading sample knowledge graph data");
-                self.load_sample_knowledge_graph();
-                iced::Task::none()
-            }
-            Message::GenerateKnowledgeGraph => {
-                tracing::info!("Generating knowledge graph from file tree");
-                self.generate_knowledge_graph_from_file_tree();
                 iced::Task::none()
             }
             Message::ClearStatus => {
@@ -1217,8 +1172,6 @@ impl DescartesGui {
             (ViewMode::SwarmMonitor, "\u{25CE}", "Agents"),  // ◎
             (ViewMode::Debugger, "\u{23F1}", "Debugger"),    // ⏱
             (ViewMode::DagEditor, "\u{25C7}", "Workflows"),  // ◇
-            (ViewMode::FileBrowser, "\u{25A4}", "Files"),    // ▤
-            (ViewMode::KnowledgeGraph, "\u{25C9}", "Graph"), // ◉
         ];
 
         let buttons: Vec<Element<Message>> = nav_items
@@ -1290,8 +1243,6 @@ impl DescartesGui {
             ViewMode::SwarmMonitor => self.view_swarm_monitor(),
             ViewMode::Debugger => self.view_debugger(),
             ViewMode::DagEditor => self.view_dag_editor(),
-            ViewMode::FileBrowser => self.view_file_browser(),
-            ViewMode::KnowledgeGraph => self.view_knowledge_graph(),
         };
 
         container(content)
@@ -1749,113 +1700,6 @@ impl DescartesGui {
             // Map DAG editor messages to main messages
             dag_editor::view(&self.dag_editor_state).map(Message::DAGEditor)
         }
-    }
-
-    /// File Browser view
-    fn view_file_browser(&self) -> Element<Message> {
-        // Check if file tree is loaded
-        if self.file_tree_state.tree.is_none() {
-            let title = text("File Browser")
-                .size(28)
-                .color(colors::TEXT_PRIMARY);
-
-            let subtitle = text("Browse and navigate the project file structure")
-                .size(14)
-                .color(colors::TEXT_SECONDARY);
-
-            let load_sample_btn = button(text("Load Sample File Tree").size(13))
-                .on_press(Message::LoadSampleFileTree)
-                .padding([10, 16])
-                .style(button_styles::primary);
-
-            column![
-                title,
-                Space::with_height(4),
-                subtitle,
-                Space::with_height(24),
-                load_sample_btn,
-            ]
-            .spacing(0)
-            .into()
-        } else {
-            // Map file tree messages to main messages
-            file_tree_view::view(&self.file_tree_state).map(Message::FileTree)
-        }
-    }
-
-    /// Load sample file tree for demonstration (stub - feature pending)
-    fn load_sample_file_tree(&mut self) {
-        self.status_message = Some("File browser feature coming soon".to_string());
-        tracing::info!("File tree loading requested - feature pending implementation");
-    }
-
-    /// Knowledge Graph view
-    fn view_knowledge_graph(&self) -> Element<Message> {
-        // Check if knowledge graph is loaded
-        if self.knowledge_graph_panel_state.graph.is_none() {
-            let title = text("Knowledge Graph")
-                .size(24)
-                .color(colors::TEXT_PRIMARY);
-
-            let description = text(
-                "No knowledge graph loaded. Generate one from the file tree or load a sample.",
-            )
-            .size(14)
-            .color(colors::TEXT_SECONDARY);
-
-            let steps = column![
-                text("Steps:").size(14).color(colors::TEXT_PRIMARY),
-                text("1. Go to File Browser and load a file tree").size(13).color(colors::TEXT_SECONDARY),
-                text("2. Come back here and click 'Generate from File Tree'").size(13).color(colors::TEXT_SECONDARY),
-                text("Or click 'Load Sample' to see a demo knowledge graph.").size(13).color(colors::TEXT_MUTED),
-            ]
-            .spacing(6);
-
-            let load_sample_btn = button(text("Load Sample").size(13))
-                .on_press(Message::LoadSampleKnowledgeGraph)
-                .padding([8, 16])
-                .style(button_styles::primary);
-
-            let generate_btn = button(text("Generate from File Tree").size(13))
-                .on_press(Message::GenerateKnowledgeGraph)
-                .padding([8, 16])
-                .style(button_styles::secondary);
-
-            let content = column![
-                title,
-                Space::with_height(12),
-                description,
-                Space::with_height(16),
-                steps,
-                Space::with_height(20),
-                row![load_sample_btn, generate_btn].spacing(12),
-            ]
-            .spacing(8)
-            .padding(24);
-
-            container(content)
-                .style(container_styles::panel)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into()
-        } else {
-            // Map knowledge graph messages to main messages
-            knowledge_graph_panel::view(&self.knowledge_graph_panel_state)
-                .map(Message::KnowledgeGraph)
-        }
-    }
-
-    /// Load sample knowledge graph for demonstration (stub - feature pending)
-    fn load_sample_knowledge_graph(&mut self) {
-        self.status_message = Some("Knowledge graph feature coming soon".to_string());
-        tracing::info!("Knowledge graph loading requested - feature pending implementation");
-    }
-
-    /// Generate knowledge graph from the current file tree (stub - feature pending)
-    fn generate_knowledge_graph_from_file_tree(&mut self) {
-        self.status_message =
-            Some("Knowledge graph generation feature coming soon".to_string());
-        tracing::info!("Knowledge graph generation requested - feature pending implementation");
     }
 }
 

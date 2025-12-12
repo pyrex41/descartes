@@ -64,9 +64,6 @@ base64 = "0.22"  # Base64 encoding for binary data
 tokio-stream = "0.1"  # Stream utilities for async
 which = "7.0"  # CLI detection
 
-# Plugin System
-wasmtime = "14.0"
-
 # Unix signal handling (for agent process management)
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["signal"] }
@@ -74,7 +71,6 @@ nix = { version = "0.29", features = ["signal"] }
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 tempfile = "3.8"
-wat = "1.0"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
