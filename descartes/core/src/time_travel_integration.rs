@@ -1110,12 +1110,12 @@ mod tests {
     use std::process::Command;
     use tempfile::{NamedTempFile, TempDir};
 
-    async fn create_test_store() -> SqliteAgentHistoryStore {
+    async fn create_test_store() -> (SqliteAgentHistoryStore, NamedTempFile) {
         let temp_file = NamedTempFile::new().unwrap();
         let path = temp_file.path().to_str().unwrap();
         let mut store = SqliteAgentHistoryStore::new(path).await.unwrap();
         store.initialize().await.unwrap();
-        store
+        (store, temp_file)
     }
 
     fn create_test_repo() -> (TempDir, PathBuf) {
@@ -1158,7 +1158,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_rewind_manager() {
-        let store = create_test_store().await;
+        let (store, _temp_file) = create_test_store().await;
         let (_temp, repo_path) = create_test_repo();
 
         let manager = DefaultRewindManager::new(store, repo_path, 10);
@@ -1194,7 +1194,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_rewind_points() {
-        let store = create_test_store().await;
+        let (store, _temp_file) = create_test_store().await;
         let (_temp, repo_path) = create_test_repo();
 
         // Create some test events
@@ -1236,7 +1236,7 @@ mod tests {
     #[tokio::test]
     async fn test_describe_rewind() {
         let from = RewindPoint::from_timestamp(1000);
-        let to = RewindPoint::from_timestamp(2000);
+        let to = RewindPoint::from_timestamp(1030);  // 30 seconds difference
 
         let description = describe_rewind(&from, &to);
         assert!(description.contains("forward"));
