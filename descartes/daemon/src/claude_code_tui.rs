@@ -195,6 +195,7 @@ pub struct ClaudeCodeTuiHandler {
 
 impl ClaudeCodeTuiHandler {
     /// Create a new Claude Code TUI handler
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: ClaudeCodeTuiConfig,
         session_manager: Arc<AttachSessionManager>,
@@ -647,6 +648,7 @@ impl ClaudeCodeTuiHandler {
 }
 
 /// Start a Claude Code TUI attach server for an agent
+#[allow(clippy::too_many_arguments)]
 pub async fn start_attach_server(
     socket_path: &std::path::Path,
     config: ClaudeCodeTuiConfig,

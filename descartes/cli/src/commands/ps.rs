@@ -28,7 +28,7 @@ pub async fn execute(config: &DescaratesConfig, format: &str, show_all: bool) ->
 
     match format {
         "json" => print_json(&rows)?,
-        "table" | _ => print_table(&rows)?,
+        _ => print_table(&rows)?,
     }
 
     Ok(())

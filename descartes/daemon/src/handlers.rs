@@ -4,14 +4,20 @@ use crate::errors::{DaemonError, DaemonResult};
 use crate::types::*;
 use chrono::Utc;
 use dashmap::DashMap;
+use descartes_core::{AgentRunner, LocalProcessRunner, SqliteStateStore};
 use serde_json::Value;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 /// RPC handlers
 pub struct RpcHandlers {
     /// In-memory agent storage (for demo; would be backed by actual agent runner)
     agents: Arc<DashMap<String, AgentInfo>>,
+    /// Optional agent runner for live agent operations
+    runner: Option<Arc<LocalProcessRunner>>,
+    /// Optional state store for state queries
+    state_store: Option<Arc<RwLock<SqliteStateStore>>>,
 }
 
 impl RpcHandlers {
@@ -19,7 +25,40 @@ impl RpcHandlers {
     pub fn new() -> Self {
         RpcHandlers {
             agents: Arc::new(DashMap::new()),
+            runner: None,
+            state_store: None,
         }
+    }
+
+    /// Create new handlers with runner and state store
+    pub fn with_runner(runner: Arc<LocalProcessRunner>) -> Self {
+        RpcHandlers {
+            agents: Arc::new(DashMap::new()),
+            runner: Some(runner),
+            state_store: None,
+        }
+    }
+
+    /// Create new handlers with full services
+    pub fn with_services(
+        runner: Arc<LocalProcessRunner>,
+        state_store: Arc<RwLock<SqliteStateStore>>,
+    ) -> Self {
+        RpcHandlers {
+            agents: Arc::new(DashMap::new()),
+            runner: Some(runner),
+            state_store: Some(state_store),
+        }
+    }
+
+    /// Set the state store
+    pub fn set_state_store(&mut self, state_store: Arc<RwLock<SqliteStateStore>>) {
+        self.state_store = Some(state_store);
+    }
+
+    /// Set the agent runner
+    pub fn set_runner(&mut self, runner: Arc<LocalProcessRunner>) {
+        self.runner = Some(runner);
     }
 
     /// Handle agent.spawn RPC method
@@ -52,8 +91,8 @@ impl RpcHandlers {
             message: "Agent spawned successfully".to_string(),
         };
 
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     /// Handle agent.list RPC method
@@ -69,8 +108,8 @@ impl RpcHandlers {
             agents,
         };
 
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     /// Handle agent.kill RPC method
@@ -96,8 +135,8 @@ impl RpcHandlers {
             message: "Agent terminated successfully".to_string(),
         };
 
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     /// Handle agent.logs RPC method
@@ -109,27 +148,106 @@ impl RpcHandlers {
         let request: AgentLogsRequest = serde_json::from_value(params)
             .map_err(|e| DaemonError::InvalidRequest(format!("Invalid params: {}", e)))?;
 
-        // Verify agent exists
-        self.agents
+        // Verify agent exists (in memory)
+        let _agent = self
+            .agents
             .get(&request.agent_id)
             .ok_or_else(|| DaemonError::AgentNotFound(request.agent_id.clone()))?;
 
-        // TODO: Fetch actual logs from agent runner
-        let logs = vec![LogEntry {
-            timestamp: Utc::now(),
-            level: "info".to_string(),
-            message: "Agent started".to_string(),
-            context: None,
-        }];
+        // Fetch logs from runner if available
+        let logs = if let Some(ref runner) = self.runner {
+            // Try to get agent info which may contain recent logs
+            let agent_uuid = Uuid::parse_str(&request.agent_id).map_err(|e| {
+                DaemonError::InvalidRequest(format!("Invalid agent_id format: {}", e))
+            })?;
+
+            match runner.get_agent(&agent_uuid).await {
+                Ok(Some(info)) => {
+                    // Build log entries from agent status/info
+                    let mut entries = Vec::new();
+                    entries.push(LogEntry {
+                        timestamp: chrono::DateTime::from_timestamp(
+                            info.started_at
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs() as i64,
+                            0,
+                        )
+                        .unwrap_or_else(Utc::now),
+                        level: "info".to_string(),
+                        message: format!("Agent started: {}", info.name),
+                        context: Some(serde_json::json!({
+                            "status": format!("{:?}", info.status),
+                            "model_backend": info.model_backend,
+                            "task": info.task
+                        })),
+                    });
+
+                    // Add pause information if present
+                    if let Some(paused_at) = info.paused_at {
+                        entries.push(LogEntry {
+                            timestamp: chrono::DateTime::from_timestamp(
+                                paused_at
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs() as i64,
+                                0,
+                            )
+                            .unwrap_or_else(Utc::now),
+                            level: "info".to_string(),
+                            message: format!(
+                                "Agent paused (mode: {:?})",
+                                info.pause_mode.unwrap_or(descartes_core::PauseMode::Cooperative)
+                            ),
+                            context: None,
+                        });
+                    }
+
+                    entries
+                }
+                Ok(None) => {
+                    // Agent not found in runner, use fallback
+                    vec![LogEntry {
+                        timestamp: Utc::now(),
+                        level: "info".to_string(),
+                        message: "Agent state unavailable".to_string(),
+                        context: None,
+                    }]
+                }
+                Err(e) => {
+                    // Error fetching, use fallback with error info
+                    vec![LogEntry {
+                        timestamp: Utc::now(),
+                        level: "warn".to_string(),
+                        message: format!("Failed to fetch agent logs: {}", e),
+                        context: None,
+                    }]
+                }
+            }
+        } else {
+            // No runner, use placeholder logs
+            vec![LogEntry {
+                timestamp: Utc::now(),
+                level: "info".to_string(),
+                message: "Agent started (no runner attached)".to_string(),
+                context: None,
+            }]
+        };
+
+        // Apply limit and offset if specified
+        let total = logs.len();
+        let offset = request.offset.unwrap_or(0);
+        let limit = request.limit.unwrap_or(logs.len());
+        let filtered_logs: Vec<LogEntry> = logs.into_iter().skip(offset).take(limit).collect();
 
         let response = AgentLogsResponse {
             agent_id: request.agent_id,
-            logs: logs.clone(),
-            total: logs.len(),
+            logs: filtered_logs,
+            total,
         };
 
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     /// Handle workflow.execute RPC method
@@ -157,8 +275,8 @@ impl RpcHandlers {
             created_at: Utc::now(),
         };
 
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     /// Handle state.query RPC method
@@ -177,16 +295,97 @@ impl RpcHandlers {
                 .ok_or_else(|| DaemonError::AgentNotFound(agent_id.clone()))?;
         }
 
-        // TODO: Fetch actual state from state store
-        let state = std::collections::HashMap::new();
+        // Fetch state from state store if available
+        let state = if let Some(ref state_store) = self.state_store {
+            let store = state_store.read().await;
+
+            if let Some(agent_id) = &request.agent_id {
+                // Get state for specific agent
+                match store.load_agent_state(agent_id).await {
+                    Ok(Some(agent_state)) => {
+                        let mut state_map = std::collections::HashMap::new();
+
+                        // Convert agent state to key-value map
+                        state_map.insert("name".to_string(), serde_json::json!(agent_state.name));
+                        state_map
+                            .insert("status".to_string(), serde_json::json!(agent_state.status));
+                        state_map.insert(
+                            "updated_at".to_string(),
+                            serde_json::json!(agent_state.updated_at),
+                        );
+                        state_map.insert("metadata".to_string(), agent_state.metadata);
+
+                        // If specific key requested, filter to just that key
+                        if let Some(key) = &request.key {
+                            if let Some(value) = state_map.get(key) {
+                                let mut filtered = std::collections::HashMap::new();
+                                filtered.insert(key.clone(), value.clone());
+                                filtered
+                            } else {
+                                state_map
+                            }
+                        } else {
+                            state_map
+                        }
+                    }
+                    Ok(None) => {
+                        // No state found for agent
+                        let mut state_map = std::collections::HashMap::new();
+                        state_map.insert(
+                            "info".to_string(),
+                            serde_json::json!("No state stored for agent"),
+                        );
+                        state_map
+                    }
+                    Err(e) => {
+                        // Error fetching state
+                        let mut state_map = std::collections::HashMap::new();
+                        state_map.insert(
+                            "error".to_string(),
+                            serde_json::json!(format!("Failed to fetch state: {}", e)),
+                        );
+                        state_map
+                    }
+                }
+            } else {
+                // List all agents' states
+                match store.list_agents().await {
+                    Ok(agents) => {
+                        let mut state_map = std::collections::HashMap::new();
+                        for agent_state in agents {
+                            state_map.insert(
+                                agent_state.agent_id.clone(),
+                                serde_json::json!({
+                                    "name": agent_state.name,
+                                    "status": agent_state.status,
+                                    "updated_at": agent_state.updated_at
+                                }),
+                            );
+                        }
+                        state_map
+                    }
+                    Err(e) => {
+                        let mut state_map = std::collections::HashMap::new();
+                        state_map.insert(
+                            "error".to_string(),
+                            serde_json::json!(format!("Failed to list states: {}", e)),
+                        );
+                        state_map
+                    }
+                }
+            }
+        } else {
+            // No state store, return empty
+            std::collections::HashMap::new()
+        };
 
         let response = StateQueryResponse {
-            state: state,
+            state,
             timestamp: Utc::now(),
         };
 
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     /// Get agent by ID

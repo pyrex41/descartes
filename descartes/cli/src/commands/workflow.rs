@@ -292,14 +292,12 @@ async fn execute_implement(plan: &str, dir: Option<PathBuf>, _adapter: Option<&s
         println!("  Available plans in {}:", thoughts_dir.display());
 
         if thoughts_dir.exists() {
-            for entry in std::fs::read_dir(&thoughts_dir)? {
-                if let Ok(entry) = entry {
-                    if entry.path().extension().map_or(false, |e| e == "md") {
-                        println!(
-                            "    - {}",
-                            entry.file_name().to_string_lossy().green()
-                        );
-                    }
+            for entry in (std::fs::read_dir(&thoughts_dir)?).flatten() {
+                if entry.path().extension().is_some_and(|e| e == "md") {
+                    println!(
+                        "    - {}",
+                        entry.file_name().to_string_lossy().green()
+                    );
                 }
             }
         } else {
@@ -363,23 +361,6 @@ async fn execute_info(name: &str) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn truncate_task(task: &str, max_len: usize) -> String {
-    if task.len() <= max_len {
-        task.to_string()
-    } else {
-        format!("{}...", &task[..max_len - 3])
-    }
-}
-
-fn get_tool_level_for_agent(agent: &str) -> &'static str {
-    match agent {
-        "codebase-locator" | "codebase-analyzer" | "codebase-pattern-finder" => "readonly",
-        "researcher" => "researcher",
-        "planner" => "planner",
-        _ => "minimal",
-    }
 }
 
 /// Create a model backend for the given provider

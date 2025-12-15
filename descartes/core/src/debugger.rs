@@ -13,6 +13,7 @@
 //! - History navigation and replay
 //! - Integration with agent state machine
 
+use crate::expression_eval::{EvalContext, ExpressionEvaluator};
 use crate::state_machine::WorkflowState;
 use crate::thoughts::ThoughtMetadata;
 use serde::{Deserialize, Serialize};
@@ -485,10 +486,21 @@ impl Breakpoint {
             return false;
         }
 
-        // TODO: Evaluate condition if present
-        // For now, conditions are not evaluated
-        if self.condition.is_some() {
-            // Would need an expression evaluator here
+        // Evaluate condition if present using expression evaluator
+        if let Some(ref condition) = self.condition {
+            let eval_context = build_eval_context(context);
+            let evaluator = ExpressionEvaluator::new();
+            match evaluator.evaluate_bool(condition, &eval_context) {
+                Ok(result) => {
+                    if !result {
+                        return false;
+                    }
+                }
+                Err(_) => {
+                    // Condition evaluation failed - don't trigger
+                    return false;
+                }
+            }
         }
 
         // Increment hit count and trigger
@@ -634,7 +646,7 @@ impl DebuggerState {
         for bp in &mut self.breakpoints {
             if bp.should_trigger(&self.current_context) {
                 self.statistics.breakpoints_hit += 1;
-                triggered_id = Some(bp.id.clone());
+                triggered_id = Some(bp.id);
                 break;
             }
         }
@@ -925,6 +937,7 @@ impl DebuggerState {
 // ============================================================================
 
 /// Debugger controller for managing agent execution and debugging operations
+#[allow(clippy::type_complexity)]
 pub struct Debugger {
     /// The current debugger state
     state: DebuggerState,
@@ -1358,15 +1371,19 @@ impl Debugger {
             }),
 
             DebugCommand::Evaluate { expression } => {
-                // TODO: Implement expression evaluation
-                // For now, return a placeholder
-                Ok(CommandResult::EvaluationResult {
-                    expression: expression.clone(),
-                    result: serde_json::json!({
-                        "error": "Expression evaluation not yet implemented",
-                        "expression": expression
+                match self.evaluate_expression(&expression) {
+                    Ok(result) => Ok(CommandResult::EvaluationResult {
+                        expression,
+                        result,
                     }),
-                })
+                    Err(e) => Ok(CommandResult::EvaluationResult {
+                        expression: expression.clone(),
+                        result: serde_json::json!({
+                            "error": e.to_string(),
+                            "expression": expression
+                        }),
+                    }),
+                }
             }
 
             DebugCommand::GotoHistory { index } => {
@@ -1407,6 +1424,79 @@ impl Debugger {
     pub fn agent_id(&self) -> Uuid {
         self.state.current_context.agent_id
     }
+
+    /// Evaluate an expression in the current debug context
+    pub fn evaluate_expression(&self, expression: &str) -> DebuggerResult<serde_json::Value> {
+        let eval_context = build_eval_context(&self.state.current_context);
+        let evaluator = ExpressionEvaluator::new();
+        evaluator
+            .evaluate(expression, &eval_context)
+            .map_err(|e| DebuggerError::ConditionEvaluationFailed(e.to_string()))
+    }
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/// Build an EvalContext from a DebugContext for expression evaluation
+fn build_eval_context(context: &DebugContext) -> EvalContext {
+    let mut eval_context = EvalContext::new();
+
+    // Add simple variables from local scope
+    for (name, value) in &context.local_variables {
+        eval_context = eval_context.with_variable(name, value.clone());
+    }
+
+    // Add common context values as variables
+    eval_context = eval_context
+        .with_variable("step", serde_json::json!(context.current_step))
+        .with_variable("stack_depth", serde_json::json!(context.stack_depth))
+        .with_variable(
+            "workflow_state",
+            serde_json::json!(context.workflow_state.to_string()),
+        )
+        .with_variable("agent_id", serde_json::json!(context.agent_id.to_string()));
+
+    // Build nested context object
+    let context_obj = serde_json::json!({
+        "agent_id": context.agent_id.to_string(),
+        "workflow_state": context.workflow_state.to_string(),
+        "stack_depth": context.stack_depth,
+        "current_step": context.current_step,
+        "variables": context.local_variables,
+        "metadata": context.metadata,
+    });
+    eval_context = eval_context.with_nested("context", context_obj);
+
+    // Add last thought if available
+    if let Some(ref thought) = context.last_thought {
+        let thought_obj = serde_json::json!({
+            "thought_id": thought.thought_id,
+            "content": thought.content,
+            "step_number": thought.step_number,
+            "tags": thought.tags,
+        });
+        eval_context = eval_context.with_nested("thought", thought_obj);
+    }
+
+    // Add current frame if available
+    if let Some(frame) = context.current_frame() {
+        let frame_obj = serde_json::json!({
+            "name": frame.name,
+            "workflow_state": frame.workflow_state.to_string(),
+            "entry_step": frame.entry_step,
+            "variables": frame.local_variables,
+        });
+        eval_context = eval_context.with_nested("frame", frame_obj);
+
+        // Also add frame variables directly for convenience
+        for (name, value) in &frame.local_variables {
+            eval_context.variables.insert(name.clone(), value.clone());
+        }
+    }
+
+    eval_context
 }
 
 // ============================================================================
@@ -1416,6 +1506,7 @@ impl Debugger {
 /// Result of executing a debug command
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum CommandResult {
     /// Command completed successfully
     Success { message: String },

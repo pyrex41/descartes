@@ -491,14 +491,13 @@ impl BodyRestoreManager for GitBodyRestoreManager {
         );
 
         // Step 1: Verify commit exists
-        if options.verify_commit {
-            if !self.verify_commit_exists(commit_hash).await? {
+        if options.verify_commit
+            && !self.verify_commit_exists(commit_hash).await? {
                 return Err(StateStoreError::NotFound(format!(
                     "Commit does not exist: {}",
                     commit_hash
                 )));
             }
-        }
 
         // Step 2: Create backup
         let backup = if options.create_backup {

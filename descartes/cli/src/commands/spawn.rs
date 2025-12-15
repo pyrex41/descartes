@@ -33,6 +33,7 @@ fn parse_tool_level(level: &str, no_spawn: bool) -> ToolLevel {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn execute(
     config: &DescaratesConfig,
     task: &str,

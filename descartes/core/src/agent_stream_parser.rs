@@ -446,7 +446,7 @@ impl AgentStreamParser {
         if let Some(agent) = self.agents.get_mut(&agent_id) {
             agent
                 .transition_to(status, Some("Status update from stream".to_string()))
-                .map_err(|e| StreamParseError::StateTransitionError(e))?;
+                .map_err(StreamParseError::StateTransitionError)?;
 
             // Clear thought if transitioning out of Thinking state
             if agent.status != AgentStatus::Thinking {

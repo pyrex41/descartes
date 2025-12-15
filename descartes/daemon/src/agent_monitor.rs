@@ -258,7 +258,7 @@ impl AgentMonitor {
     /// Process an agent stream message directly
     pub async fn process_stream_message(&self, message: AgentStreamMessage) -> StreamResult<()> {
         let json = serde_json::to_string(&message)
-            .map_err(|e| descartes_core::agent_stream_parser::StreamParseError::JsonError(e))?;
+            .map_err(descartes_core::agent_stream_parser::StreamParseError::JsonError)?;
         self.process_message(&json).await
     }
 
@@ -269,8 +269,8 @@ impl AgentMonitor {
 
         for (agent_id, agent_state) in parser_agents {
             // Check if this is a new agent
-            if !agents.contains_key(agent_id) {
-                if self.config.auto_discover {
+            if !agents.contains_key(agent_id)
+                && self.config.auto_discover {
                     info!("Discovered new agent: {} ({})", agent_state.name, agent_id);
 
                     let mut stats = self.stats.write().await;
@@ -288,7 +288,6 @@ impl AgentMonitor {
                     );
                     self.event_bus.publish(event).await;
                 }
-            }
 
             // Update our tracking
             agents.insert(*agent_id, agent_state.clone());

@@ -30,7 +30,7 @@ impl ConfigMigration {
         }
 
         // Execute migrations in sequence
-        for version in (from_major..to_major).into_iter() {
+        for version in from_major..to_major {
             config = Self::migrate_to_version(config, version)?;
         }
 

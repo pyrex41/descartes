@@ -635,6 +635,23 @@ impl AgentRunner for LocalProcessRunner {
             )))
         }
     }
+
+    async fn get_agent_pid(&self, agent_id: &Uuid) -> AgentResult<Option<u32>> {
+        if let Some(handle) = self.agents.get(agent_id) {
+            let child = {
+                let handle_guard = handle.read();
+                Arc::clone(&handle_guard.child)
+            };
+
+            let child_guard = child.lock().await;
+            Ok(child_guard.id())
+        } else {
+            Err(AgentError::NotFound(format!(
+                "Agent not found: {}",
+                agent_id
+            )))
+        }
+    }
 }
 
 /// LocalAgentHandle manages a single spawned agent process.
@@ -692,8 +709,8 @@ impl LocalAgentHandle {
         let stderr_reader = BufReader::new(stderr);
 
         // Spawn background tasks to read stdout/stderr (also broadcasts)
-        Self::spawn_stdout_reader(stdout_reader.into(), stdout_tx.clone(), stdout_broadcast.clone());
-        Self::spawn_stderr_reader(stderr_reader.into(), stderr_tx.clone(), stderr_broadcast.clone());
+        Self::spawn_stdout_reader(stdout_reader, stdout_tx.clone(), stdout_broadcast.clone());
+        Self::spawn_stderr_reader(stderr_reader, stderr_tx.clone(), stderr_broadcast.clone());
 
         Self {
             info,

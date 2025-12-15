@@ -29,7 +29,7 @@ pub async fn execute(
     }
 
     if let Some(etype) = event_type {
-        query.push_str(&format!(" AND event_type = ?"));
+        query.push_str(" AND event_type = ?");
         params.push(etype.to_string());
     }
 
@@ -69,7 +69,7 @@ async fn print_logs(
 
     match format {
         "json" => print_logs_json(&rows)?,
-        "text" | _ => print_logs_text(&rows)?,
+        _ => print_logs_text(&rows)?,
     }
 
     Ok(())
@@ -98,7 +98,7 @@ async fn follow_logs(
         if !rows.is_empty() {
             match format {
                 "json" => print_logs_json(&rows)?,
-                "text" | _ => print_logs_text(&rows)?,
+                _ => print_logs_text(&rows)?,
             }
 
             // Update last timestamp

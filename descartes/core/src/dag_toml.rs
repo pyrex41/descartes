@@ -215,7 +215,7 @@ impl TomlDAG {
         let mut toml_edges = Vec::new();
 
         // Convert nodes
-        for (_, node) in &dag.nodes {
+        for node in dag.nodes.values() {
             let toml_node = TomlDAGNode {
                 node_id: node.node_id.to_string(),
                 task_id: node.task_id.map(|id| id.to_string()),
@@ -237,7 +237,7 @@ impl TomlDAG {
         }
 
         // Convert edges
-        for (_, edge) in &dag.edges {
+        for edge in dag.edges.values() {
             let toml_edge = TomlDAGEdge {
                 edge_id: Some(edge.edge_id.to_string()),
                 from: edge.from_node_id.to_string(),

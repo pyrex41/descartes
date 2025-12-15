@@ -77,7 +77,7 @@ impl EventClient {
     }
 
     /// Create a new event client with default configuration
-    pub fn default() -> (Self, mpsc::UnboundedReceiver<DescartesEvent>) {
+    pub fn with_defaults() -> (Self, mpsc::UnboundedReceiver<DescartesEvent>) {
         Self::new(EventClientConfig::default())
     }
 
@@ -323,7 +323,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_initial_state() {
-        let (client, _rx) = EventClient::default();
+        let (client, _rx) = EventClient::with_defaults();
         assert_eq!(client.state().await, EventClientState::Disconnected);
         assert_eq!(client.subscription_id().await, None);
     }

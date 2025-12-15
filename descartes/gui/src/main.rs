@@ -211,7 +211,7 @@ impl DescartesGui {
                         self.rpc_client = Some(Arc::clone(&client));
 
                         // Create event handler
-                        let event_handler = EventHandler::default();
+                        let event_handler = EventHandler::with_defaults();
                         self.event_handler =
                             Some(Arc::new(tokio::sync::RwLock::new(event_handler)));
 
@@ -430,7 +430,7 @@ impl DescartesGui {
 
                         // Update state first (this enables the ZMQ subscription)
                         chat_state::update(&mut self.chat_state, ChatMsg::SessionCreated {
-                            session_id: session_id.clone(),
+                            session_id: *session_id,
                             pub_endpoint: pub_endpoint.clone(),
                             pending_prompt: pending_prompt.clone(),
                         });
@@ -1168,10 +1168,10 @@ impl DescartesGui {
             (ViewMode::Sessions, "\u{25C6}", "Sessions"),    // ◆
             (ViewMode::Dashboard, "\u{2302}", "Dashboard"),  // ⌂
             (ViewMode::Chat, "\u{2709}", "Chat"),            // ✉
-            (ViewMode::TaskBoard, "\u{2630}", "Tasks"),      // ☰
+            // TaskBoard removed - not connected to agent system
             (ViewMode::SwarmMonitor, "\u{25CE}", "Agents"),  // ◎
             (ViewMode::Debugger, "\u{23F1}", "Debugger"),    // ⏱
-            (ViewMode::DagEditor, "\u{25C7}", "Workflows"),  // ◇
+            // DagEditor removed - no workflow executor implemented
         ];
 
         let buttons: Vec<Element<Message>> = nav_items

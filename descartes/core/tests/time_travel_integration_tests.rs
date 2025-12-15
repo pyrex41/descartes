@@ -201,6 +201,7 @@ async fn test_can_rewind_to() {
         snapshot_id: None,
         description: "Test point".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let confirmation = manager.can_rewind_to(&point).await;
@@ -251,6 +252,7 @@ async fn test_rewind_to_point() {
         snapshot_id: None,
         description: "Rewind to commit 1".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig {
@@ -295,6 +297,7 @@ async fn test_rewind_with_validation() {
         snapshot_id: None,
         description: "Test".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig {
@@ -330,6 +333,7 @@ async fn test_rewind_creates_backup() {
         snapshot_id: None,
         description: "Test".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig {
@@ -384,6 +388,7 @@ async fn test_undo_rewind() {
         snapshot_id: None,
         description: "Rewind".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -429,6 +434,7 @@ async fn test_resume_context_creation() {
         snapshot_id: None,
         description: "Test".to_string(),
         event_index: Some(1),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -461,6 +467,7 @@ async fn test_resume_from_context() {
         snapshot_id: None,
         description: "Test".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -545,6 +552,7 @@ async fn test_rewind_to_nonexistent_commit() {
         snapshot_id: None,
         description: "Invalid commit".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -658,6 +666,7 @@ async fn test_rewind_to_first_event() {
         snapshot_id: None,
         description: "First event".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -714,6 +723,7 @@ async fn test_multiple_rewinds_in_sequence() {
         snapshot_id: None,
         description: "Rewind to commit 1".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let result1 = manager.rewind_to(point1, RewindConfig::fast()).await;
@@ -729,6 +739,7 @@ async fn test_multiple_rewinds_in_sequence() {
         snapshot_id: None,
         description: "Rewind to commit 2".to_string(),
         event_index: Some(3),
+        agent_id: None,
     };
 
     let result2 = manager.rewind_to(point2, RewindConfig::fast()).await;
@@ -746,6 +757,7 @@ async fn test_multiple_rewinds_in_sequence() {
                 snapshot_id: None,
                 description: "Back to commit 1".to_string(),
                 event_index: Some(0),
+                agent_id: None,
             },
             RewindConfig::fast(),
         )
@@ -785,6 +797,7 @@ async fn test_complete_rewind_resume_cycle() {
         snapshot_id: None,
         description: "Middle point".to_string(),
         event_index: Some(1),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -863,6 +876,7 @@ async fn test_rewind_with_no_git_commit() {
         snapshot_id: None,
         description: "Timestamp-only rewind".to_string(),
         event_index: Some(0),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -935,6 +949,7 @@ async fn test_performance_large_event_history() {
         snapshot_id: None,
         description: "Middle of large history".to_string(),
         event_index: Some(500),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -1010,6 +1025,7 @@ async fn test_performance_many_git_commits() {
         snapshot_id: None,
         description: "Commit 25".to_string(),
         event_index: Some(25),
+        agent_id: None,
     };
 
     let config = RewindConfig::fast();
@@ -1110,6 +1126,7 @@ async fn test_performance_undo_history() {
             snapshot_id: None,
             description: format!("Rewind {}", i),
             event_index: Some(commit_idx),
+            agent_id: None,
         };
 
         let result = manager

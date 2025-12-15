@@ -402,8 +402,8 @@ async fn test_provider_config_structure() {
 async fn test_default_primary_provider() {
     let config = DescaratesConfig::default();
 
-    // Default primary provider should be anthropic
-    assert_eq!(config.providers.primary, "anthropic");
+    // Default primary provider should be grok
+    assert_eq!(config.providers.primary, "grok");
 }
 
 #[tokio::test]

@@ -38,8 +38,7 @@ impl StateStore for SimpleStateStore {
         let metadata_json = event
             .metadata
             .as_ref()
-            .map(|m| serde_json::to_string(m).ok())
-            .flatten();
+            .and_then(|m| serde_json::to_string(m).ok());
 
         sqlx::query(
             r#"
@@ -101,8 +100,7 @@ impl StateStore for SimpleStateStore {
         let metadata_json = task
             .metadata
             .as_ref()
-            .map(|m| serde_json::to_string(m).ok())
-            .flatten();
+            .and_then(|m| serde_json::to_string(m).ok());
 
         sqlx::query(
             r#"

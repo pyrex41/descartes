@@ -137,6 +137,7 @@ pub struct UIState {
 
 /// Interaction state (dragging, selecting)
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct InteractionState {
     /// Selected node IDs
     pub selected_nodes: HashSet<Uuid>,
@@ -336,18 +337,6 @@ impl Default for UIState {
     }
 }
 
-impl Default for InteractionState {
-    fn default() -> Self {
-        Self {
-            selected_nodes: HashSet::new(),
-            selected_edges: HashSet::new(),
-            hover_node: None,
-            hover_edge: None,
-            drag_state: None,
-            pan_state: None,
-        }
-    }
-}
 
 // ============================================================================
 // Update Logic
@@ -481,7 +470,7 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
         DAGEditorMessage::AddNode(position) => {
             let node_count = state.dag.nodes.len();
             let node = DAGNode::new_auto(format!("Task {}", node_count + 1))
-                .with_position(position.x as f64, position.y as f64);
+                .with_position(position.x, position.y);
 
             let node_data = node.clone();
             if state.dag.add_node(node).is_ok() {
@@ -569,7 +558,7 @@ pub fn update(state: &mut DAGEditorState, message: DAGEditorMessage) {
 
             let zoom_x = state.canvas_state.bounds.width / width;
             let zoom_y = state.canvas_state.bounds.height / height;
-            state.canvas_state.zoom = zoom_x.min(zoom_y).min(MAX_ZOOM).max(MIN_ZOOM);
+            state.canvas_state.zoom = zoom_x.min(zoom_y).clamp(MIN_ZOOM, MAX_ZOOM);
 
             let center_x = (min_x + max_x) / 2.0;
             let center_y = (min_y + max_y) / 2.0;
@@ -1010,7 +999,7 @@ fn draw_node(
 
     // Draw node label (only if zoom level is reasonable)
     if canvas_state.zoom > 0.3 {
-        let font_size = (14.0 * canvas_state.zoom).max(8.0).min(24.0);
+        let font_size = (14.0 * canvas_state.zoom).clamp(8.0, 24.0);
         let label_text = Text {
             content: node.label.clone(),
             position: Point::new(x + width / 2.0, y + height / 2.0),

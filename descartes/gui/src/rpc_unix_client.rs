@@ -26,7 +26,7 @@ impl GuiUnixRpcClient {
     }
 
     /// Create a new client with default socket path (/tmp/descartes-rpc.sock)
-    pub fn default() -> Result<Self, DaemonError> {
+    pub fn with_defaults() -> Result<Self, DaemonError> {
         Self::new(PathBuf::from("/tmp/descartes-rpc.sock"))
     }
 
@@ -122,7 +122,7 @@ impl Clone for GuiUnixRpcClient {
 ///     type Theme = iced::Theme;
 ///
 ///     fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>) {
-///         let rpc = GuiUnixRpcClient::default().unwrap();
+///         let rpc = GuiUnixRpcClient::with_defaults().unwrap();
 ///         (
 ///             DescartesApp {
 ///                 rpc,
@@ -226,19 +226,19 @@ mod tests {
 
     #[test]
     fn test_default_client() {
-        let client = GuiUnixRpcClient::default();
+        let client = GuiUnixRpcClient::with_defaults();
         assert!(client.is_ok());
     }
 
     #[tokio::test]
     async fn test_initial_not_connected() {
-        let client = GuiUnixRpcClient::default().unwrap();
+        let client = GuiUnixRpcClient::with_defaults().unwrap();
         assert!(!client.is_connected().await);
     }
 
     #[tokio::test]
     async fn test_clone() {
-        let client = GuiUnixRpcClient::default().unwrap();
+        let client = GuiUnixRpcClient::with_defaults().unwrap();
         let client2 = client.clone();
         assert!(!client2.is_connected().await);
     }

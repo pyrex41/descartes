@@ -198,7 +198,7 @@ impl TranscriptWriter {
 pub fn default_sessions_dir() -> PathBuf {
     // Use .scud/sessions in current directory, or ~/.descartes/sessions
     let scud_sessions = PathBuf::from(".scud/sessions");
-    if scud_sessions.parent().map_or(false, |p| p.exists()) {
+    if scud_sessions.parent().is_some_and(|p| p.exists()) {
         scud_sessions
     } else {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());

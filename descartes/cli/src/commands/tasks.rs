@@ -153,7 +153,7 @@ async fn list_tasks(
     match format {
         "json" => print_tasks_json(&filtered)?,
         "scg" => print_tasks_scg(&filtered)?,
-        "table" | _ => print_tasks_table(&filtered)?,
+        _ => print_tasks_table(&filtered)?,
     }
 
     Ok(())
@@ -293,21 +293,13 @@ async fn show_task(storage: &Arc<ScgTaskStorage>, id: &str, format: &str) -> Res
                     });
                     println!("{}", serde_json::to_string_pretty(&json_task)?);
                 }
-                "text" | _ => {
+                _ => {
                     println!("\n{}", "Task Details".green().bold());
                     println!("{}", "─".repeat(60).dimmed());
                     println!("{:<15} {}", "ID:".bold(), t.id.to_string().cyan());
                     println!("{:<15} {}", "Title:".bold(), t.title);
-                    println!(
-                        "{:<15} {}",
-                        "Status:".bold(),
-                        format!("{:?}", t.status)
-                    );
-                    println!(
-                        "{:<15} {}",
-                        "Priority:".bold(),
-                        format!("{:?}", t.priority)
-                    );
+                    println!("{:<15} {:?}", "Status:".bold(), t.status);
+                    println!("{:<15} {:?}", "Priority:".bold(), t.priority);
                     println!("{:<15} {}", "Complexity:".bold(), complexity);
 
                     if let Some(desc) = &t.description {
@@ -349,11 +341,7 @@ async fn next_task(storage: &Arc<ScgTaskStorage>, id_only: bool) -> Result<()> {
                 println!("{}", "─".repeat(60).dimmed());
                 println!("{:<15} {}", "ID:".bold(), task.id.to_string().cyan());
                 println!("{:<15} {}", "Title:".bold(), task.title);
-                println!(
-                    "{:<15} {}",
-                    "Priority:".bold(),
-                    format!("{:?}", task.priority)
-                );
+                println!("{:<15} {:?}", "Priority:".bold(), task.priority);
                 let complexity: u32 = task.complexity.into();
                 println!("{:<15} {}", "Complexity:".bold(), complexity);
 
@@ -410,7 +398,7 @@ async fn show_stats(storage: &Arc<ScgTaskStorage>, format: &str) -> Result<()> {
                         });
                         println!("{}", serde_json::to_string_pretty(&json_stats)?);
                     }
-                    "text" | _ => {
+                    _ => {
                         let completion = if stats.total > 0 {
                             (stats.done as f64 / stats.total as f64 * 100.0).round() as usize
                         } else {
@@ -517,7 +505,7 @@ async fn list_phases(storage: &Arc<ScgTaskStorage>, format: &str) -> Result<()> 
                 .collect();
             println!("{}", serde_json::to_string_pretty(&json_phases)?);
         }
-        "table" | _ => {
+        _ => {
             println!("\n{}", "Available Phases".green().bold());
             println!("{}", "─".repeat(60).dimmed());
 

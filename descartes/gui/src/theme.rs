@@ -1,11 +1,11 @@
-/// Space-age hacker theme for Descartes GUI
-///
-/// Features:
-/// - Deep space black with cyan/green terminal accents
-/// - JetBrains Mono monospace font throughout
-/// - Neon glow effects on interactive elements
-/// - Matrix-inspired color scheme
-/// - Sharp edges, minimal border radius
+// Space-age hacker theme for Descartes GUI
+//
+// Features:
+// - Deep space black with cyan/green terminal accents
+// - JetBrains Mono monospace font throughout
+// - Neon glow effects on interactive elements
+// - Matrix-inspired color scheme
+// - Sharp edges, minimal border radius
 
 use iced::Theme;
 use iced::theme::Palette;

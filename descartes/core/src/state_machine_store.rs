@@ -165,8 +165,7 @@ impl SqliteWorkflowStore {
     /// Save or update a workflow state
     pub async fn save_workflow(&self, workflow: &WorkflowStateMachine) -> Result<(), sqlx::Error> {
         let serialized = workflow.serialize().await.map_err(|e| {
-            sqlx::Error::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            sqlx::Error::Io(std::io::Error::other(
                 e.to_string(),
             ))
         })?;

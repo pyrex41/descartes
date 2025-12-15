@@ -1,16 +1,20 @@
 /// Model provider implementations for API, Headless, and Local modes.
 use crate::errors::{AgentResult, ProviderError, ProviderResult};
-use crate::traits::{
-    FinishReason, ModelBackend, ModelProviderMode, ModelRequest,
-    ModelResponse,
-};
+use crate::traits::{FinishReason, ModelBackend, ModelProviderMode, ModelRequest, ModelResponse};
+use async_stream::try_stream;
 use async_trait::async_trait;
+use futures::stream::BoxStream;
+use futures::StreamExt;
 use serde_json::json;
 use std::collections::HashMap;
 
-/// ============================================================================
-/// API MODE: Direct HTTP clients for OpenAI, Anthropic, DeepSeek, Groq
-/// ============================================================================
+/// Type alias for the streaming response
+pub type StreamingResponse =
+    BoxStream<'static, AgentResult<ModelResponse>>;
+
+// ============================================================================
+// API MODE: Direct HTTP clients for OpenAI, Anthropic, DeepSeek, Groq
+// ============================================================================
 
 /// OpenAI provider using HTTP API.
 pub struct OpenAiProvider {
@@ -54,7 +58,7 @@ impl ModelBackend for OpenAiProvider {
         if let Some(client) = &self.client {
             if let ModelProviderMode::Api { endpoint, api_key } = &self._mode {
                 let resp = client
-                    .get(&format!("{}/models", endpoint))
+                    .get(format!("{}/models", endpoint))
                     .bearer_auth(api_key)
                     .send()
                     .await;
@@ -82,12 +86,12 @@ impl ModelBackend for OpenAiProvider {
             });
 
             let response = client
-                .post(&format!("{}/chat/completions", endpoint))
+                .post(format!("{}/chat/completions", endpoint))
                 .bearer_auth(api_key)
                 .json(&payload)
                 .send()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             if !response.status().is_success() {
                 return Err(ProviderError::ApiError(format!(
@@ -100,7 +104,7 @@ impl ModelBackend for OpenAiProvider {
             let body = response
                 .json::<serde_json::Value>()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             let content = body
                 .get("choices")
@@ -124,10 +128,97 @@ impl ModelBackend for OpenAiProvider {
 
     async fn stream(
         &self,
-        _request: ModelRequest,
+        request: ModelRequest,
     ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<ModelResponse>> + Unpin + Send>>
     {
-        Err(ProviderError::UnsupportedFeature("Streaming not yet implemented".to_string()).into())
+        let client = self
+            .client
+            .clone()
+            .ok_or_else(|| ProviderError::BackendError("Client not initialized".to_string()))?;
+
+        let (endpoint, api_key) = if let ModelProviderMode::Api { endpoint, api_key } = &self._mode
+        {
+            (endpoint.clone(), api_key.clone())
+        } else {
+            return Err(
+                ProviderError::BackendError("Invalid mode for OpenAI provider".to_string()).into(),
+            );
+        };
+
+        let payload = json!({
+            "model": request.model,
+            "messages": request.messages,
+            "max_tokens": request.max_tokens.unwrap_or(2048),
+            "temperature": request.temperature.unwrap_or(0.7),
+            "stream": true,
+        });
+
+        let stream = try_stream! {
+            let response = client
+                .post(format!("{}/chat/completions", endpoint))
+                .bearer_auth(&api_key)
+                .json(&payload)
+                .send()
+                .await
+                .map_err(ProviderError::ReqwestError)?;
+
+            if !response.status().is_success() {
+                Err(ProviderError::ApiError(format!(
+                    "API request failed with status {}",
+                    response.status()
+                )))?;
+            }
+
+            let mut byte_stream = response.bytes_stream();
+            let mut buffer = String::new();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                let chunk = chunk_result.map_err(ProviderError::ReqwestError)?;
+                let chunk_str = String::from_utf8_lossy(&chunk);
+                buffer.push_str(&chunk_str);
+
+                // Parse SSE lines
+                while let Some(line_end) = buffer.find('\n') {
+                    let line = buffer[..line_end].trim().to_string();
+                    buffer = buffer[line_end + 1..].to_string();
+
+                    if line.is_empty() || !line.starts_with("data: ") {
+                        continue;
+                    }
+
+                    let data = &line[6..]; // Skip "data: "
+
+                    if data == "[DONE]" {
+                        yield ModelResponse {
+                            content: String::new(),
+                            finish_reason: FinishReason::Stop,
+                            tokens_used: None,
+                            tool_calls: None,
+                        };
+                        return;
+                    }
+
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        if let Some(content) = json
+                            .get("choices")
+                            .and_then(|c| c.get(0))
+                            .and_then(|c| c.get("delta"))
+                            .and_then(|d| d.get("content"))
+                            .and_then(|c| c.as_str())
+                        {
+                            yield ModelResponse {
+                                content: content.to_string(),
+                                finish_reason: FinishReason::Streaming,
+                                tokens_used: None,
+                                tool_calls: None,
+                            };
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(Box::new(Box::pin(stream)))
     }
 
     async fn list_models(&self) -> AgentResult<Vec<String>> {
@@ -136,7 +227,7 @@ impl ModelBackend for OpenAiProvider {
 
     async fn estimate_tokens(&self, text: &str) -> AgentResult<usize> {
         // Simple heuristic: ~4 chars per token
-        Ok((text.len() + 3) / 4)
+        Ok(text.len().div_ceil(4))
     }
 
     async fn shutdown(&mut self) -> AgentResult<()> {
@@ -203,13 +294,13 @@ impl ModelBackend for AnthropicProvider {
             });
 
             let response = client
-                .post(&format!("{}/messages", endpoint))
+                .post(format!("{}/messages", endpoint))
                 .header("x-api-key", api_key)
                 .header("anthropic-version", "2023-06-01")
                 .json(&payload)
                 .send()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             if !response.status().is_success() {
                 return Err(ProviderError::ApiError(format!(
@@ -222,7 +313,7 @@ impl ModelBackend for AnthropicProvider {
             let body = response
                 .json::<serde_json::Value>()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             let content = body
                 .get("content")
@@ -248,10 +339,108 @@ impl ModelBackend for AnthropicProvider {
 
     async fn stream(
         &self,
-        _request: ModelRequest,
+        request: ModelRequest,
     ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<ModelResponse>> + Unpin + Send>>
     {
-        Err(ProviderError::UnsupportedFeature("Streaming not yet implemented".to_string()).into())
+        let client = self
+            .client
+            .clone()
+            .ok_or_else(|| ProviderError::BackendError("Client not initialized".to_string()))?;
+
+        let (endpoint, api_key) = if let ModelProviderMode::Api { endpoint, api_key } = &self._mode
+        {
+            (endpoint.clone(), api_key.clone())
+        } else {
+            return Err(
+                ProviderError::BackendError("Invalid mode for Anthropic provider".to_string())
+                    .into(),
+            );
+        };
+
+        let payload = json!({
+            "model": request.model,
+            "max_tokens": request.max_tokens.unwrap_or(2048),
+            "messages": request.messages,
+            "system": request.system_prompt.unwrap_or_default(),
+            "stream": true,
+        });
+
+        let stream = try_stream! {
+            let response = client
+                .post(format!("{}/messages", endpoint))
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", "2023-06-01")
+                .json(&payload)
+                .send()
+                .await
+                .map_err(ProviderError::ReqwestError)?;
+
+            if !response.status().is_success() {
+                Err(ProviderError::ApiError(format!(
+                    "API request failed with status {}",
+                    response.status()
+                )))?;
+            }
+
+            let mut byte_stream = response.bytes_stream();
+            let mut buffer = String::new();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                let chunk = chunk_result.map_err(ProviderError::ReqwestError)?;
+                let chunk_str = String::from_utf8_lossy(&chunk);
+                buffer.push_str(&chunk_str);
+
+                // Parse SSE lines (Anthropic format)
+                while let Some(line_end) = buffer.find('\n') {
+                    let line = buffer[..line_end].trim().to_string();
+                    buffer = buffer[line_end + 1..].to_string();
+
+                    // Anthropic uses "event: " and "data: " lines
+                    if line.is_empty() || line.starts_with("event:") {
+                        continue;
+                    }
+
+                    if !line.starts_with("data: ") {
+                        continue;
+                    }
+
+                    let data = &line[6..]; // Skip "data: "
+
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        let event_type = json.get("type").and_then(|t| t.as_str());
+
+                        match event_type {
+                            Some("content_block_delta") => {
+                                if let Some(content) = json
+                                    .get("delta")
+                                    .and_then(|d| d.get("text"))
+                                    .and_then(|t| t.as_str())
+                                {
+                                    yield ModelResponse {
+                                        content: content.to_string(),
+                                        finish_reason: FinishReason::Streaming,
+                                        tokens_used: None,
+                                        tool_calls: None,
+                                    };
+                                }
+                            }
+                            Some("message_stop") => {
+                                yield ModelResponse {
+                                    content: String::new(),
+                                    finish_reason: FinishReason::Stop,
+                                    tokens_used: None,
+                                    tool_calls: None,
+                                };
+                                return;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(Box::new(Box::pin(stream)))
     }
 
     async fn list_models(&self) -> AgentResult<Vec<String>> {
@@ -260,7 +449,7 @@ impl ModelBackend for AnthropicProvider {
 
     async fn estimate_tokens(&self, text: &str) -> AgentResult<usize> {
         // Simple heuristic: ~3 chars per token for Claude
-        Ok((text.len() + 2) / 3)
+        Ok(text.len().div_ceil(3))
     }
 
     async fn shutdown(&mut self) -> AgentResult<()> {
@@ -312,7 +501,7 @@ impl ModelBackend for GrokProvider {
         if let Some(client) = &self.client {
             if let ModelProviderMode::Api { endpoint, api_key } = &self._mode {
                 let resp = client
-                    .get(&format!("{}/models", endpoint))
+                    .get(format!("{}/models", endpoint))
                     .bearer_auth(api_key)
                     .send()
                     .await;
@@ -340,12 +529,12 @@ impl ModelBackend for GrokProvider {
             });
 
             let response = client
-                .post(&format!("{}/chat/completions", endpoint))
+                .post(format!("{}/chat/completions", endpoint))
                 .bearer_auth(api_key)
                 .json(&payload)
                 .send()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             if !response.status().is_success() {
                 return Err(ProviderError::ApiError(format!(
@@ -358,7 +547,7 @@ impl ModelBackend for GrokProvider {
             let body = response
                 .json::<serde_json::Value>()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             let content = body
                 .get("choices")
@@ -382,10 +571,98 @@ impl ModelBackend for GrokProvider {
 
     async fn stream(
         &self,
-        _request: ModelRequest,
+        request: ModelRequest,
     ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<ModelResponse>> + Unpin + Send>>
     {
-        Err(ProviderError::UnsupportedFeature("Streaming not yet implemented".to_string()).into())
+        // Grok uses OpenAI-compatible streaming format
+        let client = self
+            .client
+            .clone()
+            .ok_or_else(|| ProviderError::BackendError("Client not initialized".to_string()))?;
+
+        let (endpoint, api_key) = if let ModelProviderMode::Api { endpoint, api_key } = &self._mode
+        {
+            (endpoint.clone(), api_key.clone())
+        } else {
+            return Err(
+                ProviderError::BackendError("Invalid mode for Grok provider".to_string()).into(),
+            );
+        };
+
+        let payload = json!({
+            "model": request.model,
+            "messages": request.messages,
+            "max_tokens": request.max_tokens.unwrap_or(4096),
+            "temperature": request.temperature.unwrap_or(0.7),
+            "stream": true,
+        });
+
+        let stream = try_stream! {
+            let response = client
+                .post(format!("{}/chat/completions", endpoint))
+                .bearer_auth(&api_key)
+                .json(&payload)
+                .send()
+                .await
+                .map_err(ProviderError::ReqwestError)?;
+
+            if !response.status().is_success() {
+                Err(ProviderError::ApiError(format!(
+                    "API request failed with status {}",
+                    response.status()
+                )))?;
+            }
+
+            let mut byte_stream = response.bytes_stream();
+            let mut buffer = String::new();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                let chunk = chunk_result.map_err(ProviderError::ReqwestError)?;
+                let chunk_str = String::from_utf8_lossy(&chunk);
+                buffer.push_str(&chunk_str);
+
+                // Parse SSE lines (OpenAI-compatible format)
+                while let Some(line_end) = buffer.find('\n') {
+                    let line = buffer[..line_end].trim().to_string();
+                    buffer = buffer[line_end + 1..].to_string();
+
+                    if line.is_empty() || !line.starts_with("data: ") {
+                        continue;
+                    }
+
+                    let data = &line[6..]; // Skip "data: "
+
+                    if data == "[DONE]" {
+                        yield ModelResponse {
+                            content: String::new(),
+                            finish_reason: FinishReason::Stop,
+                            tokens_used: None,
+                            tool_calls: None,
+                        };
+                        return;
+                    }
+
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        if let Some(content) = json
+                            .get("choices")
+                            .and_then(|c| c.get(0))
+                            .and_then(|c| c.get("delta"))
+                            .and_then(|d| d.get("content"))
+                            .and_then(|c| c.as_str())
+                        {
+                            yield ModelResponse {
+                                content: content.to_string(),
+                                finish_reason: FinishReason::Streaming,
+                                tokens_used: None,
+                                tool_calls: None,
+                            };
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(Box::new(Box::pin(stream)))
     }
 
     async fn list_models(&self) -> AgentResult<Vec<String>> {
@@ -394,7 +671,7 @@ impl ModelBackend for GrokProvider {
 
     async fn estimate_tokens(&self, text: &str) -> AgentResult<usize> {
         // Simple heuristic: ~4 chars per token
-        Ok((text.len() + 3) / 4)
+        Ok(text.len().div_ceil(4))
     }
 
     async fn shutdown(&mut self) -> AgentResult<()> {
@@ -403,9 +680,9 @@ impl ModelBackend for GrokProvider {
     }
 }
 
-/// ============================================================================
-/// HEADLESS MODE: Spawn CLI as child process
-/// ============================================================================
+// ============================================================================
+// HEADLESS MODE: Spawn CLI as child process
+// ============================================================================
 
 /// Claude Code CLI adapter - spawns `claude` command as child process.
 pub struct ClaudeCodeAdapter {
@@ -494,7 +771,7 @@ impl ModelBackend for ClaudeCodeAdapter {
     }
 
     async fn estimate_tokens(&self, text: &str) -> AgentResult<usize> {
-        Ok((text.len() + 2) / 3)
+        Ok(text.len().div_ceil(3))
     }
 
     async fn shutdown(&mut self) -> AgentResult<()> {
@@ -587,7 +864,7 @@ impl ModelBackend for HeadlessCliAdapter {
     }
 
     async fn estimate_tokens(&self, text: &str) -> AgentResult<usize> {
-        Ok((text.len() + 3) / 4)
+        Ok(text.len().div_ceil(4))
     }
 
     async fn shutdown(&mut self) -> AgentResult<()> {
@@ -595,9 +872,9 @@ impl ModelBackend for HeadlessCliAdapter {
     }
 }
 
-/// ============================================================================
-/// LOCAL MODE: Connect to localhost services like Ollama
-/// ============================================================================
+// ============================================================================
+// LOCAL MODE: Connect to localhost services like Ollama
+// ============================================================================
 
 /// Ollama provider - connects to local Ollama service.
 pub struct OllamaProvider {
@@ -640,7 +917,7 @@ impl ModelBackend for OllamaProvider {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(self.timeout_secs))
             .build()
-            .map_err(|e| ProviderError::ReqwestError(e))?;
+            .map_err(ProviderError::ReqwestError)?;
 
         self.client = Some(client);
 
@@ -655,7 +932,7 @@ impl ModelBackend for OllamaProvider {
     async fn health_check(&self) -> AgentResult<bool> {
         if let Some(client) = &self.client {
             match client
-                .get(&format!("{}/api/tags", self.endpoint))
+                .get(format!("{}/api/tags", self.endpoint))
                 .send()
                 .await
             {
@@ -680,11 +957,11 @@ impl ModelBackend for OllamaProvider {
         });
 
         let response = client
-            .post(&format!("{}/api/chat", self.endpoint))
+            .post(format!("{}/api/chat", self.endpoint))
             .json(&payload)
             .send()
             .await
-            .map_err(|e| ProviderError::ReqwestError(e))?;
+            .map_err(ProviderError::ReqwestError)?;
 
         if !response.status().is_success() {
             return Err(ProviderError::ApiError(format!(
@@ -697,7 +974,7 @@ impl ModelBackend for OllamaProvider {
         let body = response
             .json::<serde_json::Value>()
             .await
-            .map_err(|e| ProviderError::ReqwestError(e))?;
+            .map_err(ProviderError::ReqwestError)?;
 
         let content = body
             .get("message")
@@ -716,24 +993,102 @@ impl ModelBackend for OllamaProvider {
 
     async fn stream(
         &self,
-        _request: ModelRequest,
+        request: ModelRequest,
     ) -> AgentResult<Box<dyn futures::Stream<Item = AgentResult<ModelResponse>> + Unpin + Send>>
     {
-        Err(ProviderError::UnsupportedFeature("Streaming not yet implemented".to_string()).into())
+        // Ollama uses NDJSON streaming format (newline-delimited JSON)
+        let client = self
+            .client
+            .clone()
+            .ok_or_else(|| ProviderError::BackendError("Client not initialized".to_string()))?;
+
+        let endpoint = self.endpoint.clone();
+
+        let payload = json!({
+            "model": request.model,
+            "messages": request.messages,
+            "stream": true,
+        });
+
+        let stream = try_stream! {
+            let response = client
+                .post(format!("{}/api/chat", endpoint))
+                .json(&payload)
+                .send()
+                .await
+                .map_err(ProviderError::ReqwestError)?;
+
+            if !response.status().is_success() {
+                Err(ProviderError::ApiError(format!(
+                    "Ollama request failed with status {}",
+                    response.status()
+                )))?;
+            }
+
+            let mut byte_stream = response.bytes_stream();
+            let mut buffer = String::new();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                let chunk = chunk_result.map_err(ProviderError::ReqwestError)?;
+                let chunk_str = String::from_utf8_lossy(&chunk);
+                buffer.push_str(&chunk_str);
+
+                // Parse NDJSON lines (each line is a complete JSON object)
+                while let Some(line_end) = buffer.find('\n') {
+                    let line = buffer[..line_end].trim().to_string();
+                    buffer = buffer[line_end + 1..].to_string();
+
+                    if line.is_empty() {
+                        continue;
+                    }
+
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+                        // Check if this is the final message
+                        let done = json.get("done").and_then(|d| d.as_bool()).unwrap_or(false);
+
+                        if done {
+                            yield ModelResponse {
+                                content: String::new(),
+                                finish_reason: FinishReason::Stop,
+                                tokens_used: None,
+                                tool_calls: None,
+                            };
+                            return;
+                        }
+
+                        // Extract content from streaming response
+                        if let Some(content) = json
+                            .get("message")
+                            .and_then(|m| m.get("content"))
+                            .and_then(|c| c.as_str())
+                        {
+                            yield ModelResponse {
+                                content: content.to_string(),
+                                finish_reason: FinishReason::Streaming,
+                                tokens_used: None,
+                                tool_calls: None,
+                            };
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(Box::new(Box::pin(stream)))
     }
 
     async fn list_models(&self) -> AgentResult<Vec<String>> {
         if let Some(client) = &self.client {
             let response = client
-                .get(&format!("{}/api/tags", self.endpoint))
+                .get(format!("{}/api/tags", self.endpoint))
                 .send()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             let body = response
                 .json::<serde_json::Value>()
                 .await
-                .map_err(|e| ProviderError::ReqwestError(e))?;
+                .map_err(ProviderError::ReqwestError)?;
 
             let models = body
                 .get("models")
@@ -752,7 +1107,7 @@ impl ModelBackend for OllamaProvider {
     }
 
     async fn estimate_tokens(&self, text: &str) -> AgentResult<usize> {
-        Ok((text.len() + 3) / 4)
+        Ok(text.len().div_ceil(4))
     }
 
     async fn shutdown(&mut self) -> AgentResult<()> {
@@ -761,9 +1116,9 @@ impl ModelBackend for OllamaProvider {
     }
 }
 
-/// ============================================================================
-/// PROVIDER FACTORY
-/// ============================================================================
+// ============================================================================
+// PROVIDER FACTORY
+// ============================================================================
 
 /// Factory for creating model backends based on provider type.
 pub struct ProviderFactory;

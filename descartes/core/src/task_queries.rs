@@ -286,7 +286,7 @@ impl TaskQueryBuilder {
 
         let tasks = rows
             .iter()
-            .map(|r| parse_task_row(r))
+            .map(parse_task_row)
             .collect::<StateStoreResult<Vec<Task>>>()?;
 
         Ok(tasks)
@@ -353,7 +353,7 @@ impl TaskQueries {
         .await
         .map_err(|e| StateStoreError::DatabaseError(format!("Failed to fetch task: {}", e)))?;
 
-        Ok(row.map(|r| parse_task_row(&r)).transpose()?)
+        row.map(|r| parse_task_row(&r)).transpose()
     }
 
     /// Get all tasks
@@ -433,7 +433,7 @@ impl TaskQueries {
                     StateStoreError::DatabaseError(format!("Failed to fetch dependencies: {}", e))
                 })?;
 
-                rows.iter().map(|r| parse_task_row(r)).collect()
+                rows.iter().map(parse_task_row).collect()
             }
             _ => Ok(vec![]),
         }
@@ -459,7 +459,7 @@ impl TaskQueries {
             StateStoreError::DatabaseError(format!("Failed to fetch dependent tasks: {}", e))
         })?;
 
-        rows.iter().map(|r| parse_task_row(r)).collect()
+        rows.iter().map(parse_task_row).collect()
     }
 
     /// Check if a task is blocked (has unfinished dependencies)

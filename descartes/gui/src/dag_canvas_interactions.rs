@@ -77,6 +77,7 @@ pub struct EdgeCreation {
 
 /// Extended interaction state
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ExtendedInteractionState {
     /// Box selection in progress
     pub box_selection: Option<BoxSelection>,
@@ -91,16 +92,6 @@ pub struct ExtendedInteractionState {
     pub pre_drag_positions: HashMap<Uuid, Position>,
 }
 
-impl Default for ExtendedInteractionState {
-    fn default() -> Self {
-        ExtendedInteractionState {
-            box_selection: None,
-            edge_creation: None,
-            space_held: false,
-            pre_drag_positions: HashMap::new(),
-        }
-    }
-}
 
 // ============================================================================
 // Mouse Event Handlers

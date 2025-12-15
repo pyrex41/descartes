@@ -126,7 +126,7 @@ impl FileSystemSessionManager {
         let created_at = path
             .metadata()
             .and_then(|m| m.created())
-            .map(|t| DateTime::<Utc>::from(t))
+            .map(DateTime::<Utc>::from)
             .unwrap_or_else(|_| Utc::now());
 
         Some(Session {

@@ -84,8 +84,10 @@ pub type DAGResult<T> = Result<T, DAGError>;
 /// Type of edge in the DAG
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum EdgeType {
     /// Hard dependency - target cannot start until source completes
+    #[default]
     Dependency,
 
     /// Soft dependency - target can start independently but should wait for source
@@ -104,11 +106,6 @@ pub enum EdgeType {
     Custom(String),
 }
 
-impl Default for EdgeType {
-    fn default() -> Self {
-        EdgeType::Dependency
-    }
-}
 
 /// Position in 2D space for visual editor
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -456,12 +453,12 @@ impl DAG {
 
         self.adjacency_out
             .entry(from)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(edge_id);
 
         self.adjacency_in
             .entry(to)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(edge_id);
 
         self.updated_at = chrono::Utc::now();
@@ -1140,12 +1137,12 @@ impl DAG {
         for (edge_id, edge) in &self.edges {
             self.adjacency_out
                 .entry(edge.from_node_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(*edge_id);
 
             self.adjacency_in
                 .entry(edge.to_node_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(*edge_id);
         }
     }

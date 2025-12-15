@@ -72,6 +72,7 @@ pub enum RewindMessage {
 
 /// State for rewind/resume operations in the GUI
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct RewindState {
     /// Current rewind point being considered
     pub pending_rewind: Option<RewindPoint>,
@@ -98,20 +99,6 @@ pub struct RewindState {
     pub success_message: Option<String>,
 }
 
-impl Default for RewindState {
-    fn default() -> Self {
-        Self {
-            pending_rewind: None,
-            confirmation: None,
-            rewind_in_progress: false,
-            current_progress: None,
-            last_result: None,
-            debugging_enabled: false,
-            error_message: None,
-            success_message: None,
-        }
-    }
-}
 
 impl RewindState {
     /// Create a new rewind state
@@ -403,7 +390,7 @@ pub fn view_rewind_controls(state: &RewindState) -> Element<RewindMessage> {
     let mut controls = Column::new().spacing(10);
 
     // Resume button (only if we have a successful rewind)
-    if state.last_result.as_ref().map_or(false, |r| r.success) {
+    if state.last_result.as_ref().is_some_and(|r| r.success) {
         controls = controls.push(
             button(text("▶ Resume from Here"))
                 .on_press_maybe(if state.can_rewind() {
@@ -566,7 +553,7 @@ pub fn update_rewind(state: &mut RewindState, message: RewindMessage) {
         }
 
         RewindMessage::SnapshotCreated(snapshot_id) => {
-            state.success_message = Some(format!("Snapshot created: {}", snapshot_id.to_string()));
+            state.success_message = Some(format!("Snapshot created: {}", snapshot_id));
         }
     }
 }

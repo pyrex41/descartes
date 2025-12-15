@@ -32,7 +32,7 @@ impl GuiRpcClient {
     }
 
     /// Create a new client with default settings
-    pub fn default() -> Result<Self, DaemonError> {
+    pub fn with_defaults() -> Result<Self, DaemonError> {
         Self::new("http://127.0.0.1:8080")
     }
 
@@ -131,7 +131,7 @@ impl GuiRpcClient {
 ///     type Theme = iced::Theme;
 ///
 ///     fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>) {
-///         let rpc = GuiRpcClient::default().unwrap();
+///         let rpc = GuiRpcClient::with_defaults().unwrap();
 ///         (
 ///             DescartesApp {
 ///                 rpc,
@@ -198,7 +198,6 @@ impl GuiRpcClient {
 ///     }
 /// }
 /// ```
-
 /// Pause result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PauseResult {
@@ -244,13 +243,13 @@ mod tests {
 
     #[test]
     fn test_default_client() {
-        let client = GuiRpcClient::default();
+        let client = GuiRpcClient::with_defaults();
         assert!(client.is_ok());
     }
 
     #[tokio::test]
     async fn test_initial_not_connected() {
-        let client = GuiRpcClient::default().unwrap();
+        let client = GuiRpcClient::with_defaults().unwrap();
         assert!(!client.is_connected().await);
     }
 }

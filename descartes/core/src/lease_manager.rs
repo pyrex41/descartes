@@ -218,6 +218,7 @@ impl SqliteLeaseManager {
     }
 
     /// Record a lease history event
+    #[allow(clippy::too_many_arguments)]
     async fn record_history(
         &self,
         lease_id: &Uuid,

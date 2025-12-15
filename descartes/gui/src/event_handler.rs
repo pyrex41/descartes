@@ -44,7 +44,7 @@ impl EventHandler {
     }
 
     /// Create with default configuration
-    pub fn default() -> Self {
+    pub fn with_defaults() -> Self {
         Self::new("ws://127.0.0.1:8080/events".to_string())
     }
 
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_event_handler_creation() {
-        let handler = EventHandler::default();
+        let handler = EventHandler::with_defaults();
         assert!(handler.client.is_none());
     }
 
@@ -228,7 +228,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_initial_state() {
-        let handler = EventHandler::default();
+        let handler = EventHandler::with_defaults();
         assert_eq!(handler.state().await, EventClientState::Disconnected);
     }
 }

@@ -162,6 +162,7 @@ pub enum BreakpointLocationType {
 
 /// Messages for debugger UI interactions
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum DebuggerMessage {
     // Connection
     ConnectToAgent(Uuid),
@@ -756,14 +757,12 @@ fn view_workflow_state_tab(context: &DebugContext) -> Element<DebuggerMessage> {
 
 /// View a simple workflow state diagram
 fn view_workflow_diagram(current_state: &WorkflowState) -> Element<DebuggerMessage> {
-    let states = vec![
-        WorkflowState::Idle,
+    let states = [WorkflowState::Idle,
         WorkflowState::Running,
         WorkflowState::Paused,
         WorkflowState::Completed,
         WorkflowState::Failed,
-        WorkflowState::Cancelled,
-    ];
+        WorkflowState::Cancelled];
 
     let state_buttons: Vec<Element<DebuggerMessage>> = states
         .iter()

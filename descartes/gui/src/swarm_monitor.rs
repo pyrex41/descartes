@@ -208,7 +208,7 @@ impl SwarmMonitorState {
                 for agent in filtered {
                     groups
                         .entry(agent.status)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(agent);
                 }
 
@@ -225,7 +225,7 @@ impl SwarmMonitorState {
                 for agent in filtered {
                     groups
                         .entry(agent.model_backend.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(agent);
                 }
 
@@ -434,6 +434,7 @@ impl SwarmMonitorState {
 
 /// Agent events for live updates
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum AgentEvent {
     AgentSpawned {
         agent: AgentRuntimeState,
@@ -595,6 +596,7 @@ impl SortMode {
 
 /// Messages for the swarm monitor
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum SwarmMonitorMessage {
     /// Change filter
     SetFilter(AgentFilter),

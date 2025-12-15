@@ -108,6 +108,9 @@ impl RewindConfig {
 /// Point in time to rewind to
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RewindPoint {
+    /// Agent ID this point belongs to
+    pub agent_id: Option<String>,
+
     /// Timestamp to rewind to
     pub timestamp: i64,
 
@@ -131,6 +134,20 @@ impl RewindPoint {
     /// Create from timestamp
     pub fn from_timestamp(timestamp: i64) -> Self {
         Self {
+            agent_id: None,
+            timestamp,
+            event_id: None,
+            git_commit: None,
+            snapshot_id: None,
+            description: format!("Timestamp: {}", timestamp),
+            event_index: None,
+        }
+    }
+
+    /// Create from timestamp with agent ID
+    pub fn from_timestamp_for_agent(timestamp: i64, agent_id: String) -> Self {
+        Self {
+            agent_id: Some(agent_id),
             timestamp,
             event_id: None,
             git_commit: None,
@@ -143,6 +160,7 @@ impl RewindPoint {
     /// Create from event
     pub fn from_event(event: &AgentHistoryEvent, index: Option<usize>) -> Self {
         Self {
+            agent_id: Some(event.agent_id.clone()),
             timestamp: event.timestamp,
             event_id: Some(event.event_id),
             git_commit: event.git_commit_hash.clone(),
@@ -155,6 +173,7 @@ impl RewindPoint {
     /// Create from snapshot
     pub fn from_snapshot(snapshot: &HistorySnapshot) -> Self {
         Self {
+            agent_id: Some(snapshot.agent_id.clone()),
             timestamp: snapshot.timestamp,
             event_id: None,
             git_commit: snapshot.git_commit.clone(),
@@ -177,6 +196,12 @@ impl RewindPoint {
         events
             .get(index)
             .map(|event| Self::from_event(event, Some(index)))
+    }
+
+    /// Set the agent ID for this point
+    pub fn with_agent_id(mut self, agent_id: String) -> Self {
+        self.agent_id = Some(agent_id);
+        self
     }
 }
 
@@ -736,14 +761,15 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
             ));
         }
 
+        // Get agent_id from point (required for loading events)
+        let agent_id = point.agent_id.clone().ok_or_else(|| {
+            StateStoreError::Conflict(
+                "RewindPoint must have agent_id set. Use with_agent_id() or from_event()/from_snapshot() factory methods.".to_string(),
+            )
+        })?;
+
         // Step 3: Create backup
         let backup = if config.auto_backup {
-            // Get agent_id from point or use a default
-            let agent_id = point
-                .event_id
-                .map(|_| "agent".to_string())
-                .unwrap_or_else(|| "unknown".to_string());
-
             self.create_backup(
                 &agent_id,
                 format!(
@@ -759,11 +785,7 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
         };
 
         // Step 4: Restore brain state
-        info!("Restoring brain state...");
-
-        // Determine agent_id - we need to get it from somewhere
-        // For now, use a default or extract from the event
-        let agent_id = "agent-1".to_string(); // TODO: Get from context
+        info!("Restoring brain state for agent {}...", agent_id);
 
         let events = self.load_events_for_point(&agent_id, &point).await?;
 
@@ -937,6 +959,7 @@ impl<S: AgentHistoryStore + 'static> RewindManager for DefaultRewindManager<S> {
 
         // Create result
         let point = RewindPoint {
+            agent_id: None, // Not needed for undo result
             timestamp: backup.timestamp,
             event_id: None,
             git_commit: Some(current_commit.clone()),

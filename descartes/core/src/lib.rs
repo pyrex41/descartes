@@ -23,6 +23,7 @@ pub mod dag_swarm_export;
 pub mod dag_toml;
 pub mod debugger;
 pub mod errors;
+pub mod expression_eval;
 pub mod lease;
 pub mod lease_manager;
 pub mod providers;
@@ -212,6 +213,11 @@ pub use debugger::{
     DebuggerStateExt,
     ExecutionState,
     ThoughtSnapshot,
+};
+
+pub use expression_eval::{
+    context_from_json, evaluate, evaluate_bool, EvalContext, EvalError, EvalResult, Expr,
+    ExpressionEvaluator,
 };
 
 pub use agent_history::{

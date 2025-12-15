@@ -71,6 +71,8 @@ pub enum FinishReason {
     MaxTokens,
     ToolUse,
     Error,
+    /// Streaming response - more chunks to come
+    Streaming,
 }
 
 /// Configuration for model provider mode.
@@ -148,6 +150,12 @@ pub trait AgentRunner: Send + Sync {
     /// If the agent was force-paused, sends SIGCONT to unfreeze it.
     /// Sends a resume notification via stdin.
     async fn resume(&self, agent_id: &Uuid) -> AgentResult<()>;
+
+    /// Get the process ID (PID) for an agent.
+    ///
+    /// Returns `None` if the agent doesn't have an associated OS process
+    /// (e.g., if it's a remote agent or uses a different execution model).
+    async fn get_agent_pid(&self, agent_id: &Uuid) -> AgentResult<Option<u32>>;
 }
 
 /// Configuration for spawning an agent.
@@ -397,18 +405,15 @@ pub enum TaskStatus {
     Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord,
 )]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum TaskPriority {
     Low,
+    #[default]
     Medium,
     High,
     Critical,
 }
 
-impl Default for TaskPriority {
-    fn default() -> Self {
-        TaskPriority::Medium
-    }
-}
 
 impl std::fmt::Display for TaskPriority {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -440,19 +445,16 @@ impl std::str::FromStr for TaskPriority {
     Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord,
 )]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum TaskComplexity {
     Trivial,  // < 1 hour
     Simple,   // 1-4 hours
+    #[default]
     Moderate, // 1-2 days
     Complex,  // 3-5 days
     Epic,     // > 1 week
 }
 
-impl Default for TaskComplexity {
-    fn default() -> Self {
-        TaskComplexity::Moderate
-    }
-}
 
 impl std::fmt::Display for TaskComplexity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -277,12 +277,12 @@ impl TaskEventEmitter {
             if elapsed < debounce_duration {
                 // Update pending event and don't emit yet
                 state.pending_event = Some(event.clone());
-                return false;
+                false
             } else {
                 // Enough time has passed, emit the event
                 state.last_event_time = now;
                 state.pending_event = None;
-                return true;
+                true
             }
         } else {
             // First event for this task
@@ -293,7 +293,7 @@ impl TaskEventEmitter {
                     pending_event: None,
                 },
             );
-            return true;
+            true
         }
     }
 

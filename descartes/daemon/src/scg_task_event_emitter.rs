@@ -118,14 +118,13 @@ impl ScgTaskEventEmitter {
         let project_root = self.storage.project_root().to_path_buf();
         let tasks_file = project_root.join(".scud/tasks/tasks.scg");
 
-        if !tasks_file.exists() {
-            if self.config.verbose_logging {
+        if !tasks_file.exists()
+            && self.config.verbose_logging {
                 tracing::warn!(
                     "Tasks file does not exist: {}. Watching parent directory.",
                     tasks_file.display()
                 );
             }
-        }
 
         // Create channel for file events
         let (tx, mut rx) = mpsc::channel::<()>(10);

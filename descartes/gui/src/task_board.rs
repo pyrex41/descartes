@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 /// State for the Task Board view
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct TaskBoardState {
     /// All tasks organized by status
     pub kanban_board: KanbanBoard,
@@ -76,6 +77,7 @@ pub struct KanbanBoard {
 
 /// Task filter settings
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct TaskFilters {
     pub priority: Option<TaskPriority>,
     pub complexity: Option<TaskComplexity>,
@@ -84,17 +86,6 @@ pub struct TaskFilters {
     pub show_blocked_only: bool,
 }
 
-impl Default for TaskFilters {
-    fn default() -> Self {
-        Self {
-            priority: None,
-            complexity: None,
-            assignee: None,
-            search_term: None,
-            show_blocked_only: false,
-        }
-    }
-}
 
 /// Task sorting settings
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,19 +148,6 @@ pub enum TaskBoardMessage {
     FlushPendingUpdates,
 }
 
-impl Default for TaskBoardState {
-    fn default() -> Self {
-        Self {
-            kanban_board: KanbanBoard::default(),
-            filters: TaskFilters::default(),
-            sort: TaskSort::default(),
-            selected_task: None,
-            loading: false,
-            error: None,
-            realtime_state: RealtimeUpdateState::default(),
-        }
-    }
-}
 
 impl TaskBoardState {
     /// Create a new task board state
@@ -307,40 +285,37 @@ impl TaskBoardState {
 
         self.realtime_state.events_received += 1;
 
-        match event {
-            DescartesEvent::TaskEvent(TaskEvent {
+        if let DescartesEvent::TaskEvent(TaskEvent {
                 task_id,
                 event_type,
                 data,
                 ..
-            }) => {
-                let task_uuid = Uuid::parse_str(&task_id).ok()?;
+            }) = event {
+            let task_uuid = Uuid::parse_str(&task_id).ok()?;
 
-                match event_type {
-                    TaskEventType::Created => {
-                        // Extract task from event data
-                        if let Some(task_value) = data.get("task") {
-                            if let Ok(task) = serde_json::from_value::<Task>(task_value.clone()) {
-                                return Some(TaskBoardMessage::TaskCreated(task));
-                            }
+            match event_type {
+                TaskEventType::Created => {
+                    // Extract task from event data
+                    if let Some(task_value) = data.get("task") {
+                        if let Ok(task) = serde_json::from_value::<Task>(task_value.clone()) {
+                            return Some(TaskBoardMessage::TaskCreated(task));
                         }
                     }
-                    TaskEventType::Progress => {
-                        // Task was updated
-                        if let Some(task_value) = data.get("task") {
-                            if let Ok(task) = serde_json::from_value::<Task>(task_value.clone()) {
-                                return Some(TaskBoardMessage::TaskUpdated(task));
-                            }
-                        }
-                    }
-                    TaskEventType::Cancelled => {
-                        // Task was deleted
-                        return Some(TaskBoardMessage::TaskDeleted(task_uuid));
-                    }
-                    _ => {}
                 }
+                TaskEventType::Progress => {
+                    // Task was updated
+                    if let Some(task_value) = data.get("task") {
+                        if let Ok(task) = serde_json::from_value::<Task>(task_value.clone()) {
+                            return Some(TaskBoardMessage::TaskUpdated(task));
+                        }
+                    }
+                }
+                TaskEventType::Cancelled => {
+                    // Task was deleted
+                    return Some(TaskBoardMessage::TaskDeleted(task_uuid));
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         None

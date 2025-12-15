@@ -276,8 +276,33 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Gui => {
+            use std::process::Command;
+
             println!("{}", "Launching Descartes GUI...".cyan());
-            println!("{}", "Feature: Phase 3 - Iced UI (Planned)".yellow());
+
+            // Find GUI binary next to CLI binary
+            let gui_path = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|dir| dir.join("descartes-gui")));
+
+            match gui_path {
+                Some(path) if path.exists() => {
+                    match Command::new(&path).spawn() {
+                        Ok(child) => {
+                            println!("{} (PID: {})", "GUI started".green(), child.id());
+                        }
+                        Err(e) => {
+                            eprintln!("{}: {}", "Failed to launch GUI".red(), e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!("{}", "GUI binary not found.".red());
+                    eprintln!("{}", "Build with: cargo build -p descartes-gui".yellow());
+                    std::process::exit(1);
+                }
+            }
         }
 
         Commands::Doctor => {

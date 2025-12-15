@@ -79,6 +79,7 @@ pub struct OpenCodeTuiHandler {
 
 impl OpenCodeTuiHandler {
     /// Create a new OpenCode TUI handler
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: OpenCodeTuiConfig,
         session_manager: Arc<AttachSessionManager>,
@@ -539,6 +540,7 @@ impl OpenCodeTuiHandler {
 }
 
 /// Start an OpenCode TUI attach server for an agent
+#[allow(clippy::too_many_arguments)]
 pub async fn start_opencode_attach_server(
     socket_path: &std::path::Path,
     config: OpenCodeTuiConfig,

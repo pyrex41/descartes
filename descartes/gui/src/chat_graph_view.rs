@@ -201,7 +201,7 @@ impl ChatGraphCanvas {
 
         // Draw label with type icon (only if zoom > 0.3)
         if zoom > 0.3 {
-            let font_size = (12.0 * zoom).max(8.0).min(18.0);
+            let font_size = (12.0 * zoom).clamp(8.0, 18.0);
             let icon_x = x + 10.0 * zoom;
             let label_x = x + 28.0 * zoom;
             let label_y = y + height / 2.0;

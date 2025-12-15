@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 /// Daemon configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct DaemonConfig {
     pub server: ServerConfig,
     pub auth: AuthConfig,
@@ -126,16 +127,6 @@ impl Default for LoggingConfig {
     }
 }
 
-impl Default for DaemonConfig {
-    fn default() -> Self {
-        DaemonConfig {
-            server: ServerConfig::default(),
-            auth: AuthConfig::default(),
-            pool: PoolConfig::default(),
-            logging: LoggingConfig::default(),
-        }
-    }
-}
 
 impl DaemonConfig {
     /// Load configuration from file

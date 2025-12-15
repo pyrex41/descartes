@@ -254,12 +254,12 @@ fn build_workflow_from_dag(dag: &DAG, config: &SwarmExportConfig) -> DAGResult<W
         let root_id = roots[0];
         let root_node = dag
             .get_node(root_id)
-            .ok_or_else(|| DAGError::NodeNotFound(root_id))?;
+            .ok_or(DAGError::NodeNotFound(root_id))?;
         get_state_name(root_node, config)
     };
 
     // Convert each node to a state
-    for (_node_id, node) in &dag.nodes {
+    for node in dag.nodes.values() {
         let state = build_state_from_node(node, dag, config)?;
         let state_name = get_state_name(node, config);
         states.insert(state_name, state);
@@ -302,7 +302,7 @@ fn build_state_from_node(
         for edge in dag.get_outgoing_edges(node.node_id) {
             let target_node = dag
                 .get_node(edge.to_node_id)
-                .ok_or_else(|| DAGError::NodeNotFound(edge.to_node_id))?;
+                .ok_or(DAGError::NodeNotFound(edge.to_node_id))?;
 
             let event_name = get_event_name(edge, config);
             let target_state = get_state_name(target_node, config);

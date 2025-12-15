@@ -222,6 +222,12 @@ pub struct ValidatedState {
 /// Swarm.toml Parser
 pub struct SwarmParser;
 
+impl Default for SwarmParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SwarmParser {
     /// Create a new parser instance
     pub fn new() -> Self {
@@ -318,14 +324,14 @@ impl SwarmParser {
         self.validate_dag(workflow)?;
 
         // Validate guards reference
-        for (_, state) in &workflow.states {
+        for state in workflow.states.values() {
             for handler in &state.handlers {
                 for guard in &handler.guards {
                     if !workflow.guards.contains_key(guard)
                         && !config
                             .guards
                             .as_ref()
-                            .map_or(false, |g| g.contains_key(guard))
+                            .is_some_and(|g| g.contains_key(guard))
                     {
                         return Err(SwarmParseError::InvalidGuard(format!(
                             "Guard '{}' referenced in state '{}' is not defined",

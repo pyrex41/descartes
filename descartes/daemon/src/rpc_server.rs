@@ -1213,6 +1213,7 @@ impl UnixSocketRpcServer {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_spawn_params(request: &RpcRequest) -> Result<(String, String, Value), RpcResponse> {
         let params = match &request.params {
             Some(Value::Array(arr)) => arr,
@@ -1224,8 +1225,7 @@ impl UnixSocketRpcServer {
             }
         };
 
-        let name = params
-            .get(0)
+        let name = params.first()
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
                 Self::invalid_params(request.id.clone(), "Missing agent name parameter")
@@ -1246,10 +1246,11 @@ impl UnixSocketRpcServer {
         Ok((name, agent_type, config))
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_list_params(request: &RpcRequest) -> Result<Option<Value>, RpcResponse> {
         match &request.params {
             None => Ok(None),
-            Some(Value::Array(arr)) => Ok(arr.get(0).cloned().filter(|v| !v.is_null())),
+            Some(Value::Array(arr)) => Ok(arr.first().cloned().filter(|v| !v.is_null())),
             Some(Value::Null) => Ok(None),
             _ => Err(Self::invalid_params(
                 request.id.clone(),
@@ -1258,6 +1259,7 @@ impl UnixSocketRpcServer {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_approve_params(request: &RpcRequest) -> Result<(String, bool), RpcResponse> {
         let params = match &request.params {
             Some(Value::Array(arr)) => arr,
@@ -1269,8 +1271,7 @@ impl UnixSocketRpcServer {
             }
         };
 
-        let task_id = params
-            .get(0)
+        let task_id = params.first()
             .and_then(|v| v.as_str())
             .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing task_id parameter"))?
             .to_string();
@@ -1281,10 +1282,11 @@ impl UnixSocketRpcServer {
         Ok((task_id, approved))
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_state_params(request: &RpcRequest) -> Result<Option<String>, RpcResponse> {
         match &request.params {
             None => Ok(None),
-            Some(Value::Array(arr)) => Ok(arr.get(0).and_then(|value| {
+            Some(Value::Array(arr)) => Ok(arr.first().and_then(|value| {
                 if value.is_null() {
                     None
                 } else {
@@ -1299,6 +1301,7 @@ impl UnixSocketRpcServer {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_pause_params(request: &RpcRequest) -> Result<(String, bool), RpcResponse> {
         let params = match &request.params {
             Some(Value::Array(arr)) => arr,
@@ -1310,8 +1313,7 @@ impl UnixSocketRpcServer {
             }
         };
 
-        let agent_id = params
-            .get(0)
+        let agent_id = params.first()
             .and_then(|v| v.as_str())
             .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
             .to_string();
@@ -1325,6 +1327,7 @@ impl UnixSocketRpcServer {
         Ok((agent_id, force))
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_resume_params(request: &RpcRequest) -> Result<String, RpcResponse> {
         let params = match &request.params {
             Some(Value::Array(arr)) => arr,
@@ -1336,8 +1339,7 @@ impl UnixSocketRpcServer {
             }
         };
 
-        let agent_id = params
-            .get(0)
+        let agent_id = params.first()
             .and_then(|v| v.as_str())
             .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
             .to_string();
@@ -1345,6 +1347,7 @@ impl UnixSocketRpcServer {
         Ok(agent_id)
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_attach_request_params(request: &RpcRequest) -> Result<(String, String), RpcResponse> {
         let params = match &request.params {
             Some(Value::Array(arr)) => arr,
@@ -1356,8 +1359,7 @@ impl UnixSocketRpcServer {
             }
         };
 
-        let agent_id = params
-            .get(0)
+        let agent_id = params.first()
             .and_then(|v| v.as_str())
             .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
             .to_string();
@@ -1372,6 +1374,7 @@ impl UnixSocketRpcServer {
         Ok((agent_id, client_type))
     }
 
+    #[allow(clippy::result_large_err)]
     fn parse_token_params(request: &RpcRequest) -> Result<String, RpcResponse> {
         let params = match &request.params {
             Some(Value::Array(arr)) => arr,
@@ -1383,8 +1386,7 @@ impl UnixSocketRpcServer {
             }
         };
 
-        let token = params
-            .get(0)
+        let token = params.first()
             .and_then(|v| v.as_str())
             .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing token parameter"))?
             .to_string();

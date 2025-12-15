@@ -1011,6 +1011,7 @@ fn default_audit_path() -> String {
 
 /// Notifications and alerting configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct NotificationsConfig {
     /// Enable notifications
     #[serde(default)]
@@ -1025,18 +1026,10 @@ pub struct NotificationsConfig {
     pub alerts: AlertConfig,
 }
 
-impl Default for NotificationsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            channels: NotificationChannels::default(),
-            alerts: AlertConfig::default(),
-        }
-    }
-}
 
 /// Notification channels
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct NotificationChannels {
     /// Telegram notifications
     #[serde(default)]
@@ -1055,16 +1048,6 @@ pub struct NotificationChannels {
     pub slack: Option<SlackConfig>,
 }
 
-impl Default for NotificationChannels {
-    fn default() -> Self {
-        Self {
-            telegram: None,
-            webhooks: None,
-            email: None,
-            slack: None,
-        }
-    }
-}
 
 /// Telegram notification configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1436,8 +1419,8 @@ impl ConfigManager {
     /// Validate configuration
     pub fn validate(&self) -> AgentResult<()> {
         // Validate provider settings
-        if !self.config.providers.openai.api_key.is_some()
-            && !self.config.providers.anthropic.api_key.is_some()
+        if self.config.providers.openai.api_key.is_none()
+            && self.config.providers.anthropic.api_key.is_none()
             && !self.config.providers.ollama.enabled
             && self.config.providers.custom.is_empty()
         {
@@ -1521,7 +1504,7 @@ mod tests {
     fn test_default_config() {
         let config = DescaratesConfig::default();
         assert_eq!(config.version, "1.0.0");
-        assert_eq!(config.providers.primary, "anthropic");
+        assert_eq!(config.providers.primary, "grok");
     }
 
     #[test]

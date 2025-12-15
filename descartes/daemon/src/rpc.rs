@@ -241,8 +241,8 @@ impl JsonRpcServer {
             timestamp: chrono::Utc::now(),
         };
 
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     async fn call_system_metrics(
@@ -251,8 +251,8 @@ impl JsonRpcServer {
         _auth: AuthContext,
     ) -> DaemonResult<Value> {
         let response = self.metrics.get_metrics_response();
-        Ok(serde_json::to_value(response)
-            .map_err(|e| DaemonError::SerializationError(e.to_string()))?)
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
     }
 
     // Chat RPC methods
@@ -354,7 +354,7 @@ impl JsonRpcServer {
         };
 
         let session_id = manager.start_session(config).await
-            .map_err(|e| DaemonError::ServerError(e))?;
+            .map_err(DaemonError::ServerError)?;
 
         Ok(serde_json::json!({
             "session_id": session_id.to_string(),
@@ -389,7 +389,7 @@ impl JsonRpcServer {
             .to_string();
 
         manager.send_prompt(session_id, prompt).await
-            .map_err(|e| DaemonError::ServerError(e))?;
+            .map_err(DaemonError::ServerError)?;
 
         Ok(serde_json::json!({"success": true}))
     }
@@ -415,7 +415,7 @@ impl JsonRpcServer {
             .map_err(|_| DaemonError::InvalidRequest("Invalid session_id".to_string()))?;
 
         manager.stop_session(session_id).await
-            .map_err(|e| DaemonError::ServerError(e))?;
+            .map_err(DaemonError::ServerError)?;
 
         Ok(serde_json::json!({"success": true}))
     }
@@ -459,7 +459,7 @@ impl JsonRpcServer {
             .map_err(|_| DaemonError::InvalidRequest("Invalid session_id".to_string()))?;
 
         manager.upgrade_to_agent(session_id)
-            .map_err(|e| DaemonError::ServerError(e))?;
+            .map_err(DaemonError::ServerError)?;
 
         Ok(serde_json::json!({"success": true, "mode": "agent"}))
     }

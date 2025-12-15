@@ -493,16 +493,27 @@ impl ZmqAgentServer {
         // Execute command based on type
         let result: Result<Option<serde_json::Value>, AgentError> = match command.command_type {
             ControlCommandType::Pause => {
-                // Pause not directly supported - would need SIGTSTP on Unix
-                Err(AgentError::ExecutionError(
-                    "Pause command not yet implemented - requires platform-specific signal handling".to_string(),
-                ))
+                // Check if force pause is requested (default to cooperative)
+                let force = command
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("force"))
+                    .and_then(|f| f.as_bool())
+                    .unwrap_or(false);
+
+                self.runner.pause(&agent_id, force).await.map(|_| {
+                    Some(serde_json::json!({
+                        "paused": true,
+                        "mode": if force { "forced" } else { "cooperative" }
+                    }))
+                })
             }
             ControlCommandType::Resume => {
-                // Resume not directly supported - would need SIGCONT on Unix
-                Err(AgentError::ExecutionError(
-                    "Resume command not yet implemented - requires platform-specific signal handling".to_string(),
-                ))
+                self.runner.resume(&agent_id).await.map(|_| {
+                    Some(serde_json::json!({
+                        "resumed": true
+                    }))
+                })
             }
             ControlCommandType::Stop => {
                 // Graceful stop (SIGTERM)
@@ -551,10 +562,42 @@ impl ZmqAgentServer {
                 ))
             }
             ControlCommandType::Signal => {
-                // Custom signal handling
-                Err(AgentError::ExecutionError(
-                    "Signal command not yet implemented".to_string(),
-                ))
+                // Signal handling - parse signal type from payload
+                let signal_str = command
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("signal"))
+                    .and_then(|s| s.as_str());
+
+                match signal_str {
+                    Some(signal) => {
+                        let agent_signal = match signal.to_lowercase().as_str() {
+                            "interrupt" | "sigint" | "int" => Some(AgentSignal::Interrupt),
+                            "terminate" | "sigterm" | "term" => Some(AgentSignal::Terminate),
+                            "kill" | "sigkill" => Some(AgentSignal::Kill),
+                            "stop" | "sigstop" | "pause" | "force_pause" => {
+                                Some(AgentSignal::ForcePause)
+                            }
+                            "continue" | "sigcont" | "cont" | "resume" => Some(AgentSignal::Resume),
+                            _ => None,
+                        };
+
+                        match agent_signal {
+                            Some(sig) => self.runner.signal(&agent_id, sig).await.map(|_| {
+                                Some(serde_json::json!({
+                                    "signal_sent": signal
+                                }))
+                            }),
+                            None => Err(AgentError::ExecutionError(format!(
+                                "Unknown signal type: '{}'. Valid signals: interrupt, terminate, kill, stop, continue",
+                                signal
+                            ))),
+                        }
+                    }
+                    None => Err(AgentError::ExecutionError(
+                        "Signal command requires payload with 'signal' field".to_string(),
+                    )),
+                }
             }
             ControlCommandType::CustomAction => {
                 // Custom action handling
