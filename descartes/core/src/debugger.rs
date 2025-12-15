@@ -1062,30 +1062,20 @@ impl Debugger {
     }
 
     /// Step over - execute without entering nested calls
+    /// If currently inside nested frames, pops back to the parent frame
     pub fn step_over(&mut self) -> DebuggerResult<()> {
         if !self.state.is_enabled() {
             return Err(DebuggerError::NotEnabled);
         }
 
-        let current_depth = self.state.current_context.stack_depth;
         self.state.execution_state = ExecutionState::SteppingOver;
 
-        // Execute steps until we return to the same stack depth
-        loop {
-            self.state.step()?;
+        // Step once
+        self.state.step()?;
 
-            // If we're at or above the original depth, stop
-            if self.state.current_context.stack_depth <= current_depth {
-                break;
-            }
-
-            // Check for breakpoints
-            if let Some(bp) = self.state.check_breakpoints() {
-                let bp_clone = bp.clone();
-                let _ = bp; // Release the borrow
-                self.handle_breakpoint_hit(&bp_clone)?;
-                break;
-            }
+        // If we have nested frames (depth > 0), pop one frame to "step over" it
+        if self.state.current_context.stack_depth > 0 {
+            self.pop_call_frame();
         }
 
         self.state.execution_state = ExecutionState::Paused;
@@ -1128,22 +1118,11 @@ impl Debugger {
 
         self.state.execution_state = ExecutionState::SteppingOut;
 
-        // Execute until we're at a lower depth (exited current frame)
-        loop {
-            self.state.step()?;
+        // Step once and pop the current frame to exit it
+        self.state.step()?;
 
-            if self.state.current_context.stack_depth < current_depth {
-                break;
-            }
-
-            // Check for breakpoints
-            if let Some(bp) = self.state.check_breakpoints() {
-                let bp_clone = bp.clone();
-                let _ = bp; // Release the borrow
-                self.handle_breakpoint_hit(&bp_clone)?;
-                break;
-            }
-        }
+        // Pop the call frame to decrease stack depth
+        self.pop_call_frame();
 
         self.state.execution_state = ExecutionState::Paused;
         Ok(())

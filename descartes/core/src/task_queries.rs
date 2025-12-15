@@ -608,9 +608,11 @@ mod tests {
     use chrono::Utc;
 
     async fn setup_test_db() -> (SqliteStateStore, TaskQueries) {
+        // Use UUID for uniqueness to avoid collisions when tests run in parallel
         let db_path = format!(
-            "/tmp/test_task_queries_{}.db",
-            Utc::now().timestamp_nanos_opt().unwrap_or(0)
+            "/tmp/test_task_queries_{}_{}.db",
+            Utc::now().timestamp_nanos_opt().unwrap_or(0),
+            uuid::Uuid::new_v4()
         );
         let mut store = SqliteStateStore::new(&db_path, false)
             .await

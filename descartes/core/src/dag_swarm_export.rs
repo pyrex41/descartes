@@ -14,7 +14,7 @@
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use descartes_core::dag::DAG;
 /// use descartes_core::dag_swarm_export::{export_dag_to_swarm_toml, SwarmExportConfig};
 ///

@@ -117,8 +117,8 @@ handlers = []
 "#;
 
         let parser = SwarmParser::new();
-        let config = parser.parse_string(toml_content).unwrap();
-        let result = parser.validate_config(&config);
+        // Missing version field should cause parsing to fail since it's required
+        let result = parser.parse_string(toml_content);
         assert!(result.is_err());
     }
 
@@ -147,8 +147,8 @@ handlers = []
 "#;
 
         let parser = SwarmParser::new();
-        let config = parser.parse_string(toml_content).unwrap();
-        let result = parser.validate_config(&config);
+        // Missing name field should cause parsing to fail since it's required
+        let result = parser.parse_string(toml_content);
         assert!(result.is_err());
     }
 

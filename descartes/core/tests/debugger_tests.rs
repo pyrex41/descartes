@@ -196,7 +196,7 @@ fn test_pause_already_paused() {
     debugger.pause_agent().unwrap();
     assert_eq!(debugger.state().execution_state, ExecutionState::Paused);
     // Statistics should not increment for redundant pause
-    assert_eq!(debugger.state().statistics.pauses, initial_pauses + 1);
+    assert_eq!(debugger.state().statistics.pauses, initial_pauses);
 }
 
 #[test]
@@ -996,7 +996,10 @@ fn test_process_command_show_stack() {
 fn test_process_command_get_statistics() {
     let mut debugger = create_enabled_debugger();
 
+    // step_agent() puts debugger in Paused state, so we need to
+    // resume before pause to actually increment the pause counter
     debugger.step_agent().unwrap();
+    debugger.resume_agent().unwrap();
     debugger.pause_agent().unwrap();
 
     let result = debugger.process_command(DebugCommand::GetStatistics);
@@ -1213,9 +1216,13 @@ fn test_statistics_tracking() {
     let mut debugger = create_enabled_debugger();
 
     // Perform various operations
+    // Note: step_agent() puts debugger into Paused state at the end,
+    // so pause_agent() called after step_agent() won't increment pause count
+    // (already paused). We need to resume first to properly test pause.
     debugger.step_agent().unwrap();
     debugger.step_agent().unwrap();
-    debugger.pause_agent().unwrap();
+    debugger.resume_agent().unwrap(); // Resume so we can actually pause
+    debugger.pause_agent().unwrap();  // This should now increment pauses
     debugger.resume_agent().unwrap();
     debugger.step_agent().unwrap();
 
@@ -1223,7 +1230,7 @@ fn test_statistics_tracking() {
     assert_eq!(stats.sessions_started, 1);
     assert!(stats.total_steps >= 3);
     assert_eq!(stats.pauses, 1);
-    assert_eq!(stats.resumes, 1);
+    assert_eq!(stats.resumes, 2);
 }
 
 #[test]

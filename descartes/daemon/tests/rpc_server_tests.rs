@@ -18,14 +18,15 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tempfile::tempdir;
+use tempfile::{tempdir, TempDir};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 use tokio::time::timeout;
 use uuid::Uuid;
 
 /// Test helper to create a test RPC server
-async fn setup_test_server() -> (UnixSocketRpcServer, PathBuf, Arc<SqliteStateStore>) {
+/// Returns TempDir to keep it alive for the duration of the test
+async fn setup_test_server() -> (UnixSocketRpcServer, PathBuf, Arc<SqliteStateStore>, TempDir) {
     let temp_dir = tempdir().unwrap();
     let socket_path = temp_dir.path().join("test-rpc.sock");
 
@@ -44,7 +45,7 @@ async fn setup_test_server() -> (UnixSocketRpcServer, PathBuf, Arc<SqliteStateSt
         state_store.clone() as Arc<dyn descartes_core::traits::StateStore>,
     );
 
-    (server, socket_path, state_store)
+    (server, socket_path, state_store, temp_dir)
 }
 
 /// Test helper to create a JSON-RPC request
@@ -120,7 +121,7 @@ async fn create_test_task(
 
 #[tokio::test]
 async fn test_server_start_and_stop() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
 
     // Start the server
     let mut handle = server.start().await.expect("Failed to start server");
@@ -135,7 +136,7 @@ async fn test_server_start_and_stop() {
 
 #[tokio::test]
 async fn test_server_socket_cleanup() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
 
     // Create a dummy socket file
     std::fs::write(&socket_path, "dummy").unwrap();
@@ -151,7 +152,7 @@ async fn test_server_socket_cleanup() {
 
 #[tokio::test]
 async fn test_multiple_clients_can_connect() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
 
     // Give server time to start
@@ -176,7 +177,7 @@ async fn test_multiple_clients_can_connect() {
 
 #[tokio::test]
 async fn test_list_tasks_empty() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -194,7 +195,7 @@ async fn test_list_tasks_empty() {
 
 #[tokio::test]
 async fn test_list_tasks_with_data() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create test tasks
     create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
@@ -225,7 +226,7 @@ async fn test_list_tasks_with_data() {
 
 #[tokio::test]
 async fn test_list_tasks_filter_by_status() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create tasks with different statuses
     create_test_task(&state_store, "Todo Task", TaskStatus::Todo).await;
@@ -248,7 +249,7 @@ async fn test_list_tasks_filter_by_status() {
 
 #[tokio::test]
 async fn test_list_tasks_filter_by_assigned_to() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create tasks with different assignments
     let mut task1 = create_test_task(&state_store, "Agent 1 Task", TaskStatus::Todo).await;
@@ -275,7 +276,7 @@ async fn test_list_tasks_filter_by_assigned_to() {
 
 #[tokio::test]
 async fn test_list_tasks_filter_multiple_criteria() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create tasks with various attributes
     let mut task1 = create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
@@ -310,7 +311,7 @@ async fn test_list_tasks_filter_multiple_criteria() {
 
 #[tokio::test]
 async fn test_approve_task_success() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     let task = create_test_task(&state_store, "Approval Test", TaskStatus::Todo).await;
     let task_id = task.id.to_string();
@@ -337,7 +338,7 @@ async fn test_approve_task_success() {
 
 #[tokio::test]
 async fn test_approve_task_rejection() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     let task = create_test_task(&state_store, "Rejection Test", TaskStatus::Todo).await;
     let task_id = task.id.to_string();
@@ -361,7 +362,7 @@ async fn test_approve_task_rejection() {
 
 #[tokio::test]
 async fn test_approve_nonexistent_task() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -383,7 +384,7 @@ async fn test_approve_nonexistent_task() {
 
 #[tokio::test]
 async fn test_approve_invalid_task_id() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -403,7 +404,7 @@ async fn test_approve_invalid_task_id() {
 
 #[tokio::test]
 async fn test_approve_task_metadata_preservation() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create task with existing metadata
     let mut task = create_test_task(&state_store, "Metadata Test", TaskStatus::Todo).await;
@@ -439,7 +440,7 @@ async fn test_approve_task_metadata_preservation() {
 
 #[tokio::test]
 async fn test_get_state_system_level() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create some tasks to populate the state
     create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
@@ -468,7 +469,7 @@ async fn test_get_state_system_level() {
 
 #[tokio::test]
 async fn test_get_state_invalid_entity_id() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -484,7 +485,7 @@ async fn test_get_state_invalid_entity_id() {
 
 #[tokio::test]
 async fn test_get_state_nonexistent_agent() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -508,7 +509,7 @@ async fn test_get_state_nonexistent_agent() {
 
 #[tokio::test]
 async fn test_spawn_agent_basic() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -532,7 +533,7 @@ async fn test_spawn_agent_basic() {
 
 #[tokio::test]
 async fn test_spawn_agent_with_full_config() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -560,7 +561,7 @@ async fn test_spawn_agent_with_full_config() {
 
 #[tokio::test]
 async fn test_spawn_agent_minimal_config() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -580,7 +581,7 @@ async fn test_spawn_agent_minimal_config() {
 
 #[tokio::test]
 async fn test_invalid_json_request() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -604,7 +605,7 @@ async fn test_invalid_json_request() {
 
 #[tokio::test]
 async fn test_invalid_method_name() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -621,7 +622,7 @@ async fn test_invalid_method_name() {
 
 #[tokio::test]
 async fn test_missing_required_params() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -638,7 +639,7 @@ async fn test_missing_required_params() {
 
 #[tokio::test]
 async fn test_wrong_param_types() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -662,7 +663,7 @@ async fn test_wrong_param_types() {
 
 #[tokio::test]
 async fn test_concurrent_list_tasks_requests() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create multiple tasks
     for i in 0..10 {
@@ -700,7 +701,7 @@ async fn test_concurrent_list_tasks_requests() {
 
 #[tokio::test]
 async fn test_concurrent_mixed_requests() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create test tasks
     let task1 = create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
@@ -744,7 +745,7 @@ async fn test_concurrent_mixed_requests() {
 
 #[tokio::test]
 async fn test_concurrent_task_approvals() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create multiple tasks
     let mut task_ids = vec![];
@@ -791,7 +792,7 @@ async fn test_concurrent_task_approvals() {
 
 #[tokio::test]
 async fn test_request_with_timeout() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -807,7 +808,7 @@ async fn test_request_with_timeout() {
 
 #[tokio::test]
 async fn test_rapid_sequential_requests() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -824,7 +825,7 @@ async fn test_rapid_sequential_requests() {
 
 #[tokio::test]
 async fn test_large_task_list_performance() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     // Create 100 tasks
     for i in 0..100 {
@@ -863,7 +864,7 @@ async fn test_large_task_list_performance() {
 
 #[tokio::test]
 async fn test_json_rpc_version_field() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -878,7 +879,7 @@ async fn test_json_rpc_version_field() {
 
 #[tokio::test]
 async fn test_request_id_preservation() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -897,7 +898,7 @@ async fn test_request_id_preservation() {
 
 #[tokio::test]
 async fn test_error_object_structure() {
-    let (server, socket_path, _) = setup_test_server().await;
+    let (server, socket_path, _, _temp_dir) = setup_test_server().await;
     let mut handle = server.start().await.unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -915,7 +916,7 @@ async fn test_error_object_structure() {
 
 #[tokio::test]
 async fn test_task_info_structure() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
 
@@ -944,7 +945,7 @@ async fn test_task_info_structure() {
 
 #[tokio::test]
 async fn test_approval_result_structure() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     let task = create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
 
@@ -974,7 +975,7 @@ async fn test_approval_result_structure() {
 
 #[tokio::test]
 async fn test_empty_filter_object() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
 
@@ -993,7 +994,7 @@ async fn test_empty_filter_object() {
 
 #[tokio::test]
 async fn test_filter_with_nonexistent_field() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     create_test_task(&state_store, "Task 1", TaskStatus::Todo).await;
 
@@ -1013,7 +1014,7 @@ async fn test_filter_with_nonexistent_field() {
 
 #[tokio::test]
 async fn test_very_long_task_title() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     let long_title = "A".repeat(1000);
     create_test_task(&state_store, &long_title, TaskStatus::Todo).await;
@@ -1032,7 +1033,7 @@ async fn test_very_long_task_title() {
 
 #[tokio::test]
 async fn test_task_with_special_characters() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     let special_title = r#"Task with "quotes", 'apostrophes', \backslashes, and émojis 🚀"#;
     create_test_task(&state_store, special_title, TaskStatus::Todo).await;
@@ -1051,7 +1052,7 @@ async fn test_task_with_special_characters() {
 
 #[tokio::test]
 async fn test_multiple_approvals_same_task() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     let task = create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
     let task_id = task.id.to_string();
@@ -1075,7 +1076,7 @@ async fn test_multiple_approvals_same_task() {
 
 #[tokio::test]
 async fn test_approve_then_reject_task() {
-    let (server, socket_path, state_store) = setup_test_server().await;
+    let (server, socket_path, state_store, _temp_dir) = setup_test_server().await;
 
     let task = create_test_task(&state_store, "Test Task", TaskStatus::Todo).await;
     let task_id = task.id.to_string();

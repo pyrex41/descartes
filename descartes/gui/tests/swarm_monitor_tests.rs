@@ -26,6 +26,7 @@ use uuid::Uuid;
 // ============================================================================
 
 /// Create a test agent with basic configuration
+/// Agents are created in Idle state
 fn create_test_agent(name: &str, task: &str) -> AgentRuntimeState {
     AgentRuntimeState::new(
         Uuid::new_v4(),
@@ -33,6 +34,32 @@ fn create_test_agent(name: &str, task: &str) -> AgentRuntimeState {
         task.to_string(),
         "test-backend".to_string(),
     )
+}
+
+/// Create a test agent that's already running
+/// Agents are initialized and put in Running state
+fn create_running_test_agent(name: &str, task: &str) -> AgentRuntimeState {
+    let mut agent = AgentRuntimeState::new(
+        Uuid::new_v4(),
+        name.to_string(),
+        task.to_string(),
+        "test-backend".to_string(),
+    );
+    agent.transition_to(AgentStatus::Initializing, None).ok();
+    agent.transition_to(AgentStatus::Running, None).ok();
+    agent
+}
+
+/// Create a test agent in Initializing state
+fn create_initializing_test_agent(name: &str, task: &str) -> AgentRuntimeState {
+    let mut agent = AgentRuntimeState::new(
+        Uuid::new_v4(),
+        name.to_string(),
+        task.to_string(),
+        "test-backend".to_string(),
+    );
+    agent.transition_to(AgentStatus::Initializing, None).ok();
+    agent
 }
 
 /// Create multiple test agents
@@ -117,12 +144,13 @@ fn test_agent_spawn_event() {
 #[test]
 fn test_status_change_event() {
     let mut state = SwarmMonitorState::new();
-    let agent = create_test_agent("test-agent", "test-task");
+    // Use an initializing agent so it can transition to Running
+    let agent = create_initializing_test_agent("test-agent", "test-task");
     let agent_id = agent.agent_id;
 
     state.update_agent(agent);
 
-    // Send status change event
+    // Send status change event (Initializing -> Running is valid)
     let event = AgentEvent::AgentStatusChanged {
         agent_id,
         status: AgentStatus::Running,
@@ -136,7 +164,8 @@ fn test_status_change_event() {
 #[test]
 fn test_thought_update_event() {
     let mut state = SwarmMonitorState::new();
-    let agent = create_test_agent("test-agent", "test-task");
+    // Use a running agent so it can transition to Thinking
+    let agent = create_running_test_agent("test-agent", "test-task");
     let agent_id = agent.agent_id;
 
     state.update_agent(agent);
@@ -178,12 +207,13 @@ fn test_progress_update_event() {
 #[test]
 fn test_completion_event() {
     let mut state = SwarmMonitorState::new();
-    let agent = create_test_agent("test-agent", "test-task");
+    // Use a running agent so it can transition to Completed
+    let agent = create_running_test_agent("test-agent", "test-task");
     let agent_id = agent.agent_id;
 
     state.update_agent(agent);
 
-    // Send completion event
+    // Send completion event (Running -> Completed is valid)
     let event = AgentEvent::AgentCompleted { agent_id };
     state.handle_agent_event(event);
 
@@ -194,12 +224,13 @@ fn test_completion_event() {
 #[test]
 fn test_failure_event() {
     let mut state = SwarmMonitorState::new();
-    let agent = create_test_agent("test-agent", "test-task");
+    // Use a running agent so it can transition to Failed
+    let agent = create_running_test_agent("test-agent", "test-task");
     let agent_id = agent.agent_id;
 
     state.update_agent(agent);
 
-    // Send failure event
+    // Send failure event (Running -> Failed is valid)
     let error = RuntimeAgentError::new("TEST_ERROR".to_string(), "Test error message".to_string());
     let event = AgentEvent::AgentFailed {
         agent_id,
@@ -271,17 +302,23 @@ fn test_filtering_during_live_updates() {
     let mut state = SwarmMonitorState::new();
 
     // Create agents with different statuses
-    let agents = vec![
+    // Need to follow state machine: Idle -> Initializing -> Running -> ...
+    let agents_data = vec![
         ("agent-1", AgentStatus::Running),
         ("agent-2", AgentStatus::Thinking),
         ("agent-3", AgentStatus::Completed),
         ("agent-4", AgentStatus::Failed),
     ];
 
-    for (name, status) in agents.iter() {
+    for (name, target_status) in agents_data.iter() {
         let mut agent = create_test_agent(name, "test-task");
-        let agent_id = agent.agent_id;
-        agent.transition_to(*status, None).ok();
+        // Transition through valid states
+        agent.transition_to(AgentStatus::Initializing, None).ok();
+        agent.transition_to(AgentStatus::Running, None).ok();
+        // Now transition to target if different from Running
+        if *target_status != AgentStatus::Running {
+            agent.transition_to(*target_status, None).ok();
+        }
         state.update_agent(agent);
     }
 
@@ -349,14 +386,21 @@ fn test_grouping_during_live_updates() {
     let mut state = SwarmMonitorState::new();
 
     // Create agents with different statuses
+    // Need to follow state machine: Idle -> Initializing -> Running -> ...
     for i in 0..6 {
         let mut agent = create_test_agent(&format!("agent-{}", i), "test-task");
-        let status = match i % 3 {
+        let target_status = match i % 3 {
             0 => AgentStatus::Running,
             1 => AgentStatus::Thinking,
             _ => AgentStatus::Completed,
         };
-        agent.transition_to(status, None).ok();
+        // Transition through valid states
+        agent.transition_to(AgentStatus::Initializing, None).ok();
+        agent.transition_to(AgentStatus::Running, None).ok();
+        // Now transition to target if different from Running
+        if target_status != AgentStatus::Running {
+            agent.transition_to(target_status, None).ok();
+        }
         state.update_agent(agent);
     }
 
@@ -449,15 +493,22 @@ fn test_filtering_performance_with_many_agents() {
     let mut state = SwarmMonitorState::new();
 
     // Create 100 agents with random statuses
+    // Need to follow state machine: Idle -> Initializing -> Running -> ...
     for i in 0..100 {
         let mut agent = create_test_agent(&format!("agent-{}", i), "test-task");
-        let status = match i % 4 {
+        let target_status = match i % 4 {
             0 => AgentStatus::Running,
             1 => AgentStatus::Thinking,
             2 => AgentStatus::Completed,
             _ => AgentStatus::Failed,
         };
-        agent.transition_to(status, None).ok();
+        // Transition through valid states
+        agent.transition_to(AgentStatus::Initializing, None).ok();
+        agent.transition_to(AgentStatus::Running, None).ok();
+        // Now transition to target if different from Running
+        if target_status != AgentStatus::Running {
+            agent.transition_to(target_status, None).ok();
+        }
         state.update_agent(agent);
     }
 
@@ -483,8 +534,11 @@ fn test_animation_tick_performance() {
     let mut state = SwarmMonitorState::new();
 
     // Add some agents with thinking state
+    // Need to follow state machine: Idle -> Initializing -> Running -> Thinking
     for i in 0..10 {
         let mut agent = create_test_agent(&format!("agent-{}", i), "test-task");
+        agent.transition_to(AgentStatus::Initializing, None).ok();
+        agent.transition_to(AgentStatus::Running, None).ok();
         agent.transition_to(AgentStatus::Thinking, None).ok();
         agent.update_thought("Processing...".to_string());
         state.update_agent(agent);
@@ -539,9 +593,12 @@ fn test_performance_stats() {
     let mut state = SwarmMonitorState::new();
 
     // Add some agents
+    // Need to follow state machine: Idle -> Initializing -> Running
     for i in 0..20 {
         let mut agent = create_test_agent(&format!("agent-{}", i), "test-task");
         if i % 2 == 0 {
+            // Transition through valid states to Running
+            agent.transition_to(AgentStatus::Initializing, None).ok();
             agent.transition_to(AgentStatus::Running, None).ok();
         }
         state.update_agent(agent);
@@ -744,10 +801,10 @@ fn test_complete_agent_lifecycle_with_live_updates() {
 fn test_concurrent_agent_updates() {
     let mut state = SwarmMonitorState::new();
 
-    // Spawn multiple agents
+    // Spawn multiple agents - use running agents so they can be transitioned
     let agent_ids: Vec<Uuid> = (0..10)
         .map(|i| {
-            let agent = create_test_agent(&format!("agent-{}", i), "task");
+            let agent = create_running_test_agent(&format!("agent-{}", i), "task");
             let agent_id = agent.agent_id;
             let event = AgentEvent::AgentSpawned { agent };
             state.handle_agent_event(event);
@@ -756,6 +813,7 @@ fn test_concurrent_agent_updates() {
         .collect();
 
     // Update all agents concurrently with different statuses
+    // (Running -> Running, Running -> Thinking, Running -> Completed are all valid)
     for (i, agent_id) in agent_ids.iter().enumerate() {
         let status = match i % 3 {
             0 => AgentStatus::Running,
@@ -799,15 +857,22 @@ fn test_filtering_with_live_updates() {
     let mut state = SwarmMonitorState::new();
 
     // Add 20 agents with different statuses
+    // Need to follow state machine: Idle -> Initializing -> Running -> ...
     for i in 0..20 {
         let mut agent = create_test_agent(&format!("agent-{}", i), "task");
-        let status = match i % 4 {
+        let target_status = match i % 4 {
             0 => AgentStatus::Running,
             1 => AgentStatus::Thinking,
             2 => AgentStatus::Completed,
             _ => AgentStatus::Failed,
         };
-        agent.transition_to(status, None).ok();
+        // Transition through valid states
+        agent.transition_to(AgentStatus::Initializing, None).ok();
+        agent.transition_to(AgentStatus::Running, None).ok();
+        // Now transition to target if different from Running
+        if target_status != AgentStatus::Running {
+            agent.transition_to(target_status, None).ok();
+        }
 
         let event = AgentEvent::AgentSpawned { agent };
         state.handle_agent_event(event);

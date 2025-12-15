@@ -728,8 +728,8 @@ impl SqliteStateStore {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO agent_states
-            (key, agent_id, name, status, metadata, state_data, version, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (key, agent_id, name, status, metadata, state_data, version, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&key)
@@ -739,6 +739,7 @@ impl SqliteStateStore {
         .bind(agent_state.metadata.to_string())
         .bind(&agent_state.state_data)
         .bind(agent_state.version)
+        .bind(agent_state.created_at)
         .bind(Utc::now().timestamp())
         .execute(&self.pool)
         .await

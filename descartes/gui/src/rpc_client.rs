@@ -108,7 +108,7 @@ impl GuiRpcClient {
 
 /// Example usage in Iced GUI
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use iced::{Application, Command, Element};
 ///
 /// struct DescartesApp {

@@ -384,6 +384,15 @@ impl SwarmMonitorState {
             AgentEvent::AgentThoughtUpdate { agent_id, thought } => {
                 if let Some(agent) = self.agents.get_mut(&agent_id) {
                     agent.update_thought(thought);
+                    // Auto-transition to Thinking state if not already
+                    if agent.status != RuntimeAgentStatus::Thinking {
+                        agent
+                            .transition_to(
+                                RuntimeAgentStatus::Thinking,
+                                Some("Agent is processing".to_string()),
+                            )
+                            .ok();
+                    }
                 }
             }
             AgentEvent::AgentProgressUpdate { agent_id, progress } => {

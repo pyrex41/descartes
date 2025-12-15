@@ -457,9 +457,10 @@ fn test_multiple_column_transitions() {
     assert_eq!(state.kanban_board.blocked.len(), 0);
 
     // Verify statistics
+    // initial_updates is captured after create, so we only add the 4 updates
     assert_eq!(
         state.realtime_state.updates_applied,
-        initial_updates + 5 // 1 create + 4 updates
+        initial_updates + 4 // 4 updates (create already counted in initial_updates)
     );
 }
 

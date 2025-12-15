@@ -13,7 +13,7 @@ use tempfile::NamedTempFile;
 use tokio::time::sleep;
 use uuid::Uuid;
 
-async fn setup_test_system() -> (TaskEventEmitter, Arc<EventBus>) {
+async fn setup_test_system() -> (TaskEventEmitter, Arc<EventBus>, NamedTempFile) {
     let temp_file = NamedTempFile::new().expect("Failed to create temp file");
     let db_path = temp_file.path().to_str().unwrap();
 
@@ -41,12 +41,12 @@ async fn setup_test_system() -> (TaskEventEmitter, Arc<EventBus>) {
         .await
         .expect("Failed to initialize cache");
 
-    (emitter, event_bus)
+    (emitter, event_bus, temp_file)
 }
 
 #[tokio::test]
 async fn test_concurrent_task_operations() {
-    let (emitter, event_bus) = setup_test_system().await;
+    let (emitter, event_bus, _temp_file) = setup_test_system().await;
     let emitter = Arc::new(emitter);
 
     // Subscribe to events
@@ -93,7 +93,7 @@ async fn test_concurrent_task_operations() {
 
 #[tokio::test]
 async fn test_task_lifecycle_events() {
-    let (emitter, event_bus) = setup_test_system().await;
+    let (emitter, event_bus, _temp_file) = setup_test_system().await;
 
     // Subscribe to events
     let (_sub_id, mut rx) = event_bus.subscribe(None).await;
@@ -173,7 +173,7 @@ async fn test_task_lifecycle_events() {
 
 #[tokio::test]
 async fn test_event_ordering() {
-    let (emitter, event_bus) = setup_test_system().await;
+    let (emitter, event_bus, _temp_file) = setup_test_system().await;
 
     // Subscribe to events
     let (_sub_id, mut rx) = event_bus.subscribe(None).await;
@@ -221,7 +221,7 @@ async fn test_event_ordering() {
 
 #[tokio::test]
 async fn test_statistics_accuracy() {
-    let (emitter, _) = setup_test_system().await;
+    let (emitter, _, _temp_file) = setup_test_system().await;
 
     // Create tasks
     let task_count = 20;
@@ -325,7 +325,7 @@ async fn test_rapid_updates_with_debouncing() {
 
 #[tokio::test]
 async fn test_multiple_subscribers() {
-    let (emitter, event_bus) = setup_test_system().await;
+    let (emitter, event_bus, _temp_file) = setup_test_system().await;
 
     // Create multiple subscribers
     let (_sub1, mut rx1) = event_bus.subscribe(None).await;

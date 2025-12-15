@@ -53,8 +53,8 @@ fn test_single_node_drag() {
     // Get initial position
     let initial_pos = state.dag.get_node(node_id).unwrap().position;
 
-    // Click on node
-    let click_pos = Point::new(130.0, 130.0);
+    // Click on node (offset by 30 pixels from node position to be inside the node)
+    let click_pos = Point::new(initial_pos.x as f32 + 30.0, initial_pos.y as f32 + 30.0);
     let result = handle_mouse_press(
         &mut state,
         mouse::Button::Left,
@@ -166,12 +166,24 @@ fn test_drag_with_snap_to_grid() {
 fn test_edge_creation_via_drag() {
     let mut state = create_test_state();
     state.tool = Tool::AddEdge;
-    let node_ids = get_node_ids(&state);
 
-    let from_node = node_ids[0];
-    let to_node = node_ids[1];
+    // Find the nodes by their positions
+    let from_node = state
+        .dag
+        .nodes
+        .values()
+        .find(|n| n.position.x == 100.0 && n.position.y == 100.0)
+        .unwrap()
+        .node_id;
+    let to_node = state
+        .dag
+        .nodes
+        .values()
+        .find(|n| n.position.x == 300.0 && n.position.y == 100.0)
+        .unwrap()
+        .node_id;
 
-    // Click on source node
+    // Click on source node (at 100, 100)
     let from_pos = Point::new(130.0, 130.0);
     let result = handle_mouse_press(
         &mut state,
@@ -186,7 +198,7 @@ fn test_edge_creation_via_drag() {
     ));
     assert!(state.extended_interaction.edge_creation.is_some());
 
-    // Drag to target node
+    // Drag to target node (at 300, 100)
     let to_pos = Point::new(330.0, 130.0);
     handle_mouse_move(&mut state, to_pos);
 
@@ -207,14 +219,29 @@ fn test_edge_creation_via_drag() {
 fn test_edge_creation_cycle_prevention() {
     let mut state = create_test_state();
     state.tool = Tool::AddEdge;
-    let node_ids = get_node_ids(&state);
+
+    // Find the nodes by their positions
+    let node_a = state
+        .dag
+        .nodes
+        .values()
+        .find(|n| n.position.x == 100.0 && n.position.y == 100.0)
+        .unwrap()
+        .node_id;
+    let node_b = state
+        .dag
+        .nodes
+        .values()
+        .find(|n| n.position.x == 300.0 && n.position.y == 100.0)
+        .unwrap()
+        .node_id;
 
     // Create edge A -> B
-    let edge = DAGEdge::new(node_ids[0], node_ids[1], EdgeType::Dependency);
+    let edge = DAGEdge::new(node_a, node_b, EdgeType::Dependency);
     state.dag.add_edge(edge).unwrap();
 
     // Try to create edge B -> A (would create cycle)
-    let from_pos = Point::new(330.0, 130.0); // Node B
+    let from_pos = Point::new(330.0, 130.0); // Node B at (300, 100)
     handle_mouse_press(
         &mut state,
         mouse::Button::Left,
@@ -222,7 +249,7 @@ fn test_edge_creation_cycle_prevention() {
         keyboard::Modifiers::default(),
     );
 
-    let to_pos = Point::new(130.0, 130.0); // Node A
+    let to_pos = Point::new(130.0, 130.0); // Node A at (100, 100)
     handle_mouse_move(&mut state, to_pos);
 
     let initial_edge_count = state.dag.edges.len();
@@ -293,9 +320,24 @@ fn test_box_selection() {
 #[test]
 fn test_ctrl_click_multi_select() {
     let mut state = create_test_state();
-    let node_ids = get_node_ids(&state);
 
-    // Click first node
+    // Find the nodes by their positions
+    let node_at_100_100 = state
+        .dag
+        .nodes
+        .values()
+        .find(|n| n.position.x == 100.0 && n.position.y == 100.0)
+        .unwrap()
+        .node_id;
+    let node_at_300_100 = state
+        .dag
+        .nodes
+        .values()
+        .find(|n| n.position.x == 300.0 && n.position.y == 100.0)
+        .unwrap()
+        .node_id;
+
+    // Click first node (at 100, 100)
     let pos1 = Point::new(130.0, 130.0);
     handle_mouse_press(
         &mut state,
@@ -305,8 +347,9 @@ fn test_ctrl_click_multi_select() {
     );
 
     assert_eq!(state.interaction.selected_nodes.len(), 1);
+    assert!(state.interaction.selected_nodes.contains(&node_at_100_100));
 
-    // Ctrl+click second node
+    // Ctrl+click second node (at 300, 100)
     let pos2 = Point::new(330.0, 130.0);
     handle_mouse_press(
         &mut state,
@@ -326,7 +369,8 @@ fn test_ctrl_click_multi_select() {
     );
 
     assert_eq!(state.interaction.selected_nodes.len(), 1);
-    assert!(!state.interaction.selected_nodes.contains(&node_ids[0]));
+    assert!(!state.interaction.selected_nodes.contains(&node_at_100_100));
+    assert!(state.interaction.selected_nodes.contains(&node_at_300_100));
 }
 
 #[test]

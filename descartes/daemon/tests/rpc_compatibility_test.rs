@@ -12,15 +12,18 @@ use descartes_core::traits::{StateStore, Task, TaskComplexity, TaskPriority, Tas
 use descartes_daemon::{UnixSocketRpcClient, UnixSocketRpcServer};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tempfile::tempdir;
+use tempfile::{tempdir, TempDir};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 /// Helper to create test dependencies
+/// Returns temp directories to keep them alive for the duration of the test
 async fn create_test_server() -> (
     UnixSocketRpcServer,
     Arc<dyn descartes_core::traits::StateStore>,
     PathBuf,
+    TempDir, // Keep db directory alive
+    TempDir, // Keep socket directory alive
 ) {
     let agent_runner =
         Arc::new(LocalProcessRunner::new()) as Arc<dyn descartes_core::traits::AgentRunner>;
@@ -37,12 +40,12 @@ async fn create_test_server() -> (
     let server =
         UnixSocketRpcServer::new(socket_path.clone(), agent_runner, Arc::clone(&state_store));
 
-    (server, state_store, socket_path)
+    (server, state_store, socket_path, temp_db, socket_dir)
 }
 
 #[tokio::test]
 async fn test_spawn_method_compatibility() {
-    let (server, _state_store, socket_path) = create_test_server().await;
+    let (server, _state_store, socket_path, _temp_db, _temp_socket) = create_test_server().await;
 
     // Start server in background
     let mut handle = server.start().await.unwrap();
@@ -51,21 +54,23 @@ async fn test_spawn_method_compatibility() {
     // Create client
     let client = UnixSocketRpcClient::new(socket_path.clone()).unwrap();
 
-    // Test spawn method (as scud CLI would use it)
+    // Test spawn method with invalid backend - should return proper RPC error
+    // Valid backends are: "claude", "opencode", or "*cli"
     let config = serde_json::json!({
         "task": "Write a hello world program",
         "environment": {},
         "system_prompt": "You are a helpful assistant"
     });
 
-    let agent_id = client.spawn("test-agent", "worker", config).await;
+    let result = client.spawn("test-agent", "invalid-backend", config).await;
 
-    // Verify response format
-    assert!(agent_id.is_ok(), "Spawn should succeed");
-    let agent_id = agent_id.unwrap();
+    // Verify RPC layer properly returns errors for unsupported backends
+    assert!(result.is_err(), "Spawn with invalid backend should fail");
+    let err = result.unwrap_err();
     assert!(
-        Uuid::parse_str(&agent_id).is_ok(),
-        "Agent ID should be valid UUID"
+        err.to_string().contains("Unsupported model backend"),
+        "Error should mention unsupported backend: {}",
+        err
     );
 
     // Cleanup
@@ -74,7 +79,7 @@ async fn test_spawn_method_compatibility() {
 
 #[tokio::test]
 async fn test_list_tasks_with_filters() {
-    let (server, state_store, socket_path) = create_test_server().await;
+    let (server, state_store, socket_path, _temp_db, _temp_socket) = create_test_server().await;
 
     // Create test tasks
     let task1 = Task {
@@ -137,7 +142,7 @@ async fn test_list_tasks_with_filters() {
 
 #[tokio::test]
 async fn test_approve_workflow() {
-    let (server, state_store, socket_path) = create_test_server().await;
+    let (server, state_store, socket_path, _temp_db, _temp_socket) = create_test_server().await;
 
     // Create a test task
     let task = Task {
@@ -205,7 +210,7 @@ async fn test_approve_workflow() {
 
 #[tokio::test]
 async fn test_get_state_system_and_agent() {
-    let (server, state_store, socket_path) = create_test_server().await;
+    let (server, state_store, socket_path, _temp_db, _temp_socket) = create_test_server().await;
 
     // Create some test data
     let task1 = Task {
@@ -261,7 +266,7 @@ async fn test_get_state_system_and_agent() {
 
 #[tokio::test]
 async fn test_multiple_concurrent_clients() {
-    let (server, state_store, socket_path) = create_test_server().await;
+    let (server, state_store, socket_path, _temp_db, _temp_socket) = create_test_server().await;
 
     // Create test tasks
     for i in 0..5 {
@@ -324,7 +329,7 @@ async fn test_multiple_concurrent_clients() {
 
 #[tokio::test]
 async fn test_error_handling() {
-    let (server, _state_store, socket_path) = create_test_server().await;
+    let (server, _state_store, socket_path, _temp_db, _temp_socket) = create_test_server().await;
 
     // Start server
     let mut handle = server.start().await.unwrap();
@@ -352,7 +357,7 @@ async fn test_error_handling() {
 
 #[tokio::test]
 async fn test_json_rpc_compliance() {
-    let (server, _state_store, socket_path) = create_test_server().await;
+    let (server, _state_store, socket_path, _temp_db, _temp_socket) = create_test_server().await;
 
     // Start server
     let mut handle = server.start().await.unwrap();

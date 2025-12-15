@@ -756,21 +756,49 @@ impl DAG {
             return Err(DAGError::NoStartNodes);
         }
 
-        let mut reachable = HashSet::new();
-        for start in start_nodes {
-            let _ = self.bfs_from(start, |node_id, _| {
-                reachable.insert(node_id);
-            });
-        }
+        // Use weak connectivity check (treating edges as bidirectional)
+        if !self.is_connected() {
+            // Find disconnected nodes by doing BFS from first node
+            let first_node = match self.nodes.keys().next() {
+                Some(id) => *id,
+                None => return Ok(()),
+            };
 
-        let unreachable: Vec<Uuid> = self
-            .nodes
-            .keys()
-            .filter(|id| !reachable.contains(id))
-            .copied()
-            .collect();
+            let mut visited = HashSet::new();
+            let mut queue = std::collections::VecDeque::new();
+            queue.push_back(first_node);
+            visited.insert(first_node);
 
-        if !unreachable.is_empty() {
+            while let Some(node_id) = queue.pop_front() {
+                // Follow outgoing edges (adjacency stores edge IDs)
+                if let Some(edge_ids) = self.adjacency_out.get(&node_id) {
+                    for &edge_id in edge_ids {
+                        if let Some(edge) = self.edges.get(&edge_id) {
+                            if visited.insert(edge.to_node_id) {
+                                queue.push_back(edge.to_node_id);
+                            }
+                        }
+                    }
+                }
+                // Follow incoming edges (reverse direction)
+                if let Some(edge_ids) = self.adjacency_in.get(&node_id) {
+                    for &edge_id in edge_ids {
+                        if let Some(edge) = self.edges.get(&edge_id) {
+                            if visited.insert(edge.from_node_id) {
+                                queue.push_back(edge.from_node_id);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let unreachable: Vec<Uuid> = self
+                .nodes
+                .keys()
+                .filter(|id| !visited.contains(id))
+                .copied()
+                .collect();
+
             return Err(DAGError::UnreachableNodes(unreachable));
         }
 
@@ -1101,25 +1129,48 @@ impl DAG {
         })
     }
 
-    /// Check if the DAG is connected (all nodes reachable from start nodes)
+    /// Check if the DAG is weakly connected (all nodes connected when ignoring edge direction)
     pub fn is_connected(&self) -> bool {
         if self.nodes.is_empty() {
             return true;
         }
 
-        let start_nodes = self.get_start_nodes();
-        if start_nodes.is_empty() {
-            return false;
+        // For weak connectivity, we need to check if all nodes are reachable
+        // when treating edges as bidirectional (undirected graph connectivity)
+        let first_node = match self.nodes.keys().next() {
+            Some(id) => *id,
+            None => return true,
+        };
+
+        let mut visited = HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back(first_node);
+        visited.insert(first_node);
+
+        while let Some(node_id) = queue.pop_front() {
+            // Follow outgoing edges (adjacency stores edge IDs, need to get target node)
+            if let Some(edge_ids) = self.adjacency_out.get(&node_id) {
+                for &edge_id in edge_ids {
+                    if let Some(edge) = self.edges.get(&edge_id) {
+                        if visited.insert(edge.to_node_id) {
+                            queue.push_back(edge.to_node_id);
+                        }
+                    }
+                }
+            }
+            // Follow incoming edges (reverse direction for weak connectivity)
+            if let Some(edge_ids) = self.adjacency_in.get(&node_id) {
+                for &edge_id in edge_ids {
+                    if let Some(edge) = self.edges.get(&edge_id) {
+                        if visited.insert(edge.from_node_id) {
+                            queue.push_back(edge.from_node_id);
+                        }
+                    }
+                }
+            }
         }
 
-        let mut reachable = HashSet::new();
-        for start in start_nodes {
-            let _ = self.bfs_from(start, |node_id, _| {
-                reachable.insert(node_id);
-            });
-        }
-
-        reachable.len() == self.nodes.len()
+        visited.len() == self.nodes.len()
     }
 
     /// Rebuild adjacency lists from edges (called after deserialization)
@@ -1868,21 +1919,19 @@ mod tests {
 
         assert!(dag.validate_connectivity().is_ok());
 
-        // Add a node that IS reachable from a start node via edges
-        // Note: A node with no incoming edges is itself a start node,
-        // so a truly isolated node would still be "reachable" from itself.
-        // The connectivity check ensures all nodes are reachable from some start node.
-        // Since all nodes without incoming edges ARE start nodes, an isolated node
-        // with no edges is valid (it's reachable from itself as a start node).
-
-        // To test unreachable nodes, we need a node that has incoming edges
-        // but those edges don't connect to any start node path.
-        // However, this is actually tested via cycle detection and other means.
-        // For now, just verify the basic connectivity check passes.
-        let node3 = DAGNode::new_auto("AnotherStart");
+        // Add an isolated node - this should fail connectivity check
+        // because weak connectivity requires all nodes to be in the same component
+        let node3 = DAGNode::new_auto("Isolated");
+        let id3 = node3.node_id;
         dag.add_node(node3).unwrap();
 
-        // This should pass - node3 is a start node (no incoming edges)
+        // This should fail - node3 is not connected to nodes 1 and 2
+        assert!(dag.validate_connectivity().is_err());
+
+        // Connect node3 to the existing graph
+        dag.add_edge(DAGEdge::dependency(id2, id3)).unwrap();
+
+        // Now it should pass
         assert!(dag.validate_connectivity().is_ok());
     }
 
