@@ -652,6 +652,59 @@ impl AgentRunner for LocalProcessRunner {
             )))
         }
     }
+
+    async fn write_stdin(&self, agent_id: &Uuid, data: &[u8]) -> AgentResult<()> {
+        if let Some(handle) = self.agents.get(agent_id) {
+            let stdin = {
+                let handle_guard = handle.read();
+                Arc::clone(&handle_guard.stdin)
+            };
+
+            let mut stdin_guard = stdin.lock().await;
+            stdin_guard.write_all(data).await?;
+            stdin_guard.flush().await?;
+            Ok(())
+        } else {
+            Err(AgentError::NotFound(format!(
+                "Agent not found: {}",
+                agent_id
+            )))
+        }
+    }
+
+    async fn read_stdout(&self, agent_id: &Uuid) -> AgentResult<Option<Vec<u8>>> {
+        if let Some(handle) = self.agents.get(agent_id) {
+            let stdout_buffer = {
+                let handle_guard = handle.read();
+                Arc::clone(&handle_guard.stdout_buffer)
+            };
+
+            let mut buffer = stdout_buffer.lock().await;
+            Ok(buffer.try_recv().ok())
+        } else {
+            Err(AgentError::NotFound(format!(
+                "Agent not found: {}",
+                agent_id
+            )))
+        }
+    }
+
+    async fn read_stderr(&self, agent_id: &Uuid) -> AgentResult<Option<Vec<u8>>> {
+        if let Some(handle) = self.agents.get(agent_id) {
+            let stderr_buffer = {
+                let handle_guard = handle.read();
+                Arc::clone(&handle_guard.stderr_buffer)
+            };
+
+            let mut buffer = stderr_buffer.lock().await;
+            Ok(buffer.try_recv().ok())
+        } else {
+            Err(AgentError::NotFound(format!(
+                "Agent not found: {}",
+                agent_id
+            )))
+        }
+    }
 }
 
 /// LocalAgentHandle manages a single spawned agent process.
@@ -1160,6 +1213,16 @@ impl AgentHandle for AgentHandleWrapper {
             .exit_status
             .as_ref()
             .and_then(|exit_status| exit_status.code)
+    }
+
+    fn subscribe_stdout(&self) -> broadcast::Receiver<Vec<u8>> {
+        let handle = self.handle.read();
+        handle.stdout_broadcast.subscribe()
+    }
+
+    fn subscribe_stderr(&self) -> broadcast::Receiver<Vec<u8>> {
+        let handle = self.handle.read();
+        handle.stderr_broadcast.subscribe()
     }
 }
 

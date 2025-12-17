@@ -31,16 +31,17 @@
 use crate::errors::{AgentError, AgentResult};
 use crate::traits::{AgentConfig, AgentInfo, AgentStatus};
 use crate::zmq_agent_runner::{
-    BatchControlCommand, BatchControlResponse, CommandResponse, ControlCommand, ControlCommandType,
-    CustomActionRequest, HealthCheckRequest, HealthCheckResponse, ListAgentsRequest,
-    OutputQueryRequest, OutputQueryResponse, SpawnRequest,
-    StatusUpdate, ZmqAgentRunner, ZmqMessage, ZmqOutputStream, ZmqRunnerConfig,
+    deserialize_zmq_message, BatchControlCommand, BatchControlResponse, CommandResponse,
+    ControlCommand, ControlCommandType, CustomActionRequest, HealthCheckRequest,
+    HealthCheckResponse, ListAgentsRequest, LogStreamMessage, OutputQueryRequest,
+    OutputQueryResponse, SpawnRequest, StatusUpdate, ZmqAgentRunner, ZmqMessage, ZmqOutputStream,
+    ZmqRunnerConfig,
 };
 use crate::zmq_communication::{SocketType, ZmqConnection, ZmqMessageRouter};
 use async_trait::async_trait;
 use futures::stream::{Stream, StreamExt};
 use parking_lot::RwLock;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -59,8 +60,10 @@ struct QueuedCommand {
 
 /// ZMQ client for remote agent management
 pub struct ZmqClient {
-    /// ZMQ connection
+    /// ZMQ connection (REQ socket for commands)
     connection: Arc<Mutex<ZmqConnection>>,
+    /// SUB connection for log streaming (optional)
+    sub_connection: Arc<Mutex<Option<ZmqConnection>>>,
     /// Configuration
     config: ZmqRunnerConfig,
     /// Message router for request/response correlation
@@ -68,6 +71,9 @@ pub struct ZmqClient {
     /// Status update subscribers
     status_subscribers:
         Arc<RwLock<Vec<tokio::sync::mpsc::UnboundedSender<AgentResult<StatusUpdate>>>>>,
+    /// Log stream subscribers by agent ID
+    log_subscribers:
+        Arc<RwLock<HashMap<Uuid, Vec<tokio::sync::mpsc::UnboundedSender<LogStreamMessage>>>>>,
     /// Command queue for when disconnected
     command_queue: Arc<Mutex<VecDeque<QueuedCommand>>>,
     /// Maximum queue size (prevents unbounded growth during long disconnections)
@@ -98,9 +104,11 @@ impl ZmqClient {
 
         Self {
             connection: Arc::new(Mutex::new(connection)),
+            sub_connection: Arc::new(Mutex::new(None)),
             config,
             _router: Arc::new(ZmqMessageRouter::new()),
             status_subscribers: Arc::new(RwLock::new(Vec::new())),
+            log_subscribers: Arc::new(RwLock::new(HashMap::new())),
             command_queue: Arc::new(Mutex::new(VecDeque::new())),
             _max_queue_size: 1000, // Default: queue up to 1000 commands
         }
@@ -117,9 +125,11 @@ impl ZmqClient {
 
         Self {
             connection: Arc::new(Mutex::new(connection)),
+            sub_connection: Arc::new(Mutex::new(None)),
             config,
             _router: Arc::new(ZmqMessageRouter::new()),
             status_subscribers: Arc::new(RwLock::new(Vec::new())),
+            log_subscribers: Arc::new(RwLock::new(HashMap::new())),
             command_queue: Arc::new(Mutex::new(VecDeque::new())),
             _max_queue_size: 1000, // Default: queue up to 1000 commands
         }
@@ -557,6 +567,197 @@ impl ZmqClient {
         rx.await.map_err(|e| {
             AgentError::ExecutionError(format!("Queued command response channel closed: {}", e))
         })?
+    }
+
+    /// Connect to a PUB endpoint for log streaming.
+    ///
+    /// This must be called before `stream_logs()` can work.
+    ///
+    /// # Arguments
+    ///
+    /// * `pub_endpoint` - The PUB socket endpoint (e.g., "tcp://localhost:5556")
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use descartes_core::ZmqClient;
+    /// # async fn example(client: &ZmqClient) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Connect to PUB endpoint for log streaming
+    /// client.connect_log_stream("tcp://localhost:5556").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect_log_stream(&self, pub_endpoint: &str) -> AgentResult<()> {
+        let mut sub_conn_guard = self.sub_connection.lock().await;
+
+        // Create and connect SUB socket
+        let mut sub_connection =
+            ZmqConnection::new(SocketType::Sub, pub_endpoint, self.config.clone());
+        sub_connection.connect().await?;
+
+        tracing::info!("Connected to PUB endpoint for log streaming: {}", pub_endpoint);
+
+        *sub_conn_guard = Some(sub_connection);
+
+        // Spawn the log receiver task
+        self.spawn_log_receiver_task();
+
+        Ok(())
+    }
+
+    /// Disconnect from log streaming.
+    pub async fn disconnect_log_stream(&self) -> AgentResult<()> {
+        let mut sub_conn_guard = self.sub_connection.lock().await;
+
+        if let Some(mut conn) = sub_conn_guard.take() {
+            conn.disconnect().await?;
+            tracing::info!("Disconnected from log stream");
+        }
+
+        Ok(())
+    }
+
+    /// Subscribe to log stream for a specific agent.
+    ///
+    /// Returns a receiver that will receive log messages for the agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_id` - The agent to subscribe to
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use descartes_core::ZmqClient;
+    /// # use uuid::Uuid;
+    /// # async fn example(client: &ZmqClient) -> Result<(), Box<dyn std::error::Error>> {
+    /// let agent_id = Uuid::new_v4();
+    ///
+    /// // Connect to PUB endpoint first
+    /// client.connect_log_stream("tcp://localhost:5556").await?;
+    ///
+    /// // Subscribe to agent's logs
+    /// let mut rx = client.subscribe_logs(agent_id);
+    ///
+    /// while let Some(msg) = rx.recv().await {
+    ///     println!("{:?}: {}", msg.stream_type, String::from_utf8_lossy(&msg.data));
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn subscribe_logs(
+        &self,
+        agent_id: Uuid,
+    ) -> tokio::sync::mpsc::UnboundedReceiver<LogStreamMessage> {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+
+        // Add to subscribers for this agent
+        self.log_subscribers
+            .write()
+            .entry(agent_id)
+            .or_default()
+            .push(tx);
+
+        tracing::debug!("Subscribed to logs for agent {}", agent_id);
+
+        rx
+    }
+
+    /// Stream logs for an agent via the ZMQ StreamLogs command.
+    ///
+    /// This sends a StreamLogs command to the server to get subscription info,
+    /// then uses the PUB/SUB connection to receive logs.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_id` - The agent to stream logs from
+    ///
+    /// # Returns
+    ///
+    /// A stream of log messages
+    pub async fn stream_logs(
+        &self,
+        agent_id: Uuid,
+    ) -> AgentResult<impl Stream<Item = LogStreamMessage>> {
+        // First, send StreamLogs command to get PUB endpoint info
+        let response = self
+            .send_control_command(&agent_id, ControlCommandType::StreamLogs, None)
+            .await?;
+
+        // Extract PUB endpoint from response if not already connected
+        if let Some(data) = &response.data {
+            if let Some(pub_endpoint) = data.get("pub_endpoint").and_then(|v| v.as_str()) {
+                // Connect to PUB endpoint if not already connected
+                let sub_conn_guard = self.sub_connection.lock().await;
+                if sub_conn_guard.is_none() {
+                    drop(sub_conn_guard);
+                    self.connect_log_stream(pub_endpoint).await?;
+                }
+            }
+        }
+
+        // Subscribe to logs for this agent
+        let rx = self.subscribe_logs(agent_id);
+
+        // Convert to stream
+        let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx);
+
+        Ok(stream)
+    }
+
+    /// Spawn background task to receive log messages from SUB socket.
+    fn spawn_log_receiver_task(&self) {
+        let sub_connection = self.sub_connection.clone();
+        let log_subscribers = self.log_subscribers.clone();
+
+        tokio::spawn(async move {
+            loop {
+                // Get connection
+                let conn_guard = sub_connection.lock().await;
+                let conn = match conn_guard.as_ref() {
+                    Some(c) => c,
+                    None => {
+                        drop(conn_guard);
+                        // No connection, wait and retry
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        continue;
+                    }
+                };
+
+                // Try to receive with timeout
+                let result = conn.recv_with_topic(Some(Duration::from_secs(1))).await;
+                drop(conn_guard);
+
+                match result {
+                    Ok((_topic, data)) => {
+                        // Deserialize message
+                        match deserialize_zmq_message(&data) {
+                            Ok(ZmqMessage::LogStream(msg)) => {
+                                // Dispatch to subscribers for this agent
+                                let subscribers = log_subscribers.read();
+                                if let Some(senders) = subscribers.get(&msg.agent_id) {
+                                    for tx in senders {
+                                        let _ = tx.send(msg.clone());
+                                    }
+                                }
+                            }
+                            Ok(_) => {
+                                tracing::warn!("Received non-LogStream message on SUB socket");
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to deserialize log message: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // Check if it's a timeout (expected)
+                        if !e.to_string().contains("Timeout") {
+                            tracing::warn!("Error receiving from SUB socket: {}", e);
+                        }
+                    }
+                }
+            }
+        });
     }
 }
 

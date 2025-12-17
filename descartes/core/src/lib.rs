@@ -101,9 +101,9 @@ pub use zmq_agent_runner::{
     deserialize_zmq_message, serialize_zmq_message, validate_message_size, BatchAgentResult,
     BatchControlCommand, BatchControlResponse, CommandResponse, ControlCommand, ControlCommandType,
     CustomActionRequest, HealthCheckRequest, HealthCheckResponse, ListAgentsRequest,
-    ListAgentsResponse, OutputQueryRequest, OutputQueryResponse, SpawnRequest, SpawnResponse,
-    StatusUpdate, StatusUpdateType, ZmqAgentRunner, ZmqMessage, ZmqOutputStream, ZmqRunnerConfig,
-    DEFAULT_TIMEOUT_SECS, MAX_MESSAGE_SIZE, ZMQ_PROTOCOL_VERSION,
+    ListAgentsResponse, LogStreamMessage, LogStreamType, OutputQueryRequest, OutputQueryResponse,
+    SpawnRequest, SpawnResponse, StatusUpdate, StatusUpdateType, ZmqAgentRunner, ZmqMessage,
+    ZmqOutputStream, ZmqRunnerConfig, DEFAULT_TIMEOUT_SECS, MAX_MESSAGE_SIZE, ZMQ_PROTOCOL_VERSION,
 };
 
 pub use zmq_communication::{

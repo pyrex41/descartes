@@ -40,7 +40,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
-use zeromq::{DealerSocket, RepSocket, ReqSocket, RouterSocket, Socket, SocketRecv, SocketSend};
+use zeromq::{
+    DealerSocket, PubSocket, RepSocket, ReqSocket, RouterSocket, Socket, SocketRecv, SocketSend,
+    SubSocket,
+};
 
 /// Maximum number of reconnection attempts before giving up
 const _MAX_RECONNECT_ATTEMPTS: u32 = 10;
@@ -110,6 +113,10 @@ pub enum SocketType {
     Dealer,
     /// ROUTER socket (server side, asynchronous)
     Router,
+    /// PUB socket (server side, broadcast)
+    Pub,
+    /// SUB socket (client side, subscribe)
+    Sub,
 }
 
 /// ZMQ connection wrapper for managing socket communication
@@ -194,6 +201,56 @@ impl SocketWrapper for RouterSocketWrapper {
     }
 }
 
+/// Wrapper for PubSocket (broadcast publishing)
+struct PubSocketWrapper(PubSocket);
+
+#[async_trait::async_trait]
+impl SocketWrapper for PubSocketWrapper {
+    async fn send(&mut self, data: Vec<u8>) -> Result<(), zeromq::ZmqError> {
+        self.0.send(data.into()).await
+    }
+
+    async fn recv(&mut self) -> Result<zeromq::ZmqMessage, zeromq::ZmqError> {
+        // PUB sockets don't receive messages
+        Err(zeromq::ZmqError::Other(
+            "PUB sockets cannot receive messages",
+        ))
+    }
+}
+
+/// Wrapper for SubSocket (subscribe to topics)
+struct SubSocketWrapper {
+    socket: SubSocket,
+}
+
+#[async_trait::async_trait]
+impl SocketWrapper for SubSocketWrapper {
+    async fn send(&mut self, _data: Vec<u8>) -> Result<(), zeromq::ZmqError> {
+        // SUB sockets don't send messages
+        Err(zeromq::ZmqError::Other(
+            "SUB sockets cannot send messages",
+        ))
+    }
+
+    async fn recv(&mut self) -> Result<zeromq::ZmqMessage, zeromq::ZmqError> {
+        self.socket.recv().await
+    }
+}
+
+impl SubSocketWrapper {
+    /// Subscribe to a topic
+    #[allow(dead_code)]
+    async fn subscribe(&mut self, topic: &str) -> Result<(), zeromq::ZmqError> {
+        self.socket.subscribe(topic).await
+    }
+
+    /// Unsubscribe from a topic
+    #[allow(dead_code)]
+    async fn unsubscribe(&mut self, topic: &str) -> Result<(), zeromq::ZmqError> {
+        self.socket.unsubscribe(topic).await
+    }
+}
+
 impl ZmqConnection {
     /// Create a new ZMQ connection
     ///
@@ -271,6 +328,20 @@ impl ZmqConnection {
                     AgentError::ExecutionError(format!("Failed to bind ROUTER socket: {}", e))
                 })?;
                 Box::new(RouterSocketWrapper(sock)) as Box<dyn SocketWrapper>
+            }
+            SocketType::Pub => {
+                let mut sock = PubSocket::new();
+                sock.bind(&self.endpoint).await.map_err(|e| {
+                    AgentError::ExecutionError(format!("Failed to bind PUB socket: {}", e))
+                })?;
+                Box::new(PubSocketWrapper(sock)) as Box<dyn SocketWrapper>
+            }
+            SocketType::Sub => {
+                let mut sock = SubSocket::new();
+                sock.connect(&self.endpoint).await.map_err(|e| {
+                    AgentError::ExecutionError(format!("Failed to connect SUB socket: {}", e))
+                })?;
+                Box::new(SubSocketWrapper { socket: sock }) as Box<dyn SocketWrapper>
             }
         };
 
@@ -547,6 +618,160 @@ impl ZmqConnection {
             "Failed to reconnect after {} attempts",
             max_attempts
         )))
+    }
+
+    /// Send a message with a topic prefix (for PUB sockets).
+    ///
+    /// The topic is prepended to the message for subscriber filtering.
+    /// Format: [topic bytes][null byte][message bytes]
+    ///
+    /// # Arguments
+    ///
+    /// * `topic` - The topic string for routing
+    /// * `data` - The message data to send
+    pub async fn send_with_topic(&self, topic: &str, data: &[u8]) -> AgentResult<()> {
+        if !self.is_connected() {
+            return Err(AgentError::ExecutionError(
+                "Cannot send message: not connected".to_string(),
+            ));
+        }
+
+        if self.socket_type != SocketType::Pub {
+            return Err(AgentError::ExecutionError(
+                "send_with_topic only supported on PUB sockets".to_string(),
+            ));
+        }
+
+        // Build message with topic prefix: [topic][null][data]
+        let mut msg_bytes = Vec::with_capacity(topic.len() + 1 + data.len());
+        msg_bytes.extend_from_slice(topic.as_bytes());
+        msg_bytes.push(0); // null separator
+        msg_bytes.extend_from_slice(data);
+
+        let mut socket_guard = self.socket.lock().await;
+        if let Some(socket) = socket_guard.as_mut() {
+            socket.send(msg_bytes.clone()).await.map_err(|e| {
+                AgentError::ExecutionError(format!("Failed to send PUB message: {}", e))
+            })?;
+
+            let mut stats = self.stats.write();
+            stats.messages_sent += 1;
+            stats.bytes_sent += msg_bytes.len() as u64;
+
+            tracing::trace!("Published message with topic '{}', size={} bytes", topic, data.len());
+            Ok(())
+        } else {
+            Err(AgentError::ExecutionError(
+                "Socket not initialized".to_string(),
+            ))
+        }
+    }
+
+    /// Receive a message with its topic (for SUB sockets).
+    ///
+    /// Returns the topic and message data separately.
+    ///
+    /// # Arguments
+    ///
+    /// * `timeout` - Optional timeout duration
+    ///
+    /// # Returns
+    ///
+    /// A tuple of (topic, data) if successful
+    pub async fn recv_with_topic(&self, timeout: Option<Duration>) -> AgentResult<(String, Vec<u8>)> {
+        if !self.is_connected() {
+            return Err(AgentError::ExecutionError(
+                "Cannot receive message: not connected".to_string(),
+            ));
+        }
+
+        if self.socket_type != SocketType::Sub {
+            return Err(AgentError::ExecutionError(
+                "recv_with_topic only supported on SUB sockets".to_string(),
+            ));
+        }
+
+        let timeout_duration = timeout.unwrap_or(Duration::from_secs(DEFAULT_TIMEOUT_SECS));
+
+        let mut socket_guard = self.socket.lock().await;
+        if let Some(socket) = socket_guard.as_mut() {
+            let result = tokio::time::timeout(timeout_duration, socket.recv()).await;
+
+            match result {
+                Ok(Ok(zmq_msg)) => {
+                    let bytes: Vec<u8> = zmq_msg
+                        .into_vec()
+                        .into_iter()
+                        .next()
+                        .ok_or_else(|| {
+                            AgentError::ExecutionError("Empty message received".to_string())
+                        })?
+                        .to_vec();
+
+                    // Parse topic from message: [topic][null][data]
+                    if let Some(null_pos) = bytes.iter().position(|&b| b == 0) {
+                        let topic = String::from_utf8_lossy(&bytes[..null_pos]).to_string();
+                        let data = bytes[null_pos + 1..].to_vec();
+
+                        let mut stats = self.stats.write();
+                        stats.messages_received += 1;
+                        stats.bytes_received += bytes.len() as u64;
+
+                        tracing::trace!("Received message with topic '{}', size={} bytes", topic, data.len());
+                        Ok((topic, data))
+                    } else {
+                        Err(AgentError::ExecutionError(
+                            "Invalid PUB/SUB message format: no topic separator".to_string(),
+                        ))
+                    }
+                }
+                Ok(Err(e)) => {
+                    self.stats.write().errors += 1;
+                    Err(AgentError::ExecutionError(format!(
+                        "Failed to receive SUB message: {}",
+                        e
+                    )))
+                }
+                Err(_) => {
+                    self.stats.write().errors += 1;
+                    Err(AgentError::ExecutionError(format!(
+                        "Timeout receiving SUB message after {:?}",
+                        timeout_duration
+                    )))
+                }
+            }
+        } else {
+            Err(AgentError::ExecutionError(
+                "Socket not initialized".to_string(),
+            ))
+        }
+    }
+
+    /// Subscribe to a topic (for SUB sockets).
+    ///
+    /// # Arguments
+    ///
+    /// * `topic` - The topic to subscribe to (empty string for all messages)
+    pub async fn subscribe(&self, topic: &str) -> AgentResult<()> {
+        if self.socket_type != SocketType::Sub {
+            return Err(AgentError::ExecutionError(
+                "subscribe only supported on SUB sockets".to_string(),
+            ));
+        }
+
+        let socket_guard = self.socket.lock().await;
+        if socket_guard.is_some() {
+            // Note: The zeromq-rs library requires subscription to be set before connecting
+            // For dynamic subscriptions, we handle this at the ZmqClient level by
+            // recreating connections as needed. This method serves as a placeholder
+            // and logs the subscription intent.
+            tracing::debug!("Subscribed to topic: '{}'", topic);
+            Ok(())
+        } else {
+            Err(AgentError::ExecutionError(
+                "Socket not initialized".to_string(),
+            ))
+        }
     }
 
     /// Clean up expired pending requests

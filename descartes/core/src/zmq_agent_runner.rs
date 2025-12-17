@@ -325,6 +325,55 @@ pub enum StatusUpdateType {
     Heartbeat,
 }
 
+/// Log stream message for real-time log streaming via PUB/SUB.
+///
+/// This message type is used to stream agent stdout/stderr output
+/// in real-time to subscribed clients.
+///
+/// # Example
+///
+/// ```rust
+/// use descartes_core::{LogStreamMessage, LogStreamType};
+/// use uuid::Uuid;
+/// use std::time::SystemTime;
+///
+/// let msg = LogStreamMessage {
+///     agent_id: Uuid::new_v4(),
+///     stream_type: LogStreamType::Stdout,
+///     data: b"Hello from agent\n".to_vec(),
+///     timestamp: SystemTime::now(),
+///     sequence: 1,
+/// };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogStreamMessage {
+    /// ID of the agent producing the log
+    pub agent_id: Uuid,
+
+    /// Type of output stream (stdout or stderr)
+    pub stream_type: LogStreamType,
+
+    /// The log data (raw bytes, typically UTF-8 text)
+    pub data: Vec<u8>,
+
+    /// Timestamp when the log was produced
+    pub timestamp: SystemTime,
+
+    /// Sequence number for ordering (monotonically increasing per agent/stream)
+    pub sequence: u64,
+}
+
+/// Type of log stream (stdout or stderr).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LogStreamType {
+    /// Standard output stream
+    Stdout,
+
+    /// Standard error stream
+    Stderr,
+}
+
 /// Request to list agents on a remote server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListAgentsRequest {
@@ -580,6 +629,9 @@ pub enum ZmqMessage {
 
     /// Output query response
     OutputQueryResponse(OutputQueryResponse),
+
+    /// Log stream message (for PUB/SUB streaming)
+    LogStream(LogStreamMessage),
 }
 
 // ============================================================================
@@ -1010,6 +1062,71 @@ mod tests {
         match deserialized {
             ZmqMessage::HealthCheckRequest(req) => {
                 assert_eq!(req.request_id, "health-1");
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
+
+    #[test]
+    fn test_log_stream_message_serialization() {
+        let agent_id = Uuid::new_v4();
+        let message = LogStreamMessage {
+            agent_id,
+            stream_type: LogStreamType::Stdout,
+            data: b"Hello from agent\n".to_vec(),
+            timestamp: SystemTime::now(),
+            sequence: 42,
+        };
+
+        let msg = ZmqMessage::LogStream(message);
+        let bytes = serialize_zmq_message(&msg).unwrap();
+        let deserialized = deserialize_zmq_message(&bytes).unwrap();
+
+        match deserialized {
+            ZmqMessage::LogStream(log_msg) => {
+                assert_eq!(log_msg.agent_id, agent_id);
+                assert_eq!(log_msg.stream_type, LogStreamType::Stdout);
+                assert_eq!(log_msg.data, b"Hello from agent\n".to_vec());
+                assert_eq!(log_msg.sequence, 42);
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
+
+    #[test]
+    fn test_log_stream_type_serialization() {
+        // Test stdout
+        let stdout_msg = LogStreamMessage {
+            agent_id: Uuid::new_v4(),
+            stream_type: LogStreamType::Stdout,
+            data: vec![],
+            timestamp: SystemTime::now(),
+            sequence: 0,
+        };
+        let msg = ZmqMessage::LogStream(stdout_msg);
+        let bytes = serialize_zmq_message(&msg).unwrap();
+        let deserialized = deserialize_zmq_message(&bytes).unwrap();
+        match deserialized {
+            ZmqMessage::LogStream(log_msg) => {
+                assert_eq!(log_msg.stream_type, LogStreamType::Stdout);
+            }
+            _ => panic!("Wrong message type"),
+        }
+
+        // Test stderr
+        let stderr_msg = LogStreamMessage {
+            agent_id: Uuid::new_v4(),
+            stream_type: LogStreamType::Stderr,
+            data: vec![],
+            timestamp: SystemTime::now(),
+            sequence: 0,
+        };
+        let msg = ZmqMessage::LogStream(stderr_msg);
+        let bytes = serialize_zmq_message(&msg).unwrap();
+        let deserialized = deserialize_zmq_message(&bytes).unwrap();
+        match deserialized {
+            ZmqMessage::LogStream(log_msg) => {
+                assert_eq!(log_msg.stream_type, LogStreamType::Stderr);
             }
             _ => panic!("Wrong message type"),
         }

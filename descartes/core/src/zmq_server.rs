@@ -27,18 +27,20 @@
 /// ```
 use crate::agent_runner::{LocalProcessRunner, ProcessRunnerConfig};
 use crate::errors::{AgentError, AgentResult};
-use crate::traits::{AgentConfig, AgentInfo, AgentRunner, AgentSignal, AgentStatus};
+use crate::traits::{AgentConfig, AgentHandle, AgentInfo, AgentRunner, AgentSignal, AgentStatus};
 use crate::zmq_agent_runner::{
     CommandResponse, ControlCommand, ControlCommandType, HealthCheckRequest, HealthCheckResponse,
-    ListAgentsRequest, ListAgentsResponse, SpawnRequest, SpawnResponse, ZmqMessage,
-    ZMQ_PROTOCOL_VERSION,
+    ListAgentsRequest, ListAgentsResponse, LogStreamMessage, LogStreamType, SpawnRequest,
+    SpawnResponse, ZmqMessage, ZMQ_PROTOCOL_VERSION,
 };
 use crate::zmq_communication::{SocketType, ZmqConnection};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use tokio::sync::broadcast;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -70,8 +72,10 @@ struct ManagedAgent {
 /// ZMQ server configuration
 #[derive(Debug, Clone)]
 pub struct ZmqServerConfig {
-    /// Server endpoint to bind to
+    /// Server endpoint to bind to (REP socket for commands)
     pub endpoint: String,
+    /// PUB socket endpoint for log streaming (None = disabled)
+    pub pub_endpoint: Option<String>,
     /// Server identifier (for multi-server setups)
     pub server_id: String,
     /// Maximum concurrent agents
@@ -90,6 +94,7 @@ impl Default for ZmqServerConfig {
     fn default() -> Self {
         Self {
             endpoint: "tcp://0.0.0.0:5555".to_string(),
+            pub_endpoint: Some("tcp://0.0.0.0:5556".to_string()),
             server_id: format!("server-{}", Uuid::new_v4()),
             max_agents: DEFAULT_MAX_AGENTS,
             status_update_interval_secs: DEFAULT_STATUS_UPDATE_INTERVAL_SECS,
@@ -126,8 +131,10 @@ pub struct ServerStats {
 pub struct ZmqAgentServer {
     /// Server configuration
     config: ZmqServerConfig,
-    /// ZMQ connection for request/response
+    /// ZMQ connection for request/response (REP socket)
     connection: Arc<Mutex<ZmqConnection>>,
+    /// ZMQ connection for log streaming (PUB socket, optional)
+    pub_connection: Option<Arc<Mutex<ZmqConnection>>>,
     /// Local agent runner for spawning processes
     runner: Arc<LocalProcessRunner>,
     /// Registry of managed agents
@@ -168,13 +175,27 @@ impl ZmqAgentServer {
             ..Default::default()
         };
 
-        let connection = ZmqConnection::new(SocketType::Rep, &config.endpoint, zmq_config);
+        let connection = ZmqConnection::new(SocketType::Rep, &config.endpoint, zmq_config.clone());
+
+        // Create PUB socket for log streaming if endpoint configured
+        let pub_connection = config.pub_endpoint.as_ref().map(|pub_endpoint| {
+            let pub_config = crate::zmq_agent_runner::ZmqRunnerConfig {
+                endpoint: pub_endpoint.clone(),
+                ..zmq_config
+            };
+            Arc::new(Mutex::new(ZmqConnection::new(
+                SocketType::Pub,
+                pub_endpoint,
+                pub_config,
+            )))
+        });
 
         let runner = LocalProcessRunner::with_config(config.runner_config.clone());
 
         Self {
             config,
             connection: Arc::new(Mutex::new(connection)),
+            pub_connection,
             runner: Arc::new(runner),
             agents: Arc::new(DashMap::new()),
             stats: Arc::new(RwLock::new(ServerStats::default())),
@@ -207,8 +228,17 @@ impl ZmqAgentServer {
             ));
         }
 
-        // Connect the socket
+        // Connect the REP socket for commands
         self.connection.lock().await.connect().await?;
+
+        // Connect the PUB socket for log streaming if configured
+        if let Some(pub_conn) = &self.pub_connection {
+            pub_conn.lock().await.connect().await?;
+            tracing::info!(
+                "PUB socket bound for log streaming: {}",
+                self.config.pub_endpoint.as_deref().unwrap_or("unknown")
+            );
+        }
 
         // Mark as running
         *self.is_running.write() = true;
@@ -269,8 +299,13 @@ impl ZmqAgentServer {
         // Stop all agents
         self.stop_all_agents().await?;
 
-        // Disconnect socket
+        // Disconnect REP socket
         self.connection.lock().await.disconnect().await?;
+
+        // Disconnect PUB socket if configured
+        if let Some(pub_conn) = &self.pub_connection {
+            pub_conn.lock().await.disconnect().await?;
+        }
 
         tracing::info!("ZMQ Agent Server stopped");
 
@@ -300,6 +335,35 @@ impl ZmqAgentServer {
                 .unwrap_or_default()
                 .as_secs()
         })
+    }
+
+    /// Get the PUB endpoint for log streaming (if configured)
+    pub fn pub_endpoint(&self) -> Option<&str> {
+        self.config.pub_endpoint.as_deref()
+    }
+
+    /// Check if log streaming is enabled
+    pub fn is_log_streaming_enabled(&self) -> bool {
+        self.pub_connection.is_some()
+    }
+
+    /// Publish a log message to subscribers via PUB socket.
+    ///
+    /// The message is published with the agent_id as the topic for filtering.
+    pub async fn publish_log(&self, message: &crate::zmq_agent_runner::LogStreamMessage) -> AgentResult<()> {
+        if let Some(pub_conn) = &self.pub_connection {
+            let topic = message.agent_id.to_string();
+            let data = crate::zmq_agent_runner::serialize_zmq_message(
+                &ZmqMessage::LogStream(message.clone()),
+            )?;
+            pub_conn.lock().await.send_with_topic(&topic, &data).await?;
+            tracing::trace!(
+                "Published log for agent {}: {} bytes",
+                message.agent_id,
+                message.data.len()
+            );
+        }
+        Ok(())
     }
 
     /// Run the main event loop
@@ -420,6 +484,9 @@ impl ZmqAgentServer {
 
                         // Add to registry
                         self.agents.insert(agent_id, managed);
+
+                        // Spawn output forwarders if log streaming is enabled
+                        self.spawn_output_forwarders(agent_id, handle.as_ref());
 
                         self.stats.write().successful_spawns += 1;
 
@@ -543,23 +610,75 @@ impl ZmqAgentServer {
                 }
             }
             ControlCommandType::WriteStdin => {
-                // stdin/stdout/stderr operations not directly supported by AgentRunner trait
-                // For now, return not implemented
-                Err(AgentError::ExecutionError(
-                    "WriteStdin command not yet implemented - requires extended AgentHandle interface".to_string(),
-                ))
+                // Get data to write from payload
+                let data = command
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("data"))
+                    .and_then(|d| d.as_str())
+                    .map(|s| s.as_bytes().to_vec())
+                    .or_else(|| {
+                        command
+                            .payload
+                            .as_ref()
+                            .and_then(|p| p.get("data"))
+                            .and_then(|d| d.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_u64().map(|n| n as u8))
+                                    .collect()
+                            })
+                    });
+
+                match data {
+                    Some(bytes) => {
+                        self.runner.write_stdin(&agent_id, &bytes).await.map(|_| {
+                            Some(serde_json::json!({
+                                "bytes_written": bytes.len()
+                            }))
+                        })
+                    }
+                    None => Err(AgentError::ExecutionError(
+                        "WriteStdin requires payload with 'data' field (string or byte array)"
+                            .to_string(),
+                    )),
+                }
             }
             ControlCommandType::ReadStdout => {
-                // stdout operations not directly supported
-                Err(AgentError::ExecutionError(
-                    "ReadStdout command not yet implemented - requires extended AgentHandle interface".to_string(),
-                ))
+                // Read from stdout buffer
+                match self.runner.read_stdout(&agent_id).await {
+                    Ok(Some(data)) => {
+                        let content = String::from_utf8_lossy(&data).to_string();
+                        Ok(Some(serde_json::json!({
+                            "data": content,
+                            "bytes": data.len()
+                        })))
+                    }
+                    Ok(None) => Ok(Some(serde_json::json!({
+                        "data": null,
+                        "bytes": 0,
+                        "message": "No data available in stdout buffer"
+                    }))),
+                    Err(e) => Err(e),
+                }
             }
             ControlCommandType::ReadStderr => {
-                // stderr operations not directly supported
-                Err(AgentError::ExecutionError(
-                    "ReadStderr command not yet implemented - requires extended AgentHandle interface".to_string(),
-                ))
+                // Read from stderr buffer
+                match self.runner.read_stderr(&agent_id).await {
+                    Ok(Some(data)) => {
+                        let content = String::from_utf8_lossy(&data).to_string();
+                        Ok(Some(serde_json::json!({
+                            "data": content,
+                            "bytes": data.len()
+                        })))
+                    }
+                    Ok(None) => Ok(Some(serde_json::json!({
+                        "data": null,
+                        "bytes": 0,
+                        "message": "No data available in stderr buffer"
+                    }))),
+                    Err(e) => Err(e),
+                }
             }
             ControlCommandType::Signal => {
                 // Signal handling - parse signal type from payload
@@ -606,16 +725,89 @@ impl ZmqAgentServer {
                 ))
             }
             ControlCommandType::QueryOutput => {
-                // Output querying
-                Err(AgentError::ExecutionError(
-                    "QueryOutput command not yet implemented".to_string(),
-                ))
+                // Query both stdout and stderr, optionally limited
+                let max_lines = command
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("max_lines"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(100) as usize;
+
+                let include_stdout = command
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("stdout"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+
+                let include_stderr = command
+                    .payload
+                    .as_ref()
+                    .and_then(|p| p.get("stderr"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+
+                // Collect available stdout lines - use async blocks to handle errors
+                let stdout_result: Result<Vec<String>, AgentError> = async {
+                    let mut lines = Vec::new();
+                    if include_stdout {
+                        while lines.len() < max_lines {
+                            match self.runner.read_stdout(&agent_id).await {
+                                Ok(Some(data)) => {
+                                    let line = String::from_utf8_lossy(&data).to_string();
+                                    lines.push(line);
+                                }
+                                Ok(None) => break,
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    }
+                    Ok(lines)
+                }.await;
+
+                let stderr_result: Result<Vec<String>, AgentError> = async {
+                    let mut lines = Vec::new();
+                    if include_stderr {
+                        while lines.len() < max_lines {
+                            match self.runner.read_stderr(&agent_id).await {
+                                Ok(Some(data)) => {
+                                    let line = String::from_utf8_lossy(&data).to_string();
+                                    lines.push(line);
+                                }
+                                Ok(None) => break,
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    }
+                    Ok(lines)
+                }.await;
+
+                match (stdout_result, stderr_result) {
+                    (Ok(stdout_lines), Ok(stderr_lines)) => {
+                        Ok(Some(serde_json::json!({
+                            "stdout": stdout_lines,
+                            "stderr": stderr_lines,
+                            "stdout_lines": stdout_lines.len(),
+                            "stderr_lines": stderr_lines.len()
+                        })))
+                    }
+                    (Err(e), _) | (_, Err(e)) => Err(e),
+                }
             }
             ControlCommandType::StreamLogs => {
-                // Log streaming
-                Err(AgentError::ExecutionError(
-                    "StreamLogs command not yet implemented".to_string(),
-                ))
+                // Log streaming - return PUB endpoint for client to connect
+                match &self.config.pub_endpoint {
+                    Some(pub_endpoint) => Ok(Some(serde_json::json!({
+                        "pub_endpoint": pub_endpoint,
+                        "topic": agent_id.to_string(),
+                        "enabled": true,
+                        "instructions": "Connect SUB socket to pub_endpoint, subscribe to topic filter"
+                    }))),
+                    None => Err(AgentError::ExecutionError(
+                        "Log streaming not enabled on this server (no pub_endpoint configured)"
+                            .to_string(),
+                    )),
+                }
             }
         };
 
@@ -818,6 +1010,108 @@ impl ZmqAgentServer {
             }
         });
     }
+
+    /// Spawn output forwarders for an agent to stream stdout/stderr to PUB socket.
+    ///
+    /// This subscribes to the agent's broadcast channels and publishes received
+    /// data as LogStreamMessages via the PUB socket.
+    fn spawn_output_forwarders(&self, agent_id: Uuid, handle: &dyn AgentHandle) {
+        // Only spawn forwarders if PUB socket is configured
+        let pub_connection = match &self.pub_connection {
+            Some(conn) => conn.clone(),
+            None => return,
+        };
+
+        // Subscribe to stdout broadcast
+        let stdout_rx = handle.subscribe_stdout();
+        self.spawn_single_output_forwarder(
+            agent_id,
+            stdout_rx,
+            LogStreamType::Stdout,
+            pub_connection.clone(),
+        );
+
+        // Subscribe to stderr broadcast
+        let stderr_rx = handle.subscribe_stderr();
+        self.spawn_single_output_forwarder(agent_id, stderr_rx, LogStreamType::Stderr, pub_connection);
+
+        tracing::debug!(
+            "Output forwarders spawned for agent {} (stdout + stderr)",
+            agent_id
+        );
+    }
+
+    /// Spawn a single output forwarder task for one stream type.
+    fn spawn_single_output_forwarder(
+        &self,
+        agent_id: Uuid,
+        mut rx: broadcast::Receiver<Vec<u8>>,
+        stream_type: LogStreamType,
+        pub_connection: Arc<Mutex<ZmqConnection>>,
+    ) {
+        // Use atomic counter for sequence numbers
+        let sequence = Arc::new(AtomicU64::new(0));
+
+        tokio::spawn(async move {
+            loop {
+                match rx.recv().await {
+                    Ok(data) => {
+                        let seq = sequence.fetch_add(1, Ordering::SeqCst);
+                        let message = LogStreamMessage {
+                            agent_id,
+                            stream_type,
+                            data: data.clone(),
+                            timestamp: SystemTime::now(),
+                            sequence: seq,
+                        };
+
+                        // Publish to PUB socket
+                        let topic = agent_id.to_string();
+                        match crate::zmq_agent_runner::serialize_zmq_message(&ZmqMessage::LogStream(
+                            message,
+                        )) {
+                            Ok(bytes) => {
+                                if let Err(e) =
+                                    pub_connection.lock().await.send_with_topic(&topic, &bytes).await
+                                {
+                                    tracing::warn!(
+                                        "Failed to publish {:?} for agent {}: {}",
+                                        stream_type,
+                                        agent_id,
+                                        e
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to serialize log message for agent {}: {}",
+                                    agent_id,
+                                    e
+                                );
+                            }
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        tracing::debug!(
+                            "Output channel closed for agent {} ({:?})",
+                            agent_id,
+                            stream_type
+                        );
+                        break;
+                    }
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!(
+                            "Output forwarder lagged {} messages for agent {} ({:?})",
+                            n,
+                            agent_id,
+                            stream_type
+                        );
+                        // Continue receiving
+                    }
+                }
+            }
+        });
+    }
 }
 
 #[cfg(test)]
@@ -847,5 +1141,37 @@ mod tests {
         let stats = server.stats();
         assert_eq!(stats.spawn_requests, 0);
         assert_eq!(stats.successful_spawns, 0);
+    }
+
+    #[test]
+    fn test_server_config_pub_endpoint() {
+        let config = ZmqServerConfig::default();
+        // Default config should have PUB endpoint enabled
+        assert!(config.pub_endpoint.is_some());
+        assert_eq!(
+            config.pub_endpoint.as_deref(),
+            Some("tcp://0.0.0.0:5556")
+        );
+    }
+
+    #[test]
+    fn test_server_log_streaming_enabled() {
+        // With default config (pub_endpoint enabled)
+        let config = ZmqServerConfig::default();
+        let server = ZmqAgentServer::new(config);
+        assert!(server.is_log_streaming_enabled());
+        assert_eq!(server.pub_endpoint(), Some("tcp://0.0.0.0:5556"));
+    }
+
+    #[test]
+    fn test_server_log_streaming_disabled() {
+        // With pub_endpoint disabled
+        let config = ZmqServerConfig {
+            pub_endpoint: None,
+            ..Default::default()
+        };
+        let server = ZmqAgentServer::new(config);
+        assert!(!server.is_log_streaming_enabled());
+        assert_eq!(server.pub_endpoint(), None);
     }
 }

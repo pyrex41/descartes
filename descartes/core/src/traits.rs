@@ -156,6 +156,23 @@ pub trait AgentRunner: Send + Sync {
     /// Returns `None` if the agent doesn't have an associated OS process
     /// (e.g., if it's a remote agent or uses a different execution model).
     async fn get_agent_pid(&self, agent_id: &Uuid) -> AgentResult<Option<u32>>;
+
+    /// Write data to an agent's stdin.
+    ///
+    /// Returns an error if the agent doesn't exist or stdin is not available.
+    async fn write_stdin(&self, agent_id: &Uuid, data: &[u8]) -> AgentResult<()>;
+
+    /// Read available data from an agent's stdout buffer.
+    ///
+    /// Returns `None` if no data is available, or the buffered data.
+    /// This is non-blocking and returns whatever is currently buffered.
+    async fn read_stdout(&self, agent_id: &Uuid) -> AgentResult<Option<Vec<u8>>>;
+
+    /// Read available data from an agent's stderr buffer.
+    ///
+    /// Returns `None` if no data is available, or the buffered data.
+    /// This is non-blocking and returns whatever is currently buffered.
+    async fn read_stderr(&self, agent_id: &Uuid) -> AgentResult<Option<Vec<u8>>>;
 }
 
 /// Configuration for spawning an agent.
@@ -314,6 +331,18 @@ pub trait AgentHandle: Send + Sync {
 
     /// Get the agent's exit code (if completed).
     fn exit_code(&self) -> Option<i32>;
+
+    /// Subscribe to stdout broadcast stream.
+    ///
+    /// Returns a receiver that will receive all stdout output from the agent.
+    /// This is used for real-time log streaming.
+    fn subscribe_stdout(&self) -> tokio::sync::broadcast::Receiver<Vec<u8>>;
+
+    /// Subscribe to stderr broadcast stream.
+    ///
+    /// Returns a receiver that will receive all stderr output from the agent.
+    /// This is used for real-time log streaming.
+    fn subscribe_stderr(&self) -> tokio::sync::broadcast::Receiver<Vec<u8>>;
 }
 
 /// Exit status of an agent.
