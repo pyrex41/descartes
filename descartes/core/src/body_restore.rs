@@ -459,25 +459,91 @@ impl BodyRestoreManager for GitBodyRestoreManager {
     async fn stash_changes(&self, message: &str) -> StateStoreResult<String> {
         info!("Stashing changes with message: {}", message);
 
-        // Note: gitoxide doesn't have high-level stash support yet
-        // For now, we'll return an error indicating this needs to be implemented
-        // In production, you'd either:
-        // 1. Use git2-rs for this specific operation
-        // 2. Shell out to git stash
-        // 3. Implement stashing manually using gitoxide low-level APIs
+        // Shell out to git stash since gitoxide doesn't have high-level stash support
+        let output = std::process::Command::new("git")
+            .args(["stash", "push", "-m", message])
+            .current_dir(&self.repo_path)
+            .output()
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to execute git stash: {}", e))
+            })?;
 
-        Err(StateStoreError::NotSupported(
-            "Stash functionality not yet implemented with gitoxide. Consider using git2-rs or shelling out to git.".to_string()
-        ))
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // Check if there's nothing to stash
+            if stderr.contains("No local changes to save") {
+                return Err(StateStoreError::NotFound(
+                    "No local changes to stash".to_string(),
+                ));
+            }
+            return Err(StateStoreError::DatabaseError(format!(
+                "git stash failed: {}",
+                stderr
+            )));
+        }
+
+        // Get the stash reference (usually stash@{0})
+        let stash_list_output = std::process::Command::new("git")
+            .args(["stash", "list", "-n", "1"])
+            .current_dir(&self.repo_path)
+            .output()
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to list stash: {}", e))
+            })?;
+
+        let stash_ref = if stash_list_output.status.success() {
+            let output_str = String::from_utf8_lossy(&stash_list_output.stdout);
+            // Extract stash reference like "stash@{0}"
+            output_str
+                .lines()
+                .next()
+                .and_then(|line| line.split(':').next())
+                .unwrap_or("stash@{0}")
+                .trim()
+                .to_string()
+        } else {
+            "stash@{0}".to_string()
+        };
+
+        info!("Successfully stashed changes: {}", stash_ref);
+        Ok(stash_ref)
     }
 
     async fn restore_stash(&self, stash_ref: &str) -> StateStoreResult<()> {
         info!("Restoring stash: {}", stash_ref);
 
-        // Same limitation as stash_changes
-        Err(StateStoreError::NotSupported(
-            "Stash restore functionality not yet implemented with gitoxide.".to_string(),
-        ))
+        // Shell out to git stash pop
+        let output = std::process::Command::new("git")
+            .args(["stash", "pop", stash_ref])
+            .current_dir(&self.repo_path)
+            .output()
+            .map_err(|e| {
+                StateStoreError::DatabaseError(format!("Failed to execute git stash pop: {}", e))
+            })?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // Check for common error cases
+            if stderr.contains("does not exist") || stderr.contains("is not a valid reference") {
+                return Err(StateStoreError::NotFound(format!(
+                    "Stash reference not found: {}",
+                    stash_ref
+                )));
+            }
+            if stderr.contains("conflict") {
+                return Err(StateStoreError::Conflict(format!(
+                    "Merge conflict while restoring stash: {}",
+                    stderr
+                )));
+            }
+            return Err(StateStoreError::DatabaseError(format!(
+                "git stash pop failed: {}",
+                stderr
+            )));
+        }
+
+        info!("Successfully restored stash: {}", stash_ref);
+        Ok(())
     }
 
     async fn checkout_commit(
