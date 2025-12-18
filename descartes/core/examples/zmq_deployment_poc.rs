@@ -182,6 +182,7 @@ async fn setup_server(
 
     let server_config = ZmqServerConfig {
         endpoint: config.server_endpoint.clone(),
+        pub_endpoint: None, // No PUB socket for this POC
         server_id: "poc-server-01".to_string(),
         max_agents: 50,
         status_update_interval_secs: 5,

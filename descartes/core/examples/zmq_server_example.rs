@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Configure the server
     let config = ZmqServerConfig {
         endpoint: "tcp://0.0.0.0:5555".to_string(),
+        pub_endpoint: Some("tcp://0.0.0.0:5556".to_string()), // PUB socket for log streaming
         server_id: "example-server-01".to_string(),
         max_agents: 10,
         status_update_interval_secs: 10,

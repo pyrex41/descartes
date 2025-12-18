@@ -29,6 +29,7 @@ mod test_utils {
     ) -> Result<Arc<ZmqAgentServer>, Box<dyn std::error::Error>> {
         let config = ZmqServerConfig {
             endpoint: endpoint.to_string(),
+            pub_endpoint: None, // Disable PUB socket for these tests
             server_id: format!("test-server-{}", Uuid::new_v4()),
             max_agents: 50,
             status_update_interval_secs: 5,

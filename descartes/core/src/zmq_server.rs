@@ -719,10 +719,80 @@ impl ZmqAgentServer {
                 }
             }
             ControlCommandType::CustomAction => {
-                // Custom action handling
-                Err(AgentError::ExecutionError(
-                    "CustomAction command not yet implemented".to_string(),
-                ))
+                // Custom action handling - extract action name and params from payload
+                match &command.payload {
+                    Some(payload) => {
+                        let action = payload
+                            .get("action")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown");
+
+                        let params = payload.get("params").cloned();
+
+                        // Log the custom action for debugging
+                        tracing::info!(
+                            "Received custom action '{}' for agent {} with params: {:?}",
+                            action,
+                            agent_id,
+                            params
+                        );
+
+                        // Handle built-in actions
+                        match action {
+                            // Echo action - returns the params back (useful for testing)
+                            "echo" => Ok(Some(serde_json::json!({
+                                "action": "echo",
+                                "result": params
+                            }))),
+
+                            // Ping action - simple health check
+                            "ping" => Ok(Some(serde_json::json!({
+                                "action": "ping",
+                                "result": "pong",
+                                "agent_id": agent_id.to_string()
+                            }))),
+
+                            // Get agent environment info
+                            "get_env" => {
+                                if let Some(agent) = self.agents.get(&agent_id) {
+                                    let last_update = agent
+                                        .last_status_update
+                                        .read()
+                                        .map(|t| {
+                                            t.elapsed()
+                                                .map(|d| d.as_secs())
+                                                .unwrap_or(0)
+                                        })
+                                        .unwrap_or(0);
+
+                                    Ok(Some(serde_json::json!({
+                                        "action": "get_env",
+                                        "result": {
+                                            "status": format!("{:?}", agent.info.status),
+                                            "name": agent.info.name,
+                                            "agent_id": agent.info.id.to_string(),
+                                            "last_status_update_secs": last_update
+                                        }
+                                    })))
+                                } else {
+                                    Err(AgentError::NotFound(format!(
+                                        "Agent {} not found",
+                                        agent_id
+                                    )))
+                                }
+                            }
+
+                            // Unknown action - return error with available actions
+                            _ => Err(AgentError::ExecutionError(format!(
+                                "Unknown custom action '{}'. Available actions: echo, ping, get_env",
+                                action
+                            ))),
+                        }
+                    }
+                    None => Err(AgentError::ExecutionError(
+                        "CustomAction command requires payload with 'action' field".to_string(),
+                    )),
+                }
             }
             ControlCommandType::QueryOutput => {
                 // Query both stdout and stderr, optionally limited
