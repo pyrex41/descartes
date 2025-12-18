@@ -65,6 +65,9 @@ base64 = "0.21"
 # Error handling
 failure = "0.1"
 
+# System info (CPU, memory, etc)
+sysinfo = { workspace = true }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 tempfile = "3.8"

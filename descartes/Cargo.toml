@@ -53,3 +53,6 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # SCUD task management (shared models and SCG format)
 scud = { version = "1.19", package = "scud-cli" }
+
+# System info (CPU, memory, etc)
+sysinfo = "0.32"

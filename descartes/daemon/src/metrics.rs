@@ -5,6 +5,7 @@ use chrono::Utc;
 use prometheus::{Counter, Encoder, Histogram, HistogramOpts, IntGauge, Registry};
 use std::sync::Arc;
 use std::time::Instant;
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 /// Metrics collector
 pub struct MetricsCollector {
@@ -27,6 +28,10 @@ pub struct MetricsCollector {
     // Server metrics
     pub server_uptime_secs: Arc<std::sync::atomic::AtomicU64>,
     pub server_start: Instant,
+
+    // System info for CPU/memory tracking
+    sysinfo: std::sync::Mutex<System>,
+    pid: Pid,
 }
 
 impl MetricsCollector {
@@ -83,6 +88,10 @@ impl MetricsCollector {
             .register(Box::new(connections_active.clone()))
             .map_err(|e| DaemonError::MetricsError(e.to_string()))?;
 
+        // Initialize sysinfo for this process
+        let pid = Pid::from_u32(std::process::id());
+        let sysinfo = System::new_all();
+
         Ok(MetricsCollector {
             registry,
             request_total,
@@ -95,6 +104,8 @@ impl MetricsCollector {
             connections_active,
             server_uptime_secs: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             server_start: Instant::now(),
+            sysinfo: std::sync::Mutex::new(sysinfo),
+            pid,
         })
     }
 
@@ -157,10 +168,29 @@ impl MetricsCollector {
         self.server_uptime_secs
             .store(uptime_secs, std::sync::atomic::Ordering::Relaxed);
 
+        // Get actual CPU and memory usage for this process
+        let (memory_usage_mb, cpu_usage_percent) = {
+            let mut sys = self.sysinfo.lock().unwrap();
+            // Refresh process-specific data for our PID only
+            sys.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[self.pid]),
+                false, // Don't remove dead processes
+                ProcessRefreshKind::everything(),
+            );
+
+            if let Some(process) = sys.process(self.pid) {
+                let memory_mb = process.memory() as f64 / (1024.0 * 1024.0);
+                let cpu_percent = process.cpu_usage() as f64;
+                (memory_mb, cpu_percent)
+            } else {
+                (0.0, 0.0)
+            }
+        };
+
         let system = MetricsSystem {
             uptime_secs,
-            memory_usage_mb: 0.0,   // TODO: Implement actual memory tracking
-            cpu_usage_percent: 0.0, // TODO: Implement actual CPU tracking
+            memory_usage_mb,
+            cpu_usage_percent,
             active_connections: self.connections_active.get() as usize,
         };
 
