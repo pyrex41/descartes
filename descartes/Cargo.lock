@@ -1384,7 +1384,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "which 7.0.3",
+ "which",
  "zeroize",
  "zeromq",
 ]
@@ -1395,7 +1395,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.21.7",
+ "base64 0.22.1",
  "bytes",
  "chrono",
  "clap",
@@ -1445,7 +1445,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "which 6.0.3",
+ "which",
  "zeromq",
 ]
 
@@ -7654,18 +7654,6 @@ dependencies = [
  "bitflags 2.10.0",
  "js-sys",
  "web-sys",
-]
-
-[[package]]
-name = "which"
-version = "6.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ee928febd44d98f2f459a4a79bd4d928591333a494a10a868418ac1b39cf1f"
-dependencies = [
- "either",
- "home",
- "rustix 0.38.44",
- "winsafe",
 ]
 
 [[package]]

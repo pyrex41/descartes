@@ -23,7 +23,7 @@ uuid = { workspace = true }
 iced = { version = "0.13", features = ["debug", "tokio", "advanced", "canvas"] }
 futures = "0.3"
 reqwest = { workspace = true }
-which = "6.0"
+which = "7.0"
 
 # ZMQ for streaming chat output
 zeromq = "0.4"

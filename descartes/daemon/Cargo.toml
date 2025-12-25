@@ -51,7 +51,7 @@ notify = { version = "6.1", default-features = false, features = ["macos_kqueue"
 # Authentication
 jsonwebtoken = "9.2"
 hex = "0.4"
-base64 = "0.21"
+base64 = "0.22"
 
 # System info (CPU, memory, etc)
 sysinfo = { workspace = true }
