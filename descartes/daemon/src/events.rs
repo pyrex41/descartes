@@ -72,6 +72,10 @@ pub enum AgentEventType {
     AttachConnected,
     /// External TUI disconnected from paused agent
     AttachDisconnected,
+    /// Debugger paused (Lisp/Swank - error condition with restarts)
+    DebuggerPaused,
+    /// Swank output message
+    SwankOutput,
 }
 
 /// Task execution events

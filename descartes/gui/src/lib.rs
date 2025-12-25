@@ -5,6 +5,8 @@ pub mod dag_canvas_interactions;
 pub mod dag_editor;
 pub mod debugger_ui;
 pub mod event_handler;
+pub mod lisp_debugger;
+pub mod theme;
 /// Descartes GUI - Native cross-platform interface using Iced
 /// Phase 3 implementation
 pub mod rpc_client;
@@ -43,8 +45,9 @@ pub use time_travel_integration::{
 };
 pub use zmq_subscriber::{chat_subscription, subscribe_to_session};
 pub use chat_state::{update as chat_state_update, ChatMessage, ChatMessageEntry, ChatRole, ChatState};
-
-// Note: file_tree_view, code_preview_panel, and knowledge_graph_panel modules were
-// removed as they were UI stubs without backend implementation.
+pub use lisp_debugger::{
+    update as lisp_debugger_update, view as lisp_debugger_view, parse_debugger_event,
+    LispDebuggerMessage, LispDebuggerState, LispFrame, LispRestart,
+};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

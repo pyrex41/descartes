@@ -10,7 +10,10 @@
 //! - get_state: Query the current state
 
 use crate::errors::{DaemonError, DaemonResult};
+use crate::events::{AgentEvent, AgentEventType, DescartesEvent, EventBus};
 use crate::types::{RpcError, RpcRequest, RpcResponse};
+use descartes_core::swank::{find_available_port, SwankClient, SwankLauncher, SwankMessage, DEFAULT_SWANK_PORT};
+use descartes_core::tools::SWANK_REGISTRY;
 use descartes_core::traits::{AgentConfig, TaskStatus};
 use jsonrpsee::core::async_trait;
 use jsonrpsee::proc_macros::rpc;
@@ -21,6 +24,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
+use tokio::process::Child;
 use tokio::sync::oneshot;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -197,6 +201,29 @@ pub struct AttachRevokeResult {
     pub revoked: bool,
 }
 
+/// Check if an agent should use Lisp/Swank.
+fn is_lisp_agent(config: &AgentConfig) -> bool {
+    // Check model_backend
+    let backend_lower = config.model_backend.to_lowercase();
+    if backend_lower.contains("lisp") || backend_lower.contains("sbcl") {
+        return true;
+    }
+
+    // Check environment variable
+    if let Some(tool_level) = config.environment.get("DESCARTES_TOOL_LEVEL") {
+        if tool_level == "lisp_developer" || tool_level == "lisp-developer" {
+            return true;
+        }
+    }
+
+    // Check name convention
+    if config.name.to_lowercase().contains("lisp") {
+        return true;
+    }
+
+    false
+}
+
 /// Implementation of the RPC server
 pub struct RpcServerImpl {
     /// Agent runner for spawning and managing agents
@@ -214,6 +241,10 @@ pub struct RpcServerImpl {
     event_bus: Arc<crate::events::EventBus>,
     /// Active attach server handles (agent_id -> JoinHandle)
     attach_servers: Arc<dashmap::DashMap<uuid::Uuid, tokio::task::JoinHandle<()>>>,
+    /// SBCL processes for Lisp agents (agent_id -> Child)
+    sbcl_processes: Arc<dashmap::DashMap<uuid::Uuid, Child>>,
+    /// Swank event forwarding tasks (agent_id -> JoinHandle)
+    swank_event_tasks: Arc<dashmap::DashMap<uuid::Uuid, tokio::task::JoinHandle<()>>>,
 }
 
 impl RpcServerImpl {
@@ -238,6 +269,8 @@ impl RpcServerImpl {
             attach_manager,
             event_bus,
             attach_servers: Arc::new(dashmap::DashMap::new()),
+            sbcl_processes: Arc::new(dashmap::DashMap::new()),
+            swank_event_tasks: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -264,6 +297,8 @@ impl RpcServerImpl {
             attach_manager,
             event_bus,
             attach_servers: Arc::new(dashmap::DashMap::new()),
+            sbcl_processes: Arc::new(dashmap::DashMap::new()),
+            swank_event_tasks: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -282,6 +317,8 @@ impl RpcServerImpl {
             attach_manager,
             event_bus,
             attach_servers: Arc::new(dashmap::DashMap::new()),
+            sbcl_processes: Arc::new(dashmap::DashMap::new()),
+            swank_event_tasks: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -323,6 +360,9 @@ impl RpcServerImpl {
             environment,
         };
 
+        // Check if this is a Lisp agent before spawning (agent_config is moved by spawn)
+        let needs_swank = is_lisp_agent(&agent_config);
+
         let agent_handle = self.agent_runner.spawn(agent_config).await.map_err(|e| {
             error!("Failed to spawn agent: {}", e);
             ErrorObjectOwned::owned(-32603, format!("Failed to spawn agent: {}", e), None::<()>)
@@ -332,8 +372,150 @@ impl RpcServerImpl {
         let agent_id_str = agent_id.to_string();
         self.agent_ids.insert(agent_id_str.clone(), agent_id);
 
+        // Initialize Swank for Lisp agents
+        if needs_swank {
+            match self.initialize_swank_session(agent_id).await {
+                Ok(()) => {
+                    info!("Swank session initialized for agent {}", agent_id_str);
+                }
+                Err(e) => {
+                    // Log but don't fail the spawn - agent can work without Swank
+                    warn!("Failed to initialize Swank for agent {}: {}", agent_id_str, e);
+                }
+            }
+        }
+
         info!("Agent spawned successfully with ID: {}", agent_id_str);
         Ok(agent_id_str)
+    }
+
+    /// Initialize a Swank session for a Lisp agent.
+    async fn initialize_swank_session(&self, agent_id: Uuid) -> Result<(), String> {
+        // Find available port
+        let port = find_available_port(DEFAULT_SWANK_PORT)
+            .await
+            .map_err(|e| format!("Failed to find available port: {}", e))?;
+
+        info!("Starting SBCL with Swank on port {} for agent {}", port, agent_id);
+
+        // Start SBCL
+        let sbcl_child = SwankLauncher::start_sbcl(port)
+            .await
+            .map_err(|e| format!("Failed to start SBCL: {}", e))?;
+
+        // Create event channel for this session
+        let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
+
+        // Connect SwankClient
+        let swank_client = SwankClient::connect(agent_id, port, event_tx)
+            .await
+            .map_err(|e| format!("Failed to connect to Swank: {}", e))?;
+
+        // Register in global registry
+        SWANK_REGISTRY.insert(agent_id, swank_client);
+
+        // Store SBCL process for cleanup
+        self.sbcl_processes.insert(agent_id, sbcl_child);
+
+        // Spawn event forwarding task
+        let event_bus = Arc::clone(&self.event_bus);
+        let agent_id_clone = agent_id;
+        let event_task = tokio::spawn(async move {
+            while let Some(msg) = event_rx.recv().await {
+                Self::forward_swank_event(&event_bus, agent_id_clone, msg).await;
+            }
+        });
+        self.swank_event_tasks.insert(agent_id, event_task);
+
+        Ok(())
+    }
+
+    /// Forward a Swank event to the EventBus.
+    async fn forward_swank_event(
+        event_bus: &EventBus,
+        agent_id: Uuid,
+        msg: SwankMessage,
+    ) {
+        let event = match msg {
+            SwankMessage::Debug { condition, restarts, frames, .. } => {
+                DescartesEvent::AgentEvent(AgentEvent {
+                    id: Uuid::new_v4().to_string(),
+                    agent_id: agent_id.to_string(),
+                    timestamp: chrono::Utc::now(),
+                    event_type: AgentEventType::DebuggerPaused,
+                    data: serde_json::json!({
+                        "condition": condition,
+                        "restarts": restarts.iter().map(|r| serde_json::json!({
+                            "index": r.index,
+                            "name": r.name,
+                            "description": r.description,
+                        })).collect::<Vec<_>>(),
+                        "frames": frames.iter().map(|f| serde_json::json!({
+                            "index": f.index,
+                            "description": f.description,
+                        })).collect::<Vec<_>>(),
+                    }),
+                })
+            }
+            SwankMessage::WriteString(text) => {
+                DescartesEvent::AgentEvent(AgentEvent {
+                    id: Uuid::new_v4().to_string(),
+                    agent_id: agent_id.to_string(),
+                    timestamp: chrono::Utc::now(),
+                    event_type: AgentEventType::SwankOutput,
+                    data: serde_json::json!({ "text": text }),
+                })
+            }
+            SwankMessage::Return { id, value } => {
+                DescartesEvent::AgentEvent(AgentEvent {
+                    id: Uuid::new_v4().to_string(),
+                    agent_id: agent_id.to_string(),
+                    timestamp: chrono::Utc::now(),
+                    event_type: AgentEventType::Log,
+                    data: serde_json::json!({
+                        "type": "swank_return",
+                        "request_id": id,
+                        "value": value,
+                    }),
+                })
+            }
+            SwankMessage::Abort { id, reason } => {
+                DescartesEvent::AgentEvent(AgentEvent {
+                    id: Uuid::new_v4().to_string(),
+                    agent_id: agent_id.to_string(),
+                    timestamp: chrono::Utc::now(),
+                    event_type: AgentEventType::Log,
+                    data: serde_json::json!({
+                        "type": "swank_abort",
+                        "request_id": id,
+                        "reason": reason,
+                    }),
+                })
+            }
+        };
+
+        event_bus.publish(event).await;
+    }
+
+    /// Cleanup Swank session for an agent.
+    pub async fn cleanup_swank_session(&self, agent_id: &Uuid) {
+        // Stop event forwarding task
+        if let Some((_, task)) = self.swank_event_tasks.remove(agent_id) {
+            task.abort();
+            debug!("Stopped Swank event task for agent {}", agent_id);
+        }
+
+        // Remove from global registry
+        SWANK_REGISTRY.remove(agent_id);
+
+        // Kill SBCL process
+        if let Some((_, mut child)) = self.sbcl_processes.remove(agent_id) {
+            if let Err(e) = child.kill().await {
+                warn!("Failed to kill SBCL process for agent {}: {}", agent_id, e);
+            } else {
+                info!("Killed SBCL process for agent {}", agent_id);
+            }
+        }
     }
 
     pub(crate) async fn list_tasks_internal(
@@ -1430,6 +1612,8 @@ impl Clone for RpcServerImpl {
             attach_manager: Arc::clone(&self.attach_manager),
             event_bus: Arc::clone(&self.event_bus),
             attach_servers: Arc::clone(&self.attach_servers),
+            sbcl_processes: Arc::clone(&self.sbcl_processes),
+            swank_event_tasks: Arc::clone(&self.swank_event_tasks),
         }
     }
 }

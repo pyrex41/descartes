@@ -193,6 +193,97 @@ pub fn spawn_session_tool() -> Tool {
     }
 }
 
+/// Create the `swank_eval` tool definition.
+pub fn swank_eval_tool() -> Tool {
+    let mut properties = HashMap::new();
+    properties.insert(
+        "expression".to_string(),
+        json!({
+            "type": "string",
+            "description": "The Lisp expression to evaluate"
+        }),
+    );
+    properties.insert(
+        "package".to_string(),
+        json!({
+            "type": "string",
+            "description": "The package context for evaluation (default: CL-USER)"
+        }),
+    );
+
+    Tool {
+        name: "swank_eval".to_string(),
+        description: "Evaluate a Lisp expression in the live SBCL runtime. Returns the result or enters the debugger on error.".to_string(),
+        parameters: ToolParameters {
+            required: vec!["expression".to_string()],
+            properties,
+        },
+    }
+}
+
+/// Create the `swank_compile` tool definition.
+pub fn swank_compile_tool() -> Tool {
+    let mut properties = HashMap::new();
+    properties.insert(
+        "code".to_string(),
+        json!({
+            "type": "string",
+            "description": "The Lisp code to compile (e.g., a defun form)"
+        }),
+    );
+
+    Tool {
+        name: "swank_compile".to_string(),
+        description: "Compile Lisp code in the live runtime. Provides better diagnostics than eval for definitions.".to_string(),
+        parameters: ToolParameters {
+            required: vec!["code".to_string()],
+            properties,
+        },
+    }
+}
+
+/// Create the `swank_inspect` tool definition.
+pub fn swank_inspect_tool() -> Tool {
+    let mut properties = HashMap::new();
+    properties.insert(
+        "expression".to_string(),
+        json!({
+            "type": "string",
+            "description": "The Lisp expression to inspect"
+        }),
+    );
+
+    Tool {
+        name: "swank_inspect".to_string(),
+        description: "Inspect a Lisp object to see its structure, slots, and values.".to_string(),
+        parameters: ToolParameters {
+            required: vec!["expression".to_string()],
+            properties,
+        },
+    }
+}
+
+/// Create the `swank_restart` tool definition.
+pub fn swank_restart_tool() -> Tool {
+    let mut properties = HashMap::new();
+    properties.insert(
+        "restart_index".to_string(),
+        json!({
+            "type": "integer",
+            "description": "The index of the restart to invoke (0-based, from the restarts list shown when in debugger)"
+        }),
+    );
+
+    Tool {
+        name: "swank_restart".to_string(),
+        description: "Invoke a debugger restart by index. Use this when an error has occurred and restarts are available.".to_string(),
+        parameters: ToolParameters {
+            required: vec!["restart_index".to_string()],
+            properties,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

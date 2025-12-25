@@ -104,6 +104,25 @@ impl GuiRpcClient {
         serde_json::from_value(result)
             .map_err(|e| DaemonError::SerializationError(format!("Failed to parse attach credentials result: {}", e)))
     }
+
+    /// Invoke a Swank restart for a Lisp agent
+    ///
+    /// # Arguments
+    /// * `agent_id` - The ID of the Lisp agent
+    /// * `restart_index` - The index of the restart to invoke
+    ///
+    /// # Returns
+    /// Result of the restart invocation
+    pub async fn invoke_swank_restart(&self, agent_id: &str, restart_index: usize) -> Result<SwankRestartResult, DaemonError> {
+        let params = json!({
+            "agent_id": agent_id,
+            "restart_index": restart_index
+        });
+        let result = self.client.call("swank.restart", Some(params)).await?;
+
+        serde_json::from_value(result)
+            .map_err(|e| DaemonError::SerializationError(format!("Failed to parse swank restart result: {}", e)))
+    }
 }
 
 /// Example usage in Iced GUI
@@ -220,6 +239,16 @@ pub struct AttachCredentialsResult {
     pub token: String,
     pub connect_url: String,
     pub expires_at: i64,
+}
+
+/// Swank restart result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwankRestartResult {
+    pub agent_id: String,
+    pub restart_index: usize,
+    pub success: bool,
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
 impl Clone for GuiRpcClient {

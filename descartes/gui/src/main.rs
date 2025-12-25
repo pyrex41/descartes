@@ -22,6 +22,7 @@ mod chat_view;
 mod dag_canvas_interactions;
 mod dag_editor;
 mod event_handler;
+mod lisp_debugger;
 mod rpc_client;
 mod session_selector;
 mod session_state;
@@ -37,6 +38,7 @@ use dag_editor::{DAGEditorMessage, DAGEditorState};
 use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::DescartesEvent;
 use event_handler::EventHandler;
+use lisp_debugger::{LispDebuggerMessage, LispDebuggerState};
 use rpc_client::GuiRpcClient;
 use session_state::{SessionMessage, SessionState};
 use task_board::{KanbanBoard, TaskBoardMessage, TaskBoardState};
@@ -88,6 +90,8 @@ struct DescartesGui {
     chat_state: chat_state::ChatState,
     /// Chat graph view state
     chat_graph_state: chat_graph_state::ChatGraphState,
+    /// Lisp debugger state
+    lisp_debugger_state: LispDebuggerState,
     /// RPC client (wrapped in Arc for cloning)
     rpc_client: Option<Arc<GuiRpcClient>>,
     /// Event handler
@@ -136,6 +140,8 @@ enum Message {
     Chat(chat_state::ChatMessage),
     /// Chat graph view message
     ChatGraph(chat_graph_state::ChatGraphMessage),
+    /// Lisp debugger message
+    LispDebugger(LispDebuggerMessage),
     /// Load sample history data for demo
     LoadSampleHistory,
     /// Load sample tasks for demo
@@ -161,6 +167,7 @@ impl DescartesGui {
             dag_editor_state: DAGEditorState::default(),
             chat_state: chat_state::ChatState::new(),
             chat_graph_state: chat_graph_state::ChatGraphState::new(),
+            lisp_debugger_state: LispDebuggerState::new(),
             rpc_client: None,
             event_handler: None,
             recent_events: Vec::new(),
@@ -267,6 +274,22 @@ impl DescartesGui {
                 // Keep only the last 100 events
                 if self.recent_events.len() > 100 {
                     self.recent_events.remove(0);
+                }
+
+                // Check for DebuggerPaused events (Lisp debugger)
+                if let DescartesEvent::AgentEvent(ref agent_event) = event {
+                    use descartes_daemon::events::AgentEventType;
+                    if agent_event.event_type == AgentEventType::DebuggerPaused {
+                        // Parse the debugger event and show the panel
+                        if let Some(msg) = lisp_debugger::parse_debugger_event(
+                            agent_event.agent_id.clone(),
+                            &agent_event.data,
+                        ) {
+                            lisp_debugger::update(&mut self.lisp_debugger_state, msg);
+                            self.status_message = Some("Lisp debugger activated".to_string());
+                            return iced::Task::none();
+                        }
+                    }
                 }
 
                 // Update status
@@ -497,6 +520,35 @@ impl DescartesGui {
                     self.rebuild_chat_graph();
                 }
 
+                iced::Task::none()
+            }
+            Message::LispDebugger(msg) => {
+                // Handle Lisp debugger messages
+                if let Some((agent_id, restart_index)) = lisp_debugger::update(&mut self.lisp_debugger_state, msg) {
+                    // Need to invoke the restart via RPC
+                    tracing::info!("Invoking Lisp restart {} for agent {}", restart_index, agent_id);
+
+                    if let Some(ref client) = self.rpc_client {
+                        let client = Arc::clone(client);
+                        return iced::Task::perform(
+                            async move {
+                                // Call the daemon to invoke the restart
+                                // The daemon will forward this to the Swank client
+                                match client.invoke_swank_restart(&agent_id, restart_index).await {
+                                    Ok(_) => Ok(()),
+                                    Err(e) => Err(e.to_string()),
+                                }
+                            },
+                            |result| match result {
+                                Ok(()) => Message::LispDebugger(LispDebuggerMessage::RestartComplete),
+                                Err(e) => Message::LispDebugger(LispDebuggerMessage::RestartError(e)),
+                            },
+                        );
+                    } else {
+                        // No RPC client - just dismiss the debugger
+                        self.lisp_debugger_state.set_error("No daemon connection".to_string());
+                    }
+                }
                 iced::Task::none()
             }
             Message::LoadSampleHistory => {
@@ -973,10 +1025,21 @@ impl DescartesGui {
 
         let main_layout = column![header, row![nav, content,].spacing(0)].spacing(0);
 
-        container(main_layout)
+        let main_container: Element<Message> = container(main_layout)
             .width(Length::Fill)
             .height(Length::Fill)
-            .into()
+            .into();
+
+        // If the Lisp debugger is visible, overlay it on top of the main content
+        if self.lisp_debugger_state.visible {
+            let debugger_overlay = lisp_debugger::view(&self.lisp_debugger_state)
+                .map(Message::LispDebugger);
+
+            // Use a stack to overlay the debugger on top of the main content
+            iced::widget::stack![main_container, debugger_overlay].into()
+        } else {
+            main_container
+        }
     }
 
     /// Handle subscriptions (keyboard events, timers, etc.)

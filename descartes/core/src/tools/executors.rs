@@ -10,7 +10,16 @@ use std::process::{Command, Stdio};
 use tracing::{debug, info, warn};
 
 use crate::agent_definitions::AgentDefinitionLoader;
+use crate::swank::SwankSessionRegistry;
+use crate::tools::context::ExecutionContext;
 use crate::tools::ToolLevel;
+use once_cell::sync::Lazy;
+use std::sync::Arc;
+
+/// Global Swank session registry.
+/// In production, this should be injected via ExecutionContext.
+pub static SWANK_REGISTRY: Lazy<Arc<SwankSessionRegistry>> =
+    Lazy::new(|| Arc::new(SwankSessionRegistry::new()));
 
 /// Result of a tool execution.
 #[derive(Debug, Clone)]
@@ -360,6 +369,7 @@ fn tool_level_to_string(level: ToolLevel) -> &'static str {
         ToolLevel::ReadOnly => "readonly",
         ToolLevel::Researcher => "researcher",
         ToolLevel::Planner => "planner",
+        ToolLevel::LispDeveloper => "lisp-developer",
     }
 }
 
@@ -499,11 +509,16 @@ pub fn execute_spawn_session(
 }
 
 /// Execute a tool by name.
+///
+/// Note: Swank tools (swank_eval, swank_compile, swank_inspect, swank_restart)
+/// are async and should be called via execute_tool_async().
+#[allow(unused_variables)]
 pub fn execute_tool(
     name: &str,
     args: &Value,
     working_dir: &Path,
     descartes_bin: Option<&Path>,
+    context: Option<&ExecutionContext>,
 ) -> ToolResult {
     match name {
         "read" => execute_read(args, working_dir),
@@ -511,6 +526,270 @@ pub fn execute_tool(
         "edit" => execute_edit(args, working_dir),
         "bash" => execute_bash(args, working_dir),
         "spawn_session" => execute_spawn_session(args, working_dir, descartes_bin),
+        // Swank tools are async - must use execute_tool_async()
+        "swank_eval" | "swank_compile" | "swank_inspect" | "swank_restart" => ToolResult {
+            success: false,
+            output: format!("Tool '{}' is async - use execute_tool_async()", name),
+            metadata: None,
+        },
+        _ => ToolResult {
+            success: false,
+            output: format!("Unknown tool: {}", name),
+            metadata: None,
+        },
+    }
+}
+
+/// Execute the `swank_eval` tool (async).
+pub async fn execute_swank_eval(
+    args: &Value,
+    context: Option<&ExecutionContext>,
+) -> ToolResult {
+    let expression = match args.get("expression").and_then(|v| v.as_str()) {
+        Some(e) => e,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "Missing required parameter: expression".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let package = args
+        .get("package")
+        .and_then(|v| v.as_str())
+        .unwrap_or("CL-USER");
+
+    let session_id = match context {
+        Some(ctx) => ctx.session_id,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "No session context available for Swank tools".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let client = match SWANK_REGISTRY.get(&session_id) {
+        Some(c) => c,
+        None => {
+            return ToolResult {
+                success: false,
+                output: format!("No Swank session found for session {}", session_id),
+                metadata: None,
+            }
+        }
+    };
+
+    match client.eval(expression, package).await {
+        Ok(result) => ToolResult {
+            success: true,
+            output: result,
+            metadata: Some(
+                [
+                    ("expression".to_string(), expression.to_string()),
+                    ("package".to_string(), package.to_string()),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        },
+        Err(e) => ToolResult {
+            success: false,
+            output: format!("Evaluation error: {}", e),
+            metadata: None,
+        },
+    }
+}
+
+/// Execute the `swank_compile` tool (async).
+pub async fn execute_swank_compile(
+    args: &Value,
+    context: Option<&ExecutionContext>,
+) -> ToolResult {
+    let code = match args.get("code").and_then(|v| v.as_str()) {
+        Some(c) => c,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "Missing required parameter: code".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let session_id = match context {
+        Some(ctx) => ctx.session_id,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "No session context available for Swank tools".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let client = match SWANK_REGISTRY.get(&session_id) {
+        Some(c) => c,
+        None => {
+            return ToolResult {
+                success: false,
+                output: format!("No Swank session found for session {}", session_id),
+                metadata: None,
+            }
+        }
+    };
+
+    match client.compile_string(code).await {
+        Ok(result) => ToolResult {
+            success: true,
+            output: result,
+            metadata: Some(
+                [("code_length".to_string(), code.len().to_string())]
+                    .into_iter()
+                    .collect(),
+            ),
+        },
+        Err(e) => ToolResult {
+            success: false,
+            output: format!("Compilation error: {}", e),
+            metadata: None,
+        },
+    }
+}
+
+/// Execute the `swank_inspect` tool (async).
+pub async fn execute_swank_inspect(
+    args: &Value,
+    context: Option<&ExecutionContext>,
+) -> ToolResult {
+    let expression = match args.get("expression").and_then(|v| v.as_str()) {
+        Some(e) => e,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "Missing required parameter: expression".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let session_id = match context {
+        Some(ctx) => ctx.session_id,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "No session context available for Swank tools".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let client = match SWANK_REGISTRY.get(&session_id) {
+        Some(c) => c,
+        None => {
+            return ToolResult {
+                success: false,
+                output: format!("No Swank session found for session {}", session_id),
+                metadata: None,
+            }
+        }
+    };
+
+    match client.inspect(expression).await {
+        Ok(result) => ToolResult {
+            success: true,
+            output: result,
+            metadata: Some(
+                [("expression".to_string(), expression.to_string())]
+                    .into_iter()
+                    .collect(),
+            ),
+        },
+        Err(e) => ToolResult {
+            success: false,
+            output: format!("Inspection error: {}", e),
+            metadata: None,
+        },
+    }
+}
+
+/// Execute the `swank_restart` tool (async).
+pub async fn execute_swank_restart(
+    args: &Value,
+    context: Option<&ExecutionContext>,
+) -> ToolResult {
+    let restart_index = match args.get("restart_index").and_then(|v| v.as_u64()) {
+        Some(i) => i as usize,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "Missing required parameter: restart_index".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let session_id = match context {
+        Some(ctx) => ctx.session_id,
+        None => {
+            return ToolResult {
+                success: false,
+                output: "No session context available for Swank tools".to_string(),
+                metadata: None,
+            }
+        }
+    };
+
+    let client = match SWANK_REGISTRY.get(&session_id) {
+        Some(c) => c,
+        None => {
+            return ToolResult {
+                success: false,
+                output: format!("No Swank session found for session {}", session_id),
+                metadata: None,
+            }
+        }
+    };
+
+    match client.invoke_restart(restart_index).await {
+        Ok(result) => ToolResult {
+            success: true,
+            output: result,
+            metadata: Some(
+                [("restart_index".to_string(), restart_index.to_string())]
+                    .into_iter()
+                    .collect(),
+            ),
+        },
+        Err(e) => ToolResult {
+            success: false,
+            output: format!("Restart error: {}", e),
+            metadata: None,
+        },
+    }
+}
+
+/// Execute a tool by name (async version for Swank tools).
+pub async fn execute_tool_async(
+    name: &str,
+    args: &Value,
+    working_dir: &Path,
+    descartes_bin: Option<&Path>,
+    context: Option<&ExecutionContext>,
+) -> ToolResult {
+    match name {
+        // Sync tools - delegate to sync execute_tool
+        "read" | "write" | "edit" | "bash" | "spawn_session" => {
+            execute_tool(name, args, working_dir, descartes_bin, context)
+        }
+        // Async Swank tools
+        "swank_eval" => execute_swank_eval(args, context).await,
+        "swank_compile" => execute_swank_compile(args, context).await,
+        "swank_inspect" => execute_swank_inspect(args, context).await,
+        "swank_restart" => execute_swank_restart(args, context).await,
         _ => ToolResult {
             success: false,
             output: format!("Unknown tool: {}", name),
@@ -670,9 +949,19 @@ mod tests {
     #[test]
     fn test_execute_unknown_tool() {
         let temp_dir = TempDir::new().unwrap();
-        let result = execute_tool("unknown_tool", &json!({}), temp_dir.path(), None);
+        let result = execute_tool("unknown_tool", &json!({}), temp_dir.path(), None, None);
         assert!(!result.success);
         assert!(result.output.contains("Unknown tool"));
+    }
+
+    #[test]
+    fn test_swank_tools_require_async() {
+        let temp_dir = TempDir::new().unwrap();
+        for tool_name in &["swank_eval", "swank_compile", "swank_inspect", "swank_restart"] {
+            let result = execute_tool(tool_name, &json!({}), temp_dir.path(), None, None);
+            assert!(!result.success);
+            assert!(result.output.contains("async"));
+        }
     }
 
     #[test]

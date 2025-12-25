@@ -113,6 +113,7 @@ fn parse_tool_level(s: &str) -> ToolLevel {
         "readonly" | "read_only" | "read-only" => ToolLevel::ReadOnly,
         "researcher" => ToolLevel::Researcher,
         "planner" => ToolLevel::Planner,
+        "lisp-developer" | "lisp_developer" | "lispdeveloper" => ToolLevel::LispDeveloper,
         _ => {
             warn!("Unknown tool level '{}', defaulting to ReadOnly", s);
             ToolLevel::ReadOnly
@@ -127,6 +128,7 @@ const DEFAULT_AGENT_CODEBASE_PATTERN_FINDER: &str =
     include_str!("../../agents/codebase-pattern-finder.md");
 const DEFAULT_AGENT_RESEARCHER: &str = include_str!("../../agents/researcher.md");
 const DEFAULT_AGENT_PLANNER: &str = include_str!("../../agents/planner.md");
+const DEFAULT_AGENT_LISP_DEVELOPER: &str = include_str!("../../agents/lisp-developer.md");
 
 /// Default agents bundled with Descartes.
 const DEFAULT_AGENTS: &[(&str, &str)] = &[
@@ -138,6 +140,7 @@ const DEFAULT_AGENTS: &[(&str, &str)] = &[
     ),
     ("researcher.md", DEFAULT_AGENT_RESEARCHER),
     ("planner.md", DEFAULT_AGENT_PLANNER),
+    ("lisp-developer.md", DEFAULT_AGENT_LISP_DEVELOPER),
 ];
 
 /// Loader for agent definitions from the filesystem.
@@ -316,6 +319,7 @@ fn tool_level_to_string(level: ToolLevel) -> &'static str {
         ToolLevel::ReadOnly => "readonly",
         ToolLevel::Researcher => "researcher",
         ToolLevel::Planner => "planner",
+        ToolLevel::LispDeveloper => "lisp-developer",
     }
 }
 
@@ -482,6 +486,9 @@ Prompt content.
         assert_eq!(parse_tool_level("read-only"), ToolLevel::ReadOnly);
         assert_eq!(parse_tool_level("researcher"), ToolLevel::Researcher);
         assert_eq!(parse_tool_level("planner"), ToolLevel::Planner);
+        assert_eq!(parse_tool_level("lisp-developer"), ToolLevel::LispDeveloper);
+        assert_eq!(parse_tool_level("lisp_developer"), ToolLevel::LispDeveloper);
+        assert_eq!(parse_tool_level("lispdeveloper"), ToolLevel::LispDeveloper);
         assert_eq!(parse_tool_level("unknown"), ToolLevel::ReadOnly); // default
     }
 }
