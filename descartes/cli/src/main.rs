@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 
 mod commands;
 mod rpc;
-mod state;
 
 /// Load configuration from the given path or default location
 fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {

@@ -33,5 +33,3 @@ path = "src/main.rs"
 
 [dev-dependencies]
 tempfile = "3.8"
-assert_cmd = "2.0"
-wat = "1.0"

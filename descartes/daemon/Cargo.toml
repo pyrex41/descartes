@@ -21,12 +21,6 @@ sqlx = { workspace = true }
 # Descartes core
 descartes-core = { path = "../core" }
 
-# JSON-RPC (legacy)
-jsonrpc-core = "18.0"
-jsonrpc-http-server = "18.0"
-jsonrpc-ws-server = "18.0"
-jsonrpc-derive = "18.0"
-
 # jsonrpsee (new implementation for Unix sockets)
 jsonrpsee = { version = "0.21", features = ["server", "macros", "http-client", "ws-client"] }
 
@@ -36,9 +30,6 @@ reqwest = { workspace = true }
 tokio-tungstenite = "0.21"
 futures = "0.3"
 clap = { workspace = true, features = ["derive"] }
-
-# Connection pooling
-deadpool = { version = "0.10", features = ["managed"] }
 
 # Metrics and monitoring
 prometheus = "0.13"
@@ -61,9 +52,6 @@ notify = { version = "6.1", default-features = false, features = ["macos_kqueue"
 jsonwebtoken = "9.2"
 hex = "0.4"
 base64 = "0.21"
-
-# Error handling
-failure = "0.1"
 
 # System info (CPU, memory, etc)
 sysinfo = { workspace = true }
