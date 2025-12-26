@@ -7,7 +7,7 @@ use super::definitions::*;
 use crate::traits::Tool;
 
 /// Tool capability levels for agents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ToolLevel {
     /// Minimal tools: read, write, edit, bash
     /// Used for sub-sessions that cannot spawn further agents
@@ -24,6 +24,9 @@ pub enum ToolLevel {
     /// Planner tools: read, bash, write (to thoughts only)
     /// Used for planning and documentation tasks
     Planner,
+    /// Lisp developer tools: swank_eval, swank_compile, swank_inspect, swank_restart + read, bash
+    /// Used for live Lisp development with SBCL/Swank
+    LispDeveloper,
 }
 
 /// Get the tools for a given capability level.
@@ -49,6 +52,14 @@ pub fn get_tools(level: ToolLevel) -> Vec<Tool> {
             read_tool(),
             write_tool(), // Can write to thoughts/plans
             bash_tool(),
+        ],
+        ToolLevel::LispDeveloper => vec![
+            swank_eval_tool(),
+            swank_compile_tool(),
+            swank_inspect_tool(),
+            swank_restart_tool(),
+            read_tool(),  // For reading Lisp source files
+            bash_tool(),  // For running shell commands
         ],
     }
 }
@@ -145,6 +156,28 @@ Guidelines:
 - Be specific about file locations and changes needed"#
 }
 
+/// Get Lisp developer system prompt for live Lisp development.
+pub fn lisp_developer_system_prompt() -> &'static str {
+    r#"You are a Lisp developer with access to a live SBCL runtime via Swank.
+
+Available tools:
+- swank_eval: Evaluate Lisp expressions in the live runtime
+- swank_compile: Compile Lisp code (better diagnostics for defun, defclass, etc.)
+- swank_inspect: Inspect Lisp objects to see their structure
+- swank_restart: Invoke a debugger restart when errors occur
+- read: Read source files
+- bash: Execute shell commands
+
+Guidelines:
+- Use swank_eval for interactive exploration and testing
+- Use swank_compile for defining functions, classes, and macros
+- When an error occurs, you'll see available restarts - use swank_restart to choose one
+- Restart index 0 is typically ABORT (return to top level)
+- Use read to examine Lisp source files before modifying
+- The runtime persists state between evaluations - defined functions remain available
+- Package defaults to CL-USER, specify :package for other packages"#
+}
+
 /// Get the appropriate system prompt for a tool level.
 pub fn get_system_prompt(level: ToolLevel) -> &'static str {
     match level {
@@ -153,6 +186,7 @@ pub fn get_system_prompt(level: ToolLevel) -> &'static str {
         ToolLevel::ReadOnly => readonly_system_prompt(),
         ToolLevel::Researcher => researcher_system_prompt(),
         ToolLevel::Planner => planner_system_prompt(),
+        ToolLevel::LispDeveloper => lisp_developer_system_prompt(),
     }
 }
 
@@ -222,12 +256,29 @@ mod tests {
     }
 
     #[test]
+    fn test_lisp_developer_tools() {
+        let tools = get_tools(ToolLevel::LispDeveloper);
+        assert_eq!(tools.len(), 6);
+
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"swank_eval"));
+        assert!(names.contains(&"swank_compile"));
+        assert!(names.contains(&"swank_inspect"));
+        assert!(names.contains(&"swank_restart"));
+        assert!(names.contains(&"read"));
+        assert!(names.contains(&"bash"));
+        assert!(!names.contains(&"write"));
+        assert!(!names.contains(&"edit"));
+    }
+
+    #[test]
     fn test_system_prompts_not_empty() {
         assert!(!minimal_system_prompt().is_empty());
         assert!(!orchestrator_system_prompt().is_empty());
         assert!(!readonly_system_prompt().is_empty());
         assert!(!researcher_system_prompt().is_empty());
         assert!(!planner_system_prompt().is_empty());
+        assert!(!lisp_developer_system_prompt().is_empty());
     }
 
     #[test]
@@ -240,6 +291,15 @@ mod tests {
         assert_eq!(get_system_prompt(ToolLevel::ReadOnly), readonly_system_prompt());
         assert_eq!(get_system_prompt(ToolLevel::Researcher), researcher_system_prompt());
         assert_eq!(get_system_prompt(ToolLevel::Planner), planner_system_prompt());
+        assert_eq!(get_system_prompt(ToolLevel::LispDeveloper), lisp_developer_system_prompt());
+    }
+
+    #[test]
+    fn test_lisp_developer_prompt_mentions_swank() {
+        let prompt = lisp_developer_system_prompt();
+        assert!(prompt.contains("swank_eval"));
+        assert!(prompt.contains("SBCL"));
+        assert!(prompt.contains("restart"));
     }
 
     #[test]

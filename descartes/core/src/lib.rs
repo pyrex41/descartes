@@ -31,6 +31,7 @@ pub mod secrets;
 pub mod secrets_crypto;
 pub mod state_machine;
 pub mod state_machine_store;
+pub mod swank;
 pub mod state_store;
 pub mod swarm_parser;
 pub mod task_queries;
@@ -283,9 +284,18 @@ pub use daemon_launcher::{
 
 pub use tools::{
     bash_tool, edit_tool, execute_bash, execute_edit, execute_read, execute_spawn_session,
-    execute_tool, execute_write, get_system_prompt, get_tools, minimal_system_prompt,
-    orchestrator_system_prompt, planner_system_prompt, read_tool, readonly_system_prompt,
-    researcher_system_prompt, spawn_session_tool, write_tool, ToolLevel, ToolResult,
+    execute_tool, execute_tool_async, execute_write, get_system_prompt, get_tools,
+    lisp_developer_system_prompt, minimal_system_prompt, orchestrator_system_prompt,
+    planner_system_prompt, read_tool, readonly_system_prompt, researcher_system_prompt,
+    spawn_session_tool, swank_compile_tool, swank_eval_tool, swank_inspect_tool, swank_restart_tool,
+    write_tool, ExecutionContext, ToolLevel, ToolResult, SWANK_REGISTRY,
+    execute_swank_compile, execute_swank_eval, execute_swank_inspect, execute_swank_restart,
+};
+
+// Swank integration (Lisp live development)
+pub use swank::{
+    find_available_port, LauncherError, SwankClient, SwankError, SwankFrame, SwankLauncher,
+    SwankMessage, SwankRestart, SwankSessionRegistry, DEFAULT_SWANK_PORT,
 };
 
 pub use session_transcript::{

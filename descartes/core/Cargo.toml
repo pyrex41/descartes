@@ -56,6 +56,11 @@ base64 = "0.22"  # Base64 encoding for binary data
 tokio-stream = "0.1"  # Stream utilities for async
 which = "7.0"  # CLI detection
 
+# Swank protocol support (Lisp live development)
+lexpr = "0.2"  # S-expression parser
+tokio-util = { version = "0.7", features = ["codec"] }
+once_cell = "1.19"
+
 # Unix signal handling (for agent process management)
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.29", features = ["signal"] }
