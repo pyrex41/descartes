@@ -42,6 +42,7 @@ pub mod time_travel_integration;
 pub mod traits;
 pub mod workflow_commands;
 pub mod workflow_executor;
+pub mod flow_executor;
 pub mod zmq_agent_runner;
 pub mod zmq_client;
 pub mod zmq_communication;
@@ -186,6 +187,11 @@ pub use workflow_commands::{
 pub use workflow_executor::{
     execute_step, execute_workflow, StepExecutionResult, WorkflowExecutionError,
     WorkflowExecutorConfig,
+};
+
+pub use flow_executor::{
+    FlowArtifacts, FlowConfig, FlowExecutor, FlowGitState, FlowPhases, FlowResult, FlowState,
+    PhaseState, PhaseStatus,
 };
 
 pub use scud_plugin::{

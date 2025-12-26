@@ -80,6 +80,30 @@ pub enum WorkflowCommands {
         /// Workflow name
         name: String,
     },
+
+    /// Run the full flow workflow from PRD to implementation
+    #[command(name = "flow")]
+    Flow {
+        /// Path to the PRD file
+        #[arg(long)]
+        prd: PathBuf,
+
+        /// Tag name for this workflow (auto-generated if not provided)
+        #[arg(long)]
+        tag: Option<String>,
+
+        /// Resume from previous flow state
+        #[arg(long)]
+        resume: bool,
+
+        /// Working directory
+        #[arg(short, long)]
+        dir: Option<PathBuf>,
+
+        /// Model adapter to use
+        #[arg(long)]
+        adapter: Option<String>,
+    },
 }
 
 pub async fn execute(cmd: &WorkflowCommands, config: &DescaratesConfig) -> Result<()> {
@@ -95,6 +119,9 @@ pub async fn execute(cmd: &WorkflowCommands, config: &DescaratesConfig) -> Resul
             execute_implement(plan, dir.clone(), adapter.as_deref(), config).await
         }
         WorkflowCommands::Info { name } => execute_info(name).await,
+        WorkflowCommands::Flow { prd, tag, resume, dir, adapter } => {
+            execute_flow(prd.clone(), tag.clone(), *resume, dir.clone(), adapter.as_deref(), config).await
+        }
     }
 }
 
@@ -358,6 +385,82 @@ async fn execute_info(name: &str) -> Result<()> {
             println!("     Output: {}", output.yellow());
         }
         println!();
+    }
+
+    Ok(())
+}
+
+async fn execute_flow(
+    prd: PathBuf,
+    tag: Option<String>,
+    resume: bool,
+    dir: Option<PathBuf>,
+    adapter: Option<&str>,
+    config: &DescaratesConfig,
+) -> Result<()> {
+    use descartes_core::FlowExecutor;
+
+    println!();
+    println!("{}", "Flow Workflow".cyan().bold());
+    println!("{}", "═".repeat(55).cyan());
+    println!();
+    println!("PRD: {}", prd.display().to_string().yellow());
+    if let Some(t) = &tag {
+        println!("Tag: {}", t.yellow());
+    }
+    println!("Resume: {}", resume);
+    println!();
+
+    // Create backend - use adapter if specified, otherwise use primary provider
+    let (provider_name, _model, mut backend) = if let Some(adapter_name) = adapter {
+        println!("Using adapter: {}", adapter_name.cyan());
+        let backend = create_adapter_backend(adapter_name)?;
+        (adapter_name.to_string(), "default".to_string(), backend)
+    } else {
+        let provider_name = &config.providers.primary;
+        let backend = create_backend(config, provider_name)?;
+        let model = get_model_for_provider(config, provider_name)?;
+        (provider_name.clone(), model, backend)
+    };
+
+    backend.initialize().await?;
+    info!("Using provider: {}", provider_name);
+
+    let backend = Arc::from(backend);
+
+    let mut executor = if resume {
+        println!("{}", "Resuming from previous state...".green());
+        FlowExecutor::resume(dir, backend).await?
+    } else {
+        FlowExecutor::new(prd, tag, dir, backend).await?
+    };
+
+    println!();
+    println!("{}", "Executing flow phases...".green().bold());
+    println!();
+
+    let result = executor.execute().await?;
+
+    println!();
+    println!("{}", "═".repeat(55).cyan());
+    if result.success {
+        println!("{}", "Flow Complete!".green().bold());
+    } else {
+        println!("{}", "Flow completed with errors.".yellow().bold());
+    }
+    println!();
+    println!("Phases completed: {:?}", result.phases_completed);
+    if !result.phases_failed.is_empty() {
+        println!("Phases failed: {:?}", result.phases_failed);
+    }
+    if let Some(summary) = result.summary_path {
+        println!("Summary: {}", summary.display().to_string().yellow());
+    }
+    println!("Duration: {}s", result.duration_secs);
+
+    if result.success {
+        println!();
+        println!("{}", "Ready for retrospective: /scud:retrospective".dimmed());
     }
 
     Ok(())

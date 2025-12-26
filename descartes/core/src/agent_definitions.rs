@@ -130,6 +130,15 @@ const DEFAULT_AGENT_RESEARCHER: &str = include_str!("../../agents/researcher.md"
 const DEFAULT_AGENT_PLANNER: &str = include_str!("../../agents/planner.md");
 const DEFAULT_AGENT_LISP_DEVELOPER: &str = include_str!("../../agents/lisp-developer.md");
 
+// Flow workflow agents
+const DEFAULT_AGENT_FLOW_ORCHESTRATOR: &str = include_str!("../../agents/flow-orchestrator.md");
+const DEFAULT_AGENT_FLOW_INGEST: &str = include_str!("../../agents/flow-ingest.md");
+const DEFAULT_AGENT_FLOW_REVIEW_GRAPH: &str = include_str!("../../agents/flow-review-graph.md");
+const DEFAULT_AGENT_FLOW_PLAN_TASKS: &str = include_str!("../../agents/flow-plan-tasks.md");
+const DEFAULT_AGENT_FLOW_IMPLEMENT: &str = include_str!("../../agents/flow-implement.md");
+const DEFAULT_AGENT_FLOW_QA: &str = include_str!("../../agents/flow-qa.md");
+const DEFAULT_AGENT_FLOW_SUMMARIZE: &str = include_str!("../../agents/flow-summarize.md");
+
 /// Default agents bundled with Descartes.
 const DEFAULT_AGENTS: &[(&str, &str)] = &[
     ("codebase-locator.md", DEFAULT_AGENT_CODEBASE_LOCATOR),
@@ -141,6 +150,14 @@ const DEFAULT_AGENTS: &[(&str, &str)] = &[
     ("researcher.md", DEFAULT_AGENT_RESEARCHER),
     ("planner.md", DEFAULT_AGENT_PLANNER),
     ("lisp-developer.md", DEFAULT_AGENT_LISP_DEVELOPER),
+    // Flow workflow agents
+    ("flow-orchestrator.md", DEFAULT_AGENT_FLOW_ORCHESTRATOR),
+    ("flow-ingest.md", DEFAULT_AGENT_FLOW_INGEST),
+    ("flow-review-graph.md", DEFAULT_AGENT_FLOW_REVIEW_GRAPH),
+    ("flow-plan-tasks.md", DEFAULT_AGENT_FLOW_PLAN_TASKS),
+    ("flow-implement.md", DEFAULT_AGENT_FLOW_IMPLEMENT),
+    ("flow-qa.md", DEFAULT_AGENT_FLOW_QA),
+    ("flow-summarize.md", DEFAULT_AGENT_FLOW_SUMMARIZE),
 ];
 
 /// Loader for agent definitions from the filesystem.
