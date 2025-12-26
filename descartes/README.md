@@ -14,6 +14,7 @@
   <a href="#philosophy">Philosophy</a> •
   <a href="#tools">Tools</a> •
   <a href="#skills">Skills</a> •
+  <a href="docs/FLOW-WORKFLOW.md">Flow Workflow</a> •
   <a href="docs/">Documentation</a>
 </p>
 
@@ -347,6 +348,36 @@ cat .scud/sessions/*.json | jq '.'
 # Just the tool calls
 cat .scud/sessions/*.json | jq '.entries[] | select(.role == "tool_call")'
 ```
+
+## Flow Workflow (PRD to Code)
+
+For larger projects, Descartes provides a **multi-agent flow workflow** that transforms Product Requirement Documents into implemented code:
+
+```bash
+# Transform a PRD into working code
+descartes workflow flow --prd docs/requirements.md
+
+# Resume an interrupted flow
+descartes workflow flow --prd docs/requirements.md --resume
+```
+
+The flow executes 6 phases with specialized agents:
+
+| Phase | Agent | Purpose |
+|-------|-------|---------|
+| 1. Ingest | `flow-ingest` | Parse PRD into SCUD tasks |
+| 2. Review | `flow-review-graph` | Optimize task dependencies |
+| 3. Plan | `flow-plan-tasks` | Generate implementation plans |
+| 4. Implement | `flow-implement` | Execute tasks wave-by-wave |
+| 5. QA | `flow-qa` | Monitor quality |
+| 6. Summarize | `flow-summarize` | Generate documentation |
+
+Features:
+- **Stateful** — Pause/resume via `.scud/flow-state.json`
+- **Error recovery** — Orchestrator agent handles failures intelligently
+- **Full observability** — Every phase produces artifacts and logs
+
+**[→ Full Flow Workflow Guide](docs/FLOW-WORKFLOW.md)** — Complete documentation with examples.
 
 ## Architecture
 
