@@ -168,7 +168,11 @@ fn check_skills() -> (Status, String) {
             Ok(entries) => {
                 let count = entries
                     .filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_file())
+                    .filter(|e| {
+                        let path = e.path();
+                        // Count executable files (not READMEs or other non-skill files)
+                        path.is_file() && path.extension().is_none()
+                    })
                     .count();
                 if count > 0 {
                     (Status::Ok, format!("{} skills available", count))
@@ -180,6 +184,24 @@ fn check_skills() -> (Status, String) {
         }
     } else {
         (Status::NotConfigured, "no skills directory".to_string())
+    }
+}
+
+/// Check OpenCode availability
+fn check_opencode() -> (Status, String) {
+    match Command::new("opencode").arg("--version").output() {
+        Ok(output) if output.status.success() => {
+            let version = String::from_utf8_lossy(&output.stdout);
+            let version = version.trim();
+            // Check if version string is reasonable
+            if version.is_empty() {
+                (Status::Ok, "installed".to_string())
+            } else {
+                (Status::Ok, format!("installed ({})", version))
+            }
+        }
+        Ok(_) => (Status::Warning, "installed but returned error".to_string()),
+        Err(_) => (Status::NotConfigured, "not installed".to_string()),
     }
 }
 
@@ -251,6 +273,9 @@ pub async fn execute() -> Result<()> {
 
     let (status, skills_info) = check_skills();
     print_check(status, "Skills", &skills_info);
+
+    let (status, opencode_info) = check_opencode();
+    print_check(status, "OpenCode", &opencode_info);
 
     // Summary
     println!("\n{}", "─".repeat(40).dimmed());

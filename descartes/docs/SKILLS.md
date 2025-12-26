@@ -192,7 +192,56 @@ Skills should be safe to retry:
 See `examples/skills/` for reference implementations:
 
 - `web-search/` - Web search example
-- (Add more as needed)
+
+## OpenCode Integration Skills
+
+Descartes includes built-in skills for integrating with [OpenCode](https://opencode.ai),
+an open-source AI coding assistant with LSP support.
+
+### Available OpenCode Skills
+
+| Skill | Description |
+|-------|-------------|
+| `opencode-delegate` | Delegate prompts to OpenCode |
+| `opencode-server` | Manage OpenCode server lifecycle |
+| `lsp-check` | Get LSP diagnostics for a file |
+| `lsp-fix` | Fix LSP errors using OpenCode |
+
+### Usage Patterns
+
+#### Quick Query (Cold Start)
+```bash
+.descartes/skills/opencode-delegate "Explain this code"
+```
+
+#### Fast Queries (With Server)
+```bash
+# Start server once
+.descartes/skills/opencode-server start
+
+# Multiple fast queries
+.descartes/skills/opencode-delegate "Query 1"
+.descartes/skills/opencode-delegate "Query 2"
+
+# Stop when done
+.descartes/skills/opencode-server stop
+```
+
+#### LSP Workflow
+```bash
+# Check for errors
+.descartes/skills/lsp-check src/main.rs
+
+# Auto-fix errors
+.descartes/skills/lsp-fix src/main.rs
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENCODE_PORT` | 4096 | Server port |
+| `OPENCODE_HOST` | 127.0.0.1 | Server hostname |
 
 ## Comparison with Claude Code Slash Commands
 

@@ -1,0 +1,138 @@
+#!/bin/bash
+# opencode-server - Manage OpenCode server lifecycle
+#
+# Usage: opencode-server <command> [options]
+#
+# Commands:
+#   start   Start the OpenCode server
+#   stop    Stop the OpenCode server
+#   status  Check if server is running
+#   url     Print the server URL
+
+set -e
+
+COMMAND="${1:-status}"
+PORT="${OPENCODE_PORT:-4096}"
+HOSTNAME="${OPENCODE_HOST:-127.0.0.1}"
+PIDFILE="/tmp/opencode-server.pid"
+LOGFILE="/tmp/opencode-server.log"
+
+case "$COMMAND" in
+    start)
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
+            echo "OpenCode server already running (PID: $(cat $PIDFILE))"
+            echo "URL: http://$HOSTNAME:$PORT"
+            exit 0
+        fi
+
+        # Check if opencode is available
+        if ! command -v opencode &> /dev/null; then
+            echo "Error: opencode not found in PATH"
+            exit 1
+        fi
+
+        echo "Starting OpenCode server on $HOSTNAME:$PORT..."
+        nohup opencode serve --port "$PORT" --hostname "$HOSTNAME" > "$LOGFILE" 2>&1 &
+        echo $! > "$PIDFILE"
+
+        # Wait for server to be ready
+        for i in {1..10}; do
+            if curl -s "http://$HOSTNAME:$PORT/health" > /dev/null 2>&1; then
+                echo "Server started successfully"
+                echo "URL: http://$HOSTNAME:$PORT"
+                echo "PID: $(cat $PIDFILE)"
+                exit 0
+            fi
+            sleep 0.5
+        done
+
+        echo "Warning: Server started but health check failed"
+        echo "Check logs: $LOGFILE"
+        ;;
+
+    stop)
+        if [ -f "$PIDFILE" ]; then
+            PID=$(cat "$PIDFILE")
+            if kill -0 "$PID" 2>/dev/null; then
+                echo "Stopping OpenCode server (PID: $PID)..."
+                kill "$PID"
+                rm -f "$PIDFILE"
+                echo "Server stopped"
+            else
+                echo "Server not running (stale PID file)"
+                rm -f "$PIDFILE"
+            fi
+        else
+            echo "Server not running (no PID file)"
+        fi
+        ;;
+
+    status)
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
+            echo "OpenCode server is running"
+            echo "URL: http://$HOSTNAME:$PORT"
+            echo "PID: $(cat $PIDFILE)"
+
+            # Check health
+            if curl -s "http://$HOSTNAME:$PORT/health" > /dev/null 2>&1; then
+                echo "Health: OK"
+            else
+                echo "Health: UNHEALTHY"
+            fi
+        else
+            echo "OpenCode server is not running"
+            exit 1
+        fi
+        ;;
+
+    url)
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
+            echo "http://$HOSTNAME:$PORT"
+        else
+            echo "Error: Server not running"
+            exit 1
+        fi
+        ;;
+
+    logs)
+        if [ -f "$LOGFILE" ]; then
+            tail -50 "$LOGFILE"
+        else
+            echo "No logs found"
+        fi
+        ;;
+
+    -h|--help)
+        echo "Usage: opencode-server <command>"
+        echo ""
+        echo "Manage OpenCode server lifecycle."
+        echo ""
+        echo "Commands:"
+        echo "  start   Start the OpenCode server"
+        echo "  stop    Stop the OpenCode server"
+        echo "  status  Check if server is running"
+        echo "  url     Print the server URL"
+        echo "  logs    Show recent server logs"
+        echo ""
+        echo "Environment variables:"
+        echo "  OPENCODE_PORT  Server port (default: 4096)"
+        echo "  OPENCODE_HOST  Server hostname (default: 127.0.0.1)"
+        exit 0
+        ;;
+
+    *)
+        echo "Usage: opencode-server <command>"
+        echo ""
+        echo "Commands:"
+        echo "  start   Start the OpenCode server"
+        echo "  stop    Stop the OpenCode server"
+        echo "  status  Check if server is running"
+        echo "  url     Print the server URL"
+        echo "  logs    Show recent server logs"
+        echo ""
+        echo "Environment variables:"
+        echo "  OPENCODE_PORT  Server port (default: 4096)"
+        echo "  OPENCODE_HOST  Server hostname (default: 127.0.0.1)"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,97 @@
+#!/bin/bash
+# opencode-delegate - Delegate a task to OpenCode
+#
+# Usage: opencode-delegate "prompt" [--attach URL] [--format json|text]
+#
+# Examples:
+#   opencode-delegate "Explain this Rust code" --file src/main.rs
+#   opencode-delegate "Fix the compilation errors" --attach http://localhost:4096
+
+set -e
+
+# Parse arguments
+PROMPT=""
+ATTACH_URL=""
+FORMAT="text"
+FILES=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --attach)
+            ATTACH_URL="$2"
+            shift 2
+            ;;
+        --format)
+            FORMAT="$2"
+            shift 2
+            ;;
+        --file)
+            FILES="$FILES --file $2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: opencode-delegate \"prompt\" [options]"
+            echo ""
+            echo "Delegate a task to OpenCode AI assistant."
+            echo ""
+            echo "Options:"
+            echo "  --attach URL    Connect to running OpenCode server (faster)"
+            echo "  --format FMT    Output format: text (default) or json"
+            echo "  --file PATH     Include file context (can be repeated)"
+            echo "  -h, --help      Show this help"
+            echo ""
+            echo "Examples:"
+            echo "  opencode-delegate \"What does this function do?\""
+            echo "  opencode-delegate \"Fix errors\" --attach http://localhost:4096"
+            echo "  opencode-delegate \"Review this\" --file src/lib.rs --format json"
+            exit 0
+            ;;
+        *)
+            if [ -z "$PROMPT" ]; then
+                PROMPT="$1"
+            else
+                PROMPT="$PROMPT $1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$PROMPT" ]; then
+    echo "Error: No prompt provided"
+    echo "Usage: opencode-delegate \"prompt\" [options]"
+    exit 1
+fi
+
+# Check if opencode is available
+if ! command -v opencode &> /dev/null; then
+    echo "Error: opencode not found in PATH"
+    echo "Install it from: https://opencode.ai"
+    exit 1
+fi
+
+# Auto-attach to running server if no explicit --attach
+if [ -z "$ATTACH_URL" ]; then
+    # Check if server is running
+    PIDFILE="/tmp/opencode-server.pid"
+    if [ -f "$PIDFILE" ] && kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
+        ATTACH_URL="http://${OPENCODE_HOST:-127.0.0.1}:${OPENCODE_PORT:-4096}"
+        echo "Auto-attaching to: $ATTACH_URL" >&2
+    fi
+fi
+
+# Build command
+CMD="opencode run"
+
+if [ -n "$ATTACH_URL" ]; then
+    CMD="$CMD --attach $ATTACH_URL"
+fi
+
+if [ "$FORMAT" = "json" ]; then
+    CMD="$CMD --format json"
+fi
+
+CMD="$CMD -q"  # Quiet mode for scripting
+
+# Execute
+$CMD "$PROMPT"

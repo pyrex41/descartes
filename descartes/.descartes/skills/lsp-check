@@ -1,0 +1,48 @@
+#!/bin/bash
+# lsp-check - Get LSP diagnostics for a file
+#
+# Usage: lsp-check <file> [--format json|text]
+#
+# Returns compilation errors, warnings, and hints from the language server.
+
+set -e
+
+FILE="$1"
+FORMAT="${2:-text}"
+
+if [ -z "$FILE" ]; then
+    echo "Usage: lsp-check <file> [--format json|text]"
+    echo ""
+    echo "Get LSP diagnostics (errors, warnings) for a file."
+    echo ""
+    echo "Arguments:"
+    echo "  file      Path to the file to check"
+    echo "  --format  Output format: text (default) or json"
+    echo ""
+    echo "Examples:"
+    echo "  lsp-check src/main.rs"
+    echo "  lsp-check app.tsx --format json"
+    echo ""
+    echo "Supported languages: Rust, Go, TypeScript, Python, and 20+ more"
+    exit 1
+fi
+
+if [ ! -f "$FILE" ]; then
+    echo "Error: File not found: $FILE"
+    exit 1
+fi
+
+# Check if opencode is available
+if ! command -v opencode &> /dev/null; then
+    echo "Error: opencode not found in PATH"
+    exit 1
+fi
+
+echo "Checking: $FILE"
+echo "---"
+
+# Run LSP diagnostics
+opencode debug lsp diagnostics "$FILE"
+
+echo "---"
+echo "Skill: lsp-check"

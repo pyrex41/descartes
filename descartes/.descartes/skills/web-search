@@ -1,0 +1,56 @@
+#!/bin/bash
+# web-search - Example skill demonstrating the CLI tool pattern
+#
+# This is a demonstration skill that shows the interface pattern.
+# In production, you'd connect to a real search API like:
+# - SerpAPI (https://serpapi.com)
+# - Google Custom Search
+# - Brave Search API
+#
+# Usage: web-search "query" [max_results]
+
+set -e
+
+query="$1"
+max_results="${2:-5}"
+
+if [ -z "$query" ]; then
+    echo "Usage: web-search \"query\" [max_results]"
+    echo ""
+    echo "Arguments:"
+    echo "  query       - Search query (required)"
+    echo "  max_results - Maximum results to return (default: 5)"
+    echo ""
+    echo "Environment variables:"
+    echo "  SEARCH_API_KEY - API key for your search provider (optional in demo mode)"
+    exit 1
+fi
+
+echo "Searching for: $query"
+echo "Max results: $max_results"
+echo "---"
+
+# Check if we have a real API key
+if [ -n "$SEARCH_API_KEY" ]; then
+    # Production mode: use a real search API
+    # Example with SerpAPI (uncomment and adapt):
+    # curl -s "https://serpapi.com/search?q=${query}&num=${max_results}&api_key=${SEARCH_API_KEY}" \
+    #   | jq -r '.organic_results[] | "- \(.title): \(.link)"'
+    echo "Using API key: ${SEARCH_API_KEY:0:8}..."
+    echo "(Real API integration would go here)"
+else
+    # Demo mode: return placeholder results
+    echo "Demo mode (no SEARCH_API_KEY set)"
+    echo ""
+    echo "In production, this would return real search results."
+    echo "To enable real search, set SEARCH_API_KEY environment variable."
+    echo ""
+    echo "Example results for '$query':"
+    echo "- Result 1: https://example.com/result1"
+    echo "- Result 2: https://example.com/result2"
+    echo "- Result 3: https://example.com/result3"
+fi
+
+echo ""
+echo "---"
+echo "Skill: web-search (example implementation)"
