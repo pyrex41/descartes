@@ -376,6 +376,23 @@ impl SwankClient {
         }
     }
 
+    /// Escape a string for use in an S-expression.
+    /// Handles backslash, double-quote, newline, carriage return, and tab.
+    fn escape_for_sexp(s: &str) -> String {
+        let mut result = String::with_capacity(s.len());
+        for c in s.chars() {
+            match c {
+                '\\' => result.push_str("\\\\"),
+                '"' => result.push_str("\\\""),
+                '\n' => result.push_str("\\n"),
+                '\r' => result.push_str("\\r"),
+                '\t' => result.push_str("\\t"),
+                _ => result.push(c),
+            }
+        }
+        result
+    }
+
     /// Send a raw message to Swank.
     async fn send_raw(&self, msg: &str) -> Result<(), SwankError> {
         if !*self.connected.read().await {
@@ -390,7 +407,7 @@ impl SwankClient {
     /// Evaluate code in the Lisp runtime.
     pub async fn eval(&self, code: &str, package: &str) -> Result<String, SwankError> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        let escaped = code.replace('\\', "\\\\").replace('"', "\\\"");
+        let escaped = Self::escape_for_sexp(code);
         let msg = format!(
             "(:emacs-rex (swank:eval-and-grab-output \"{}\") \"{}\" t {})",
             escaped, package, id
@@ -410,7 +427,7 @@ impl SwankClient {
     /// Compile a code string.
     pub async fn compile_string(&self, code: &str) -> Result<String, SwankError> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        let escaped = code.replace('\\', "\\\\").replace('"', "\\\"");
+        let escaped = Self::escape_for_sexp(code);
         let msg = format!(
             "(:emacs-rex (swank:compile-string-for-emacs \"{}\" \"repl\" '((:position 1) (:line 1 1))) \"CL-USER\" t {})",
             escaped, id
@@ -430,7 +447,7 @@ impl SwankClient {
     /// Inspect an expression.
     pub async fn inspect(&self, expr: &str) -> Result<String, SwankError> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        let escaped = expr.replace('\\', "\\\\").replace('"', "\\\"");
+        let escaped = Self::escape_for_sexp(expr);
         let msg = format!(
             "(:emacs-rex (swank:init-inspector \"{}\") \"CL-USER\" t {})",
             escaped, id
@@ -523,6 +540,30 @@ mod tests {
         assert_eq!(
             SwankClient::extract_write_string("(:write-string \"test\\\"quoted\\\"\")"),
             Some("test\"quoted\"".to_string())
+        );
+    }
+
+    #[test]
+    fn test_escape_for_sexp() {
+        // Basic escaping
+        assert_eq!(SwankClient::escape_for_sexp("hello"), "hello");
+        assert_eq!(SwankClient::escape_for_sexp("hello world"), "hello world");
+
+        // Backslash escaping
+        assert_eq!(SwankClient::escape_for_sexp("path\\to\\file"), "path\\\\to\\\\file");
+
+        // Quote escaping
+        assert_eq!(SwankClient::escape_for_sexp("say \"hello\""), "say \\\"hello\\\"");
+
+        // Newline, carriage return, tab escaping
+        assert_eq!(SwankClient::escape_for_sexp("line1\nline2"), "line1\\nline2");
+        assert_eq!(SwankClient::escape_for_sexp("col1\tcol2"), "col1\\tcol2");
+        assert_eq!(SwankClient::escape_for_sexp("line\r\n"), "line\\r\\n");
+
+        // Combined escaping
+        assert_eq!(
+            SwankClient::escape_for_sexp("path\\file\nwith \"quotes\""),
+            "path\\\\file\\nwith \\\"quotes\\\""
         );
     }
 }

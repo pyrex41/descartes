@@ -201,6 +201,15 @@ pub struct AttachRevokeResult {
     pub revoked: bool,
 }
 
+/// Swank restart result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SwankRestartResult {
+    pub agent_id: String,
+    pub restart_index: usize,
+    pub success: bool,
+    pub message: Option<String>,
+}
+
 /// Check if an agent should use Lisp/Swank.
 fn is_lisp_agent(config: &AgentConfig) -> bool {
     // Check model_backend
@@ -372,15 +381,27 @@ impl RpcServerImpl {
         let agent_id_str = agent_id.to_string();
         self.agent_ids.insert(agent_id_str.clone(), agent_id);
 
-        // Initialize Swank for Lisp agents
+        // Initialize Swank for Lisp agents - fail spawn if Swank init fails
         if needs_swank {
             match self.initialize_swank_session(agent_id).await {
                 Ok(()) => {
                     info!("Swank session initialized for agent {}", agent_id_str);
                 }
                 Err(e) => {
-                    // Log but don't fail the spawn - agent can work without Swank
-                    warn!("Failed to initialize Swank for agent {}: {}", agent_id_str, e);
+                    // Swank is required for Lisp agents - kill the agent and fail the spawn
+                    error!("Failed to initialize Swank for Lisp agent {}: {}", agent_id_str, e);
+
+                    // Clean up the partially spawned agent
+                    if let Err(kill_err) = self.agent_runner.kill(&agent_id).await {
+                        warn!("Failed to kill agent after Swank init failure: {}", kill_err);
+                    }
+                    self.agent_ids.remove(&agent_id_str);
+
+                    return Err(ErrorObjectOwned::owned(
+                        -32017,
+                        format!("Failed to initialize Lisp runtime (SBCL/Swank): {}", e),
+                        None::<()>,
+                    ));
                 }
             }
         }
@@ -980,6 +1001,51 @@ impl RpcServerImpl {
 
         Ok(AttachRevokeResult { revoked })
     }
+
+    pub(crate) async fn swank_restart_internal(
+        &self,
+        agent_id: String,
+        restart_index: usize,
+    ) -> Result<SwankRestartResult, ErrorObjectOwned> {
+        info!("Invoking Swank restart {} for agent {}", restart_index, agent_id);
+
+        let agent_uuid = Uuid::parse_str(&agent_id).map_err(|e| {
+            error!("Invalid agent ID format: {}", e);
+            ErrorObjectOwned::owned(-32602, format!("Invalid agent ID format: {}", e), None::<()>)
+        })?;
+
+        // Get Swank client from registry
+        let swank_client = SWANK_REGISTRY.get(&agent_uuid).ok_or_else(|| {
+            error!("No Swank session for agent {}", agent_id);
+            ErrorObjectOwned::owned(
+                -32016,
+                format!("No Swank session for agent {}", agent_id),
+                None::<()>,
+            )
+        })?;
+
+        // Invoke the restart
+        match swank_client.invoke_restart(restart_index).await {
+            Ok(_) => {
+                info!("Swank restart {} invoked successfully for agent {}", restart_index, agent_id);
+                Ok(SwankRestartResult {
+                    agent_id,
+                    restart_index,
+                    success: true,
+                    message: None,
+                })
+            }
+            Err(e) => {
+                error!("Failed to invoke Swank restart: {}", e);
+                Ok(SwankRestartResult {
+                    agent_id,
+                    restart_index,
+                    success: false,
+                    message: Some(e.to_string()),
+                })
+            }
+        }
+    }
 }
 
 // Import ErrorObjectOwned for the trait implementation
@@ -1391,6 +1457,22 @@ impl UnixSocketRpcServer {
                 },
                 Err(response) => response,
             },
+            "swank.restart" => match Self::parse_swank_restart_params(&request) {
+                Ok((agent_id, restart_index)) => {
+                    match server_impl.swank_restart_internal(agent_id, restart_index).await {
+                        Ok(result) => match serde_json::to_value(result) {
+                            Ok(value) => RpcResponse::success(value, request.id.clone()),
+                            Err(e) => RpcResponse::error(
+                                -32603,
+                                format!("Serialization error: {}", e),
+                                request.id.clone(),
+                            ),
+                        },
+                        Err(err) => Self::convert_error(err, request.id.clone()),
+                    }
+                }
+                Err(response) => response,
+            },
             _ => RpcResponse::error(-32601, "Method not found".to_string(), request.id.clone()),
         }
     }
@@ -1574,6 +1656,39 @@ impl UnixSocketRpcServer {
             .to_string();
 
         Ok(token)
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn parse_swank_restart_params(request: &RpcRequest) -> Result<(String, usize), RpcResponse> {
+        // Support both positional array and named object params
+        match &request.params {
+            Some(Value::Array(arr)) => {
+                let agent_id = arr.first()
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
+                    .to_string();
+                let restart_index = arr.get(1)
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing restart_index parameter"))?
+                    as usize;
+                Ok((agent_id, restart_index))
+            }
+            Some(Value::Object(obj)) => {
+                let agent_id = obj.get("agent_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing agent_id parameter"))?
+                    .to_string();
+                let restart_index = obj.get("restart_index")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| Self::invalid_params(request.id.clone(), "Missing restart_index parameter"))?
+                    as usize;
+                Ok((agent_id, restart_index))
+            }
+            _ => Err(Self::invalid_params(
+                request.id.clone(),
+                "Expected parameters [agent_id, restart_index] or {agent_id, restart_index}",
+            )),
+        }
     }
 
     fn convert_error(err: ErrorObjectOwned, id: Option<Value>) -> RpcResponse {
@@ -1876,5 +1991,69 @@ mod tests {
             .get_state(Some("invalid-uuid".to_string()))
             .await;
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_lisp_agent_detection() {
+        use descartes_core::traits::AgentConfig;
+
+        // Test model_backend detection (sbcl)
+        let lisp_config = AgentConfig {
+            name: "test-lisp".to_string(),
+            model_backend: "sbcl".to_string(),
+            task: "test".to_string(),
+            context: None,
+            system_prompt: None,
+            environment: std::collections::HashMap::new(),
+        };
+        assert!(is_lisp_agent(&lisp_config));
+
+        // Test model_backend detection (lisp)
+        let lisp_backend_config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "lisp".to_string(),
+            task: "test".to_string(),
+            context: None,
+            system_prompt: None,
+            environment: std::collections::HashMap::new(),
+        };
+        assert!(is_lisp_agent(&lisp_backend_config));
+
+        // Test name detection
+        let lisp_name_config = AgentConfig {
+            name: "my-lisp-agent".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test".to_string(),
+            context: None,
+            system_prompt: None,
+            environment: std::collections::HashMap::new(),
+        };
+        assert!(is_lisp_agent(&lisp_name_config));
+
+        // Test environment variable detection
+        let mut env_config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test".to_string(),
+            context: None,
+            system_prompt: None,
+            environment: std::collections::HashMap::new(),
+        };
+        env_config.environment.insert(
+            "DESCARTES_TOOL_LEVEL".to_string(),
+            "lisp_developer".to_string(),
+        );
+        assert!(is_lisp_agent(&env_config));
+
+        // Test non-lisp agent
+        let non_lisp_config = AgentConfig {
+            name: "regular-agent".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test".to_string(),
+            context: None,
+            system_prompt: None,
+            environment: std::collections::HashMap::new(),
+        };
+        assert!(!is_lisp_agent(&non_lisp_config));
     }
 }

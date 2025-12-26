@@ -85,6 +85,7 @@ impl JsonRpcServer {
             "chat.stop" => self.call_chat_stop(request.params, auth_context).await,
             "chat.list" => self.call_chat_list(request.params, auth_context).await,
             "chat.upgrade_to_agent" => self.call_chat_upgrade_to_agent(request.params, auth_context).await,
+            "swank.restart" => self.call_swank_restart(request.params, auth_context).await,
             _ => Err(DaemonError::MethodNotFound(method.clone())),
         };
 
@@ -462,6 +463,71 @@ impl JsonRpcServer {
             .map_err(DaemonError::ServerError)?;
 
         Ok(serde_json::json!({"success": true, "mode": "agent"}))
+    }
+
+    /// Invoke a Swank restart for a Lisp agent
+    /// Method: "swank.restart"
+    /// Params: { "agent_id": string, "restart_index": number } or [agent_id, restart_index]
+    async fn call_swank_restart(
+        &self,
+        params: Option<Value>,
+        _auth: AuthContext,
+    ) -> DaemonResult<Value> {
+        use descartes_core::tools::SWANK_REGISTRY;
+
+        let params = params.ok_or_else(|| DaemonError::InvalidRequest("Missing params".to_string()))?;
+
+        // Support both object and array params
+        let (agent_id, restart_index) = if let Some(obj) = params.as_object() {
+            let agent_id = obj.get("agent_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| DaemonError::InvalidRequest("Missing agent_id".to_string()))?
+                .to_string();
+            let restart_index = obj.get("restart_index")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| DaemonError::InvalidRequest("Missing restart_index".to_string()))?
+                as usize;
+            (agent_id, restart_index)
+        } else if let Some(arr) = params.as_array() {
+            let agent_id = arr.first()
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| DaemonError::InvalidRequest("Missing agent_id".to_string()))?
+                .to_string();
+            let restart_index = arr.get(1)
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| DaemonError::InvalidRequest("Missing restart_index".to_string()))?
+                as usize;
+            (agent_id, restart_index)
+        } else {
+            return Err(DaemonError::InvalidRequest("Expected object or array params".to_string()));
+        };
+
+        let agent_uuid = Uuid::parse_str(&agent_id)
+            .map_err(|e| DaemonError::InvalidRequest(format!("Invalid agent_id format: {}", e)))?;
+
+        // Get Swank client from registry
+        let swank_client = SWANK_REGISTRY.get(&agent_uuid)
+            .ok_or_else(|| DaemonError::AgentNotFound(format!("No Swank session for agent {}", agent_id)))?;
+
+        // Invoke the restart
+        match swank_client.invoke_restart(restart_index).await {
+            Ok(_) => {
+                Ok(serde_json::json!({
+                    "agent_id": agent_id,
+                    "restart_index": restart_index,
+                    "success": true,
+                    "message": null
+                }))
+            }
+            Err(e) => {
+                Ok(serde_json::json!({
+                    "agent_id": agent_id,
+                    "restart_index": restart_index,
+                    "success": false,
+                    "message": e.to_string()
+                }))
+            }
+        }
     }
 
     /// Handle batch requests (JSON-RPC 2.0)

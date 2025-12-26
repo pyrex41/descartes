@@ -43,3 +43,9 @@ mod tests {
         assert!(port >= 40000 && port < 40100);
     }
 }
+
+#[cfg(test)]
+mod integration_tests;
+
+#[cfg(test)]
+pub use integration_tests::*;
