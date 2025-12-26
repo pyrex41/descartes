@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="#quickstart">Quickstart</a> •
+  <a href="docs/QUICKSTART.md">Quickstart</a> •
   <a href="#philosophy">Philosophy</a> •
   <a href="#tools">Tools</a> •
   <a href="#skills">Skills</a> •
@@ -55,17 +55,19 @@ Descartes strips AI agents down to their essence:
 # Install
 cargo install descartes
 
+# Set your API key
+export ANTHROPIC_API_KEY="sk-ant-..."
+
 # Run your first agent
 descartes spawn --task "Fix the type error in main.rs"
-
-# Check system status
-descartes doctor
 
 # View what happened
 cat .scud/sessions/*.json | jq '.entries[-5:]'
 ```
 
 That's it. Watch it work. See every action in the transcript.
+
+**[→ Full Quickstart Guide](docs/QUICKSTART.md)** — Hands-on tutorial covering all features in 10 minutes.
 
 ## What Descartes Actually Does
 
