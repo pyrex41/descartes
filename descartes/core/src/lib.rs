@@ -14,6 +14,7 @@ pub mod brain_restore;
 pub mod channel_bridge;
 pub mod claude_backend;
 pub mod cli_backend;
+pub mod intercepting_backend;
 pub mod config;
 pub mod config_loader;
 pub mod config_migration;
@@ -121,6 +122,10 @@ pub use channel_bridge::{ChannelBridge, InternalMessage};
 
 pub use cli_backend::{ChatSessionConfig, ChatSessionHandle, CliBackend, StreamChunk};
 pub use claude_backend::ClaudeBackend;
+pub use intercepting_backend::{
+    InterceptConfig, InterceptedToolCall, InterceptingClaudeBackend, ToolInterceptCallback,
+    ToolInterceptResult, spawn_agent_tool_description,
+};
 
 pub use lease::{
     Lease, LeaseAcquisitionRequest, LeaseAcquisitionResponse, LeaseManager, LeaseReleaseRequest,

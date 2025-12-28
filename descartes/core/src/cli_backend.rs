@@ -29,6 +29,25 @@ pub enum StreamChunk {
         result: String,
         is_error: bool,
     },
+    /// Sub-agent spawned (detected from Task tool)
+    ///
+    /// Emitted when Claude Code's Task tool spawns a sub-agent.
+    /// The agent_id can be used to:
+    /// - Track sub-agent hierarchy in a DAG
+    /// - Read agent session from ~/.claude/projects/.../agent-{agent_id}.jsonl
+    /// - Monitor sub-agent progress
+    SubAgentSpawned {
+        /// Short agent ID (e.g., "a9a57a7")
+        agent_id: String,
+        /// Parent session's UUID (shared between parent and sub-agent)
+        session_id: String,
+        /// The prompt given to the sub-agent
+        prompt: String,
+        /// The sub-agent type (e.g., "general-purpose", "Explore")
+        subagent_type: Option<String>,
+        /// Parent tool_use_id that spawned this agent
+        parent_tool_id: String,
+    },
     /// Turn complete
     TurnComplete { turn_number: u32 },
     /// Session complete
