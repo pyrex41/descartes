@@ -38,6 +38,27 @@ pub struct ChatState {
     pub mode: String,
     /// Pending prompt to send after subscription is ready
     pub pending_prompt: Option<String>,
+
+    // === Sub-agent tracking ===
+    /// Sub-agents spawned during this session
+    pub sub_agents: Vec<SubAgentInfo>,
+}
+
+/// Information about a spawned sub-agent
+#[derive(Debug, Clone)]
+pub struct SubAgentInfo {
+    /// Short agent ID (Claude) or full session ID (OpenCode)
+    pub agent_id: String,
+    /// Parent session ID
+    pub session_id: String,
+    /// The prompt/task given to this sub-agent
+    pub prompt: String,
+    /// Agent type (e.g., "general-purpose", "explore")
+    pub subagent_type: Option<String>,
+    /// Tool use ID that spawned this agent
+    pub parent_tool_id: String,
+    /// When this sub-agent was spawned
+    pub spawned_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// A single chat message entry
@@ -243,6 +264,28 @@ pub fn update(state: &mut ChatState, message: ChatMessage) {
                 | StreamChunk::ToolResult { .. } => {
                     // Tool use events - could be displayed in UI later
                     // For now, just track that we're still active
+                }
+                StreamChunk::SubAgentSpawned {
+                    agent_id,
+                    session_id,
+                    prompt,
+                    subagent_type,
+                    parent_tool_id,
+                } => {
+                    // Track the spawned sub-agent
+                    tracing::info!(
+                        "Sub-agent spawned: {} (type: {:?})",
+                        agent_id,
+                        subagent_type
+                    );
+                    state.sub_agents.push(SubAgentInfo {
+                        agent_id,
+                        session_id,
+                        prompt,
+                        subagent_type,
+                        parent_tool_id,
+                        spawned_at: chrono::Utc::now(),
+                    });
                 }
             }
         }

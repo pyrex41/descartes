@@ -3,7 +3,7 @@
 //! Provides a chat UI for interacting with Claude Code in full session mode.
 //! Supports streaming output with thinking blocks displayed distinctively.
 
-use crate::chat_state::{ChatMessage, ChatMessageEntry, ChatRole, ChatState};
+use crate::chat_state::{ChatMessage, ChatMessageEntry, ChatRole, ChatState, SubAgentInfo};
 use crate::theme::{button_styles, colors, container_styles, fonts};
 use iced::alignment::Vertical;
 use iced::widget::text_input::Id as TextInputId;
@@ -336,13 +336,46 @@ pub fn view(state: &ChatState) -> Element<ChatMessage> {
         .size(10)
         .color(colors::TEXT_MUTED);
 
+    // Sub-agents section (shows active sub-agents spawned by the main agent)
+    let sub_agents_section = if !state.sub_agents.is_empty() {
+        let agent_items: Vec<Element<ChatMessage>> = state
+            .sub_agents
+            .iter()
+            .map(|agent| view_sub_agent(agent))
+            .collect();
+
+        container(
+            column![
+                row![
+                    text("🔀").size(12),
+                    Space::with_width(6),
+                    text(format!("Sub-agents ({})", state.sub_agents.len()))
+                        .size(11)
+                        .font(fonts::MONO_MEDIUM)
+                        .color(colors::TEXT_SECONDARY),
+                ]
+                .align_y(Vertical::Center),
+                Space::with_height(8),
+                column(agent_items).spacing(6),
+            ]
+            .spacing(4),
+        )
+        .padding(10)
+        .width(Length::Fill)
+        .style(container_styles::panel)
+    } else {
+        container(Space::with_height(0))
+    };
+
     column![
         title,
         Space::with_height(4),
         subtitle,
         Space::with_height(16),
         controls_row,
-        Space::with_height(12),
+        Space::with_height(8),
+        sub_agents_section,
+        Space::with_height(8),
         messages_area,
         Space::with_height(8),
         streaming_section,
@@ -447,4 +480,58 @@ fn view_message(msg: &ChatMessageEntry) -> Element<ChatMessage> {
             .style(container_styles::card)
             .into(),
     }
+}
+
+/// Render a single sub-agent info card
+fn view_sub_agent(agent: &SubAgentInfo) -> Element<ChatMessage> {
+    let type_label = agent
+        .subagent_type
+        .as_ref()
+        .map(|t| t.as_str())
+        .unwrap_or("general");
+
+    // Truncate prompt for display (first 60 chars)
+    let prompt_preview = if agent.prompt.len() > 60 {
+        format!("{}...", &agent.prompt[..60])
+    } else {
+        agent.prompt.clone()
+    };
+
+    let timestamp = agent.spawned_at.format("%H:%M:%S").to_string();
+
+    container(
+        row![
+            // Agent type badge
+            container(
+                text(type_label)
+                    .size(9)
+                    .font(fonts::MONO)
+                    .color(colors::PRIMARY)
+            )
+            .padding([2, 6])
+            .style(container_styles::panel),
+            Space::with_width(8),
+            // Agent ID
+            text(&agent.agent_id)
+                .size(10)
+                .font(fonts::MONO)
+                .color(colors::TEXT_MUTED),
+            Space::with_width(12),
+            // Prompt preview
+            text(prompt_preview)
+                .size(11)
+                .font(fonts::MONO)
+                .color(colors::TEXT_SECONDARY),
+            Space::with_width(Length::Fill),
+            // Timestamp
+            text(timestamp)
+                .size(9)
+                .color(colors::TEXT_MUTED),
+        ]
+        .align_y(Vertical::Center),
+    )
+    .padding([6, 8])
+    .width(Length::Fill)
+    .style(container_styles::card)
+    .into()
 }
