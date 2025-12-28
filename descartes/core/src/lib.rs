@@ -45,6 +45,7 @@ pub mod workflow_commands;
 pub mod workflow_executor;
 pub mod flow_executor;
 pub mod flow_git;
+pub mod iterative_loop;
 pub mod zmq_agent_runner;
 pub mod zmq_client;
 pub mod zmq_communication;
@@ -201,6 +202,14 @@ pub use flow_executor::{
 };
 
 pub use flow_git::FlowGit;
+
+pub use iterative_loop::{
+    IterativeLoop, IterativeLoopConfig, IterativeLoopResult, IterativeLoopState,
+    IterativeExitReason, LoopBackendConfig, LoopGitConfig,
+    IterationSummary,
+    // Phase 3: Backend trait and presets
+    LoopBackend, LoopClaudeBackend, LoopOpenCodeBackend, LoopGenericBackend, create_loop_backend,
+};
 
 pub use scud_plugin::{
     detect_workspace_type, ensure_scud_dir, has_scud, is_dual_workspace, read_scud_tasks,
