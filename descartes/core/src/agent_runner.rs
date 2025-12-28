@@ -114,20 +114,78 @@ impl LocalProcessRunner {
     /// Build the tokio Command from AgentConfig
     fn build_command(&self, config: &AgentConfig) -> AgentResult<Command> {
         // Determine the command based on model_backend
-        let (cmd, args) = match config.model_backend.as_str() {
+        let (cmd, mut args) = match config.model_backend.as_str() {
             "claude-code-cli" | "claude" => {
-                // Claude Code CLI
+                // Claude Code CLI - use proper headless mode with tool control
+                // See: https://code.claude.com/docs/en/headless
                 let mut args = vec![];
 
-                // Add task/prompt as argument
+                // -p flag for headless/print mode (non-interactive)
+                args.push(String::from("-p"));
                 args.push(config.task.clone());
+
+                // Output format for parsing
+                args.push(String::from("--output-format"));
+                args.push(String::from("stream-json"));
+
+                // Model selection (use aliases for latest versions)
+                if let Some(ref model) = config.model {
+                    args.push(String::from("--model"));
+                    args.push(model.clone());
+                }
+
+                // Tool level -> --allowedTools
+                // This is the key fix: actually control which tools are available
+                if let Some(ref tool_level_str) = config.tool_level {
+                    if let Some(level) = crate::tools::parse_tool_level(tool_level_str) {
+                        let allowed_tools = crate::tools::tool_level_to_allowed_tools(level);
+                        args.push(String::from("--allowedTools"));
+                        args.push(allowed_tools.to_string());
+                    }
+                }
+
+                // System prompt (append to keep Claude Code defaults)
+                if let Some(ref system_prompt) = config.system_prompt {
+                    args.push(String::from("--append-system-prompt"));
+                    args.push(system_prompt.clone());
+                }
+
+                // Sub-agent definitions (Claude Code --agents flag)
+                if let Some(ref agents) = config.agents {
+                    let agents_json = serde_json::to_string(agents).unwrap_or_default();
+                    if !agents_json.is_empty() && agents_json != "{}" {
+                        args.push(String::from("--agents"));
+                        args.push(agents_json);
+                    }
+                }
 
                 (String::from("claude"), args)
             }
             "opencode" => {
-                // OpenCode CLI
-                let mut args = vec![String::from("--headless")];
+                // OpenCode CLI - use run command for non-interactive mode
+                // See: https://opencode.ai/docs/cli/
+                let mut args = vec![];
+
+                // "run" subcommand for non-interactive execution
+                args.push(String::from("run"));
+
+                // JSON output format for structured parsing (enables sub-agent tracking)
+                args.push(String::from("--format"));
+                args.push(String::from("json"));
+
+                // Task/prompt
                 args.push(config.task.clone());
+
+                // Model selection
+                if let Some(ref model) = config.model {
+                    args.push(String::from("--model"));
+                    args.push(model.clone());
+                }
+
+                // Note: OpenCode tool control is via config file, not CLI flags
+                // For now, we rely on project-level opencode.json for tool restrictions
+                // TODO: Generate temporary opencode.json with tool restrictions
+
                 (String::from("opencode"), args)
             }
             backend if backend.contains("cli") => {
@@ -144,6 +202,13 @@ impl LocalProcessRunner {
             }
         };
 
+        // Add any extra environment-specified args
+        if let Some(extra_args) = config.environment.get("AGENT_EXTRA_ARGS") {
+            for arg in extra_args.split_whitespace() {
+                args.push(arg.to_string());
+            }
+        }
+
         let mut command = Command::new(&cmd);
         command.args(&args);
 
@@ -157,19 +222,16 @@ impl LocalProcessRunner {
             command.current_dir(working_dir);
         }
 
-        // Set environment variables
+        // Set environment variables (excluding internal ones we've already handled)
         for (key, value) in &config.environment {
-            command.env(key, value);
+            if key != "AGENT_EXTRA_ARGS" {
+                command.env(key, value);
+            }
         }
 
         // Add context as environment variable if provided
         if let Some(ref context) = config.context {
             command.env("AGENT_CONTEXT", context);
-        }
-
-        // Add system prompt as environment variable if provided
-        if let Some(ref system_prompt) = config.system_prompt {
-            command.env("AGENT_SYSTEM_PROMPT", system_prompt);
         }
 
         Ok(command)
@@ -1451,5 +1513,175 @@ mod tests {
         assert_eq!(deserialized.connect_url, attach_info.connect_url);
         assert_eq!(deserialized.token, attach_info.token);
         assert_eq!(deserialized.expires_at, attach_info.expires_at);
+    }
+
+    #[test]
+    fn test_build_command_claude_basic() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "claude".to_string(),
+            task: "say hello".to_string(),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        // Should have: -p, task, --output-format, stream-json
+        assert!(args.contains(&"-p"));
+        assert!(args.contains(&"say hello"));
+        assert!(args.contains(&"--output-format"));
+        assert!(args.contains(&"stream-json"));
+    }
+
+    #[test]
+    fn test_build_command_claude_with_model() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test task".to_string(),
+            model: Some("sonnet".to_string()),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        assert!(args.contains(&"--model"));
+        assert!(args.contains(&"sonnet"));
+    }
+
+    #[test]
+    fn test_build_command_claude_with_tool_level() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test task".to_string(),
+            tool_level: Some("minimal".to_string()),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        assert!(args.contains(&"--allowedTools"));
+        // Should include Read,Write,Edit,Bash,Glob,Grep (minimal level)
+        let allowed_idx = args.iter().position(|&a| a == "--allowedTools").unwrap();
+        assert!(args[allowed_idx + 1].contains("Read"));
+    }
+
+    #[test]
+    fn test_build_command_claude_with_system_prompt() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test task".to_string(),
+            system_prompt: Some("You are a helpful assistant".to_string()),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        assert!(args.contains(&"--append-system-prompt"));
+        assert!(args.contains(&"You are a helpful assistant"));
+    }
+
+    #[test]
+    fn test_build_command_opencode_basic() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "opencode".to_string(),
+            task: "say hello".to_string(),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let program = cmd.as_std().get_program().to_str().unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        assert_eq!(program, "opencode");
+        assert!(args.contains(&"run"));
+        assert!(args.contains(&"--format"));
+        assert!(args.contains(&"json"));
+        assert!(args.contains(&"say hello"));
+    }
+
+    #[test]
+    fn test_build_command_opencode_with_model() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "opencode".to_string(),
+            task: "test task".to_string(),
+            model: Some("gpt-4".to_string()),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        assert!(args.contains(&"--model"));
+        assert!(args.contains(&"gpt-4"));
+    }
+
+    #[test]
+    fn test_build_command_unsupported_backend() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "unknown-api".to_string(), // Not a CLI backend
+            task: "test task".to_string(),
+            ..Default::default()
+        };
+
+        let result = runner.build_command(&config);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unsupported model backend"));
+    }
+
+    #[test]
+    fn test_build_command_orchestrator_tool_level_includes_task() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test task".to_string(),
+            tool_level: Some("orchestrator".to_string()),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        assert!(args.contains(&"--allowedTools"));
+        let allowed_idx = args.iter().position(|&a| a == "--allowedTools").unwrap();
+        // Orchestrator should include Task for spawning sub-agents
+        assert!(args[allowed_idx + 1].contains("Task"));
+    }
+
+    #[test]
+    fn test_build_command_minimal_tool_level_excludes_task() {
+        let runner = LocalProcessRunner::new();
+        let config = AgentConfig {
+            name: "test".to_string(),
+            model_backend: "claude".to_string(),
+            task: "test task".to_string(),
+            tool_level: Some("minimal".to_string()),
+            ..Default::default()
+        };
+
+        let cmd = runner.build_command(&config).unwrap();
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+
+        assert!(args.contains(&"--allowedTools"));
+        let allowed_idx = args.iter().position(|&a| a == "--allowedTools").unwrap();
+        // Minimal should NOT include Task - prevents sub-agent spawning
+        assert!(!args[allowed_idx + 1].contains("Task"));
     }
 }

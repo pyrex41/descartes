@@ -717,4 +717,107 @@ mod tests {
             .and_then(|id| id.as_str());
         assert_eq!(parent_tool_id, Some("toolu_014bmYNjTN754JKMTVXd9ijG"));
     }
+
+    #[test]
+    fn test_opencode_subagent_detection() {
+        // Simulate OpenCode's JSON format for task tool completion
+        let opencode_json = r#"{
+            "type": "tool_use",
+            "timestamp": 1766901159273,
+            "sessionID": "ses_49c7c7eb8ffev6NZJAKSt5p48e",
+            "part": {
+                "tool": "task",
+                "callID": "call_55642786",
+                "state": {
+                    "status": "completed",
+                    "input": {
+                        "description": "Search CLI files",
+                        "prompt": "Search the codebase for CLI backends",
+                        "subagent_type": "explore"
+                    },
+                    "output": "Found 22 files...",
+                    "metadata": {
+                        "sessionId": "ses_49c7c5e7bffeI3pI0nEWWAO4p9"
+                    }
+                }
+            }
+        }"#;
+
+        let msg: serde_json::Value = serde_json::from_str(opencode_json).unwrap();
+
+        // Verify OpenCode format parsing
+        let msg_type = msg.get("type").and_then(|t| t.as_str());
+        assert_eq!(msg_type, Some("tool_use"));
+
+        let part = msg.get("part").unwrap();
+        let tool = part.get("tool").and_then(|t| t.as_str());
+        assert_eq!(tool, Some("task"));
+
+        let state = part.get("state").unwrap();
+        let status = state.get("status").and_then(|s| s.as_str());
+        assert_eq!(status, Some("completed"));
+
+        let input = state.get("input").unwrap();
+        let subagent_type = input.get("subagent_type").and_then(|t| t.as_str());
+        assert_eq!(subagent_type, Some("explore"));
+
+        let prompt = input.get("prompt").and_then(|p| p.as_str());
+        assert_eq!(prompt, Some("Search the codebase for CLI backends"));
+
+        let metadata = state.get("metadata").unwrap();
+        let subagent_session_id = metadata.get("sessionId").and_then(|s| s.as_str());
+        assert_eq!(subagent_session_id, Some("ses_49c7c5e7bffeI3pI0nEWWAO4p9"));
+
+        let parent_session_id = msg.get("sessionID").and_then(|s| s.as_str());
+        assert_eq!(parent_session_id, Some("ses_49c7c7eb8ffev6NZJAKSt5p48e"));
+
+        let call_id = part.get("callID").and_then(|c| c.as_str());
+        assert_eq!(call_id, Some("call_55642786"));
+    }
+}
+
+/// Helper function to detect sub-agent spawns from OpenCode JSON format
+///
+/// OpenCode uses a different format than Claude Code:
+/// - `type: "tool_use"` with `part.tool: "task"`
+/// - Sub-agent session ID in `part.state.metadata.sessionId`
+/// - Parent session ID in top-level `sessionID`
+/// - Subagent type in `part.state.input.subagent_type`
+pub fn parse_opencode_subagent(msg: &serde_json::Value) -> Option<StreamChunk> {
+    // Check if this is a tool_use message for the task tool
+    let msg_type = msg.get("type").and_then(|t| t.as_str())?;
+    if msg_type != "tool_use" {
+        return None;
+    }
+
+    let part = msg.get("part")?;
+    let tool = part.get("tool").and_then(|t| t.as_str())?;
+    if tool != "task" {
+        return None;
+    }
+
+    let state = part.get("state")?;
+    let status = state.get("status").and_then(|s| s.as_str())?;
+    if status != "completed" {
+        return None;
+    }
+
+    // Extract sub-agent info
+    let metadata = state.get("metadata")?;
+    let agent_id = metadata.get("sessionId").and_then(|s| s.as_str())?.to_string();
+
+    let input = state.get("input")?;
+    let prompt = input.get("prompt").and_then(|p| p.as_str()).unwrap_or("").to_string();
+    let subagent_type = input.get("subagent_type").and_then(|t| t.as_str()).map(|s| s.to_string());
+
+    let session_id = msg.get("sessionID").and_then(|s| s.as_str()).unwrap_or("").to_string();
+    let parent_tool_id = part.get("callID").and_then(|c| c.as_str()).unwrap_or("").to_string();
+
+    Some(StreamChunk::SubAgentSpawned {
+        agent_id,
+        session_id,
+        prompt,
+        subagent_type,
+        parent_tool_id,
+    })
 }

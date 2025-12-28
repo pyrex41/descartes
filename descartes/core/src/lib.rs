@@ -124,7 +124,7 @@ pub use cli_backend::{ChatSessionConfig, ChatSessionHandle, CliBackend, StreamCh
 pub use claude_backend::ClaudeBackend;
 pub use intercepting_backend::{
     InterceptConfig, InterceptedToolCall, InterceptingClaudeBackend, ToolInterceptCallback,
-    ToolInterceptResult, spawn_agent_tool_description,
+    ToolInterceptResult, spawn_agent_tool_description, parse_opencode_subagent,
 };
 
 pub use lease::{

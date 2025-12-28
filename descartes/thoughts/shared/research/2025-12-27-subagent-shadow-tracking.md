@@ -1,7 +1,7 @@
 # Sub-Agent Shadow Tracking Research
 
 **Date**: 2025-12-27
-**Status**: Implemented
+**Status**: Implemented (Claude Code), In Progress (OpenCode)
 **Related Files**:
 - `core/src/intercepting_backend.rs` (new)
 - `core/src/cli_backend.rs` (StreamChunk::SubAgentSpawned)
@@ -156,3 +156,115 @@ Example Task tool output that triggers detection:
   }
 }
 ```
+
+---
+
+## OpenCode Sub-Agent Tracking
+
+OpenCode (v1.0.201) also supports sub-agents with a different but more structured format.
+
+### Available Agent Types
+
+```
+build (primary)
+compaction (primary)
+explore (subagent)    # For codebase exploration
+general (subagent)    # General purpose sub-agent
+plan (primary)
+summary (primary)
+title (primary)
+context7 (all)
+```
+
+### JSON Output Format
+
+Run with `--format json` to get structured output:
+
+```json
+{
+  "type": "tool_use",
+  "timestamp": 1766901159273,
+  "sessionID": "ses_49c7c7eb8ffev6NZJAKSt5p48e",
+  "part": {
+    "tool": "task",
+    "state": {
+      "status": "completed",
+      "input": {
+        "description": "Search CLI files",
+        "prompt": "Search the codebase for...",
+        "subagent_type": "explore"
+      },
+      "output": "...",
+      "metadata": {
+        "sessionId": "ses_49c7c5e7bffeI3pI0nEWWAO4p9"
+      }
+    }
+  }
+}
+```
+
+### Session Export
+
+OpenCode provides `opencode export <sessionID>` with rich metadata:
+
+```json
+{
+  "info": {
+    "id": "ses_49c7c5e7bffeI3pI0nEWWAO4p9",
+    "parentID": "ses_49c7c7eb8ffev6NZJAKSt5p48e",  // Direct parent tracking!
+    "title": "Search CLI files (@explore subagent)",
+    "directory": "/path/to/project"
+  },
+  "messages": [{
+    "info": {
+      "agent": "explore",
+      "model": {"providerID": "xai", "modelID": "grok-3-mini-latest"},
+      "tools": {
+        "task": false,  // Sub-agents can't spawn more sub-agents
+        "edit": false,
+        "write": false
+      }
+    }
+  }]
+}
+```
+
+### Key Differences from Claude Code
+
+| Feature | Claude Code | OpenCode |
+|---------|-------------|----------|
+| Tool name | `Task` (capital) | `task` (lowercase) |
+| Agent ID format | Short 7-char (`a9a57a7`) | Full session ID (`ses_...`) |
+| Parent tracking | Must infer from tool_use_id | Explicit `parentID` field |
+| Session storage | `~/.claude/projects/.../agent-{id}.jsonl` | SQLite DB, exportable |
+| Sub-agent nesting | Allowed | Restricted (`task: false`) |
+| Resume support | Limited (short ID doesn't work) | `--session <id>` with full ID |
+
+### OpenCode Shadow-Tracking Implementation
+
+For OpenCode, detection is simpler:
+
+```rust
+// In stream parsing
+if part.tool == "task" && state.status == "completed" {
+    let subagent_id = state.metadata.sessionId;
+    let subagent_type = state.input.subagent_type;
+    let prompt = state.input.prompt;
+
+    emit(StreamChunk::SubAgentSpawned {
+        agent_id: subagent_id,
+        session_id: parent_session_id,  // From message sessionID
+        prompt,
+        subagent_type: Some(subagent_type),
+        parent_tool_id: part.callID,
+    });
+}
+```
+
+### OpenCode Advantages
+
+1. **Explicit parent tracking** - `parentID` field eliminates guesswork
+2. **Full session IDs** - No short-ID-to-UUID mapping needed
+3. **Tool restrictions visible** - Can see what sub-agents are allowed to do
+4. **Export command** - `opencode export <id>` gives complete session data
+5. **Resume works** - `opencode run --session <id>` continues any session
