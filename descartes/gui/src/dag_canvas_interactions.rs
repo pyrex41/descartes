@@ -118,6 +118,15 @@ fn handle_left_click(
     position: Point,
     modifiers: Modifiers,
 ) -> Option<InteractionResult> {
+    // Space+Left Click = Panning (like middle mouse)
+    if state.extended_interaction.space_held {
+        state.interaction.pan_state = Some(PanState {
+            start_cursor: position,
+            start_offset: state.canvas_state.offset,
+        });
+        return Some(InteractionResult::PanStarted);
+    }
+
     let world_pos = screen_to_world(position, &state.canvas_state);
 
     match state.tool {
@@ -435,11 +444,8 @@ pub fn handle_mouse_move(state: &mut DAGEditorState, position: Point) -> Option<
         return Some(InteractionResult::Panning);
     }
 
-    // Handle space+drag panning
-    if state.extended_interaction.space_held && state.tool == Tool::Select {
-        // Similar to middle mouse panning
-        // This would be initiated when space is pressed
-    }
+    // Note: Space+drag panning is handled through pan_state
+    // which is initiated in handle_left_click when space_held is true
 
     None
 }

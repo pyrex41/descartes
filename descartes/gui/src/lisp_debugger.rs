@@ -95,6 +95,11 @@ impl LispDebuggerState {
         self.error = Some(error);
         self.invoking_restart = false;
     }
+
+    /// Check if the debugger is currently active/visible
+    pub fn is_active(&self) -> bool {
+        self.visible
+    }
 }
 
 // ============================================================================
