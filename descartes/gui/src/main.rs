@@ -665,6 +665,15 @@ impl DescartesGui {
             }
         }
 
+        // Tab / Shift+Tab: Focus navigation between inputs
+        if matches!(key, Key::Named(Named::Tab)) {
+            if modifiers.shift() {
+                return iced::widget::focus_previous();
+            } else {
+                return iced::widget::focus_next();
+            }
+        }
+
         // Escape or q: Close modals, cancel operations, or clear errors
         if matches!(key, Key::Named(Named::Escape)) || matches!(&key, Key::Character(c) if c == "q" && !modifiers.control()) {
             // First check if Lisp debugger is active
