@@ -279,6 +279,7 @@ async fn spawn_agents(
                     env.insert("ENV".to_string(), "production".to_string());
                     env
                 },
+                ..Default::default()
             };
 
             match client.spawn_remote(agent_config.clone(), Some(300)).await {
@@ -405,6 +406,7 @@ async fn demonstrate_error_handling(client: &ZmqClient) -> Result<(), Box<dyn st
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     match client.spawn_remote(invalid_config, Some(10)).await {
@@ -421,6 +423,7 @@ async fn demonstrate_error_handling(client: &ZmqClient) -> Result<(), Box<dyn st
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     match client.spawn_remote(timeout_config, Some(1)).await {
@@ -469,6 +472,7 @@ async fn run_load_tests(config: &DeploymentConfig) -> Result<(), Box<dyn std::er
                 context: None,
                 system_prompt: None,
                 environment: HashMap::new(),
+                ..Default::default()
             };
 
             client_clone.spawn_remote(agent_config, Some(60)).await

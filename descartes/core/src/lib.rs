@@ -46,6 +46,7 @@ pub mod workflow_executor;
 pub mod flow_executor;
 pub mod flow_git;
 pub mod iterative_loop;
+pub mod scud_loop;
 pub mod zmq_agent_runner;
 pub mod zmq_client;
 pub mod zmq_communication;
@@ -209,6 +210,11 @@ pub use iterative_loop::{
     IterationSummary,
     // Phase 3: Backend trait and presets
     LoopBackend, LoopClaudeBackend, LoopOpenCodeBackend, LoopGenericBackend, create_loop_backend,
+};
+
+pub use scud_loop::{
+    ScudIterativeLoop, ScudLoopConfig, ScudLoopState, ScudStats, LoopTask, ScudWave,
+    WaveCommit, BlockedTask,
 };
 
 pub use scud_plugin::{

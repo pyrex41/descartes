@@ -1,6 +1,6 @@
 //! Loop view component for GUI
 
-use crate::loop_state::{LoopMessage, LoopViewState};
+use crate::loop_state::{LoopMessage, LoopViewState, TaskStatus};
 use crate::theme::{colors, fonts};
 use iced::alignment::Vertical;
 use iced::widget::{button, column, container, progress_bar, row, scrollable, text, Space};
@@ -58,7 +58,13 @@ pub fn view(state: &LoopViewState) -> Element<LoopMessage> {
 
     // Progress section
     let progress_section: Element<LoopMessage> = if state.active || state.max_iterations.is_some() {
-        let progress_text = if let Some(max) = state.max_iterations {
+        let progress_text = if state.is_scud_loop() {
+            format!(
+                "Tasks: {}/{} | Wave {}/{}",
+                state.scud_tasks_done, state.scud_tasks_total,
+                state.current_wave, state.total_waves
+            )
+        } else if let Some(max) = state.max_iterations {
             format!("Iteration {} of {}", state.current_iteration, max)
         } else {
             format!("Iteration {}", state.current_iteration)
@@ -99,6 +105,97 @@ pub fn view(state: &LoopViewState) -> Element<LoopMessage> {
         container(text("No active loop").size(12).color(colors::TEXT_MUTED))
             .padding(12)
             .into()
+    };
+
+    // SCUD Wave section (only shown for SCUD-aware loops)
+    let wave_section: Element<LoopMessage> = if state.is_scud_loop() && !state.tasks_in_wave.is_empty() {
+        let tag_row = row![
+            text("Tag: ").size(10).color(colors::TEXT_MUTED),
+            text(state.scud_tag.as_deref().unwrap_or(""))
+                .size(10)
+                .font(fonts::MONO)
+                .color(colors::PRIMARY),
+        ];
+
+        let wave_header = row![
+            text(format!("Wave {} Tasks", state.current_wave))
+                .size(11)
+                .font(fonts::MONO_BOLD)
+                .color(colors::TEXT_PRIMARY),
+            Space::with_width(Length::Fill),
+            text(format!("{} remaining", state.tasks_in_wave.iter().filter(|t| matches!(t.status, TaskStatus::Pending | TaskStatus::InProgress)).count()))
+                .size(10)
+                .color(colors::TEXT_MUTED),
+        ];
+
+        let task_list: Vec<Element<LoopMessage>> = state.tasks_in_wave.iter().map(|task| {
+            let (icon, color) = match task.status {
+                TaskStatus::Pending => ("\u{25CB}", colors::TEXT_MUTED),    // Empty circle
+                TaskStatus::InProgress => ("\u{25CF}", colors::PRIMARY),     // Filled circle
+                TaskStatus::Done => ("\u{2713}", colors::SUCCESS),           // Checkmark
+                TaskStatus::Blocked => ("\u{26A0}", colors::WARNING),        // Warning
+            };
+
+            row![
+                text(icon).size(10).color(color),
+                Space::with_width(6),
+                text(format!("#{}", task.id))
+                    .size(10)
+                    .font(fonts::MONO)
+                    .color(colors::TEXT_MUTED),
+                Space::with_width(6),
+                text(&task.title)
+                    .size(11)
+                    .color(if matches!(task.status, TaskStatus::Done) { colors::TEXT_MUTED } else { colors::TEXT_PRIMARY }),
+                Space::with_width(Length::Fill),
+                text(format!("[{}]", task.complexity))
+                    .size(9)
+                    .font(fonts::MONO)
+                    .color(colors::TEXT_MUTED),
+            ]
+            .align_y(Vertical::Center)
+            .into()
+        }).collect();
+
+        let commits_section: Element<LoopMessage> = if !state.wave_commits.is_empty() {
+            column![
+                Space::with_height(8),
+                text("Wave Commits:")
+                    .size(10)
+                    .color(colors::TEXT_MUTED),
+                text(state.wave_commits.iter().map(|c| format!("{}", &c[..7.min(c.len())])).collect::<Vec<_>>().join(" → "))
+                    .size(10)
+                    .font(fonts::MONO)
+                    .color(colors::SUCCESS),
+            ]
+            .into()
+        } else {
+            Space::with_height(0).into()
+        };
+
+        container(
+            column![
+                tag_row,
+                Space::with_height(8),
+                wave_header,
+                Space::with_height(6),
+            ]
+            .push(column(task_list).spacing(4))
+            .push(commits_section),
+        )
+        .padding(12)
+        .style(|_theme: &Theme| container::Style {
+            background: Some(iced::Background::Color(colors::SURFACE)),
+            border: iced::Border {
+                color: colors::PRIMARY,
+                width: 1.0,
+                radius: 4.0.into(),
+            },
+            ..Default::default()
+        })
+        .into()
+    } else {
+        Space::with_height(0).into()
     };
 
     // Command info section
@@ -237,6 +334,8 @@ pub fn view(state: &LoopViewState) -> Element<LoopMessage> {
         subtitle,
         Space::with_height(16),
         progress_section,
+        Space::with_height(12),
+        wave_section,
         Space::with_height(12),
         command_section,
         Space::with_height(12),

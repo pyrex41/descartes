@@ -206,10 +206,16 @@ pub fn parse_tool_level(s: &str) -> Option<ToolLevel> {
 
 /// Convert a tool level to Claude Code's --allowedTools format.
 /// This returns the tool names that should be allowed for the given level.
+/// Claude Code uses PascalCase tool names (Read, Write, Task, etc.)
 pub fn tool_level_to_allowed_tools(level: ToolLevel) -> String {
-    let tools = get_tools(level);
-    let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
-    tool_names.join(",")
+    match level {
+        ToolLevel::Minimal => "Read,Write,Edit,Bash,Glob,Grep".to_string(),
+        ToolLevel::Orchestrator => "Read,Write,Edit,Bash,Glob,Grep,Task,WebFetch,WebSearch".to_string(),
+        ToolLevel::ReadOnly => "Read,Bash,Glob,Grep".to_string(),
+        ToolLevel::Researcher => "Read,Bash,Glob,Grep,WebFetch,WebSearch".to_string(),
+        ToolLevel::Planner => "Read,Write,Bash,Glob,Grep".to_string(),
+        ToolLevel::LispDeveloper => "Read,Bash,Glob,Grep".to_string(), // Swank tools are custom
+    }
 }
 
 #[cfg(test)]
