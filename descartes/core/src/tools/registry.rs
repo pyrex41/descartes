@@ -190,6 +190,28 @@ pub fn get_system_prompt(level: ToolLevel) -> &'static str {
     }
 }
 
+/// Parse a tool level from a string.
+/// Supports various formats: "minimal", "read-only", "readonly", "orchestrator", etc.
+pub fn parse_tool_level(s: &str) -> Option<ToolLevel> {
+    match s.to_lowercase().replace('-', "").replace('_', "").as_str() {
+        "minimal" => Some(ToolLevel::Minimal),
+        "orchestrator" | "full" => Some(ToolLevel::Orchestrator),
+        "readonly" | "read" => Some(ToolLevel::ReadOnly),
+        "researcher" | "research" => Some(ToolLevel::Researcher),
+        "planner" | "plan" => Some(ToolLevel::Planner),
+        "lispdeveloper" | "lisp" => Some(ToolLevel::LispDeveloper),
+        _ => None,
+    }
+}
+
+/// Convert a tool level to Claude Code's --allowedTools format.
+/// This returns the tool names that should be allowed for the given level.
+pub fn tool_level_to_allowed_tools(level: ToolLevel) -> String {
+    let tools = get_tools(level);
+    let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+    tool_names.join(",")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

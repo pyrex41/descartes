@@ -176,14 +176,29 @@ pub trait AgentRunner: Send + Sync {
 }
 
 /// Configuration for spawning an agent.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct AgentConfig {
+    #[serde(default)]
     pub name: String,
-    pub model_backend: String, // e.g., "anthropic", "openai", "ollama"
+    #[serde(default)]
+    pub model_backend: String, // e.g., "anthropic", "openai", "ollama", "claude", "opencode"
+    #[serde(default)]
     pub task: String,
+    #[serde(default)]
     pub context: Option<String>,
+    #[serde(default)]
     pub system_prompt: Option<String>,
+    #[serde(default)]
     pub environment: std::collections::HashMap<String, String>,
+    /// Optional model override (e.g., "opus", "sonnet", "gpt-4")
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Tool level for capability control (e.g., "read-only", "edit", "full")
+    #[serde(default)]
+    pub tool_level: Option<String>,
+    /// Sub-agent definitions for hierarchical spawning
+    #[serde(default)]
+    pub agents: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
 /// Signal to send to an agent.

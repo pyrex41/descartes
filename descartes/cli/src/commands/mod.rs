@@ -3,6 +3,7 @@ pub mod doctor;
 pub mod init;
 pub mod kill;
 pub mod logs;
+pub mod loop_cmd;
 pub mod pause;
 pub mod ps;
 pub mod resume;

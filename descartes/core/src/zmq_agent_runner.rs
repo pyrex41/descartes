@@ -969,6 +969,7 @@ mod tests {
                 context: None,
                 system_prompt: None,
                 environment: HashMap::new(),
+                ..Default::default()
             },
             timeout_secs: Some(30),
             metadata: None,
