@@ -152,6 +152,10 @@ enum Message {
     ClearStatus,
     /// Show error message
     ShowError(String),
+    /// Global keyboard event (routed based on current view)
+    KeyPressed(keyboard::Key, keyboard::Modifiers),
+    /// Focus the chat input
+    FocusChatInput,
 }
 
 impl DescartesGui {
@@ -574,7 +578,304 @@ impl DescartesGui {
                 self.status_message = Some(format!("Error: {}", error));
                 iced::Task::none()
             }
+            Message::KeyPressed(key, modifiers) => {
+                self.handle_keyboard(key, modifiers)
+            }
+            Message::FocusChatInput => {
+                iced::widget::text_input::focus(iced::widget::text_input::Id::new("chat-prompt"))
+            }
         }
+    }
+
+    /// Centralized keyboard handler with view-specific routing
+    fn handle_keyboard(&mut self, key: keyboard::Key, modifiers: keyboard::Modifiers) -> iced::Task<Message> {
+        use keyboard::key::Named;
+
+        // === GLOBAL SHORTCUTS (work in all views) ===
+        //
+        // Vim-like keybindings:
+        //   Navigation: j/k (down/up), h/l (left/right in time travel)
+        //   Jump: g (start), G (end)
+        //   Views: 1-6 (switch views, no modifier needed)
+        //   Actions: i (insert/focus input), o (open/new), r (refresh)
+        //   Search: / (filter/search)
+        //   Cancel: Escape, q (quit modal)
+
+        // Plain number keys 1-6: View switching (vim-like, no modifier)
+        if !modifiers.control() && !modifiers.shift() && !modifiers.alt() {
+            match &key {
+                Key::Character(c) if c == "1" => {
+                    self.current_view = ViewMode::Sessions;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "2" => {
+                    self.current_view = ViewMode::Dashboard;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "3" => {
+                    self.current_view = ViewMode::Chat;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "4" => {
+                    self.current_view = ViewMode::SwarmMonitor;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "5" => {
+                    self.current_view = ViewMode::Debugger;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "6" => {
+                    self.current_view = ViewMode::DagEditor;
+                    return iced::Task::none();
+                }
+                _ => {}
+            }
+        }
+
+        // Ctrl+1-6: Also support Ctrl+number for view switching (fallback)
+        if modifiers.control() && !modifiers.shift() && !modifiers.alt() {
+            match &key {
+                Key::Character(c) if c == "1" => {
+                    self.current_view = ViewMode::Sessions;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "2" => {
+                    self.current_view = ViewMode::Dashboard;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "3" => {
+                    self.current_view = ViewMode::Chat;
+                    return iced::widget::text_input::focus(
+                        iced::widget::text_input::Id::new("chat-prompt")
+                    );
+                }
+                Key::Character(c) if c == "4" => {
+                    self.current_view = ViewMode::SwarmMonitor;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "5" => {
+                    self.current_view = ViewMode::Debugger;
+                    return iced::Task::none();
+                }
+                Key::Character(c) if c == "6" => {
+                    self.current_view = ViewMode::DagEditor;
+                    return iced::Task::none();
+                }
+                _ => {}
+            }
+        }
+
+        // Tab / Shift+Tab: Focus navigation between inputs
+        if matches!(key, Key::Named(Named::Tab)) {
+            if modifiers.shift() {
+                return iced::widget::focus_previous();
+            } else {
+                return iced::widget::focus_next();
+            }
+        }
+
+        // Escape or q: Close modals, cancel operations, or clear errors
+        if matches!(key, Key::Named(Named::Escape)) || matches!(&key, Key::Character(c) if c == "q" && !modifiers.control()) {
+            // First check if Lisp debugger is active
+            if self.lisp_debugger_state.is_active() {
+                lisp_debugger::update(&mut self.lisp_debugger_state, LispDebuggerMessage::Dismiss);
+                return iced::Task::none();
+            }
+
+            // Check if session creation dialog is open
+            if self.session_state.show_create_dialog {
+                self.session_state.show_create_dialog = false;
+                return iced::Task::none();
+            }
+
+            // Clear any error messages
+            if self.connection_error.is_some() {
+                self.connection_error = None;
+                return iced::Task::none();
+            }
+
+            // View-specific escape handling
+            match self.current_view {
+                ViewMode::Chat => {
+                    // Clear chat error if present
+                    if self.chat_state.error.is_some() {
+                        chat_state::update(&mut self.chat_state, chat_state::ChatMessage::ClearError);
+                        return iced::Task::none();
+                    }
+                }
+                ViewMode::DagEditor => {
+                    // DAG editor handles its own escape via its message system
+                    dag_editor::update(
+                        &mut self.dag_editor_state,
+                        DAGEditorMessage::KeyPressed(key.clone(), modifiers),
+                    );
+                    return iced::Task::none();
+                }
+                _ => {}
+            }
+        }
+
+        // r or F5: Refresh (view-specific) - vim-like 'r' for refresh
+        if matches!(key, Key::Named(Named::F5)) || matches!(&key, Key::Character(c) if c == "r" && !modifiers.control() && !modifiers.shift() && !modifiers.alt()) {
+            match self.current_view {
+                ViewMode::Sessions => {
+                    session_state::update(&mut self.session_state, SessionMessage::RefreshSessions);
+                    return iced::Task::none();
+                }
+                ViewMode::Dashboard => {
+                    // Reconnect to daemon
+                    return iced::Task::done(Message::ConnectDaemon);
+                }
+                _ => {}
+            }
+        }
+
+        // === VIEW-SPECIFIC SHORTCUTS ===
+        match self.current_view {
+            ViewMode::Debugger => {
+                // Time Travel shortcuts (only active in Debugger view)
+                // Vim-like: h/l for step, g/G for start/end, j/k for scrubbing
+                match &key {
+                    // h or Left Arrow: Previous event (vim: left motion)
+                    Key::Named(Named::ArrowLeft) => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::PrevEvent);
+                    }
+                    Key::Character(c) if c == "h" && !modifiers.control() && !modifiers.alt() => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::PrevEvent);
+                    }
+                    // l or Right Arrow: Next event (vim: right motion)
+                    Key::Named(Named::ArrowRight) => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::NextEvent);
+                    }
+                    Key::Character(c) if c == "l" && !modifiers.shift() && !modifiers.control() && !modifiers.alt() => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::NextEvent);
+                    }
+                    // g or Home: Jump to start (vim: gg goes to top)
+                    Key::Named(Named::Home) => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToStart);
+                    }
+                    Key::Character(c) if c == "g" && !modifiers.shift() && !modifiers.control() => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToStart);
+                    }
+                    // G or End: Jump to end (vim: G goes to bottom)
+                    Key::Named(Named::End) => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToEnd);
+                    }
+                    Key::Character(c) if c == "G" && modifiers.shift() && !modifiers.control() => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToEnd);
+                    }
+                    // Space: Toggle playback
+                    Key::Character(c) if c == " " => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::TogglePlayback);
+                    }
+                    // +/= for zoom in, - for zoom out
+                    Key::Character(c) if c == "+" || c == "=" => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::ZoomIn);
+                    }
+                    Key::Character(c) if c == "-" => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::ZoomOut);
+                    }
+                    // L (shift+l): Toggle loop (since l is now step forward)
+                    Key::Character(c) if c == "L" && modifiers.shift() && !modifiers.control() => {
+                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::ToggleLoop);
+                    }
+                    _ => {}
+                }
+            }
+
+            ViewMode::Chat => {
+                // Chat shortcuts (vim-like)
+                match &key {
+                    // i: Enter insert mode (focus chat input) - vim-like
+                    Key::Character(c) if c == "i" && !modifiers.control() && !modifiers.shift() && !modifiers.alt() => {
+                        return iced::widget::text_input::focus(
+                            iced::widget::text_input::Id::new("chat-prompt")
+                        );
+                    }
+                    // a: Append mode (also focus input) - vim-like
+                    Key::Character(c) if c == "a" && !modifiers.control() && !modifiers.shift() && !modifiers.alt() => {
+                        return iced::widget::text_input::focus(
+                            iced::widget::text_input::Id::new("chat-prompt")
+                        );
+                    }
+                    // Ctrl+L: Clear conversation
+                    Key::Character(c) if c == "l" && modifiers.control() => {
+                        chat_state::update(&mut self.chat_state, chat_state::ChatMessage::ClearConversation);
+                    }
+                    // j/k: Scroll through messages (if implemented)
+                    // TODO: Add message scrolling with j/k
+                    _ => {}
+                }
+            }
+
+            ViewMode::DagEditor => {
+                // Forward all keyboard events to DAG editor
+                dag_editor::update(
+                    &mut self.dag_editor_state,
+                    DAGEditorMessage::KeyPressed(key.clone(), modifiers),
+                );
+            }
+
+            ViewMode::Sessions => {
+                // Session list navigation (vim-like)
+                match &key {
+                    // k or Up Arrow: Previous session (vim: up motion)
+                    Key::Named(Named::ArrowUp) => {
+                        session_state::update(&mut self.session_state, SessionMessage::SelectPrevious);
+                    }
+                    Key::Character(c) if c == "k" && !modifiers.control() && !modifiers.alt() => {
+                        session_state::update(&mut self.session_state, SessionMessage::SelectPrevious);
+                    }
+                    // j or Down Arrow: Next session (vim: down motion)
+                    Key::Named(Named::ArrowDown) => {
+                        session_state::update(&mut self.session_state, SessionMessage::SelectNext);
+                    }
+                    Key::Character(c) if c == "j" && !modifiers.control() && !modifiers.alt() => {
+                        session_state::update(&mut self.session_state, SessionMessage::SelectNext);
+                    }
+                    // Enter: Activate selected session
+                    Key::Named(Named::Enter) => {
+                        if let Some(id) = self.session_state.selected_session_id {
+                            session_state::update(&mut self.session_state, SessionMessage::SelectSession(id));
+                        }
+                    }
+                    // o: Open/create new session (vim: open line below)
+                    Key::Character(c) if c == "o" && !modifiers.control() && !modifiers.shift() && !modifiers.alt() => {
+                        self.session_state.show_create_dialog = true;
+                    }
+                    // Ctrl+N: Also support Ctrl+N for new session (fallback)
+                    Key::Character(c) if c == "n" && modifiers.control() => {
+                        self.session_state.show_create_dialog = true;
+                    }
+                    // /: Filter/search sessions (vim: search)
+                    Key::Character(c) if c == "/" && !modifiers.control() => {
+                        // Focus the filter input if we have one
+                        return iced::widget::text_input::focus(
+                            iced::widget::text_input::Id::new("session-filter")
+                        );
+                    }
+                    // g: Jump to first session (vim: gg)
+                    Key::Character(c) if c == "g" && !modifiers.shift() && !modifiers.control() => {
+                        let visible = self.session_state.visible_sessions();
+                        if let Some(first) = visible.first() {
+                            self.session_state.selected_session_id = Some(first.id);
+                        }
+                    }
+                    // G: Jump to last session (vim: G)
+                    Key::Character(c) if c == "G" && modifiers.shift() && !modifiers.control() => {
+                        let visible = self.session_state.visible_sessions();
+                        if let Some(last) = visible.last() {
+                            self.session_state.selected_session_id = Some(last.id);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            _ => {}
+        }
+
+        iced::Task::none()
     }
 
     /// Rebuild the chat graph from current chat state
@@ -1044,56 +1345,16 @@ impl DescartesGui {
 
     /// Handle subscriptions (keyboard events, timers, etc.)
     fn subscription(&self) -> iced::Subscription<Message> {
-        // Keyboard event subscription
-        let keyboard_sub = iced::event::listen_with(|event, _status, _window| {
+        // Keyboard event subscription - route all key presses to centralized handler
+        let keyboard_sub = iced::event::listen_with(|event, status, _window| {
+            // Only handle if the event wasn't captured by a widget (e.g., text input)
+            if status == iced::event::Status::Captured {
+                return None;
+            }
+
             if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
-                // Only handle keyboard shortcuts in Debugger view
-                match key {
-                    // Arrow keys for navigation
-                    Key::Named(keyboard::key::Named::ArrowLeft) => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::PrevEvent));
-                    }
-                    Key::Named(keyboard::key::Named::ArrowRight) => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::NextEvent));
-                    }
-                    // Space bar for play/pause
-                    Key::Character(ref c) if c == " " => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::TogglePlayback));
-                    }
-                    // +/- for zoom
-                    Key::Character(ref c) if c == "+" || c == "=" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::ZoomIn));
-                    }
-                    Key::Character(ref c) if c == "-" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::ZoomOut));
-                    }
-                    // Number keys for speed control
-                    Key::Character(ref c) if c == "1" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
-                            0.5,
-                        )));
-                    }
-                    Key::Character(ref c) if c == "2" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
-                            1.0,
-                        )));
-                    }
-                    Key::Character(ref c) if c == "3" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
-                            2.0,
-                        )));
-                    }
-                    Key::Character(ref c) if c == "4" => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::SetPlaybackSpeed(
-                            5.0,
-                        )));
-                    }
-                    // L for loop toggle
-                    Key::Character(ref c) if c == "l" && !modifiers.shift() => {
-                        return Some(Message::TimeTravel(TimeTravelMessage::ToggleLoop));
-                    }
-                    _ => {}
-                }
+                // Route all keyboard events to centralized handler
+                return Some(Message::KeyPressed(key, modifiers));
             }
             None
         });

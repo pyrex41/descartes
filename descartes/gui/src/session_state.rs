@@ -13,6 +13,8 @@ pub struct SessionState {
     pub sessions: Vec<Session>,
     /// Currently active session ID
     pub active_session_id: Option<Uuid>,
+    /// Currently keyboard-selected session ID (for arrow key navigation)
+    pub selected_session_id: Option<Uuid>,
     /// Session being created (name input)
     pub new_session_name: String,
     /// Session being created (path input)
@@ -143,6 +145,10 @@ pub enum SessionMessage {
     Error(String),
     /// Clear error
     ClearError,
+    /// Select previous session in list (arrow up)
+    SelectPrevious,
+    /// Select next session in list (arrow down)
+    SelectNext,
 }
 
 /// Update session state based on messages
@@ -253,6 +259,40 @@ pub fn update(state: &mut SessionState, message: SessionMessage) {
         }
         SessionMessage::ClearError => {
             state.error = None;
+        }
+        SessionMessage::SelectPrevious => {
+            let visible = state.visible_sessions();
+            if visible.is_empty() {
+                return;
+            }
+
+            let current_idx = state.selected_session_id
+                .and_then(|id| visible.iter().position(|s| s.id == id));
+
+            let new_idx = match current_idx {
+                Some(0) => 0, // Already at start
+                Some(idx) => idx - 1,
+                None => 0, // Select first if nothing selected
+            };
+
+            state.selected_session_id = visible.get(new_idx).map(|s| s.id);
+        }
+        SessionMessage::SelectNext => {
+            let visible = state.visible_sessions();
+            if visible.is_empty() {
+                return;
+            }
+
+            let current_idx = state.selected_session_id
+                .and_then(|id| visible.iter().position(|s| s.id == id));
+
+            let new_idx = match current_idx {
+                Some(idx) if idx + 1 < visible.len() => idx + 1,
+                Some(idx) => idx, // Already at end
+                None => 0, // Select first if nothing selected
+            };
+
+            state.selected_session_id = visible.get(new_idx).map(|s| s.id);
         }
     }
 }

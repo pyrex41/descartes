@@ -263,6 +263,12 @@ pub enum TimeTravelMessage {
     /// Zoom out on timeline
     ZoomOut,
 
+    /// Jump to start of timeline (Home key)
+    JumpToStart,
+
+    /// Jump to end of timeline (End key)
+    JumpToEnd,
+
     /// Scroll timeline
     ScrollTimeline(i32),
 
@@ -853,6 +859,20 @@ pub fn update(state: &mut TimeTravelState, message: TimeTravelMessage) {
 
         TimeTravelMessage::ZoomOut => {
             state.zoom_level = (state.zoom_level / 1.5).max(0.1);
+        }
+
+        TimeTravelMessage::JumpToStart => {
+            if !state.events.is_empty() {
+                state.jump_to_event(0);
+                state.playback.playing = false;
+            }
+        }
+
+        TimeTravelMessage::JumpToEnd => {
+            if !state.events.is_empty() {
+                state.jump_to_event(state.events.len() - 1);
+                state.playback.playing = false;
+            }
         }
 
         TimeTravelMessage::ScrollTimeline(delta) => {
