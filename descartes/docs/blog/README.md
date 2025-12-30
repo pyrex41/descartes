@@ -19,6 +19,7 @@
 | Use the GUI | [GUI Features](09-gui-features.md) |
 | Track sub-agents | [Sub-Agent Tracking](10-subagent-tracking.md) |
 | Explore advanced features | [Advanced Features](11-advanced-features.md) |
+| Run iterative loops | [Iterative Loops](12-iterative-loops.md) |
 
 ---
 
@@ -77,6 +78,10 @@
 11. **[Advanced Features](11-advanced-features.md)**
 
     Time-travel debugging, brain/body restoration, state machines, distributed execution with ZeroMQ, persistent memory, and more.
+
+12. **[Iterative Loops](12-iterative-loops.md)**
+
+    Autonomous task execution with the Ralph Wiggum pattern: repeatedly execute commands until completion detection, with SCUD integration for wave-based task tracking.
 
 ---
 

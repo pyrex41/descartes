@@ -476,6 +476,73 @@ Global shortcuts:
 
 ---
 
+## Comprehensive Keyboard Reference
+
+The Descartes GUI embraces vim-style navigation philosophy throughout. Modal key bindings allow for efficient, keyboard-driven workflows without reaching for the mouse. Single-key shortcuts activate common actions, while modified keys (Ctrl, Shift) provide access to less frequent operations.
+
+### Global Shortcuts (All Views)
+
+| Key | Action |
+|-----|--------|
+| 1 | Sessions view |
+| 2 | Dashboard view |
+| 3 | Chat view |
+| 4 | Agents/Swarm view |
+| 5 | Debugger view |
+| 6 | DAG Editor view |
+| Ctrl+1-6 | Alternative view switching |
+| Tab | Focus next input |
+| Shift+Tab | Focus previous input |
+| Escape / q | Cancel/dismiss/clear |
+| r / F5 | Refresh current view |
+
+### Chat View
+
+| Key | Action |
+|-----|--------|
+| i | Focus input (vim insert mode) |
+| a | Focus input (vim append mode) |
+| Ctrl+L | Clear conversation |
+
+### Sessions View
+
+| Key | Action |
+|-----|--------|
+| j / Down | Select next session |
+| k / Up | Select previous session |
+| Enter | Activate selected session |
+| g | Jump to first session |
+| G (Shift+g) | Jump to last session |
+| o / Ctrl+N | New session dialog |
+| / | Focus search/filter |
+
+### Time Travel Debugger
+
+| Key | Action |
+|-----|--------|
+| h / Left | Previous event |
+| l / Right | Next event |
+| g / Home | Jump to start |
+| G / End | Jump to end |
+| Space | Toggle playback |
+| + / = | Zoom in |
+| - | Zoom out |
+| L (Shift+l) | Toggle loop |
+
+### DAG Editor
+
+| Key | Action |
+|-----|--------|
+| Space+Drag | Pan canvas |
+| Delete | Delete selected nodes |
+| Ctrl+A | Select all |
+| Ctrl+Z | Undo |
+| Ctrl+Shift+Z / Ctrl+Y | Redo |
+| Escape | Cancel operation |
+| Mouse wheel | Zoom to cursor |
+
+---
+
 ## Next Steps
 
 - **[Sub-Agent Tracking →](10-subagent-tracking.md)** — Monitor agent hierarchies

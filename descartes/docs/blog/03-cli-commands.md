@@ -23,6 +23,7 @@ Commands:
   doctor      Check system health
   tasks       Manage SCUD tasks
   workflow    Execute multi-phase workflows
+  loop        Run iterative execution loops
   gui         Launch the native GUI
   completions Generate shell completions
 ```
@@ -458,6 +459,151 @@ descartes workflow research --topic "authentication patterns"
 # Create implementation plan
 descartes workflow plan --task "Add OAuth support"
 ```
+
+---
+
+## loop — Iterative Execution Loops
+
+Commands for iterative execution loops that run a command repeatedly until completion. Useful for automating multi-step AI agent workflows that require repeated passes.
+
+### Subcommands
+
+```bash
+descartes loop <SUBCOMMAND>
+
+Subcommands:
+  start   Start a new iterative loop
+  status  Show current loop state
+  resume  Resume an interrupted loop
+  cancel  Cancel a running loop
+```
+
+### loop start
+
+Start a new iterative loop that runs a command repeatedly until a completion condition is met.
+
+```bash
+descartes loop start [OPTIONS]
+```
+
+**Options:**
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--command` | `-c` | Command to run (e.g., "claude", "opencode") | Required |
+| `--prompt` | `-p` | Task prompt for the agent | Required |
+| `--completion-promise` | | Text that signals completion | `COMPLETE` |
+| `--max-iterations` | `-m` | Maximum iterations (safety limit) | `20` |
+| `--working-dir` | `-w` | Working directory | Current dir |
+| `--backend` | | Backend type: `claude`, `opencode`, or `generic` | `generic` |
+| `--auto-commit` | | Git commit after each iteration | `false` |
+| `--timeout` | | Timeout per iteration in seconds | None |
+
+**Example:**
+
+```bash
+# Start a loop with Claude
+descartes loop start \
+  --command claude \
+  --prompt "Implement the user authentication feature" \
+  --max-iterations 10 \
+  --backend claude \
+  --auto-commit
+
+# Generic loop with custom completion text
+descartes loop start \
+  --command "python agent.py" \
+  --prompt "Process all pending items" \
+  --completion-promise "ALL_DONE" \
+  --timeout 300
+```
+
+### loop status
+
+Show the current state of a running or completed loop.
+
+```bash
+descartes loop status [OPTIONS]
+```
+
+**Options:**
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--state-file` | `-s` | Path to state file | `.descartes/loop-state.json` |
+
+**Example Output:**
+
+```
+Loop Status
+===========
+  State file: ".descartes/loop-state.json"
+  Iteration: 5
+  Started: 2024-01-15T10:30:00Z
+  Completed: No
+  Last iteration: 2024-01-15T10:45:00Z
+
+Config:
+  Command: claude
+  Max iterations: 20
+  Completion promise: "COMPLETE"
+```
+
+### loop resume
+
+Resume an interrupted loop from its saved state.
+
+```bash
+descartes loop resume [OPTIONS]
+```
+
+**Options:**
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--state-file` | `-s` | Path to state file | `.descartes/loop-state.json` |
+
+**Example:**
+
+```bash
+# Resume from default state file
+descartes loop resume
+
+# Resume from custom state file
+descartes loop resume --state-file ./custom-loop-state.json
+```
+
+### loop cancel
+
+Cancel a running loop by marking it as completed in the state file.
+
+```bash
+descartes loop cancel [OPTIONS]
+```
+
+**Options:**
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--state-file` | `-s` | Path to state file | `.descartes/loop-state.json` |
+
+**Example:**
+
+```bash
+descartes loop cancel
+```
+
+### How Loops Work
+
+1. **Initialization** — The loop starts with your command and prompt
+2. **Iteration** — Each iteration runs the command with context about the current iteration
+3. **Completion Detection** — The loop checks output for the completion promise text
+4. **Exit Conditions** — Loop exits when:
+   - Completion promise is detected
+   - Maximum iterations reached
+   - User cancels with Ctrl+C
+   - Timeout exceeded (if configured)
+5. **State Persistence** — State is saved after each iteration for resumability
 
 ---
 

@@ -598,6 +598,69 @@ descartes workflow flow --prd requirements.md --resume
 
 ---
 
+## SCUD Integration
+
+The Flow Workflow integrates deeply with SCUD (the task management system) for tracking and executing tasks.
+
+### Task Management
+
+Flow uses SCUD commands throughout execution:
+- `scud parse-prd` - Generate tasks from PRD (Ingest phase)
+- `scud list` / `scud show` - View task details
+- `scud expand` - Break complex tasks into subtasks
+- `scud waves` - Compute execution waves
+- `scud set-status` - Update task status during implementation
+- `scud stats` - Track overall progress
+
+### Wave Computation
+
+Tasks are organized into waves based on dependencies:
+
+```
+Wave 1: [Task A]           # No dependencies
+Wave 2: [Task B, Task C]   # Both depend on A
+Wave 3: [Task D]           # Depends on B and C
+```
+
+The `flow-review-graph` agent optimizes wave groupings for maximum parallelization.
+
+### Task Status Flow
+
+During implementation, tasks transition through statuses:
+
+```
+pending → in-progress → done
+                     ↘ blocked (if verification fails)
+```
+
+The implementation agent:
+1. Claims task with `scud set-status <id> in-progress`
+2. Executes implementation
+3. Runs verification
+4. Marks `done` or `blocked` based on result
+
+### Customizing Flow Agents
+
+Flow agents are defined in `agents/flow-*.md` files:
+
+| Agent | File | Tool Level | Purpose |
+|-------|------|------------|---------|
+| Orchestrator | flow-orchestrator.md | orchestrator | Error handling decisions |
+| Ingest | flow-ingest.md | researcher | PRD parsing |
+| Review Graph | flow-review-graph.md | researcher | Dependency optimization |
+| Plan Tasks | flow-plan-tasks.md | planner | Implementation planning |
+| Implement | flow-implement.md | orchestrator | Task execution |
+| QA | flow-qa.md | researcher | Quality monitoring |
+| Summarize | flow-summarize.md | readonly | Report generation |
+
+You can customize agent behavior by editing these files. Each agent has:
+- Metadata (name, model, tool_level, tags)
+- Responsibilities
+- Process steps
+- Output format
+
+---
+
 ## Next Steps
 
 - **[Skills System →](08-skills-system.md)** — Extend Flow with custom skills
