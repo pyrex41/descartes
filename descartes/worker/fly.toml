@@ -1,0 +1,29 @@
+# Fly.io configuration for descartes-workers
+# Workers are ephemeral machines spawned on-demand by the orchestrator
+
+app = "descartes-workers"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# No services - workers are ephemeral and callback to orchestrator
+# They don't expose any ports
+
+[env]
+  RUST_LOG = "info"
+
+# Workers are spawned via Machines API with auto_destroy = true
+# These settings are defaults that can be overridden at spawn time
+
+[experimental]
+  auto_rollback = false
+
+# Note: Workers are NOT deployed with `fly deploy`
+# Instead:
+# 1. Build and push the image: `fly deploy --image-only`
+# 2. Orchestrator spawns workers via Machines API with specific env vars:
+#    - TASK_ID: The SCUD task to execute
+#    - PROJECT_ID: The project context
+#    - CALLBACK_URL: Where to report status
+#    - ANTHROPIC_API_KEY: For AI agent access
