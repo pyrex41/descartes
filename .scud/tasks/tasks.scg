@@ -407,9 +407,9 @@
 3.2 | Implement Wave Execution Logic and Integration | P | 0 | H
 4 | Update HTTP router with REST routes | P | 3 | H
 5 | Integrate WebSocket server | P | 3 | H
-6 | Create Fly.io Machines API client | X | 5 | H
-6.1 | Implement API models and HTTP client setup | P | 0 | H
-6.2 | Implement core API functions and unit tests | P | 0 | H
+6 | Create Fly.io Machines API client | D | 5 | H
+6.1 | Implement API models and HTTP client setup | D | 0 | H
+6.2 | Implement core API functions and unit tests | D | 0 | H
 7 | Update agent spawn handler for cloud | P | 3 | H
 8 | Create worker binary | D | 5 | H
 8.1 | Set up worker project structure and Cargo.toml | D | 0 | H

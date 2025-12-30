@@ -26,6 +26,7 @@ pub mod scg_task_event_emitter; // SCG file-based task event emitter
 pub mod types;
 pub mod zmq_publisher; // ZMQ PUB socket for streaming chat output
 pub mod chat_manager; // Chat session management
+pub mod fly_machines; // Fly.io Machines API client for ephemeral workers
 
 // Re-export commonly used types
 pub use agent_monitor::{AgentMonitor, AgentMonitorConfig, HealthSummary, MonitorStats};
@@ -59,6 +60,10 @@ pub use scg_task_event_emitter::{
 pub use types::{RpcRequest, RpcResponse};
 pub use zmq_publisher::ZmqPublisher;
 pub use chat_manager::{ChatManager, ChatSessionInfo};
+pub use fly_machines::{
+    CreateMachineRequest, FlyMachinesClient, GuestConfig, InitConfig, Machine, MachineConfig,
+    MachineEvent, RestartPolicy,
+};
 
 /// Daemon version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
