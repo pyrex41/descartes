@@ -1,18 +1,93 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Descartes</title>
+    <title>Descartes - Guided Software Development</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link href="/main.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        code, pre, .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
 </head>
-<body>
-    <div id="app"></div>
+<body class="h-full bg-slate-900 text-gray-100">
+    <div id="app" class="h-full"></div>
     <script src="/main.js"></script>
     <script>
+        // Initialize Elm application
         var app = Elm.Main.init({
-            node: document.getElementById('app')
+            node: document.getElementById('app'),
+            flags: {
+                token: localStorage.getItem('descartes_token')
+            }
         });
+
+        // WebSocket management
+        let socket = null;
+
+        if (app.ports && app.ports.connectWebSocket) {
+            app.ports.connectWebSocket.subscribe(function(url) {
+                if (socket) {
+                    socket.close();
+                }
+
+                socket = new WebSocket(url);
+
+                socket.onopen = function() {
+                    if (app.ports.webSocketStatus) {
+                        app.ports.webSocketStatus.send('connected');
+                    }
+                };
+
+                socket.onmessage = function(event) {
+                    if (app.ports.webSocketMessage) {
+                        app.ports.webSocketMessage.send(event.data);
+                    }
+                };
+
+                socket.onclose = function() {
+                    if (app.ports.webSocketStatus) {
+                        app.ports.webSocketStatus.send('disconnected');
+                    }
+                    // Reconnect after 3 seconds
+                    setTimeout(function() {
+                        if (app.ports.connectWebSocket) {
+                            app.ports.connectWebSocket.send(url);
+                        }
+                    }, 3000);
+                };
+
+                socket.onerror = function() {
+                    if (app.ports.webSocketStatus) {
+                        app.ports.webSocketStatus.send('error');
+                    }
+                };
+            });
+        }
+
+        if (app.ports && app.ports.disconnectWebSocket) {
+            app.ports.disconnectWebSocket.subscribe(function() {
+                if (socket) {
+                    socket.close();
+                    socket = null;
+                }
+            });
+        }
+
+        if (app.ports && app.ports.sendWebSocketMessage) {
+            app.ports.sendWebSocketMessage.subscribe(function(message) {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(message);
+                }
+            });
+        }
     </script>
 </body>
 </html>

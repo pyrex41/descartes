@@ -2,13 +2,21 @@
   "name": "descartes-webapp",
   "version": "0.1.0",
   "scripts": {
-    "build:tw": "postcss tailwind.css -o static/main.css",
+    "build:css": "NODE_ENV=production postcss tailwind.css -o static/main.css",
     "build:elm": "elm make src/Main.elm --optimize --output=static/main.js",
-    "build": "npm run build:tw && npm run build:elm",
-    "dev": "elm reactor"
+    "build": "npm run build:css && npm run build:elm",
+    "dev:css": "postcss tailwind.css -o static/main.css --watch",
+    "dev:elm": "elm-live src/Main.elm --open --dir=static -- --output=static/main.js",
+    "dev": "concurrently \"npm run dev:css\" \"npm run dev:elm\"",
+    "test": "elm-test"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.0",
+    "concurrently": "^8.2.0",
+    "cssnano": "^6.0.0",
     "elm": "^0.19.1-6",
+    "elm-live": "^4.0.2",
+    "elm-test": "^0.19.1-revision12",
     "postcss": "^8.4.0",
     "postcss-cli": "^11.0.0",
     "tailwindcss": "^3.4.0"
