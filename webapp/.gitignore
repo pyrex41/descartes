@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+elm-stuff/
+
+# Build outputs
+static/main.js
+static/main.css
+
+# Lock files (optional - can be committed for reproducible builds)
+package-lock.json
+
+# Editor files
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
