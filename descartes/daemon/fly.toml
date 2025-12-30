@@ -1,0 +1,40 @@
+# Fly.io configuration for descartes-api (orchestrator)
+
+app = "descartes-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false   # Always-on orchestrator
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8081
+
+  [[services.ports]]
+    port = 8081
+    handlers = ["tls"]
+
+[env]
+  RUST_LOG = "info"
+  FLY_WORKER_APP = "descartes-workers"
+
+[mounts]
+  source = "descartes_data"
+  destination = "/data"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory = "1gb"

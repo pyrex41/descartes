@@ -421,9 +421,9 @@
 12.1 | Set up Elm application with Browser.application, URL routing, and page handling | D | 0 | H
 12.2 | Integrate session management and WebSocket ports | D | 0 | H
 13 | Configure TailwindCSS for Elm | D | 3 | M
-14 | Deploy orchestrator to Fly.io | X | 5 | H
-14.1 | Set up deployment configuration and containerization | P | 0 | H
-14.2 | Deploy to Fly.io and verify functionality | P | 0 | H
+14 | Deploy orchestrator to Fly.io | D | 5 | H
+14.1 | Set up deployment configuration and containerization | D | 0 | H
+14.2 | Deploy to Fly.io and verify functionality | D | 0 | H
 
 @edges
 # dependent -> dependency
