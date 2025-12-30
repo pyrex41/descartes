@@ -2,6 +2,7 @@
 use crate::auth::AuthContext;
 use crate::errors::{DaemonError, DaemonResult};
 use crate::fly_machines::FlyMachinesClient;
+use crate::project_store::ProjectStore;
 use crate::types::*;
 use chrono::Utc;
 use dashmap::DashMap;
@@ -23,6 +24,8 @@ pub struct RpcHandlers {
     fly_client: Option<Arc<FlyMachinesClient>>,
     /// Callback base URL for cloud workers
     callback_base_url: Option<String>,
+    /// Optional project store for webapp
+    project_store: Option<Arc<ProjectStore>>,
 }
 
 impl RpcHandlers {
@@ -34,6 +37,7 @@ impl RpcHandlers {
             state_store: None,
             fly_client: None,
             callback_base_url: None,
+            project_store: None,
         }
     }
 
@@ -45,6 +49,7 @@ impl RpcHandlers {
             state_store: None,
             fly_client: None,
             callback_base_url: None,
+            project_store: None,
         }
     }
 
@@ -59,6 +64,7 @@ impl RpcHandlers {
             state_store: Some(state_store),
             fly_client: None,
             callback_base_url: None,
+            project_store: None,
         }
     }
 
@@ -80,6 +86,11 @@ impl RpcHandlers {
     /// Set the callback base URL for cloud workers
     pub fn set_callback_base_url(&mut self, url: String) {
         self.callback_base_url = Some(url);
+    }
+
+    /// Set the project store for webapp
+    pub fn set_project_store(&mut self, project_store: Arc<ProjectStore>) {
+        self.project_store = Some(project_store);
     }
 
     /// Handle agent.spawn RPC method
@@ -485,12 +496,95 @@ impl RpcHandlers {
     pub fn list_agents(&self) -> Vec<AgentInfo> {
         self.agents.iter().map(|r| r.clone()).collect()
     }
+
+    /// Get the project store
+    pub fn project_store(&self) -> Option<&Arc<ProjectStore>> {
+        self.project_store.as_ref()
+    }
 }
 
 impl Default for RpcHandlers {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ============================================================================
+// REST Endpoint Handlers
+// ============================================================================
+
+/// Handle create project request
+pub async fn handle_create_project(
+    project_store: &ProjectStore,
+    owner_id: &str,
+    req: CreateProjectRequest,
+) -> Result<CreateProjectResponse, RpcError> {
+    let project = project_store
+        .create(owner_id, req)
+        .await
+        .map_err(|e| RpcError::internal(format!("Failed to create project: {}", e)))?;
+
+    Ok(CreateProjectResponse { project })
+}
+
+/// Handle list projects request
+pub async fn handle_list_projects(
+    project_store: &ProjectStore,
+    owner_id: &str,
+) -> Result<Vec<Project>, RpcError> {
+    project_store
+        .list(owner_id)
+        .await
+        .map_err(|e| RpcError::internal(format!("Failed to list projects: {}", e)))
+}
+
+/// Handle get project request
+pub async fn handle_get_project(
+    project_store: &ProjectStore,
+    project_id: &str,
+) -> Result<Project, RpcError> {
+    project_store
+        .get(project_id)
+        .await
+        .map_err(|e| RpcError::internal(format!("Failed to get project: {}", e)))?
+        .ok_or_else(|| RpcError::not_found("Project not found"))
+}
+
+/// Handle delete project request
+pub async fn handle_delete_project(
+    project_store: &ProjectStore,
+    project_id: &str,
+) -> Result<bool, RpcError> {
+    project_store
+        .delete(project_id)
+        .await
+        .map_err(|e| RpcError::internal(format!("Failed to delete project: {}", e)))
+}
+
+/// Handle parse PRD request
+pub async fn handle_parse_prd(
+    project_store: &ProjectStore,
+    project_id: &str,
+) -> Result<Vec<Wave>, RpcError> {
+    let project = handle_get_project(project_store, project_id).await?;
+
+    let _prd_content = project.prd_content
+        .ok_or_else(|| RpcError::bad_request("Project has no PRD content"))?;
+
+    // For MVP, return mock waves - real implementation would use SCUD CLI
+    // In production: parse PRD with SCUD and return actual waves
+    Ok(vec![
+        Wave {
+            index: 0,
+            tasks: vec!["Task 1".to_string(), "Task 2".to_string()],
+            status: WaveStatus::Pending,
+        },
+        Wave {
+            index: 1,
+            tasks: vec!["Task 3".to_string()],
+            status: WaveStatus::Pending,
+        },
+    ])
 }
 
 #[cfg(test)]

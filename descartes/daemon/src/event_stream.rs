@@ -48,6 +48,35 @@ pub enum ClientMessage {
     },
 }
 
+/// Start WebSocket server for event streaming
+pub async fn start_websocket_server(
+    addr: &str,
+    event_bus: Arc<EventBus>,
+) -> DaemonResult<()> {
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| DaemonError::ServerError(format!("Failed to bind WebSocket server: {}", e)))?;
+
+    info!("WebSocket event server listening on ws://{}", addr);
+
+    loop {
+        match listener.accept().await {
+            Ok((stream, addr)) => {
+                info!("WebSocket connection from {}", addr);
+                let event_bus = event_bus.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handle_event_stream(stream, event_bus).await {
+                        error!("WebSocket error for {}: {}", addr, e);
+                    }
+                });
+            }
+            Err(e) => {
+                error!("Failed to accept WebSocket connection: {}", e);
+            }
+        }
+    }
+}
+
 /// Handle a WebSocket connection for event streaming
 pub async fn handle_event_stream(
     stream: tokio::net::TcpStream,

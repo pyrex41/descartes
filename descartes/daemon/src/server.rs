@@ -2,7 +2,12 @@
 use crate::auth::AuthManager;
 use crate::config::DaemonConfig;
 use crate::errors::{DaemonError, DaemonResult};
-use crate::handlers::RpcHandlers;
+use crate::event_stream::start_websocket_server;
+use crate::events::EventBus;
+use crate::handlers::{
+    handle_create_project, handle_delete_project, handle_get_project, handle_list_projects,
+    handle_parse_prd, RpcHandlers,
+};
 use crate::metrics::MetricsCollector;
 use crate::pool::ConnectionPool;
 use crate::rpc::JsonRpcServer;
@@ -11,7 +16,8 @@ use crate::chat_manager::ChatManager;
 use crate::zmq_publisher::ZmqPublisher;
 use hyper::header::AUTHORIZATION;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server, StatusCode};
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use serde::{Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -31,6 +37,8 @@ pub struct RpcServer {
     /// ZMQ PUB socket for streaming chat output (initialized lazily in run())
     #[allow(dead_code)]
     publisher: Option<Arc<ZmqPublisher>>,
+    /// Event bus for WebSocket event streaming
+    event_bus: Arc<EventBus>,
 }
 
 impl RpcServer {
@@ -41,6 +49,7 @@ impl RpcServer {
         let metrics = Arc::new(MetricsCollector::new()?);
         let handlers = Arc::new(RpcHandlers::new());
         let pool = Arc::new(ConnectionPool::new(config.pool.clone()));
+        let event_bus = Arc::new(EventBus::new());
 
         let auth = if config.auth.enabled {
             Some(Arc::new(AuthManager::new(config.auth.clone())?))
@@ -62,6 +71,7 @@ impl RpcServer {
             pool,
             rpc,
             publisher: None, // Initialized in run()
+            event_bus,
         })
     }
 
@@ -87,15 +97,18 @@ impl RpcServer {
 
         let rpc = self.rpc.clone();
         let metrics = self.metrics.clone();
+        let handlers = self.handlers.clone();
 
         let make_svc = make_service_fn(move |_conn| {
             let rpc = rpc.clone();
             let metrics = metrics.clone();
+            let handlers = handlers.clone();
             async move {
                 Ok::<_, hyper::Error>(service_fn(move |req| {
                     let rpc = rpc.clone();
                     let metrics = metrics.clone();
-                    handle_http_request(req, rpc, metrics)
+                    let handlers = handlers.clone();
+                    handle_http_request(req, rpc, metrics, handlers)
                 }))
             }
         });
@@ -193,12 +206,23 @@ impl RpcServer {
             }
         });
 
+        // Start WebSocket server for event streaming
+        let ws_event_bus = server.event_bus.clone();
+        let ws_port = server.config.server.http_port + 1; // Use next port for WebSocket
+        let ws_addr = format!("{}:{}", server.config.server.http_addr, ws_port);
+        let ws_handle = tokio::spawn(async move {
+            if let Err(e) = start_websocket_server(&ws_addr, ws_event_bus).await {
+                error!("WebSocket server error: {}", e);
+            }
+        });
+
         info!("RPC server started");
 
         // Wait for servers
         tokio::select! {
             _ = http_handle => {},
             _ = metrics_handle => {},
+            _ = ws_handle => {},
         }
 
         Ok(())
@@ -210,9 +234,96 @@ async fn handle_http_request(
     req: Request<Body>,
     rpc: Arc<JsonRpcServer>,
     metrics: Arc<MetricsCollector>,
+    handlers: Arc<RpcHandlers>,
 ) -> Result<Response<Body>, hyper::Error> {
     metrics.record_connection();
 
+    // Handle REST API routes
+    match (req.method(), req.uri().path()) {
+        // Health check
+        (&Method::GET, "/health") => {
+            metrics.record_connection_closed();
+            return Ok(Response::new(Body::from("OK")));
+        }
+
+        // Project endpoints (REST-style)
+        (&Method::GET, "/api/projects") => {
+            metrics.record_connection_closed();
+            let owner_id = extract_owner_id(&req).unwrap_or_else(|| "anonymous".to_string());
+            if let Some(store) = handlers.project_store() {
+                match handle_list_projects(store, &owner_id).await {
+                    Ok(projects) => return json_response(projects),
+                    Err(e) => return error_response(500, &e.message),
+                }
+            } else {
+                return error_response(500, "Project store not configured");
+            }
+        }
+
+        (&Method::POST, "/api/projects") => {
+            metrics.record_connection_closed();
+            let owner_id = extract_owner_id(&req).unwrap_or_else(|| "anonymous".to_string());
+            if let Some(store) = handlers.project_store() {
+                let body = hyper::body::to_bytes(req.into_body()).await?;
+                match serde_json::from_slice::<CreateProjectRequest>(&body) {
+                    Ok(create_req) => {
+                        match handle_create_project(store, &owner_id, create_req).await {
+                            Ok(response) => return json_response(response),
+                            Err(e) => return error_response(500, &e.message),
+                        }
+                    }
+                    Err(e) => return error_response(400, &format!("Invalid request: {}", e)),
+                }
+            } else {
+                return error_response(500, "Project store not configured");
+            }
+        }
+
+        (&Method::GET, path) if path.starts_with("/api/projects/") => {
+            metrics.record_connection_closed();
+            let project_id = path.trim_start_matches("/api/projects/");
+            if let Some(store) = handlers.project_store() {
+                match handle_get_project(store, project_id).await {
+                    Ok(project) => return json_response(project),
+                    Err(e) => return error_response(if e.code == -32001 { 404 } else { 500 }, &e.message),
+                }
+            } else {
+                return error_response(500, "Project store not configured");
+            }
+        }
+
+        (&Method::DELETE, path) if path.starts_with("/api/projects/") => {
+            metrics.record_connection_closed();
+            let project_id = path.trim_start_matches("/api/projects/");
+            if let Some(store) = handlers.project_store() {
+                match handle_delete_project(store, project_id).await {
+                    Ok(deleted) => return json_response(serde_json::json!({"deleted": deleted})),
+                    Err(e) => return error_response(500, &e.message),
+                }
+            } else {
+                return error_response(500, "Project store not configured");
+            }
+        }
+
+        (&Method::POST, path) if path.starts_with("/api/projects/") && path.ends_with("/parse-prd") => {
+            metrics.record_connection_closed();
+            let project_id = path.trim_start_matches("/api/projects/").trim_end_matches("/parse-prd");
+            if let Some(store) = handlers.project_store() {
+                match handle_parse_prd(store, project_id).await {
+                    Ok(waves) => return json_response(waves),
+                    Err(e) => return error_response(if e.code == -32001 { 404 } else { 500 }, &e.message),
+                }
+            } else {
+                return error_response(500, "Project store not configured");
+            }
+        }
+
+        _ => {
+            // Fall through to JSON-RPC handling
+        }
+    }
+
+    // JSON-RPC handling
     match *req.method() {
         hyper::Method::POST => {
             let auth_header = req
@@ -332,6 +443,34 @@ fn parse_bearer_token(header: &str) -> Option<String> {
     } else {
         Some(token.to_string())
     }
+}
+
+/// Helper function to create JSON response
+fn json_response<T: Serialize>(data: T) -> Result<Response<Body>, hyper::Error> {
+    let body = serde_json::to_string(&data).unwrap_or_else(|_| "{}".to_string());
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/json")
+        .body(Body::from(body))
+        .unwrap())
+}
+
+/// Helper function to create error response
+fn error_response(status: u16, message: &str) -> Result<Response<Body>, hyper::Error> {
+    Ok(Response::builder()
+        .status(status)
+        .header("Content-Type", "application/json")
+        .body(Body::from(format!(r#"{{"error":"{}"}}"#, message)))
+        .unwrap())
+}
+
+/// Extract owner ID from request headers
+fn extract_owner_id(req: &Request<Body>) -> Option<String> {
+    // For MVP, extract from header or use anonymous
+    req.headers()
+        .get("X-User-ID")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
 }
 
 /// Handle metrics requests

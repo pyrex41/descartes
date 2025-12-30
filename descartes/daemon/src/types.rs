@@ -34,6 +34,35 @@ pub struct RpcError {
     pub data: Option<serde_json::Value>,
 }
 
+impl RpcError {
+    /// Create an internal server error
+    pub fn internal(message: String) -> Self {
+        RpcError {
+            code: -32603,
+            message,
+            data: None,
+        }
+    }
+
+    /// Create a not found error
+    pub fn not_found(message: impl Into<String>) -> Self {
+        RpcError {
+            code: -32001,
+            message: message.into(),
+            data: None,
+        }
+    }
+
+    /// Create a bad request error
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        RpcError {
+            code: -32602,
+            message: message.into(),
+            data: None,
+        }
+    }
+}
+
 impl RpcResponse {
     /// Create a successful response
     pub fn success(result: serde_json::Value, id: Option<serde_json::Value>) -> Self {

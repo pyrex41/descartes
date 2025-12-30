@@ -402,11 +402,11 @@
 2 | Implement Project Store with SQLite | D | 5 | H
 2.1 | Set up Project Model and SQLite Schema with Migrations | D | 0 | H
 2.2 | Implement CRUD Operations and Unit Tests | D | 0 | H
-3 | Add REST endpoint handlers | X | 5 | H
-3.1 | Implement Project CRUD Handlers | P | 0 | H
-3.2 | Implement Wave Execution Logic and Integration | P | 0 | H
-4 | Update HTTP router with REST routes | P | 3 | H
-5 | Integrate WebSocket server | P | 3 | H
+3 | Add REST endpoint handlers | D | 5 | H
+3.1 | Implement Project CRUD Handlers | D | 0 | H
+3.2 | Implement Wave Execution Logic and Integration | D | 0 | H
+4 | Update HTTP router with REST routes | D | 3 | H
+5 | Integrate WebSocket server | D | 3 | H
 6 | Create Fly.io Machines API client | D | 5 | H
 6.1 | Implement API models and HTTP client setup | D | 0 | H
 6.2 | Implement core API functions and unit tests | D | 0 | H
