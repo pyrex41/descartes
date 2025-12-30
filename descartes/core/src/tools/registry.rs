@@ -190,6 +190,34 @@ pub fn get_system_prompt(level: ToolLevel) -> &'static str {
     }
 }
 
+/// Parse a tool level from a string.
+/// Supports various formats: "minimal", "read-only", "readonly", "orchestrator", etc.
+pub fn parse_tool_level(s: &str) -> Option<ToolLevel> {
+    match s.to_lowercase().replace('-', "").replace('_', "").as_str() {
+        "minimal" => Some(ToolLevel::Minimal),
+        "orchestrator" | "full" => Some(ToolLevel::Orchestrator),
+        "readonly" | "read" => Some(ToolLevel::ReadOnly),
+        "researcher" | "research" => Some(ToolLevel::Researcher),
+        "planner" | "plan" => Some(ToolLevel::Planner),
+        "lispdeveloper" | "lisp" => Some(ToolLevel::LispDeveloper),
+        _ => None,
+    }
+}
+
+/// Convert a tool level to Claude Code's --allowedTools format.
+/// This returns the tool names that should be allowed for the given level.
+/// Claude Code uses PascalCase tool names (Read, Write, Task, etc.)
+pub fn tool_level_to_allowed_tools(level: ToolLevel) -> String {
+    match level {
+        ToolLevel::Minimal => "Read,Write,Edit,Bash,Glob,Grep".to_string(),
+        ToolLevel::Orchestrator => "Read,Write,Edit,Bash,Glob,Grep,Task,WebFetch,WebSearch".to_string(),
+        ToolLevel::ReadOnly => "Read,Bash,Glob,Grep".to_string(),
+        ToolLevel::Researcher => "Read,Bash,Glob,Grep,WebFetch,WebSearch".to_string(),
+        ToolLevel::Planner => "Read,Write,Bash,Glob,Grep".to_string(),
+        ToolLevel::LispDeveloper => "Read,Bash,Glob,Grep".to_string(), // Swank tools are custom
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

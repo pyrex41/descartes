@@ -20,6 +20,7 @@ async fn test_spawn_unsupported_backend() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     // Attempt to spawn - should fail because this backend doesn't contain 'cli'
@@ -81,6 +82,7 @@ async fn test_process_runner_with_max_agents() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     // Should fail due to max concurrent limit
@@ -134,6 +136,7 @@ async fn test_agent_config_creation() {
         context: Some("Test context".to_string()),
         system_prompt: Some("You are a test assistant".to_string()),
         environment: env.clone(),
+        ..Default::default()
     };
 
     assert_eq!(config.name, "test-agent");
@@ -176,6 +179,7 @@ async fn test_spawn_with_sleep_backend() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(config).await.unwrap();
@@ -201,6 +205,7 @@ async fn test_agent_lifecycle() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(config).await.unwrap();
@@ -242,6 +247,7 @@ async fn test_graceful_shutdown() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(config).await.unwrap();
@@ -274,6 +280,7 @@ async fn test_graceful_shutdown_timeout() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(config).await.unwrap();
@@ -307,6 +314,7 @@ async fn test_stdio_streaming() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(config).await.unwrap();
@@ -340,6 +348,7 @@ async fn test_health_checks() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(agent_config).await.unwrap();
@@ -385,6 +394,7 @@ async fn test_process_exit_detection() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(config).await.unwrap();
@@ -414,6 +424,7 @@ async fn test_signal_handling() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let mut handle = runner.spawn(config).await.unwrap();

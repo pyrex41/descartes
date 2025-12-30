@@ -45,6 +45,8 @@ pub mod workflow_commands;
 pub mod workflow_executor;
 pub mod flow_executor;
 pub mod flow_git;
+pub mod iterative_loop;
+pub mod scud_loop;
 pub mod zmq_agent_runner;
 pub mod zmq_client;
 pub mod zmq_communication;
@@ -202,6 +204,19 @@ pub use flow_executor::{
 
 pub use flow_git::FlowGit;
 
+pub use iterative_loop::{
+    IterativeLoop, IterativeLoopConfig, IterativeLoopResult, IterativeLoopState,
+    IterativeExitReason, LoopBackendConfig, LoopGitConfig,
+    IterationSummary,
+    // Phase 3: Backend trait and presets
+    LoopBackend, LoopClaudeBackend, LoopOpenCodeBackend, LoopGenericBackend, create_loop_backend,
+};
+
+pub use scud_loop::{
+    ScudIterativeLoop, ScudLoopConfig, ScudLoopState, ScudStats, LoopTask, ScudWave,
+    WaveCommit, BlockedTask,
+};
+
 pub use scud_plugin::{
     detect_workspace_type, ensure_scud_dir, has_scud, is_dual_workspace, read_scud_tasks,
     read_scud_workflow_state, scud_available, scud_dir, scud_tasks_file, scud_version,
@@ -300,10 +315,11 @@ pub use tools::{
     bash_tool, edit_tool, execute_bash, execute_edit, execute_read, execute_spawn_session,
     execute_tool, execute_tool_async, execute_write, get_system_prompt, get_tools,
     lisp_developer_system_prompt, minimal_system_prompt, orchestrator_system_prompt,
-    planner_system_prompt, read_tool, readonly_system_prompt, researcher_system_prompt,
-    spawn_session_tool, swank_compile_tool, swank_eval_tool, swank_inspect_tool, swank_restart_tool,
-    write_tool, ExecutionContext, ToolLevel, ToolResult, SWANK_REGISTRY,
-    execute_swank_compile, execute_swank_eval, execute_swank_inspect, execute_swank_restart,
+    parse_tool_level, planner_system_prompt, read_tool, readonly_system_prompt,
+    researcher_system_prompt, spawn_session_tool, swank_compile_tool, swank_eval_tool,
+    swank_inspect_tool, swank_restart_tool, tool_level_to_allowed_tools, write_tool,
+    ExecutionContext, ToolLevel, ToolResult, SWANK_REGISTRY, execute_swank_compile,
+    execute_swank_eval, execute_swank_inspect, execute_swank_restart,
 };
 
 // Swank integration (Lisp live development)

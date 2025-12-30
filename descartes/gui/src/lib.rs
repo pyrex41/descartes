@@ -15,6 +15,8 @@ pub mod swarm_handler; // Stream handler for swarm events
 pub mod swarm_monitor; // Live swarm monitoring UI (phase 3:5.5)
 pub mod zmq_subscriber; // ZMQ SUB client for chat streaming
 pub mod chat_state; // Chat interface state management
+pub mod loop_state; // Iterative loop state management
+pub mod loop_view; // Iterative loop view component
 pub mod task_board;
 pub mod time_travel;
 pub mod time_travel_integration;
@@ -45,6 +47,8 @@ pub use time_travel_integration::{
 };
 pub use zmq_subscriber::{chat_subscription, subscribe_to_session};
 pub use chat_state::{update as chat_state_update, ChatMessage, ChatMessageEntry, ChatRole, ChatState};
+pub use loop_state::{LoopMessage, LoopViewState};
+pub use loop_view::view as loop_view;
 pub use lisp_debugger::{
     update as lisp_debugger_update, view as lisp_debugger_view, parse_debugger_event,
     LispDebuggerMessage, LispDebuggerState, LispFrame, LispRestart,

@@ -360,6 +360,20 @@ impl RpcServerImpl {
             .and_then(|s| s.as_str())
             .map(|s| s.to_string());
 
+        // Extract optional fields
+        let model = config
+            .get("model")
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string());
+        let tool_level = config
+            .get("tool_level")
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string());
+        let agents = config
+            .get("agents")
+            .and_then(|v| v.as_object())
+            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
+
         let agent_config = AgentConfig {
             name: name.clone(),
             model_backend: agent_type,
@@ -367,6 +381,9 @@ impl RpcServerImpl {
             context,
             system_prompt,
             environment,
+            model,
+            tool_level,
+            agents,
         };
 
         // Check if this is a Lisp agent before spawning (agent_config is moved by spawn)
@@ -2005,6 +2022,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(is_lisp_agent(&lisp_config));
 
@@ -2016,6 +2034,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(is_lisp_agent(&lisp_backend_config));
 
@@ -2027,6 +2046,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(is_lisp_agent(&lisp_name_config));
 
@@ -2038,6 +2058,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         env_config.environment.insert(
             "DESCARTES_TOOL_LEVEL".to_string(),
@@ -2053,6 +2074,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(!is_lisp_agent(&non_lisp_config));
     }

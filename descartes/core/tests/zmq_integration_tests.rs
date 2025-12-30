@@ -46,6 +46,7 @@ fn test_message_serialization_spawn_request() {
             context: Some("Test context".to_string()),
             system_prompt: None,
             environment: HashMap::new(),
+            ..Default::default()
         },
         timeout_secs: Some(300),
         metadata: None,
@@ -355,6 +356,7 @@ fn test_serialization_efficiency() {
                 }
                 env
             },
+            ..Default::default()
         },
         timeout_secs: Some(300),
         metadata: Some({

@@ -94,6 +94,9 @@ async fn spawn_agent(
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        model: None,
+        tool_level: None,
+        agents: None,
     };
 
     match runner.spawn(agent_config).await {

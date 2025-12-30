@@ -18,7 +18,7 @@ fn load_config(config_path: Option<&Path>) -> anyhow::Result<DescaratesConfig> {
     Ok(manager.config().clone())
 }
 
-use commands::{attach, doctor, init, kill, logs, pause, ps, resume, spawn, tasks, workflow};
+use commands::{attach, doctor, init, kill, logs, loop_cmd, pause, ps, resume, spawn, tasks, workflow};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -178,6 +178,10 @@ enum Commands {
     #[command(subcommand)]
     Workflow(workflow::WorkflowCommands),
 
+    /// Run iterative agent loops (ralph-style)
+    #[command(subcommand)]
+    Loop(loop_cmd::LoopCommand),
+
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for
@@ -316,6 +320,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Workflow(cmd) => {
             let config = load_config(args.config.as_deref())?;
             workflow::execute(&cmd, &config).await?;
+        }
+
+        Commands::Loop(cmd) => {
+            loop_cmd::execute(&cmd).await?;
         }
 
         Commands::Completions { shell } => {

@@ -103,6 +103,7 @@ async fn test_server_spawn_agent() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let result = client.spawn_remote(config, Some(30)).await;
@@ -160,6 +161,7 @@ async fn test_server_list_agents() {
             context: None,
             system_prompt: None,
             environment: HashMap::new(),
+            ..Default::default()
         };
 
         if let Ok(_) = client.spawn_remote(config, Some(30)).await {
@@ -198,6 +200,7 @@ async fn test_server_control_commands() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     if let Ok(agent_info) = client.spawn_remote(config, Some(30)).await {
@@ -264,6 +267,7 @@ async fn test_server_max_agents_limit() {
             context: None,
             system_prompt: None,
             environment: HashMap::new(),
+            ..Default::default()
         };
 
         match client.spawn_remote(config, Some(30)).await {
@@ -314,6 +318,7 @@ async fn test_server_statistics() {
         context: None,
         system_prompt: None,
         environment: HashMap::new(),
+        ..Default::default()
     };
 
     let _ = client.spawn_remote(config, Some(30)).await;

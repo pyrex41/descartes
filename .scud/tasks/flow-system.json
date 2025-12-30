@@ -1,0 +1,254 @@
+{
+  "tag": "flow-system",
+  "created_at": "2025-12-29T00:00:00Z",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Cherry-pick loop commit from local-master-backup",
+      "description": "Merge the iterative loop implementation (be26678) from local-master-backup branch",
+      "status": "pending",
+      "complexity": 3,
+      "priority": "high",
+      "depends_on": [],
+      "phase": "merge-infrastructure"
+    },
+    {
+      "id": 2,
+      "title": "Resolve merge conflicts with blog docs",
+      "description": "Keep current blog docs, resolve any conflicts from the cherry-pick",
+      "status": "pending",
+      "complexity": 2,
+      "priority": "high",
+      "depends_on": [1],
+      "phase": "merge-infrastructure"
+    },
+    {
+      "id": 3,
+      "title": "Verify cargo check passes for all crates",
+      "description": "Run cargo check on core, cli, and gui crates to ensure compilation",
+      "status": "pending",
+      "complexity": 1,
+      "priority": "high",
+      "depends_on": [2],
+      "phase": "merge-infrastructure"
+    },
+    {
+      "id": 4,
+      "title": "Verify loop tests pass",
+      "description": "Run cargo test for iterative loop module",
+      "status": "pending",
+      "complexity": 1,
+      "priority": "high",
+      "depends_on": [3],
+      "phase": "merge-infrastructure"
+    },
+    {
+      "id": 5,
+      "title": "Test descartes loop CLI command",
+      "description": "Manual test of descartes loop start/resume/status/cancel commands",
+      "status": "pending",
+      "complexity": 2,
+      "priority": "high",
+      "depends_on": [4],
+      "phase": "merge-infrastructure"
+    },
+    {
+      "id": 6,
+      "title": "Create scud_loop.rs with ScudLoopConfig",
+      "description": "Create the SCUD-aware loop wrapper module with configuration types",
+      "status": "pending",
+      "complexity": 5,
+      "priority": "high",
+      "depends_on": [5],
+      "phase": "scud-wrapper"
+    },
+    {
+      "id": 7,
+      "title": "Implement ScudStats and SCUD CLI integration",
+      "description": "Parse SCUD CLI output for stats, waves, and task information",
+      "status": "pending",
+      "complexity": 3,
+      "priority": "high",
+      "depends_on": [6],
+      "phase": "scud-wrapper"
+    },
+    {
+      "id": 8,
+      "title": "Implement wave-based execution logic",
+      "description": "Loop through waves, execute tasks, handle completion detection",
+      "status": "pending",
+      "complexity": 5,
+      "priority": "high",
+      "depends_on": [7],
+      "phase": "scud-wrapper"
+    },
+    {
+      "id": 9,
+      "title": "Add wave commit functionality",
+      "description": "Commit after each wave with appropriate message format",
+      "status": "pending",
+      "complexity": 2,
+      "priority": "medium",
+      "depends_on": [8],
+      "phase": "scud-wrapper"
+    },
+    {
+      "id": 10,
+      "title": "Write tests for ScudIterativeLoop",
+      "description": "Unit and integration tests for the SCUD loop wrapper",
+      "status": "pending",
+      "complexity": 3,
+      "priority": "medium",
+      "depends_on": [9],
+      "phase": "scud-wrapper"
+    },
+    {
+      "id": 11,
+      "title": "Create /flow:research command",
+      "description": "Enhanced research command with handoff document generation",
+      "status": "pending",
+      "complexity": 5,
+      "priority": "high",
+      "depends_on": [5],
+      "phase": "flow-commands"
+    },
+    {
+      "id": 12,
+      "title": "Create /flow:plan command with SCUD task generation",
+      "description": "Planning command that creates SCUD tasks from plan phases",
+      "status": "pending",
+      "complexity": 8,
+      "priority": "high",
+      "depends_on": [11],
+      "phase": "flow-commands"
+    },
+    {
+      "id": 13,
+      "title": "Create /flow:implement command with loop integration",
+      "description": "Implementation command using ScudIterativeLoop for wave execution",
+      "status": "pending",
+      "complexity": 8,
+      "priority": "high",
+      "depends_on": [10, 12],
+      "phase": "flow-commands"
+    },
+    {
+      "id": 14,
+      "title": "Create /flow:resume command",
+      "description": "Resume from any handoff document, detect phase and continue",
+      "status": "pending",
+      "complexity": 5,
+      "priority": "medium",
+      "depends_on": [13],
+      "phase": "flow-commands"
+    },
+    {
+      "id": 15,
+      "title": "Create /flow:status command",
+      "description": "Show current flow state across all phases",
+      "status": "pending",
+      "complexity": 3,
+      "priority": "low",
+      "depends_on": [14],
+      "phase": "flow-commands"
+    },
+    {
+      "id": 16,
+      "title": "Create task-implementer sub-agent",
+      "description": "Sub-agent for implementing a single SCUD task with verification",
+      "status": "pending",
+      "complexity": 5,
+      "priority": "high",
+      "depends_on": [13],
+      "phase": "sub-agents"
+    },
+    {
+      "id": 17,
+      "title": "Create task-context sub-agent",
+      "description": "Sub-agent for gathering context before task implementation",
+      "status": "pending",
+      "complexity": 3,
+      "priority": "medium",
+      "depends_on": [16],
+      "phase": "sub-agents"
+    },
+    {
+      "id": 18,
+      "title": "Integrate sub-agents with flow:implement",
+      "description": "Wire up sub-agent spawning in the implementation loop",
+      "status": "pending",
+      "complexity": 5,
+      "priority": "high",
+      "depends_on": [17],
+      "phase": "sub-agents"
+    },
+    {
+      "id": 19,
+      "title": "Update loop_state.rs with SCUD fields",
+      "description": "Add wave progress, task list, and commit history to GUI state",
+      "status": "pending",
+      "complexity": 3,
+      "priority": "low",
+      "depends_on": [10],
+      "phase": "gui-integration"
+    },
+    {
+      "id": 20,
+      "title": "Update loop_view.rs with wave visualization",
+      "description": "Show wave progress, task statuses, and commit history in GUI",
+      "status": "pending",
+      "complexity": 5,
+      "priority": "low",
+      "depends_on": [19],
+      "phase": "gui-integration"
+    }
+  ],
+  "waves": [
+    {
+      "number": 1,
+      "name": "Merge Infrastructure",
+      "task_ids": [1]
+    },
+    {
+      "number": 2,
+      "name": "Resolve & Verify",
+      "task_ids": [2, 3, 4, 5]
+    },
+    {
+      "number": 3,
+      "name": "SCUD Wrapper & Research Command",
+      "task_ids": [6, 11]
+    },
+    {
+      "number": 4,
+      "name": "SCUD Integration & Plan Command",
+      "task_ids": [7, 12]
+    },
+    {
+      "number": 5,
+      "name": "Wave Execution & Implement Command",
+      "task_ids": [8, 9, 10, 13]
+    },
+    {
+      "number": 6,
+      "name": "Resume, Status & Sub-agents",
+      "task_ids": [14, 15, 16]
+    },
+    {
+      "number": 7,
+      "name": "Sub-agent Integration & GUI",
+      "task_ids": [17, 18, 19, 20]
+    }
+  ],
+  "summary": {
+    "total_tasks": 20,
+    "total_complexity": 76,
+    "phases": [
+      {"name": "merge-infrastructure", "tasks": 5, "complexity": 9},
+      {"name": "scud-wrapper", "tasks": 5, "complexity": 18},
+      {"name": "flow-commands", "tasks": 5, "complexity": 29},
+      {"name": "sub-agents", "tasks": 3, "complexity": 13},
+      {"name": "gui-integration", "tasks": 2, "complexity": 8}
+    ]
+  }
+}
