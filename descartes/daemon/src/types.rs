@@ -312,3 +312,70 @@ pub struct AttachRevokeRequest {
 pub struct AttachRevokeResponse {
     pub revoked: bool,
 }
+
+// ============================================================================
+// Webapp REST/RPC Types
+// ============================================================================
+
+/// Project management types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub owner_id: String,
+    pub prd_content: Option<String>,
+    pub scud_tag: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProjectRequest {
+    pub name: String,
+    pub prd_content: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProjectResponse {
+    pub project: Project,
+}
+
+/// Wave execution types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Wave {
+    pub index: usize,
+    pub tasks: Vec<String>,
+    pub status: WaveStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WaveStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecuteWaveRequest {
+    pub project_id: String,
+    pub wave_index: usize,
+}
+
+/// Cost tracking types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostSummary {
+    pub project_id: String,
+    pub total_compute_seconds: u64,
+    pub total_tokens: u64,
+    pub estimated_cost_usd: f64,
+    pub breakdown: Vec<CostEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostEntry {
+    pub agent_id: String,
+    pub compute_seconds: u64,
+    pub tokens: u64,
+    pub cost_usd: f64,
+}

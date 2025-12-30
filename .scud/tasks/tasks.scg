@@ -398,7 +398,7 @@
 
 @nodes
 # id | title | status | complexity | priority
-1 | Add shared types for REST and RPC | P | 3 | H
+1 | Add shared types for REST and RPC | D | 3 | H
 2 | Implement Project Store with SQLite | X | 5 | H
 2.1 | Set up Project Model and SQLite Schema with Migrations | P | 0 | H
 2.2 | Implement CRUD Operations and Unit Tests | P | 0 | H
