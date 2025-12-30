@@ -786,4 +786,148 @@ mod tests {
         assert_eq!(parsed.task_id, 5);
         assert_eq!(parsed.attempts, 3);
     }
+
+    #[test]
+    fn test_loop_task_serialization() {
+        let task = LoopTask {
+            id: 7,
+            title: "Implement feature X".to_string(),
+            description: Some("Add new functionality".to_string()),
+            status: "pending".to_string(),
+            complexity: 5,
+            depends_on: vec![1, 2, 3],
+            test_strategy: Some("Unit tests".to_string()),
+        };
+        let json = serde_json::to_string(&task).unwrap();
+        let parsed: LoopTask = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.id, 7);
+        assert_eq!(parsed.title, "Implement feature X");
+        assert_eq!(parsed.complexity, 5);
+        assert_eq!(parsed.depends_on, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_scud_wave_serialization() {
+        let wave = ScudWave {
+            number: 2,
+            tasks: vec![
+                LoopTask {
+                    id: 4,
+                    title: "Task A".to_string(),
+                    description: None,
+                    status: "pending".to_string(),
+                    complexity: 3,
+                    depends_on: vec![],
+                    test_strategy: None,
+                },
+                LoopTask {
+                    id: 5,
+                    title: "Task B".to_string(),
+                    description: None,
+                    status: "done".to_string(),
+                    complexity: 2,
+                    depends_on: vec![4],
+                    test_strategy: None,
+                },
+            ],
+        };
+        let json = serde_json::to_string(&wave).unwrap();
+        let parsed: ScudWave = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.number, 2);
+        assert_eq!(parsed.tasks.len(), 2);
+        assert_eq!(parsed.tasks[0].id, 4);
+        assert_eq!(parsed.tasks[1].status, "done");
+    }
+
+    #[test]
+    fn test_scud_stats_parse_empty() {
+        let output = "";
+        let stats = ScudStats::parse(output).unwrap();
+        assert_eq!(stats.total, 0);
+        assert!(stats.is_complete()); // Empty is complete
+    }
+
+    #[test]
+    fn test_scud_stats_parse_partial() {
+        let output = "Total: 5, Done: 3";
+        let stats = ScudStats::parse(output).unwrap();
+        assert_eq!(stats.total, 5);
+        assert_eq!(stats.done, 3);
+        assert_eq!(stats.pending, 0);
+        assert!(stats.is_complete()); // No pending or in_progress
+    }
+
+    #[test]
+    fn test_scud_stats_parse_json_with_defaults() {
+        // JSON parsing requires all fields defined in the struct due to serde defaults
+        // Partial JSON falls back to text parsing which returns 0s
+        // This tests the full JSON format with explicit zeros
+        let output = r#"{"total": 8, "done": 2, "pending": 0, "in_progress": 0, "blocked": 0, "expanded": 0}"#;
+        let stats = ScudStats::parse(output).unwrap();
+        assert_eq!(stats.total, 8);
+        assert_eq!(stats.done, 2);
+        assert_eq!(stats.pending, 0);
+    }
+
+    #[test]
+    fn test_scud_loop_config_serialization() {
+        let config = ScudLoopConfig {
+            tag: "test-tag".to_string(),
+            plan_path: Some(PathBuf::from("/path/to/plan.md")),
+            handoff_path: None,
+            max_iterations_per_task: 5,
+            max_total_iterations: 50,
+            working_directory: PathBuf::from("/project"),
+            use_sub_agents: false,
+            verification_command: Some("cargo test".to_string()),
+            auto_commit_waves: false,
+            state_file: Some(PathBuf::from("/state.json")),
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let parsed: ScudLoopConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.tag, "test-tag");
+        assert_eq!(parsed.max_iterations_per_task, 5);
+        assert!(!parsed.use_sub_agents);
+        assert!(!parsed.auto_commit_waves);
+    }
+
+    #[test]
+    fn test_scud_loop_state_with_commits() {
+        let mut state = ScudLoopState::default();
+        state.wave_commits.push(WaveCommit {
+            wave: 1,
+            commit_hash: "abc123".to_string(),
+            timestamp: Utc::now(),
+            tasks_completed: vec![1, 2],
+        });
+        state.wave_commits.push(WaveCommit {
+            wave: 2,
+            commit_hash: "def456".to_string(),
+            timestamp: Utc::now(),
+            tasks_completed: vec![3, 4, 5],
+        });
+
+        let json = serde_json::to_string(&state).unwrap();
+        let parsed: ScudLoopState = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.wave_commits.len(), 2);
+        assert_eq!(parsed.wave_commits[0].commit_hash, "abc123");
+        assert_eq!(parsed.wave_commits[1].tasks_completed.len(), 3);
+    }
+
+    #[test]
+    fn test_scud_loop_state_with_blocked_tasks() {
+        let mut state = ScudLoopState::default();
+        state.blocked_tasks.push(BlockedTask {
+            task_id: 10,
+            title: "Blocked task".to_string(),
+            reason: "Tests failed".to_string(),
+            attempts: 2,
+            blocked_at: Utc::now(),
+        });
+
+        let json = serde_json::to_string(&state).unwrap();
+        let parsed: ScudLoopState = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.blocked_tasks.len(), 1);
+        assert_eq!(parsed.blocked_tasks[0].reason, "Tests failed");
+    }
 }

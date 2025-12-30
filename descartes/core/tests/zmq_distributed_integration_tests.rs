@@ -86,6 +86,7 @@ mod test_utils {
             context: Some("Integration test context".to_string()),
             system_prompt: None,
             environment: HashMap::new(),
+            ..Default::default()
         }
     }
 }

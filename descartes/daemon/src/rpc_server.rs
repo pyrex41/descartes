@@ -2022,6 +2022,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(is_lisp_agent(&lisp_config));
 
@@ -2033,6 +2034,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(is_lisp_agent(&lisp_backend_config));
 
@@ -2044,6 +2046,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(is_lisp_agent(&lisp_name_config));
 
@@ -2055,6 +2058,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         env_config.environment.insert(
             "DESCARTES_TOOL_LEVEL".to_string(),
@@ -2070,6 +2074,7 @@ mod tests {
             context: None,
             system_prompt: None,
             environment: std::collections::HashMap::new(),
+            ..Default::default()
         };
         assert!(!is_lisp_agent(&non_lisp_config));
     }

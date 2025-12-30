@@ -96,6 +96,7 @@ async fn spawn_agent_example() -> Result<(), Box<dyn std::error::Error>> {
             env.insert("OUTPUT_FORMAT".to_string(), "JSON".to_string());
             env
         },
+        ..Default::default()
     };
 
     println!("Agent Configuration:");

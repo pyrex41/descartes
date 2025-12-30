@@ -67,6 +67,7 @@ pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
 ///         context: None,
 ///         system_prompt: None,
 ///         environment: HashMap::new(),
+///         ..Default::default()
 ///     },
 ///     timeout_secs: Some(300),
 ///     metadata: None,
@@ -662,6 +663,7 @@ pub enum ZmqMessage {
 ///         context: None,
 ///         system_prompt: None,
 ///         environment: HashMap::new(),
+///         ..Default::default()
 ///     };
 ///
 ///     let agent_info = runner.spawn_remote(config, None).await?;
@@ -726,6 +728,7 @@ pub trait ZmqAgentRunner: Send + Sync {
     ///     context: None,
     ///     system_prompt: None,
     ///     environment: HashMap::new(),
+    ///     ..Default::default()
     /// };
     ///
     /// let agent = runner.spawn_remote(config, Some(30)).await?;
