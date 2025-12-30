@@ -3,7 +3,7 @@
 
 @meta {
   name codelayer
-  updated 2025-12-06T21:10:47.023020+00:00
+  updated 2025-12-30T05:28:30.833077+00:00
 }
 
 @nodes
@@ -148,7 +148,7 @@
 
 @meta {
   name opencode
-  updated 2025-12-06T21:10:47.023183+00:00
+  updated 2025-12-30T05:28:30.833305+00:00
 }
 
 @nodes
@@ -389,11 +389,135 @@
 ---
 
 # SCUD Graph v1
+# Phase: webapp
+
+@meta {
+  name webapp
+  updated 2025-12-30T05:28:30.833409+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Add shared types for REST and RPC | P | 3 | H
+2 | Implement Project Store with SQLite | X | 5 | H
+2.1 | Set up Project Model and SQLite Schema with Migrations | P | 0 | H
+2.2 | Implement CRUD Operations and Unit Tests | P | 0 | H
+3 | Add REST endpoint handlers | X | 5 | H
+3.1 | Implement Project CRUD Handlers | P | 0 | H
+3.2 | Implement Wave Execution Logic and Integration | P | 0 | H
+4 | Update HTTP router with REST routes | P | 3 | H
+5 | Integrate WebSocket server | P | 3 | H
+6 | Create Fly.io Machines API client | X | 5 | H
+6.1 | Implement API models and HTTP client setup | P | 0 | H
+6.2 | Implement core API functions and unit tests | P | 0 | H
+7 | Update agent spawn handler for cloud | P | 3 | H
+8 | Create worker binary | X | 5 | H
+8.1 | Set up worker project structure and Cargo.toml | P | 0 | H
+8.2 | Implement main.rs and integrate core functionality | P | 0 | H
+9 | Build worker Docker image | P | 2 | H
+10 | Configure worker Fly.io app | P | 1 | M
+11 | Set up Elm project structure | P | 2 | H
+12 | Implement Elm main app with routing | X | 8 | H
+12.1 | Set up Elm application with Browser.application, URL routing, and page handling | P | 0 | H
+12.2 | Integrate session management and WebSocket ports | P | 0 | H
+13 | Configure TailwindCSS for Elm | P | 3 | M
+14 | Deploy orchestrator to Fly.io | X | 5 | H
+14.1 | Set up deployment configuration and containerization | P | 0 | H
+14.2 | Deploy to Fly.io and verify functionality | P | 0 | H
+
+@edges
+# dependent -> dependency
+2 -> 1
+2.2 -> 2.1
+3 -> 1
+3 -> 2
+3.2 -> 3.1
+4 -> 3
+5 -> 4
+6.2 -> 6.1
+7 -> 6
+8.2 -> 8.1
+9 -> 8
+10 -> 9
+12 -> 11
+12.2 -> 12.1
+13 -> 11
+14 -> 5
+14 -> 7
+14 -> 10
+14.2 -> 14.1
+
+@parents
+# parent: subtasks...
+2: 2.1, 2.2
+3: 3.1, 3.2
+6: 6.1, 6.2
+8: 8.1, 8.2
+12: 12.1, 12.2
+14: 14.1, 14.2
+
+@details
+1 | description |
+  Create shared request/response types for both Unix socket RPC and HTTP handlers in descartes/daemon/src/types.rs. Include Project, Wave, ExecuteWaveRequest, and Cost tracking types as specified. Verify types compile and serialize correctly.
+2 | description |
+  Create project_store.rs with SQLite-backed storage for projects, including create, list, get, and delete operations. Run migrations and ensure CRUD works via unit tests.
+2.1 | description |
+  Define the Project struct and create the SQLite schema in project_store.rs. Implement database migrations to set up the projects table.
+2.2 | description |
+  Implement create, list, get, and delete operations for projects in SQLite. Add unit tests to verify all CRUD functionality works correctly.
+3 | description |
+  Extend handlers.rs with project CRUD handlers (create, list, get, parse PRD) and wave execution logic. Ensure handlers integrate with existing RpcHandlers and return proper responses.
+3.1 | description |
+  Extend handlers.rs to add REST endpoint handlers for project CRUD operations: create, list, get, and parse PRD. Ensure proper request handling and response structures.
+3.2 | description |
+  Add wave execution logic to handlers.rs and ensure all handlers integrate with existing RpcHandlers, returning proper responses.
+4 | description |
+  Modify server.rs to add REST routes for projects, PRD parsing, and health check in handle_http_request. Include WebSocket upgrade handling for event streaming.
+5 | description |
+  Wire WebSocket event server into RpcServer::run() in server.rs, using a separate port for WebSocket connections. Test that WebSocket starts alongside HTTP server.
+6 | description |
+  Implement fly_machines.rs with HTTP client for spawning, getting, stopping, and destroying Fly.io machines. Include unit tests with mocked responses.
+6.1 | description |
+  Define the data models and structures for Fly.io machines API responses and requests. Set up the HTTP client with necessary authentication and base configurations in fly_machines.rs.
+6.2 | description |
+  Implement the functions for spawning, getting, stopping, and destroying Fly.io machines using the HTTP client. Add unit tests with mocked responses to verify functionality.
+7 | description |
+  Modify handle_spawn_agent in handlers.rs to support cloud spawning via Fly.io when cloud=true. Integrate with fly client and emit events.
+8 | description |
+  Set up worker/Cargo.toml and main.rs for minimal task execution, including SCUD integration, agent spawning, and callback to orchestrator. Ensure binary builds and runs.
+8.1 | description |
+  Create the worker directory, initialize Cargo.toml with necessary dependencies for SCUD integration, agent spawning, and orchestrator communication. Ensure the project is properly configured for building a binary.
+8.2 | description |
+  Write main.rs to include minimal task execution logic, SCUD integration, agent spawning, and callback to orchestrator. Test that the binary builds and runs successfully.
+9 | description |
+  Create worker/Dockerfile with multi-stage build, SCUD CLI installation, and runtime setup. Verify image builds and pushes to registry.
+10 | description |
+  Create worker/fly.toml for ephemeral worker deployment. Test deployment configuration without full deploy.
+11 | description |
+  Create webapp directory with src/, static/, elm.json, and basic file structure. Initialize Elm project and ensure it compiles.
+12 | description |
+  Build Main.elm with Browser.application setup, URL routing, session management, and page handling. Include WebSocket ports integration.
+12.1 | description |
+  Create Main.elm with Browser.application initialization, define URL parsing and routing logic, set up page models and views for different routes, and implement basic navigation.
+12.2 | description |
+  Add session management logic to handle user sessions (e.g., login/logout), implement WebSocket ports for real-time communication, and integrate them into the application update logic.
+13 | description |
+  Set up tailwind.config.js, postcss.config.js, package.json, and generate TW/Utilities.elm. Verify Tailwind builds CSS utilities.
+14 | description |
+  Create daemon/Dockerfile, fly.toml, and database migrations. Deploy to Fly.io and verify API endpoints are accessible.
+14.1 | description |
+  Create the Dockerfile for the daemon, configure fly.toml for Fly.io deployment, and prepare database migrations.
+14.2 | description |
+  Deploy the orchestrator to Fly.io using the prepared configurations and verify that API endpoints are accessible.
+
+---
+
+# SCUD Graph v1
 # Phase: zmq-backbone
 
 @meta {
   name zmq-backbone
-  updated 2025-12-10T17:14:12+00:00
+  updated 2025-12-30T05:28:30.833451+00:00
 }
 
 @nodes
