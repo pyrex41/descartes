@@ -1,0 +1,16 @@
+{
+  "name": "descartes-webapp",
+  "version": "0.1.0",
+  "scripts": {
+    "build:tw": "postcss tailwind.css -o static/main.css",
+    "build:elm": "elm make src/Main.elm --optimize --output=static/main.js",
+    "build": "npm run build:tw && npm run build:elm",
+    "dev": "elm reactor"
+  },
+  "devDependencies": {
+    "elm": "^0.19.1-6",
+    "postcss": "^8.4.0",
+    "postcss-cli": "^11.0.0",
+    "tailwindcss": "^3.4.0"
+  }
+}

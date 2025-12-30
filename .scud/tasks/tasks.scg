@@ -416,7 +416,7 @@
 8.2 | Implement main.rs and integrate core functionality | P | 0 | H
 9 | Build worker Docker image | P | 2 | H
 10 | Configure worker Fly.io app | P | 1 | M
-11 | Set up Elm project structure | P | 2 | H
+11 | Set up Elm project structure | D | 2 | H
 12 | Implement Elm main app with routing | X | 8 | H
 12.1 | Set up Elm application with Browser.application, URL routing, and page handling | P | 0 | H
 12.2 | Integrate session management and WebSocket ports | P | 0 | H
