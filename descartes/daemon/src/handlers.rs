@@ -1,6 +1,7 @@
 /// RPC method handlers
 use crate::auth::AuthContext;
 use crate::errors::{DaemonError, DaemonResult};
+use crate::fly_machines::FlyMachinesClient;
 use crate::types::*;
 use chrono::Utc;
 use dashmap::DashMap;
@@ -18,6 +19,10 @@ pub struct RpcHandlers {
     runner: Option<Arc<LocalProcessRunner>>,
     /// Optional state store for state queries
     state_store: Option<Arc<RwLock<SqliteStateStore>>>,
+    /// Optional Fly.io client for cloud spawning
+    fly_client: Option<Arc<FlyMachinesClient>>,
+    /// Callback base URL for cloud workers
+    callback_base_url: Option<String>,
 }
 
 impl RpcHandlers {
@@ -27,6 +32,8 @@ impl RpcHandlers {
             agents: Arc::new(DashMap::new()),
             runner: None,
             state_store: None,
+            fly_client: None,
+            callback_base_url: None,
         }
     }
 
@@ -36,6 +43,8 @@ impl RpcHandlers {
             agents: Arc::new(DashMap::new()),
             runner: Some(runner),
             state_store: None,
+            fly_client: None,
+            callback_base_url: None,
         }
     }
 
@@ -48,6 +57,8 @@ impl RpcHandlers {
             agents: Arc::new(DashMap::new()),
             runner: Some(runner),
             state_store: Some(state_store),
+            fly_client: None,
+            callback_base_url: None,
         }
     }
 
@@ -61,6 +72,16 @@ impl RpcHandlers {
         self.runner = Some(runner);
     }
 
+    /// Set the Fly.io client for cloud spawning
+    pub fn set_fly_client(&mut self, fly_client: Arc<FlyMachinesClient>) {
+        self.fly_client = Some(fly_client);
+    }
+
+    /// Set the callback base URL for cloud workers
+    pub fn set_callback_base_url(&mut self, url: String) {
+        self.callback_base_url = Some(url);
+    }
+
     /// Handle agent.spawn RPC method
     pub async fn handle_agent_spawn(
         &self,
@@ -70,6 +91,12 @@ impl RpcHandlers {
         let request: AgentSpawnRequest = serde_json::from_value(params)
             .map_err(|e| DaemonError::InvalidRequest(format!("Invalid params: {}", e)))?;
 
+        // Check if cloud spawning is requested
+        if request.cloud {
+            return self.handle_cloud_spawn(request).await;
+        }
+
+        // Local spawn (existing logic)
         let agent_id = Uuid::new_v4().to_string();
         let now = Utc::now();
 
@@ -89,6 +116,64 @@ impl RpcHandlers {
             agent_id,
             status: AgentStatus::Running,
             message: "Agent spawned successfully".to_string(),
+        };
+
+        serde_json::to_value(response)
+            .map_err(|e| DaemonError::SerializationError(e.to_string()))
+    }
+
+    /// Handle cloud spawn via Fly.io
+    async fn handle_cloud_spawn(&self, request: AgentSpawnRequest) -> DaemonResult<Value> {
+        // Validate required fields for cloud spawn
+        let task_id = request
+            .task_id
+            .as_ref()
+            .ok_or_else(|| DaemonError::InvalidRequest("task_id required for cloud spawn".to_string()))?;
+        let project_id = request
+            .project_id
+            .as_ref()
+            .ok_or_else(|| DaemonError::InvalidRequest("project_id required for cloud spawn".to_string()))?;
+
+        // Get Fly.io client
+        let fly_client = self
+            .fly_client
+            .as_ref()
+            .ok_or_else(|| DaemonError::InvalidRequest("Fly.io client not configured (FLY_API_TOKEN not set)".to_string()))?;
+
+        // Get callback base URL
+        let callback_base_url = self
+            .callback_base_url
+            .as_ref()
+            .ok_or_else(|| DaemonError::InvalidRequest("Callback base URL not configured".to_string()))?;
+
+        // Construct callback URL
+        let callback_url = format!("{}/api/agents/callback", callback_base_url);
+
+        // Spawn worker on Fly.io
+        let machine = fly_client
+            .spawn_worker(task_id, project_id, &callback_url)
+            .await
+            .map_err(|e| DaemonError::InvalidRequest(format!("Fly.io spawn failed: {}", e)))?;
+
+        let now = Utc::now();
+
+        // Create agent info with Fly machine ID
+        let agent = AgentInfo {
+            id: machine.id.clone(),
+            name: request.name,
+            status: AgentStatus::Running,
+            created_at: now,
+            updated_at: now,
+            pid: None, // Cloud agents don't have local PIDs
+            config: request.config,
+        };
+
+        self.agents.insert(machine.id.clone(), agent.clone());
+
+        let response = AgentSpawnResponse {
+            agent_id: machine.id,
+            status: AgentStatus::Running,
+            message: "Agent spawned on Fly.io successfully".to_string(),
         };
 
         serde_json::to_value(response)

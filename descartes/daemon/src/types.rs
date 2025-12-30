@@ -89,6 +89,15 @@ pub struct AgentSpawnRequest {
     pub name: String,
     pub agent_type: String,
     pub config: serde_json::Value,
+    /// If true, spawn agent on Fly.io cloud infrastructure
+    #[serde(default)]
+    pub cloud: bool,
+    /// Task ID for cloud spawn (required when cloud=true)
+    #[serde(default)]
+    pub task_id: Option<String>,
+    /// Project ID for cloud spawn (required when cloud=true)
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 /// Agent spawn response

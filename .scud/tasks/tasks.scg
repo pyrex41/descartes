@@ -399,9 +399,9 @@
 @nodes
 # id | title | status | complexity | priority
 1 | Add shared types for REST and RPC | D | 3 | H
-2 | Implement Project Store with SQLite | X | 5 | H
-2.1 | Set up Project Model and SQLite Schema with Migrations | P | 0 | H
-2.2 | Implement CRUD Operations and Unit Tests | P | 0 | H
+2 | Implement Project Store with SQLite | D | 5 | H
+2.1 | Set up Project Model and SQLite Schema with Migrations | D | 0 | H
+2.2 | Implement CRUD Operations and Unit Tests | D | 0 | H
 3 | Add REST endpoint handlers | X | 5 | H
 3.1 | Implement Project CRUD Handlers | P | 0 | H
 3.2 | Implement Wave Execution Logic and Integration | P | 0 | H
@@ -410,7 +410,7 @@
 6 | Create Fly.io Machines API client | D | 5 | H
 6.1 | Implement API models and HTTP client setup | D | 0 | H
 6.2 | Implement core API functions and unit tests | D | 0 | H
-7 | Update agent spawn handler for cloud | P | 3 | H
+7 | Update agent spawn handler for cloud | D | 3 | H
 8 | Create worker binary | D | 5 | H
 8.1 | Set up worker project structure and Cargo.toml | D | 0 | H
 8.2 | Implement main.rs and integrate core functionality | D | 0 | H
@@ -420,7 +420,7 @@
 12 | Implement Elm main app with routing | X | 8 | H
 12.1 | Set up Elm application with Browser.application, URL routing, and page handling | P | 0 | H
 12.2 | Integrate session management and WebSocket ports | P | 0 | H
-13 | Configure TailwindCSS for Elm | P | 3 | M
+13 | Configure TailwindCSS for Elm | D | 3 | M
 14 | Deploy orchestrator to Fly.io | X | 5 | H
 14.1 | Set up deployment configuration and containerization | P | 0 | H
 14.2 | Deploy to Fly.io and verify functionality | P | 0 | H
