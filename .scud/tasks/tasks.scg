@@ -411,9 +411,9 @@
 6.1 | Implement API models and HTTP client setup | P | 0 | H
 6.2 | Implement core API functions and unit tests | P | 0 | H
 7 | Update agent spawn handler for cloud | P | 3 | H
-8 | Create worker binary | X | 5 | H
-8.1 | Set up worker project structure and Cargo.toml | P | 0 | H
-8.2 | Implement main.rs and integrate core functionality | P | 0 | H
+8 | Create worker binary | D | 5 | H
+8.1 | Set up worker project structure and Cargo.toml | D | 0 | H
+8.2 | Implement main.rs and integrate core functionality | D | 0 | H
 9 | Build worker Docker image | P | 2 | H
 10 | Configure worker Fly.io app | P | 1 | M
 11 | Set up Elm project structure | D | 2 | H
