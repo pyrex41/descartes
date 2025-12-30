@@ -1,0 +1,10 @@
+# descartes/.dockerignore
+target/
+.git/
+*.md
+.github/
+gui/
+cli/
+daemon/
+agent-runner/
+**/*.rs.bk
