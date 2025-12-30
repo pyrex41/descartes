@@ -27,6 +27,7 @@ pub mod types;
 pub mod zmq_publisher; // ZMQ PUB socket for streaming chat output
 pub mod chat_manager; // Chat session management
 pub mod fly_machines; // Fly.io Machines API client for ephemeral workers
+pub mod project_store; // SQLite-backed project storage for webapp
 
 // Re-export commonly used types
 pub use agent_monitor::{AgentMonitor, AgentMonitorConfig, HealthSummary, MonitorStats};
@@ -64,6 +65,7 @@ pub use fly_machines::{
     CreateMachineRequest, FlyMachinesClient, GuestConfig, InitConfig, Machine, MachineConfig,
     MachineEvent, RestartPolicy,
 };
+pub use project_store::ProjectStore;
 
 /// Daemon version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
