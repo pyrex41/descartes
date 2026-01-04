@@ -32,6 +32,8 @@ Not every task needs full system access. Descartes provides **tool levels** that
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> **Implementation Note:** Tool availability (which tools an agent receives) is code-enforced. Behavioral restrictions within tools (e.g., "bash read-only") are prompt-based guidance that relies on LLM compliance.
+
 ---
 
 ## Orchestrator Level
@@ -138,8 +140,10 @@ Minimal is leaner and more predictable.
 | Tool | Description |
 |------|-------------|
 | `read` | Read any file |
-| `write` | Write to `thoughts/` directory only |
-| `bash` | Execute commands (typically read-only) |
+| `write` | Create/overwrite files |
+| `bash` | Execute commands |
+
+> **Guidance:** The Planner's system prompt instructs it to write only to the `thoughts/` directory for plans and documentation. This is prompt-based guidance, not a code-enforced restriction.
 
 ### When to Use
 
@@ -203,17 +207,19 @@ descartes spawn \
   --tool-level researcher
 ```
 
-### Bash Restrictions
+### Bash Guidance
 
-Researcher-level bash is limited to read-only operations:
+The Researcher's system prompt instructs it to use read-only bash operations:
 - `ls`, `find`, `grep`, `cat`
 - `git log`, `git show`, `git diff`
 - `npm list`, `cargo tree`
 
-Mutations are blocked:
-- No `rm`, `mv`, `cp`
-- No `git commit`, `git push`
-- No file writes via redirection
+The prompt discourages mutations:
+- `rm`, `mv`, `cp`
+- `git commit`, `git push`
+- File writes via redirection
+
+> **Note:** These restrictions are prompt-based guidance. The LLM is instructed to avoid mutations, but no code-level enforcement exists. For guaranteed safety, use the Read-Only level.
 
 ---
 
@@ -243,13 +249,14 @@ descartes spawn \
   --tool-level readonly
 ```
 
-### Bash Whitelist
+### Bash Guidance
 
-Only these commands are allowed:
-- `ls`
-- `pwd`
-- `echo` (for basic output)
-- `cat` (read-only file access)
+The Read-Only system prompt strongly instructs the agent to use only safe commands:
+- `ls`, `pwd` - Directory listing
+- `cat`, `head`, `tail` - File reading
+- `echo` - Basic output
+
+> **Note:** This is prompt-based guidance. For environments requiring absolute safety, consider running Descartes with OS-level sandboxing or restricted user permissions.
 
 ---
 
@@ -262,13 +269,13 @@ Only these commands are allowed:
 | Tool | Description |
 |------|-------------|
 | `read` | Read any file |
-| `write` | Create/overwrite files |
-| `edit` | Surgical text replacement |
 | `bash` | Execute commands |
 | `swank_eval` | Evaluate Lisp expressions |
 | `swank_compile` | Compile Lisp code |
 | `swank_inspect` | Inspect Lisp objects |
 | `swank_restart` | Invoke debugger restarts |
+
+> **Note:** The Lisp Developer level focuses on interactive REPL-based development. File modifications are done via Swank compilation rather than direct write/edit tools.
 
 ### When to Use
 

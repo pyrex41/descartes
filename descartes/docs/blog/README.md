@@ -102,9 +102,12 @@
 |-------|-------------|
 | Orchestrator | Full access + sub-agent spawning |
 | Minimal | 4 tools, no spawning |
-| Planner | Read + write to thoughts/ only |
-| Researcher | Read + bash (read-only) |
-| Read-Only | Safe observation only |
+| Planner | Read + write + bash (prompt guides thoughts/ usage) |
+| Researcher | Read + bash (prompt guides read-only usage) |
+| Read-Only | Read + bash (prompt guides safe commands) |
+| Lisp Developer | Read + bash + Swank tools |
+
+> **Note:** Behavioral restrictions are prompt-based guidance. Tool availability is code-enforced.
 
 ### Flow Phases
 

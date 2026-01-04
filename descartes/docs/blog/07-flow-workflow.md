@@ -175,9 +175,11 @@ Implement POST /api/auth/register endpoint...
 
 1. Loads task waves from Phase 2
 2. For each wave, spawns implementation agents
-3. Tasks in same wave run in parallel
+3. Tasks execute sequentially within each wave
 4. Waits for wave completion before next wave
 5. Commits changes after each wave
+
+> **Note:** Parallel execution within waves is planned for a future release. Currently, tasks execute one at a time.
 
 ### Wave Execution
 
@@ -201,11 +203,14 @@ git add .
 git commit -m "feat(flow): Wave 2 - TASK-002, TASK-003"
 ```
 
-Checkpoints enable rollback:
+Checkpoints enable rollback via git:
 ```bash
-# Rollback to after Wave 1
-descartes workflow rollback --phase implement --wave 1
+# Rollback to after Wave 1 using git
+git log --oneline  # Find the wave commit
+git reset --hard <commit-hash>
 ```
+
+> **Note:** A dedicated `--rollback` CLI flag is planned for future releases.
 
 ### Agent Used
 
@@ -345,44 +350,27 @@ descartes workflow flow --prd requirements.md --resume
 
 ### Start from Specific Phase
 
+> **Note:** The `--phase` flag is planned but not yet implemented. Currently, use `--resume` to continue from saved state.
+
 ```bash
-# Skip to implementation (tasks already planned)
-descartes workflow flow --prd requirements.md --phase implement
+# Resume from where you left off
+descartes workflow flow --prd requirements.md --resume
 ```
 
 ---
 
 ## Configuration
 
-### Flow Config File
+### Flow Configuration
 
-```toml
-# .scud/flow-config.toml
+Flow currently uses sensible defaults. Custom configuration via TOML is planned for a future release.
 
-[flow]
-# Models for each phase
-orchestrator_model = "claude-3-5-sonnet-20241022"
-implementation_model = "claude-3-5-sonnet-20241022"
-qa_model = "claude-3-haiku-20240307"
+**Default Settings:**
+- Phase timeout: 30 minutes
+- Max retries per phase: 3
+- Auto-commit after each wave: enabled
 
-# Parallelization
-max_parallel_tasks = 3
-
-# Git behavior
-auto_commit = true
-commit_after_wave = true
-
-# Timeouts (seconds)
-phase_timeout_secs = 1800      # 30 minutes per phase
-watchdog_interval_secs = 60    # Check every minute
-max_flow_duration_secs = 14400 # 4 hours total
-
-# Retry behavior
-max_retries_per_phase = 3
-
-# QA settings
-qa_check_interval_secs = 30    # Check every 30 seconds during implement
-```
+> **Planned:** A `.scud/flow-config.toml` file will allow customization of these settings.
 
 ### Timeout Handling
 
@@ -436,8 +424,9 @@ cat .scud/flow-state.json | jq '.current_phase'
 # Resume from saved state
 descartes workflow flow --prd requirements.md --resume
 
-# Rollback to phase checkpoint
-descartes workflow rollback --phase plan
+# Rollback to phase checkpoint (using git)
+git log --oneline  # Find the checkpoint commit
+git reset --hard <commit-hash>
 ```
 
 ---
@@ -532,13 +521,14 @@ The better your PRD, the better the results:
 ### 2. Review Before Implement
 
 ```bash
-# Run just planning phases
-descartes workflow flow --prd requirements.md --phase plan --stop
+# Start the workflow - it saves state after each phase
+descartes workflow flow --prd requirements.md
 
+# If you need to pause, use Ctrl+C - state is preserved
 # Review generated plans
 ls thoughts/shared/plans/
 
-# If satisfied, continue
+# Resume from saved state
 descartes workflow flow --prd requirements.md --resume
 ```
 
@@ -591,7 +581,9 @@ cat .scud/flow-state.json | jq '.phases.ingest.status'
 
 Rollback and resolve:
 ```bash
-descartes workflow rollback --phase implement --wave 1
+# Find the wave commit before the conflict
+git log --oneline
+git reset --hard <commit-hash>
 # Resolve conflicts manually
 descartes workflow flow --prd requirements.md --resume
 ```
@@ -600,11 +592,13 @@ descartes workflow flow --prd requirements.md --resume
 
 ## SCUD Integration
 
-The Flow Workflow integrates deeply with SCUD (the task management system) for tracking and executing tasks.
+The Flow Workflow can integrate with SCUD, an external task management system, for enhanced tracking and execution.
 
-### Task Management
+> **Note:** SCUD is a separate tool with its own CLI. The commands below are SCUD commands, not Descartes commands. If you don't have SCUD installed, Flow uses its own internal task representation.
 
-Flow uses SCUD commands throughout execution:
+### Task Management (with SCUD)
+
+When SCUD is available, Flow can use these SCUD commands:
 - `scud parse-prd` - Generate tasks from PRD (Ingest phase)
 - `scud list` / `scud show` - View task details
 - `scud expand` - Break complex tasks into subtasks

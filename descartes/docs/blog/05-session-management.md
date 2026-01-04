@@ -33,36 +33,47 @@ A session represents a single agent execution, including:
 
 ## Session Lifecycle
 
-```
-┌─────────┐     ┌────────────┐     ┌─────────┐
-│ Inactive │────▶│ Starting   │────▶│ Active  │
-└─────────┘     └────────────┘     └────┬────┘
-                                        │
-                     ┌──────────────────┼──────────────────┐
-                     ▼                  ▼                  ▼
-               ┌─────────┐        ┌──────────┐      ┌──────────┐
-               │ Paused  │◀──────▶│ Thinking │      │ Completed│
-               └────┬────┘        └──────────┘      └──────────┘
-                    │
-                    ▼
-               ┌─────────┐        ┌──────────┐
-               │ Archived│        │  Failed  │
-               └─────────┘        └──────────┘
-```
+Sessions track the daemon/workspace state, while agents within sessions have their own status.
 
-### Status Definitions
+### SessionStatus Values
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐
+│ Inactive │────▶│ Starting │────▶│  Active  │
+└──────────┘     └──────────┘     └────┬─────┘
+                                       │
+                      ┌────────────────┼────────────────┐
+                      ▼                ▼                ▼
+                ┌──────────┐    ┌──────────┐     ┌──────────┐
+                │ Stopping │    │ Archived │     │  Error   │
+                └──────────┘    └──────────┘     └──────────┘
+```
 
 | Status | Description |
 |--------|-------------|
-| **Inactive** | Session created but not started |
-| **Starting** | Agent initializing |
-| **Active** | Agent running normally |
-| **Thinking** | Processing/generating response |
-| **Paused** | Suspended, can be resumed |
-| **Completed** | Finished successfully |
-| **Failed** | Encountered unrecoverable error |
-| **Archived** | Marked inactive but preserved |
-| **Terminated** | Manually killed |
+| **Inactive** | Session exists but daemon not running |
+| **Starting** | Daemon is starting up |
+| **Active** | Daemon is running and connected |
+| **Stopping** | Daemon is stopping |
+| **Archived** | Session has been archived |
+| **Error** | Session has errors |
+
+### AgentStatus Values
+
+When monitoring individual agents within a session, agents have their own status:
+
+| Status | Description |
+|--------|-------------|
+| **Idle** | Agent created but not started |
+| **Initializing** | Agent loading context and environment |
+| **Running** | Agent actively executing tasks |
+| **Thinking** | Agent processing/generating response |
+| **Paused** | Agent suspended, can be resumed |
+| **Completed** | Agent finished successfully |
+| **Failed** | Agent encountered unrecoverable error |
+| **Terminated** | Agent was manually killed |
+
+> **Note:** SessionStatus tracks the daemon/workspace state, while AgentStatus tracks individual agent lifecycle within that session.
 
 ---
 
@@ -133,10 +144,17 @@ Every session creates a detailed JSON transcript.
 
 ### Location
 
+Session transcripts are stored in project-local directories:
+
 ```
-.scud/sessions/
+.scud/sessions/           # Flow workflow sessions
 └── 2025-01-15-10-30-00-a1b2c3.json
+
+.descartes/sessions/      # General agent sessions
+└── 2025-01-15-10-30-00-d4e5f6.json
 ```
+
+The location depends on how the session was spawned. Flow workflow sessions use `.scud/`, while direct `descartes spawn` sessions use `.descartes/`.
 
 ### Transcript Structure
 
@@ -190,8 +208,8 @@ descartes logs a1b2c3 --format json
 # Follow in real-time
 descartes logs a1b2c3 --follow
 
-# Last 20 entries
-descartes logs a1b2c3 --tail 20
+# Show 20 entries
+descartes logs a1b2c3 --limit 20
 ```
 
 ---
@@ -227,9 +245,6 @@ descartes pause a1b2c3 --force
 ```bash
 # Simple resume
 descartes resume a1b2c3
-
-# Resume with TUI attachment
-descartes resume a1b2c3 --attach
 ```
 
 **What Happens:**
@@ -272,13 +287,13 @@ Attach external terminal UIs to paused agents.
 descartes pause a1b2c3
 
 # Attach Claude Code
-descartes attach a1b2c3 --tui claude
+descartes attach a1b2c3 --client claude-code
 
-# Attach OpenCode
-descartes attach a1b2c3 --tui opencode
+# Attach OpenCode and launch it
+descartes attach a1b2c3 --client opencode --launch
 
-# Custom TUI
-descartes attach a1b2c3 --tui custom --command "my-tui"
+# Get credentials as JSON for scripting
+descartes attach a1b2c3 --json
 ```
 
 ### Credentials
@@ -379,9 +394,6 @@ descartes kill a1b2c3
 
 # Force kill
 descartes kill a1b2c3 --force
-
-# Kill all running
-descartes kill --all
 ```
 
 ### Archive Sessions
