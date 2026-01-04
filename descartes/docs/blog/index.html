@@ -1,0 +1,1971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Descartes Documentation</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #232323;
+      background: #fff;
+    }
+    .container {
+      display: flex;
+      max-width: 1200px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+    nav {
+      width: 280px;
+      flex-shrink: 0;
+      border-right: 1px solid #e9e9e9;
+      padding: 2rem 1.5rem;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    nav h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+    }
+    nav .subtitle {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 1.5rem;
+    }
+    nav a {
+      display: block;
+      padding: 0.6rem 0;
+      color: #444;
+      text-decoration: none;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.9rem;
+    }
+    nav a:hover { color: #000; }
+    nav a.active {
+      color: #000;
+      font-weight: 600;
+    }
+    nav .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    main {
+      flex: 1;
+      max-width: 80ch;
+      padding: 2rem 3rem;
+    }
+    .post { display: none; }
+    .post.active { display: block; }
+    h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+    h2 { font-size: 1.5rem; margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e9e9e9; }
+    h3 { font-size: 1.25rem; margin: 1.5rem 0 0.75rem; }
+    h4 { font-size: 1.1rem; margin: 1.25rem 0 0.5rem; }
+    .post > h1:first-child { border: none; margin-top: 0; }
+    .tagline {
+      font-style: italic;
+      color: #666;
+      margin-bottom: 1.5rem;
+    }
+    p { margin: 1rem 0; }
+    hr { border: none; border-top: 1px solid #e9e9e9; margin: 2rem 0; }
+    pre {
+      background: #f6f6f6;
+      padding: 1rem;
+      overflow-x: auto;
+      border-radius: 4px;
+      margin: 1rem 0;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    code {
+      font-family: "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.9em;
+    }
+    p code, li code, td code {
+      background: #f0f0f0;
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid #e9e9e9;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    th { background: #f9f9f9; font-weight: 600; }
+    tr:nth-child(even) { background: #fafafa; }
+    ul, ol { margin: 1rem 0; padding-left: 1.5rem; }
+    li { margin: 0.35rem 0; }
+    blockquote {
+      border-left: 3px solid #e9e9e9;
+      margin: 1rem 0;
+      padding: 0.5rem 1rem;
+      color: #555;
+      background: #fafafa;
+    }
+    a { color: #0066cc; }
+    a:hover { color: #004499; }
+    .next-steps { margin-top: 2rem; }
+    .next-steps a { display: block; margin: 0.5rem 0; }
+    strong { font-weight: 600; }
+    @media (max-width: 900px) {
+      .container { flex-direction: column; }
+      nav {
+        width: 100%;
+        height: auto;
+        position: static;
+        border-right: none;
+        border-bottom: 1px solid #e9e9e9;
+        padding: 1rem;
+      }
+      nav a { display: inline-block; padding: 0.5rem 1rem; border: none; }
+      main { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <h1>Descartes</h1>
+      <p class="subtitle">Minimal, observable AI agents</p>
+
+      <div class="section-label">Foundations</div>
+      <a href="#" data-post="01" class="active">The Pi Philosophy</a>
+      <a href="#" data-post="02">Getting Started</a>
+      <a href="#" data-post="03">CLI Commands</a>
+
+      <div class="section-label">Configuration</div>
+      <a href="#" data-post="04">Providers &amp; Config</a>
+      <a href="#" data-post="05">Session Management</a>
+      <a href="#" data-post="06">Agent Types</a>
+
+      <div class="section-label">Workflows</div>
+      <a href="#" data-post="07">Flow Workflow</a>
+      <a href="#" data-post="08">Skills System</a>
+
+      <div class="section-label">Interfaces</div>
+      <a href="#" data-post="09">GUI Features</a>
+
+      <div class="section-label">Advanced</div>
+      <a href="#" data-post="10">Sub-Agent Tracking</a>
+      <a href="#" data-post="11">Advanced Features</a>
+      <a href="#" data-post="12">Iterative Loops</a>
+    </nav>
+
+    <main>
+      <!-- Post 01: The Pi Philosophy -->
+      <article id="post-01" class="post active">
+        <h1>The Pi Philosophy: Why Less is More in AI Agents</h1>
+        <p class="tagline">Stripping AI agents down to their essence</p>
+        <hr>
+
+        <h2>The Problem with Modern AI Agent Frameworks</h2>
+        <p>If you've worked with AI coding agents, you've likely encountered the complexity creep that plagues most frameworks. Typical agent systems come packed with:</p>
+        <ul>
+          <li><strong>40+ specialized tools</strong> for every conceivable operation</li>
+          <li><strong>10,000+ token system prompts</strong> trying to anticipate every edge case</li>
+          <li><strong>Complex orchestration layers</strong> that obscure what's actually happening</li>
+          <li><strong>MCP servers</strong> that add 2-5k tokens per message just for tool definitions</li>
+        </ul>
+        <p>The result? Bloated context windows, unpredictable behavior, and agents that feel like black boxes.</p>
+
+        <h2>Enter Descartes: The Pi Philosophy</h2>
+        <p>Descartes takes a radically different approach, inspired by what we call the <strong>Pi Philosophy</strong>—named after the mathematical constant that captures infinite complexity in a simple ratio.</p>
+        <p>The core insight: <strong>You don't need 40 tools. You need 4.</strong></p>
+<pre><code>read   → Read any file
+write  → Write any file
+edit   → Surgical text replacement
+bash   → Execute any command</code></pre>
+        <p>That's it. These four primitives can accomplish virtually any software engineering task. Need to search code? <code>bash</code> with grep. Need to run tests? <code>bash</code> with your test runner. Need to commit changes? <code>bash</code> with git.</p>
+
+        <h2>The Power of Minimalism</h2>
+
+        <h3>1. Predictable Behavior</h3>
+        <p>With only 4 tools, you can actually understand what your agent is doing. Every action is visible, every decision is traceable. There's no magic—just simple operations composed together.</p>
+
+        <h3>2. Reduced Token Overhead</h3>
+        <p>Compare the token cost:</p>
+        <table>
+          <tr><th>Approach</th><th>Tokens per Message</th></tr>
+          <tr><td>MCP Server (40 tools)</td><td>2,000 - 5,000</td></tr>
+          <tr><td>Descartes (4 tools)</td><td>~200</td></tr>
+        </table>
+        <p>That's a 10-25x reduction in overhead, leaving more context for actual work.</p>
+
+        <h3>3. Full Observability</h3>
+        <p>Every agent action is logged to a JSON transcript. You can replay, audit, and debug any session. No hidden state, no mysterious failures.</p>
+<pre><code>{
+  "role": "assistant",
+  "tool_calls": [{
+    "name": "bash",
+    "arguments": {"command": "cargo test"}
+  }],
+  "timestamp": "2025-01-15T10:30:00Z"
+}</code></pre>
+
+        <h3>4. Controlled Delegation</h3>
+        <p>When an agent needs to spawn sub-agents, Descartes enforces a strict hierarchy:</p>
+<pre><code>Orchestrator Agent (can spawn)
+    └── Sub-Agent (cannot spawn further)</code></pre>
+        <p>This prevents the recursive explosion that can occur when agents spawn agents that spawn agents. One level of delegation, no more.</p>
+
+        <h2>Skills: Power When You Need It</h2>
+        <p>"But what about complex operations?" you ask.</p>
+        <p>Descartes introduces <strong>Skills</strong>—CLI tools that agents can invoke via <code>bash</code>. Skills are:</p>
+        <ul>
+          <li><strong>Lazy-loaded</strong>: Only cost tokens when actually used</li>
+          <li><strong>Discoverable</strong>: Agents learn about them from documentation</li>
+          <li><strong>Composable</strong>: Built from standard CLI tools</li>
+          <li><strong>Extensible</strong>: Drop a script in <code>~/.descartes/skills/</code> and it's available</li>
+        </ul>
+        <p>Example skill invocation:</p>
+<pre><code>web-search "rust async patterns" 5</code></pre>
+        <p>This costs ~50 tokens when invoked, versus 2k+ tokens if it were a permanent tool definition.</p>
+
+        <h2>The Descartes Architecture</h2>
+<pre><code>┌─────────────────────────────────────────────────┐
+│                   CLI / GUI                      │
+├─────────────────────────────────────────────────┤
+│              Session Manager                     │
+├─────────────────────────────────────────────────┤
+│   ┌─────────┐  ┌─────────┐  ┌─────────┐        │
+│   │ Anthropic│  │ OpenAI  │  │ Ollama  │  ...   │
+│   │ Provider │  │ Provider│  │ Provider│        │
+│   └─────────┘  └─────────┘  └─────────┘        │
+├─────────────────────────────────────────────────┤
+│           4 Core Tools + Skills                  │
+├─────────────────────────────────────────────────┤
+│         JSON Transcript Storage                  │
+└─────────────────────────────────────────────────┘</code></pre>
+
+        <h2>What You Get</h2>
+        <ul>
+          <li><strong>~200 token system prompts</strong> instead of 10k</li>
+          <li><strong>Full JSON transcripts</strong> of every session</li>
+          <li><strong>Multiple LLM providers</strong> (Anthropic, OpenAI, Grok, Ollama)</li>
+          <li><strong>Native GUI</strong> for visualization</li>
+          <li><strong>Pause/Resume</strong> for long-running tasks</li>
+          <li><strong>Sub-agent tracking</strong> without interception</li>
+          <li><strong>Flow Workflow</strong> for PRD-to-code automation</li>
+        </ul>
+
+        <h2>Philosophy in Practice</h2>
+        <p>When you run:</p>
+<pre><code>descartes spawn --task "Add authentication to the API"</code></pre>
+        <p>You get an agent that:</p>
+        <ol>
+          <li>Uses <code>read</code> to understand your codebase</li>
+          <li>Uses <code>bash</code> to run tests and check status</li>
+          <li>Uses <code>edit</code> for surgical code changes</li>
+          <li>Uses <code>write</code> for new files when needed</li>
+          <li>Logs every action to a reviewable transcript</li>
+        </ol>
+        <p>No hidden complexity. No token bloat. Just focused, observable work.</p>
+
+        <hr>
+        <p><em>Descartes: Because the best tool is often the simplest one.</em></p>
+      </article>
+
+      <!-- Post 02: Getting Started -->
+      <article id="post-02" class="post">
+        <h1>Getting Started with Descartes</h1>
+        <p class="tagline">From zero to your first AI agent in 10 minutes</p>
+        <hr>
+
+        <h2>Prerequisites</h2>
+        <p>Before installing Descartes, ensure you have:</p>
+        <ul>
+          <li><strong>Rust toolchain</strong> (1.75+) — Install via <a href="https://rustup.rs">rustup</a></li>
+          <li><strong>An API key</strong> for at least one provider:
+            <ul>
+              <li>Anthropic (<code>ANTHROPIC_API_KEY</code>)</li>
+              <li>OpenAI (<code>OPENAI_API_KEY</code>)</li>
+              <li>xAI/Grok (<code>XAI_API_KEY</code>)</li>
+              <li>Or a local Ollama installation</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h2>Installation</h2>
+        <h3>From Source</h3>
+<pre><code># Clone the repository
+git clone https://github.com/your-org/descartes.git
+cd descartes/descartes
+
+# Build in release mode
+cargo build --release
+
+# Add to your PATH
+export PATH="$PATH:$(pwd)/target/release"</code></pre>
+
+        <h3>Verify Installation</h3>
+<pre><code>descartes --version
+# descartes 0.1.0
+
+descartes doctor
+# ✓ Rust toolchain found
+# ✓ Database initialized
+# ✓ Anthropic API key configured
+# ...</code></pre>
+
+        <h2>Configuration</h2>
+        <h3>Quick Setup</h3>
+        <p>Create your configuration file:</p>
+<pre><code>descartes init</code></pre>
+        <p>This creates <code>~/.descartes/config.toml</code> with sensible defaults.</p>
+
+        <h3>API Keys</h3>
+        <p>Set your API keys via environment variables:</p>
+<pre><code>export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+export XAI_API_KEY="xai-..."</code></pre>
+        <p>Or add them to your config file:</p>
+<pre><code># ~/.descartes/config.toml
+
+[providers.anthropic]
+enabled = true
+api_key = "sk-ant-..."
+model = "claude-3-5-sonnet-20241022"
+
+[providers.openai]
+enabled = true
+api_key = "sk-..."
+model = "gpt-4-turbo"</code></pre>
+
+        <h2>Your First Agent</h2>
+        <h3>Simple Task</h3>
+        <p>Navigate to any project directory and spawn an agent:</p>
+<pre><code>cd ~/my-project
+
+descartes spawn --task "Explain the structure of this codebase"</code></pre>
+        <p>The agent will:</p>
+        <ol>
+          <li>Read key files (README, package.json, Cargo.toml, etc.)</li>
+          <li>Explore the directory structure</li>
+          <li>Provide a summary of the codebase architecture</li>
+        </ol>
+
+        <h3>With Streaming Output</h3>
+        <p>See the agent's work in real-time:</p>
+<pre><code>descartes spawn --task "Find and fix any TODO comments" --stream</code></pre>
+
+        <h3>Specify a Provider</h3>
+        <p>Use a specific LLM provider:</p>
+<pre><code># Use OpenAI
+descartes spawn --task "Write unit tests" --provider openai
+
+# Use local Ollama
+descartes spawn --task "Review this code" --provider ollama --model codellama</code></pre>
+
+        <h2>Understanding Tool Levels</h2>
+        <p>Descartes agents operate at different capability levels:</p>
+
+        <h3>Orchestrator (Default)</h3>
+        <p>Full capabilities including sub-agent spawning:</p>
+<pre><code>descartes spawn --task "Implement feature X" --tool-level orchestrator</code></pre>
+        <p>Tools: <code>read</code>, <code>write</code>, <code>edit</code>, <code>bash</code>, <code>spawn_session</code></p>
+
+        <h3>Minimal</h3>
+        <p>Focused work without delegation:</p>
+<pre><code>descartes spawn --task "Fix this specific bug" --tool-level minimal</code></pre>
+        <p>Tools: <code>read</code>, <code>write</code>, <code>edit</code>, <code>bash</code></p>
+
+        <h3>Read-Only</h3>
+        <p>Safe exploration mode:</p>
+<pre><code>descartes spawn --task "Audit security practices" --tool-level readonly</code></pre>
+        <p>Tools: <code>read</code>, <code>bash</code> (read-only commands only)</p>
+
+        <h2>Managing Sessions</h2>
+        <h3>List Running Agents</h3>
+<pre><code>descartes ps
+# ID       STATUS    TASK                          STARTED
+# a1b2c3   running   Implement feature X           2 min ago
+# d4e5f6   paused    Review authentication code    15 min ago</code></pre>
+
+        <h3>View Logs</h3>
+<pre><code># Follow logs in real-time
+descartes logs a1b2c3 --follow
+
+# View full transcript
+descartes logs a1b2c3 --format json</code></pre>
+
+        <h3>Pause and Resume</h3>
+<pre><code># Pause an agent
+descartes pause a1b2c3
+
+# Resume later
+descartes resume a1b2c3</code></pre>
+
+        <h3>Terminate</h3>
+<pre><code># Graceful shutdown
+descartes kill a1b2c3
+
+# Force kill
+descartes kill a1b2c3 --force</code></pre>
+
+        <h2>Project Structure</h2>
+        <p>After running Descartes in a project, you'll see:</p>
+<pre><code>my-project/
+├── .descartes/
+│   ├── config.toml         # Project-specific config
+│   └── session.json        # Session metadata
+├── .scud/
+│   ├── sessions/           # Conversation transcripts
+│   │   └── 2025-01-15-10-30-00-abc123.json
+│   └── workflow-state.json # Workflow progress
+└── ... your project files</code></pre>
+
+        <h2>Common Workflows</h2>
+        <h3>Bug Fixing</h3>
+<pre><code>descartes spawn --task "Fix the bug in user authentication where sessions expire too quickly"</code></pre>
+
+        <h3>Code Review</h3>
+<pre><code>descartes spawn --task "Review the recent changes in src/api/ for security issues" --tool-level readonly</code></pre>
+
+        <h3>Documentation</h3>
+<pre><code>descartes spawn --task "Add docstrings to all public functions in src/lib/"</code></pre>
+
+        <h3>Testing</h3>
+<pre><code>descartes spawn --task "Write integration tests for the payment module"</code></pre>
+
+        <h2>Troubleshooting</h2>
+        <h3>Agent Not Starting</h3>
+<pre><code># Check system health
+descartes doctor
+
+# Common issues:
+# - Missing API key
+# - Invalid configuration
+# - Database not initialized</code></pre>
+
+        <h3>API Errors</h3>
+<pre><code># Test provider connectivity
+descartes spawn --task "Say hello" --provider anthropic
+
+# Check rate limits and quotas in your provider dashboard</code></pre>
+
+        <h3>Session Recovery</h3>
+        <p>If an agent crashes, find the transcript:</p>
+<pre><code>ls .scud/sessions/
+# Review the most recent JSON file</code></pre>
+
+        <hr>
+        <p><em>Happy coding with your new AI pair programmer!</em></p>
+      </article>
+
+      <!-- Post 03: CLI Commands -->
+      <article id="post-03" class="post">
+        <h1>CLI Commands Reference</h1>
+        <p class="tagline">Master the Descartes command line</p>
+        <hr>
+
+        <p>The Descartes CLI is your primary interface for spawning, managing, and monitoring AI agents. This guide covers every command with practical examples.</p>
+
+        <h2>Command Overview</h2>
+<pre><code>descartes &lt;COMMAND&gt;
+
+Commands:
+  spawn       Create and run an AI agent
+  ps          List running agents
+  logs        View agent session logs
+  kill        Terminate an agent
+  pause       Pause a running agent
+  resume      Resume a paused agent
+  attach      Attach a TUI client to an agent
+  init        Initialize Descartes in a directory
+  doctor      Check system health
+  tasks       Manage SCUD tasks
+  workflow    Execute multi-phase workflows
+  loop        Run iterative execution loops
+  gui         Launch the native GUI
+  completions Generate shell completions</code></pre>
+
+        <hr>
+
+        <h2>spawn — Create and Run Agents</h2>
+        <p>The <code>spawn</code> command is how you start new agent sessions.</p>
+
+        <h3>Basic Usage</h3>
+<pre><code>descartes spawn --task "Your task description"</code></pre>
+
+        <h3>Options</h3>
+        <table>
+          <tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr>
+          <tr><td><code>--task</code></td><td><code>-t</code></td><td>Task/prompt for the agent</td><td>Required</td></tr>
+          <tr><td><code>--provider</code></td><td><code>-p</code></td><td>LLM provider to use</td><td>Primary from config</td></tr>
+          <tr><td><code>--model</code></td><td><code>-m</code></td><td>Specific model ID</td><td>Provider default</td></tr>
+          <tr><td><code>--tool-level</code></td><td><code>-l</code></td><td>Agent capability level</td><td><code>orchestrator</code></td></tr>
+          <tr><td><code>--stream</code></td><td><code>-s</code></td><td>Stream output in real-time</td><td><code>false</code></td></tr>
+          <tr><td><code>--system</code></td><td></td><td>System prompt/context</td><td>None</td></tr>
+          <tr><td><code>--no-spawn</code></td><td></td><td>Disable sub-agent spawning</td><td><code>false</code></td></tr>
+        </table>
+
+        <h3>Examples</h3>
+<pre><code># Basic task
+descartes spawn --task "Add input validation to the signup form"
+
+# With streaming output
+descartes spawn -t "Refactor the database module" --stream
+
+# Use specific provider and model
+descartes spawn -t "Write documentation" -p openai -m gpt-4-turbo
+
+# Read-only exploration
+descartes spawn -t "Analyze code quality" --tool-level readonly
+
+# Prevent sub-agent spawning
+descartes spawn -t "Simple fix" --no-spawn</code></pre>
+
+        <h3>Tool Levels</h3>
+        <table>
+          <tr><th>Level</th><th>Capabilities</th></tr>
+          <tr><td><code>orchestrator</code></td><td>Full access + sub-agent spawning</td></tr>
+          <tr><td><code>minimal</code></td><td>read, write, edit, bash (no spawning)</td></tr>
+          <tr><td><code>readonly</code></td><td>read, bash (no modifications)</td></tr>
+          <tr><td><code>researcher</code></td><td>Optimized for codebase research</td></tr>
+          <tr><td><code>planner</code></td><td>Can write to thoughts/ only</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>ps — List Running Agents</h2>
+        <p>View all active agent sessions.</p>
+<pre><code>descartes ps</code></pre>
+
+        <h3>Example Output</h3>
+<pre><code>ID       STATUS    TASK                              STARTED      PROVIDER
+a1b2c3   running   Add authentication system         2 min ago    anthropic
+d4e5f6   paused    Review security practices         15 min ago   openai
+g7h8i9   thinking  Implement payment integration     30 sec ago   anthropic</code></pre>
+
+        <h3>Status Values</h3>
+        <table>
+          <tr><th>Status</th><th>Description</th></tr>
+          <tr><td><code>running</code></td><td>Actively executing</td></tr>
+          <tr><td><code>thinking</code></td><td>Processing/generating response</td></tr>
+          <tr><td><code>paused</code></td><td>Suspended, can be resumed</td></tr>
+          <tr><td><code>completed</code></td><td>Finished successfully</td></tr>
+          <tr><td><code>failed</code></td><td>Encountered error</td></tr>
+          <tr><td><code>terminated</code></td><td>Manually killed</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>logs — View Session Logs</h2>
+        <p>Access conversation transcripts and agent output.</p>
+<pre><code>descartes logs &lt;SESSION_ID&gt;</code></pre>
+
+        <h3>Options</h3>
+        <table>
+          <tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr>
+          <tr><td><code>--follow</code></td><td><code>-f</code></td><td>Stream logs in real-time</td><td><code>false</code></td></tr>
+          <tr><td><code>--format</code></td><td></td><td>Output format: <code>text</code> or <code>json</code></td><td><code>text</code></td></tr>
+          <tr><td><code>--limit</code></td><td><code>-l</code></td><td>Number of entries to show</td><td><code>100</code></td></tr>
+        </table>
+
+        <h3>Examples</h3>
+<pre><code># View logs for session
+descartes logs a1b2c3
+
+# Follow logs in real-time
+descartes logs a1b2c3 --follow
+
+# JSON format for parsing
+descartes logs a1b2c3 --format json</code></pre>
+
+        <hr>
+
+        <h2>kill — Terminate Agents</h2>
+<pre><code># Graceful shutdown
+descartes kill a1b2c3
+
+# Force kill unresponsive agent
+descartes kill a1b2c3 --force</code></pre>
+
+        <hr>
+
+        <h2>pause / resume — Suspend Agents</h2>
+<pre><code># Pause running agent
+descartes pause a1b2c3
+
+# Resume paused agent
+descartes resume a1b2c3</code></pre>
+
+        <hr>
+
+        <h2>attach — Connect External TUI</h2>
+        <p>Attach an external terminal UI (Claude Code, OpenCode) to a paused agent.</p>
+<pre><code># Attach Claude Code
+descartes attach a1b2c3 --client claude-code
+
+# Attach OpenCode and launch it
+descartes attach a1b2c3 --client opencode --launch
+
+# Get credentials as JSON for scripting
+descartes attach a1b2c3 --json</code></pre>
+
+        <hr>
+
+        <h2>init — Initialize Project</h2>
+<pre><code>descartes init</code></pre>
+        <p>Creates:</p>
+<pre><code>.descartes/
+├── config.toml       # Project configuration
+└── session.json      # Session metadata
+
+.scud/
+├── sessions/         # Transcript storage
+└── workflow-state.json</code></pre>
+
+        <hr>
+
+        <h2>doctor — Health Check</h2>
+<pre><code>descartes doctor
+
+# Output:
+# ✓ Rust toolchain found (1.75.0)
+# ✓ SQLite database initialized
+# ✓ Configuration file valid
+# ✓ Anthropic API key configured
+# ✓ OpenAI API key configured
+# ✗ Grok API key not configured
+# ✓ Ollama server reachable</code></pre>
+
+        <hr>
+
+        <h2>tasks — SCUD Task Management</h2>
+<pre><code>descartes tasks list           # List all tasks
+descartes tasks show TASK-001  # Show task details
+descartes tasks next           # Get next actionable task
+descartes tasks stats          # Show task statistics
+descartes tasks use TASK-001   # Mark task as in-progress</code></pre>
+
+        <hr>
+
+        <h2>workflow — Multi-Phase Execution</h2>
+<pre><code># Full PRD-to-code workflow
+descartes workflow flow --prd requirements.md
+
+# Resume interrupted workflow
+descartes workflow flow --prd requirements.md --resume
+
+# Research workflow
+descartes workflow research --topic "authentication patterns"</code></pre>
+
+        <hr>
+
+        <h2>loop — Iterative Execution</h2>
+<pre><code># Start iterative loop with Claude
+descartes loop start \
+  --command claude \
+  --prompt "Implement the feature" \
+  --max-iterations 10
+
+# Check loop status
+descartes loop status
+
+# Resume interrupted loop
+descartes loop resume
+
+# Cancel running loop
+descartes loop cancel</code></pre>
+
+        <hr>
+
+        <h2>gui — Launch Desktop GUI</h2>
+<pre><code>descartes gui</code></pre>
+
+        <hr>
+
+        <h2>Global Options</h2>
+        <table>
+          <tr><th>Option</th><th>Description</th></tr>
+          <tr><td><code>--config</code></td><td>Path to config file</td></tr>
+          <tr><td><code>--verbose</code></td><td>Increase output verbosity</td></tr>
+          <tr><td><code>--quiet</code></td><td>Suppress non-essential output</td></tr>
+          <tr><td><code>--help</code></td><td>Show help information</td></tr>
+          <tr><td><code>--version</code></td><td>Show version</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>Environment Variables</h2>
+        <table>
+          <tr><th>Variable</th><th>Description</th></tr>
+          <tr><td><code>DESCARTES_CONFIG</code></td><td>Path to config file</td></tr>
+          <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Anthropic API key</td></tr>
+          <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI API key</td></tr>
+          <tr><td><code>XAI_API_KEY</code></td><td>xAI/Grok API key</td></tr>
+        </table>
+
+        <hr>
+        <p><em>Now you're ready to command your AI agents like a pro.</em></p>
+      </article>
+
+      <!-- Post 04: Providers and Configuration -->
+      <article id="post-04" class="post">
+        <h1>Providers and Configuration</h1>
+        <p class="tagline">Connect to any LLM, your way</p>
+        <hr>
+
+        <p>Descartes is provider-agnostic by design. Whether you prefer Claude's reasoning, GPT's breadth, or running models locally with Ollama, configuration is straightforward and consistent.</p>
+
+        <h2>Supported Providers</h2>
+        <table>
+          <tr><th>Provider</th><th>Type</th><th>Models</th><th>Best For</th></tr>
+          <tr><td><strong>Anthropic</strong></td><td>Cloud API</td><td>Claude 3.5 Sonnet, Opus, Haiku</td><td>Complex reasoning, code</td></tr>
+          <tr><td><strong>OpenAI</strong></td><td>Cloud API</td><td>GPT-4, GPT-4 Turbo, GPT-3.5</td><td>General purpose</td></tr>
+          <tr><td><strong>xAI/Grok</strong></td><td>Cloud API</td><td>Grok 4.1, Grok 3</td><td>Fast reasoning</td></tr>
+          <tr><td><strong>Ollama</strong></td><td>Local</td><td>Llama 2, CodeLlama, Mistral</td><td>Privacy, offline</td></tr>
+        </table>
+        <blockquote><strong>Note:</strong> DeepSeek and Groq configuration structures exist in the codebase but provider implementations are not yet complete.</blockquote>
+
+        <hr>
+
+        <h2>Configuration File</h2>
+        <p>Descartes uses TOML for configuration. The primary config file lives at <code>~/.descartes/config.toml</code>.</p>
+
+        <h3>Minimal Configuration</h3>
+<pre><code>[providers]
+primary = "anthropic"
+
+[providers.anthropic]
+enabled = true
+# API key from environment: ANTHROPIC_API_KEY</code></pre>
+
+        <h3>Full Configuration</h3>
+<pre><code># Descartes Configuration
+version = "1.0.0"
+
+[providers]
+primary = "anthropic"
+
+[providers.anthropic]
+enabled = true
+api_key = ""  # Or use ANTHROPIC_API_KEY env var
+endpoint = "https://api.anthropic.com/v1"
+model = "claude-3-5-sonnet-20241022"
+timeout_secs = 120
+max_retries = 3
+
+[providers.openai]
+enabled = true
+api_key = ""  # Or use OPENAI_API_KEY env var
+endpoint = "https://api.openai.com/v1"
+model = "gpt-4-turbo"
+
+[providers.grok]
+enabled = true
+api_key = ""  # Or use XAI_API_KEY env var
+endpoint = "https://api.x.ai/v1"
+model = "grok-4-1-fast"
+
+[providers.ollama]
+enabled = true
+endpoint = "http://localhost:11434"
+model = "llama2"
+timeout_secs = 300  # Longer for local inference</code></pre>
+
+        <hr>
+
+        <h2>Provider Deep Dives</h2>
+
+        <h3>Anthropic (Claude)</h3>
+        <p>Claude models excel at complex reasoning and code understanding.</p>
+<pre><code>[providers.anthropic]
+enabled = true
+model = "claude-3-5-sonnet-20241022"  # Best balance
+# model = "claude-3-opus-20240229"    # Maximum capability
+# model = "claude-3-haiku-20240307"   # Fast &amp; cheap</code></pre>
+        <p><strong>Authentication:</strong></p>
+<pre><code>export ANTHROPIC_API_KEY="sk-ant-api03-..."</code></pre>
+
+        <h3>OpenAI (GPT)</h3>
+<pre><code>[providers.openai]
+enabled = true
+model = "gpt-4-turbo"</code></pre>
+        <p><strong>Authentication:</strong></p>
+<pre><code>export OPENAI_API_KEY="sk-..."</code></pre>
+
+        <h3>xAI/Grok</h3>
+<pre><code>[providers.grok]
+enabled = true
+model = "grok-4-1-fast"</code></pre>
+        <p><strong>Authentication:</strong></p>
+<pre><code>export XAI_API_KEY="xai-..."</code></pre>
+
+        <h3>Ollama (Local Models)</h3>
+        <p>Run models locally for privacy and offline use.</p>
+<pre><code># Install and setup Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama2
+ollama pull codellama
+ollama serve</code></pre>
+
+<pre><code>[providers.ollama]
+enabled = true
+endpoint = "http://localhost:11434"
+model = "codellama"
+timeout_secs = 300</code></pre>
+
+        <hr>
+
+        <h2>Provider Selection</h2>
+        <h3>At Spawn Time</h3>
+<pre><code># Use OpenAI for this task
+descartes spawn -t "Write tests" --provider openai
+
+# Use local Ollama
+descartes spawn -t "Review code" --provider ollama --model codellama</code></pre>
+
+        <hr>
+
+        <h2>Rate Limiting &amp; Retries</h2>
+<pre><code>[providers.anthropic]
+max_retries = 3           # Retry failed requests
+retry_backoff_ms = 1000   # Wait between retries (exponential)
+rate_limit_rpm = 60       # Max requests per minute
+timeout_secs = 120        # Request timeout</code></pre>
+
+        <hr>
+
+        <h2>Health Checks</h2>
+<pre><code>descartes doctor
+
+# Provider Health Checks:
+# ✓ Anthropic: claude-3-5-sonnet responding
+# ✓ OpenAI: gpt-4-turbo responding
+# ✗ Grok: API key not configured
+# ✓ Ollama: localhost:11434 reachable</code></pre>
+
+        <hr>
+
+        <h2>Best Practices</h2>
+
+        <h3>1. Use Environment Variables for Keys</h3>
+<pre><code># ~/.bashrc or ~/.zshrc
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."</code></pre>
+
+        <h3>2. Match Model to Task</h3>
+        <table>
+          <tr><th>Task Type</th><th>Recommended</th></tr>
+          <tr><td>Complex reasoning</td><td>Claude Opus, GPT-4</td></tr>
+          <tr><td>Code generation</td><td>Claude Sonnet, CodeLlama</td></tr>
+          <tr><td>Fast iteration</td><td>Claude Haiku, GPT-3.5</td></tr>
+          <tr><td>Privacy-sensitive</td><td>Ollama (local)</td></tr>
+        </table>
+
+        <h3>3. Set Appropriate Timeouts</h3>
+<pre><code># Cloud APIs: 120s is usually enough
+[providers.anthropic]
+timeout_secs = 120
+
+# Local models: allow more time
+[providers.ollama]
+timeout_secs = 300</code></pre>
+
+        <hr>
+        <p><em>With providers configured, you're ready to put your AI agents to work.</em></p>
+      </article>
+
+      <!-- Post 05: Session Management -->
+      <article id="post-05" class="post">
+        <h1>Session Management</h1>
+        <p class="tagline">Control, observe, and manage your agent sessions</p>
+        <hr>
+
+        <p>Every Descartes agent runs within a <strong>session</strong>—a tracked execution context with its own transcript, state, and lifecycle.</p>
+
+        <h2>What is a Session?</h2>
+        <p>A session represents a single agent execution, including:</p>
+        <ul>
+          <li><strong>Unique ID</strong> — UUID for identification</li>
+          <li><strong>Task</strong> — The prompt/goal given to the agent</li>
+          <li><strong>Transcript</strong> — Complete conversation history</li>
+          <li><strong>Status</strong> — Current lifecycle state</li>
+          <li><strong>Metadata</strong> — Timestamps, provider info, parent session</li>
+        </ul>
+
+        <hr>
+
+        <h2>Session Lifecycle</h2>
+<pre><code>┌──────────┐     ┌──────────┐     ┌──────────┐
+│ Inactive │────▶│ Starting │────▶│  Active  │
+└──────────┘     └──────────┘     └────┬─────┘
+                                       │
+                      ┌────────────────┼────────────────┐
+                      ▼                ▼                ▼
+                ┌──────────┐    ┌──────────┐     ┌──────────┐
+                │ Stopping │    │ Archived │     │  Error   │
+                └──────────┘    └──────────┘     └──────────┘</code></pre>
+
+        <h3>SessionStatus Values</h3>
+        <table>
+          <tr><th>Status</th><th>Description</th></tr>
+          <tr><td><strong>Inactive</strong></td><td>Session exists but daemon not running</td></tr>
+          <tr><td><strong>Starting</strong></td><td>Daemon is starting up</td></tr>
+          <tr><td><strong>Active</strong></td><td>Daemon is running and connected</td></tr>
+          <tr><td><strong>Stopping</strong></td><td>Daemon is stopping</td></tr>
+          <tr><td><strong>Archived</strong></td><td>Session has been archived</td></tr>
+          <tr><td><strong>Error</strong></td><td>Session has errors</td></tr>
+        </table>
+
+        <h3>AgentStatus Values</h3>
+        <table>
+          <tr><th>Status</th><th>Description</th></tr>
+          <tr><td><strong>Idle</strong></td><td>Agent created but not started</td></tr>
+          <tr><td><strong>Initializing</strong></td><td>Agent loading context and environment</td></tr>
+          <tr><td><strong>Running</strong></td><td>Agent actively executing tasks</td></tr>
+          <tr><td><strong>Thinking</strong></td><td>Agent processing/generating response</td></tr>
+          <tr><td><strong>Paused</strong></td><td>Agent suspended, can be resumed</td></tr>
+          <tr><td><strong>Completed</strong></td><td>Agent finished successfully</td></tr>
+          <tr><td><strong>Failed</strong></td><td>Agent encountered unrecoverable error</td></tr>
+          <tr><td><strong>Terminated</strong></td><td>Agent was manually killed</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>Creating Sessions</h2>
+<pre><code># Simple spawn
+descartes spawn --task "Fix the login bug"
+
+# With custom name
+descartes spawn --task "Add OAuth" --name oauth-feature
+
+# Stream output
+descartes spawn --task "Refactor tests" --stream</code></pre>
+
+        <hr>
+
+        <h2>Monitoring Sessions</h2>
+<pre><code>descartes ps
+
+# Output:
+# ID       STATUS    TASK                              STARTED      PROVIDER
+# a1b2c3   running   Implement JWT authentication      2 min ago    anthropic
+# d4e5f6   paused    Review security practices         15 min ago   openai</code></pre>
+
+        <hr>
+
+        <h2>Session Transcripts</h2>
+        <p>Every session creates a detailed JSON transcript stored in:</p>
+<pre><code>.scud/sessions/           # Flow workflow sessions
+.descartes/sessions/      # General agent sessions</code></pre>
+
+        <h3>View Transcripts</h3>
+<pre><code># Text format (default)
+descartes logs a1b2c3
+
+# JSON format
+descartes logs a1b2c3 --format json
+
+# Follow in real-time
+descartes logs a1b2c3 --follow</code></pre>
+
+        <hr>
+
+        <h2>Pause and Resume</h2>
+        <h3>Why Pause?</h3>
+        <ul>
+          <li><strong>Free resources</strong> during long-running tasks</li>
+          <li><strong>Attach external TUI</strong> (Claude Code, OpenCode)</li>
+          <li><strong>Review progress</strong> before continuing</li>
+        </ul>
+
+<pre><code># Cooperative pause (graceful)
+descartes pause a1b2c3
+
+# Forced pause (SIGSTOP)
+descartes pause a1b2c3 --force
+
+# Resume
+descartes resume a1b2c3</code></pre>
+
+        <hr>
+
+        <h2>External TUI Attachment</h2>
+        <p>Attach external terminal UIs to paused agents:</p>
+<pre><code># Pause first
+descartes pause a1b2c3
+
+# Attach Claude Code
+descartes attach a1b2c3 --client claude-code
+
+# Attach OpenCode and launch it
+descartes attach a1b2c3 --client opencode --launch</code></pre>
+
+        <hr>
+
+        <h2>Sub-Sessions</h2>
+        <p>Orchestrator agents can spawn sub-sessions for focused tasks:</p>
+<pre><code>Main Session (orchestrator)
+├── Sub-Session 1 (minimal) — "Write tests"
+├── Sub-Session 2 (minimal) — "Update docs"
+└── Sub-Session 3 (readonly) — "Review changes"</code></pre>
+
+        <h3>Sub-Session Rules</h3>
+        <ol>
+          <li><strong>No recursive spawning</strong> — Sub-sessions cannot spawn further</li>
+          <li><strong>Automatic downgrade</strong> — Orchestrator → Minimal for children</li>
+          <li><strong>Parent tracking</strong> — <code>parent_session_id</code> links to parent</li>
+        </ol>
+
+<pre><code>descartes ps --tree
+
+# a1b2c3 (running) — Main implementation
+# ├── d4e5f6 (completed) — Write tests
+# ├── g7h8i9 (running) — Update docs
+# └── j0k1l2 (completed) — Review changes</code></pre>
+
+        <hr>
+
+        <h2>Session Cleanup</h2>
+<pre><code># Graceful shutdown
+descartes kill a1b2c3
+
+# Force kill
+descartes kill a1b2c3 --force
+
+# Archive session
+descartes archive a1b2c3
+
+# Clean up old sessions
+descartes cleanup --older-than 30d</code></pre>
+
+        <hr>
+
+        <h2>Best Practices</h2>
+        <ol>
+          <li><strong>Use Meaningful Names</strong>: <code>descartes spawn --task "Add OAuth" --name oauth-feature</code></li>
+          <li><strong>Stream for Long Tasks</strong>: <code>descartes spawn --task "Major refactor" --stream</code></li>
+          <li><strong>Pause Before Walking Away</strong>: Pause long-running tasks when stepping away</li>
+          <li><strong>Review Transcripts</strong>: After completion, review what happened</li>
+          <li><strong>Clean Up Regularly</strong>: <code>descartes cleanup --older-than 7d --status completed</code></li>
+        </ol>
+
+        <hr>
+        <p><em>With session management mastered, you have full control over your AI workforce.</em></p>
+      </article>
+
+      <!-- Post 06: Agent Types -->
+      <article id="post-06" class="post">
+        <h1>Agent Types and Tool Levels</h1>
+        <p class="tagline">Right-sizing capabilities for every task</p>
+        <hr>
+
+        <p>Not every task needs full system access. Descartes provides <strong>tool levels</strong> that scope agent capabilities appropriately—from read-only exploration to full orchestration with sub-agent spawning.</p>
+
+        <h2>The Tool Level Hierarchy</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                     ORCHESTRATOR                            │
+│  read, write, edit, bash, spawn_session                     │
+│  Full capabilities + delegation                             │
+├─────────────────────────────────────────────────────────────┤
+│                       MINIMAL                               │
+│  read, write, edit, bash                                    │
+│  Focused work, no delegation                                │
+├─────────────────────────────────────────────────────────────┤
+│                       PLANNER                               │
+│  read, write (thoughts/ only), bash                         │
+│  Planning and documentation                                 │
+├─────────────────────────────────────────────────────────────┤
+│                      RESEARCHER                             │
+│  read, bash                                                 │
+│  Analysis and exploration                                   │
+├─────────────────────────────────────────────────────────────┤
+│                       READONLY                              │
+│  read, bash (read-only commands)                            │
+│  Safe observation                                           │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+
+        <blockquote><strong>Note:</strong> Tool availability is code-enforced. Behavioral restrictions (e.g., "bash read-only") are prompt-based guidance.</blockquote>
+
+        <hr>
+
+        <h2>Orchestrator Level</h2>
+        <p><strong>The fully-capable agent for complex, multi-step tasks.</strong></p>
+        <table>
+          <tr><th>Tool</th><th>Description</th></tr>
+          <tr><td><code>read</code></td><td>Read any file</td></tr>
+          <tr><td><code>write</code></td><td>Create/overwrite files</td></tr>
+          <tr><td><code>edit</code></td><td>Surgical text replacement</td></tr>
+          <tr><td><code>bash</code></td><td>Execute any command</td></tr>
+          <tr><td><code>spawn_session</code></td><td>Delegate to sub-agents</td></tr>
+        </table>
+        <p><strong>When to Use:</strong> Complex features, tasks benefiting from delegation, top-level workflow orchestration.</p>
+<pre><code>descartes spawn \
+  --task "Implement a new payment system with Stripe integration" \
+  --tool-level orchestrator</code></pre>
+
+        <hr>
+
+        <h2>Minimal Level</h2>
+        <p><strong>Focused execution without delegation overhead.</strong></p>
+        <p>Tools: <code>read</code>, <code>write</code>, <code>edit</code>, <code>bash</code></p>
+        <p><strong>When to Use:</strong> Single-focus tasks, bug fixes, small feature additions.</p>
+<pre><code>descartes spawn \
+  --task "Fix the race condition in the user service" \
+  --tool-level minimal</code></pre>
+
+        <hr>
+
+        <h2>Planner Level</h2>
+        <p><strong>For designing and documenting, not implementing.</strong></p>
+        <p>Tools: <code>read</code>, <code>write</code>, <code>bash</code> — writes only to <code>thoughts/</code> directory.</p>
+        <p><strong>When to Use:</strong> Creating implementation plans, designing architecture, writing specs.</p>
+<pre><code>descartes spawn \
+  --task "Design the authentication system architecture" \
+  --tool-level planner</code></pre>
+
+        <hr>
+
+        <h2>Researcher Level</h2>
+        <p><strong>Pure analysis and exploration.</strong></p>
+        <p>Tools: <code>read</code>, <code>bash</code> (read-only)</p>
+        <p><strong>When to Use:</strong> Codebase analysis, security audits, understanding patterns.</p>
+<pre><code>descartes spawn \
+  --task "Analyze how error handling works across the application" \
+  --tool-level researcher</code></pre>
+
+        <hr>
+
+        <h2>Read-Only Level</h2>
+        <p><strong>Maximum safety for sensitive environments.</strong></p>
+        <p>Tools: <code>read</code>, <code>bash</code> (extremely restricted)</p>
+        <p><strong>When to Use:</strong> Production exploration, auditing without risk, learning unfamiliar codebases.</p>
+<pre><code>descartes spawn \
+  --task "Explore the production database schema" \
+  --tool-level readonly</code></pre>
+
+        <hr>
+
+        <h2>Choosing the Right Level</h2>
+<pre><code>Is this a complex multi-part task?
+├─ Yes → Does it benefit from delegation?
+│        ├─ Yes → ORCHESTRATOR
+│        └─ No  → MINIMAL
+└─ No  → Is it implementation or planning?
+         ├─ Implementation → MINIMAL
+         └─ Planning → Does it need to write plans?
+                       ├─ Yes → PLANNER
+                       └─ No  → RESEARCHER or READONLY</code></pre>
+
+        <h3>Quick Reference</h3>
+        <table>
+          <tr><th>Task Type</th><th>Recommended Level</th></tr>
+          <tr><td>Full feature implementation</td><td>Orchestrator</td></tr>
+          <tr><td>Bug fix</td><td>Minimal</td></tr>
+          <tr><td>Small enhancement</td><td>Minimal</td></tr>
+          <tr><td>Architecture design</td><td>Planner</td></tr>
+          <tr><td>Codebase exploration</td><td>Researcher</td></tr>
+          <tr><td>Security audit</td><td>Read-Only</td></tr>
+          <tr><td>Production debugging</td><td>Read-Only</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>The One-Level Rule</h2>
+        <p>When orchestrators spawn sub-agents, capabilities are automatically reduced:</p>
+<pre><code>Orchestrator spawns → Minimal (cannot spawn further)
+
+Main Agent (Orchestrator)
+├── Sub-Agent A (Minimal) ← Cannot spawn
+├── Sub-Agent B (Minimal) ← Cannot spawn
+└── Sub-Agent C (Minimal) ← Cannot spawn</code></pre>
+        <p>This prevents recursive agent explosions and resource exhaustion.</p>
+
+        <hr>
+
+        <h2>Security Considerations</h2>
+        <p><strong>Principle of Least Privilege:</strong> Always use the minimum level needed.</p>
+<pre><code># Bad: Using orchestrator for simple read
+descartes spawn -t "What files are in src/?" --tool-level orchestrator
+
+# Good: Using readonly for exploration
+descartes spawn -t "What files are in src/?" --tool-level readonly</code></pre>
+
+        <hr>
+        <p><em>The right tool for the right job—now you know how to choose.</em></p>
+      </article>
+
+      <!-- Post 07: Flow Workflow -->
+      <article id="post-07" class="post">
+        <h1>The Flow Workflow: PRD to Production</h1>
+        <p class="tagline">Transform requirements into working code, automatically</p>
+        <hr>
+
+        <p>The <strong>Flow Workflow</strong> is Descartes' flagship automation—a six-phase pipeline that takes a Product Requirements Document (PRD) and produces tested, documented code.</p>
+
+        <h2>The Vision</h2>
+<pre><code>PRD Document ────▶ [FLOW WORKFLOW] ────▶ Working Code
+                        │
+              ┌─────────┼─────────┐
+              ▼         ▼         ▼
+           Tasks    Plans    Tests</code></pre>
+
+        <h2>The Six Phases</h2>
+<pre><code>┌──────────┐   ┌──────────┐   ┌──────────┐
+│  INGEST  │──▶│  REVIEW  │──▶│   PLAN   │
+│ Parse PRD│   │ Optimize │   │ Generate │
+│ → Tasks  │   │  Graph   │   │  Plans   │
+└──────────┘   └──────────┘   └──────────┘
+                                   │
+┌──────────────────────────────────┘
+│
+▼
+┌──────────┐   ┌──────────┐   ┌──────────┐
+│IMPLEMENT │──▶│    QA    │──▶│SUMMARIZE │
+│ Execute  │   │ Monitor  │   │ Generate │
+│  Waves   │   │ Quality  │   │   Docs   │
+└──────────┘   └──────────┘   └──────────┘</code></pre>
+
+        <hr>
+
+        <h2>Phase 1: Ingest</h2>
+        <p><strong>Goal:</strong> Parse the PRD into structured tasks.</p>
+        <ol>
+          <li>Agent reads the PRD document</li>
+          <li>Identifies discrete features and requirements</li>
+          <li>Creates SCUD-format tasks with titles, dependencies, complexity, priority</li>
+        </ol>
+
+        <h2>Phase 2: Review Graph</h2>
+        <p><strong>Goal:</strong> Optimize the task dependency graph.</p>
+        <ul>
+          <li>Analyzes task relationships</li>
+          <li>Identifies parallelization opportunities</li>
+          <li>Detects cycles or impossible orderings</li>
+        </ul>
+<pre><code>Wave 1: [TASK-001]              # No dependencies
+Wave 2: [TASK-002, TASK-003]    # Both depend on TASK-001
+Wave 3: [TASK-004, TASK-005]    # Depend on Wave 2</code></pre>
+
+        <h2>Phase 3: Plan Tasks</h2>
+        <p><strong>Goal:</strong> Create implementation plans for each task.</p>
+        <p>For each task: researches the codebase, identifies relevant files, writes detailed implementation plan.</p>
+<pre><code>thoughts/shared/plans/
+├── TASK-001-auth-schema.md
+├── TASK-002-user-registration.md
+└── TASK-003-login-endpoint.md</code></pre>
+
+        <h2>Phase 4: Implement</h2>
+        <p><strong>Goal:</strong> Execute tasks wave-by-wave.</p>
+        <ul>
+          <li>Loads task waves from Phase 2</li>
+          <li>Spawns implementation agents for each wave</li>
+          <li>Commits changes after each wave</li>
+        </ul>
+
+        <h2>Phase 5: QA</h2>
+        <p><strong>Goal:</strong> Monitor quality during and after implementation.</p>
+        <p>Checks: Tests passing, linting, type checking, build success, security.</p>
+
+        <h2>Phase 6: Summarize</h2>
+        <p><strong>Goal:</strong> Generate documentation for implemented features.</p>
+        <p>Creates changelog entries, updates docs, generates PR description, writes executive summary.</p>
+
+        <hr>
+
+        <h2>Running Flow</h2>
+<pre><code># Basic usage
+descartes workflow flow --prd requirements.md
+
+# With options
+descartes workflow flow \
+  --prd requirements.md \
+  --tag feature-auth \
+  --dir /path/to/project
+
+# Resume interrupted flow
+descartes workflow flow --prd requirements.md --resume</code></pre>
+
+        <hr>
+
+        <h2>State Management</h2>
+        <p>Flow saves state to <code>.scud/flow-state.json</code>, enabling resume after interruptions.</p>
+
+        <hr>
+
+        <h2>Best Practices</h2>
+        <ol>
+          <li><strong>Write Good PRDs</strong>: Clear requirements, technical constraints, out of scope items</li>
+          <li><strong>Review Before Implement</strong>: Check generated plans before execution</li>
+          <li><strong>Use Tags</strong>: <code>--tag auth-v1</code> for artifact organization</li>
+          <li><strong>Monitor Progress</strong>: <code>watch cat .scud/flow-state.json</code></li>
+        </ol>
+
+        <hr>
+        <p><em>From requirements to reality—that's the power of Flow.</em></p>
+      </article>
+
+      <!-- Post 08: Skills System -->
+      <article id="post-08" class="post">
+        <h1>The Skills System</h1>
+        <p class="tagline">Extend agent capabilities without token bloat</p>
+        <hr>
+
+        <p>Skills are Descartes' answer to tool sprawl. Instead of loading 40+ tool definitions into every prompt (2-5k tokens each), skills are CLI scripts that agents invoke via <code>bash</code>—only costing tokens when actually used.</p>
+
+        <h2>The Problem with Traditional Tools</h2>
+<pre><code>Tool: web-search
+  - Description: 200 tokens
+  - Parameters: 150 tokens
+  - Examples: 300 tokens
+Total: 650 tokens × 40 tools = 26,000 tokens
+
+Per message. Every message. Even if unused.</code></pre>
+
+        <h2>The Skills Solution</h2>
+        <p>Skills are:</p>
+        <ul>
+          <li><strong>CLI scripts</strong> in <code>~/.descartes/skills/</code></li>
+          <li><strong>Invoked via bash</strong> when needed</li>
+          <li><strong>Documented in README</strong> files</li>
+          <li><strong>Zero cost</strong> until used (~50 tokens per invocation)</li>
+        </ul>
+
+        <hr>
+
+        <h2>Anatomy of a Skill</h2>
+<pre><code>~/.descartes/skills/
+├── web-search/
+│   ├── web-search           # Executable script
+│   └── README.md            # Documentation for agent
+├── image-gen/
+│   ├── image-gen
+│   └── README.md
+└── code-review/
+    ├── code-review
+    └── README.md</code></pre>
+
+        <h3>The Script</h3>
+<pre><code>#!/bin/bash
+# ~/.descartes/skills/web-search/web-search
+
+QUERY="$1"
+MAX_RESULTS="${2:-5}"
+
+# Call your search API
+curl -s "https://api.search.example.com/search?q=$QUERY&amp;limit=$MAX_RESULTS" \
+  | jq -r '.results[] | "- \(.title): \(.url)"'</code></pre>
+
+        <hr>
+
+        <h2>Creating Custom Skills</h2>
+<pre><code># Step 1: Create the directory
+mkdir -p ~/.descartes/skills/my-skill
+
+# Step 2: Write the script
+cat &gt; ~/.descartes/skills/my-skill/my-skill &lt;&lt;'EOF'
+#!/bin/bash
+echo "Hello from my-skill!"
+EOF
+
+# Step 3: Make executable
+chmod +x ~/.descartes/skills/my-skill/my-skill
+
+# Step 4: Add README.md with usage docs</code></pre>
+
+        <hr>
+
+        <h2>Example Skills</h2>
+
+        <h3>Web Search</h3>
+<pre><code>#!/bin/bash
+QUERY="$1"
+MAX="${2:-5}"
+curl -s "https://api.duckduckgo.com/?q=$QUERY&amp;format=json" \
+  | jq -r ".RelatedTopics[:$MAX][] | \"- \(.Text)\""</code></pre>
+
+        <h3>Code Review</h3>
+<pre><code>#!/bin/bash
+FILE="$1"
+echo "## Linting"
+eslint "$FILE" 2>&amp;1 || true
+echo "## Type Check"
+tsc --noEmit "$FILE" 2>&amp;1 || true</code></pre>
+
+        <h3>Git Stats</h3>
+<pre><code>#!/bin/bash
+echo "## Commit Activity (last 30 days)"
+git log --since="30 days ago" --oneline | wc -l
+echo "## Top Contributors"
+git shortlog -sn --since="30 days ago" | head -5</code></pre>
+
+        <hr>
+
+        <h2>Skills vs MCP Servers</h2>
+        <table>
+          <tr><th>Aspect</th><th>Skills</th><th>MCP Servers</th></tr>
+          <tr><td><strong>Token cost (idle)</strong></td><td>0</td><td>2,000-5,000</td></tr>
+          <tr><td><strong>Token cost (active)</strong></td><td>~50-100</td><td>~200-500</td></tr>
+          <tr><td><strong>Setup</strong></td><td>Drop-in scripts</td><td>Server configuration</td></tr>
+          <tr><td><strong>Language</strong></td><td>Any (bash, python, etc.)</td><td>TypeScript/JavaScript</td></tr>
+          <tr><td><strong>Best for</strong></td><td>Simple operations</td><td>Complex integrations</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>Best Practices</h2>
+        <ol>
+          <li><strong>Keep Skills Focused</strong>: One skill, one purpose</li>
+          <li><strong>Provide Clear Output</strong>: Structured, readable output</li>
+          <li><strong>Handle Errors Gracefully</strong>: Check inputs, provide usage hints</li>
+          <li><strong>Document Thoroughly</strong>: README is the agent's interface</li>
+          <li><strong>Use Environment Variables</strong>: For credentials and secrets</li>
+        </ol>
+
+        <hr>
+        <p><em>Extend your agents' capabilities without the bloat.</em></p>
+      </article>
+
+      <!-- Post 09: GUI Features -->
+      <article id="post-09" class="post">
+        <h1>The Descartes GUI</h1>
+        <p class="tagline">Visual control and monitoring for your AI agents</p>
+        <hr>
+
+        <p>While Descartes shines on the command line, the native GUI provides powerful visualization and control capabilities. Built with the Iced framework, it offers real-time monitoring, visual workflow editing, and time-travel debugging.</p>
+
+        <h2>Launching the GUI</h2>
+<pre><code>descartes gui</code></pre>
+
+        <hr>
+
+        <h2>The Interface</h2>
+<pre><code>┌────────────────────────────────────────────────────────────────┐
+│ [◆] DESCARTES Agent Orchestration    [●] Connected [Disconnect]│
+├────────┬───────────────────────────────────────────────────────┤
+│        │                                                        │
+│ ◆ Sess │   Main Content Area                                   │
+│ ⌂ Dash │   (Changes based on selected view)                    │
+│ ✉ Chat │                                                        │
+│ ◎ Agents│                                                       │
+│ ⏱ Debug│                                                        │
+│        │                                                        │
+├────────┴───────────────────────────────────────────────────────┤
+│ Status: Connected to daemon successfully!                       │
+└────────────────────────────────────────────────────────────────┘</code></pre>
+
+        <h3>Navigation</h3>
+        <table>
+          <tr><th>Icon</th><th>View</th><th>Purpose</th></tr>
+          <tr><td>◆</td><td>Sessions</td><td>Workspace/session selection</td></tr>
+          <tr><td>⌂</td><td>Dashboard</td><td>Overview and statistics</td></tr>
+          <tr><td>✉</td><td>Chat</td><td>Interactive conversation</td></tr>
+          <tr><td>◎</td><td>Agents</td><td>Real-time agent monitoring</td></tr>
+          <tr><td>⏱</td><td>Debugger</td><td>Time-travel debugging</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>Dashboard View</h2>
+        <p>At-a-glance status: active agents, pending tasks, today's events, connection status, recent events feed.</p>
+
+        <hr>
+
+        <h2>Chat View</h2>
+        <p>Interactive conversation with streaming support, thinking block visualization, sub-agent tracking with badges.</p>
+
+        <hr>
+
+        <h2>Agents View (Swarm Monitor)</h2>
+        <p>Real-time monitoring of all running agents:</p>
+        <ul>
+          <li>Live status updates at 60 FPS</li>
+          <li>Thinking state animation</li>
+          <li>Performance metrics (CPU, memory)</li>
+          <li>Progress tracking with visual bars</li>
+          <li>Status filtering and search</li>
+        </ul>
+
+        <h3>Status Colors</h3>
+        <table>
+          <tr><th>Status</th><th>Color</th></tr>
+          <tr><td>Active</td><td>Cyan ●</td></tr>
+          <tr><td>Thinking</td><td>Purple 💭</td></tr>
+          <tr><td>Idle</td><td>Gray ○</td></tr>
+          <tr><td>Paused</td><td>Yellow ◐</td></tr>
+          <tr><td>Error</td><td>Red ✕</td></tr>
+          <tr><td>Completed</td><td>Green ✓</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>DAG Editor</h2>
+        <p>Visual workflow designer for task dependencies:</p>
+        <ul>
+          <li>Drag-and-drop nodes</li>
+          <li>Edge creation by dragging</li>
+          <li>Cycle detection</li>
+          <li>Multi-select, pan and zoom</li>
+          <li>Undo/Redo with full history</li>
+        </ul>
+
+        <hr>
+
+        <h2>Time-Travel Debugger</h2>
+        <p>Replay and inspect agent execution history:</p>
+        <ul>
+          <li>Timeline scrubbing</li>
+          <li>Event inspection</li>
+          <li>Playback controls (step, play, speed)</li>
+          <li>Snapshot navigation</li>
+        </ul>
+
+        <hr>
+
+        <h2>Theme</h2>
+        <p>"Space-age hacker" aesthetic:</p>
+        <table>
+          <tr><th>Element</th><th>Color</th></tr>
+          <tr><td>Background</td><td>Deep black #050508</td></tr>
+          <tr><td>Primary</td><td>Neon cyan #00e6e6</td></tr>
+          <tr><td>Success</td><td>Neon green #00ff80</td></tr>
+          <tr><td>Warning</td><td>Amber #ffcc00</td></tr>
+          <tr><td>Error</td><td>Neon red #ff334d</td></tr>
+        </table>
+        <p><strong>Font:</strong> JetBrains Mono (monospace throughout)</p>
+
+        <hr>
+
+        <h2>Keyboard Navigation</h2>
+        <table>
+          <tr><th>Shortcut</th><th>Action</th></tr>
+          <tr><td>Ctrl+1-6</td><td>Switch views</td></tr>
+          <tr><td>Tab/Shift+Tab</td><td>Focus navigation</td></tr>
+          <tr><td>Escape / q</td><td>Cancel/dismiss</td></tr>
+          <tr><td>r / F5</td><td>Refresh</td></tr>
+        </table>
+
+        <hr>
+        <p><em>See your AI agents at work with the power of visual monitoring.</em></p>
+      </article>
+
+      <!-- Post 10: Sub-Agent Tracking -->
+      <article id="post-10" class="post">
+        <h1>Sub-Agent Shadow Tracking</h1>
+        <p class="tagline">Non-invasive monitoring of agent hierarchies</p>
+        <hr>
+
+        <p>When orchestrator agents delegate to sub-agents, visibility becomes critical. Descartes implements <strong>shadow tracking</strong>—a read-only detection system that monitors sub-agent spawning without intercepting or modifying behavior.</p>
+
+        <h2>The Challenge</h2>
+        <p>Modern AI coding agents like Claude Code can spawn sub-agents:</p>
+<pre><code>Main Agent (claude)
+├── Task Agent (explore codebase)
+├── Task Agent (write tests)
+└── Task Agent (update docs)</code></pre>
+        <p>But how do you track this hierarchy when you don't control the underlying CLI?</p>
+
+        <hr>
+
+        <h2>Shadow Tracking Architecture</h2>
+<pre><code>┌───────────────────────────────────────────────────────────────┐
+│                     Descartes Session                          │
+├───────────────────────────────────────────────────────────────┤
+│   ┌──────────────┐      Stream-JSON       ┌───────────────┐   │
+│   │  Claude Code │ ────────────────────── │    Parser     │   │
+│   │     CLI      │                        └───────┬───────┘   │
+│   └──────────────┘                                │           │
+│                                                   ▼           │
+│                                          ┌───────────────┐    │
+│                                          │ Sub-Agent     │    │
+│                                          │ Detector      │    │
+│                                          └───────────────┘    │
+└───────────────────────────────────────────────────────────────┘</code></pre>
+
+        <h3>Key Principles</h3>
+        <ol>
+          <li><strong>Non-invasive</strong> — Read-only observation</li>
+          <li><strong>No interception</strong> — Cannot modify sub-agent behavior</li>
+          <li><strong>Stream parsing</strong> — Analyze JSON output in real-time</li>
+          <li><strong>Hierarchical tracking</strong> — Parent-child relationships preserved</li>
+        </ol>
+
+        <hr>
+
+        <h2>What Can Be Tracked</h2>
+        <table>
+          <tr><th>Data</th><th>Reliability</th></tr>
+          <tr><td>Agent ID</td><td>High</td></tr>
+          <tr><td>Prompt/Task</td><td>High</td></tr>
+          <tr><td>Agent type</td><td>High</td></tr>
+          <tr><td>Spawn timestamp</td><td>High</td></tr>
+          <tr><td>Completion status</td><td>Medium</td></tr>
+          <tr><td>Sub-agent output</td><td>Low*</td></tr>
+        </table>
+        <p>*Sub-agent output may be summarized by the parent.</p>
+
+        <h3>Not Available</h3>
+        <ul>
+          <li>Internal thinking (not exposed in stream)</li>
+          <li>Tool call details (sub-agent's session private)</li>
+          <li>Full transcript (stored in sub-agent's session)</li>
+        </ul>
+
+        <hr>
+
+        <h2>Viewing Sub-Agents</h2>
+        <h3>CLI</h3>
+<pre><code>descartes ps --tree
+
+# a1b2c3 (running) — Main: Implement auth system
+# ├── d4e5f6 (completed) — Explore: Find auth patterns
+# ├── g7h8i9 (running) — Explore: Check test coverage
+# └── j0k1l2 (pending) — General: Write documentation</code></pre>
+
+        <h3>JSON Output</h3>
+<pre><code>descartes logs a1b2c3 --format json | jq '.sub_agents'</code></pre>
+
+        <hr>
+
+        <h2>The One-Level Rule</h2>
+<pre><code>Orchestrator (can spawn)
+└── Sub-Agent (cannot spawn further)</code></pre>
+        <p>This prevents recursive spawning, resource exhaustion, and circular delegation.</p>
+
+        <hr>
+
+        <h2>Practical Examples</h2>
+        <h3>Feature Implementation</h3>
+<pre><code>Main: "Implement user authentication"
+├── Explore: "Find existing auth patterns" (completed)
+├── Explore: "Check security best practices" (completed)
+├── Minimal: "Implement JWT tokens" (running)
+└── Minimal: "Add login endpoint" (pending)</code></pre>
+
+        <h3>Code Review</h3>
+<pre><code>Main: "Review the payment module"
+├── Explore: "Analyze code structure" (completed)
+├── Explore: "Find similar patterns" (completed)
+└── Researcher: "Check for vulnerabilities" (running)</code></pre>
+
+        <hr>
+
+        <h2>Monitoring Best Practices</h2>
+        <ol>
+          <li><strong>Use Tree View</strong>: <code>descartes ps --tree</code></li>
+          <li><strong>Follow Sub-Agent Logs</strong>: <code>descartes logs abc123 --follow</code></li>
+          <li><strong>Set Alerts for Failures</strong>: Monitor for sub-agent errors</li>
+          <li><strong>Review After Completion</strong>: Check the full hierarchy</li>
+        </ol>
+
+        <hr>
+        <p><em>Visibility without invasion—shadow tracking gives you insight without control.</em></p>
+      </article>
+
+      <!-- Post 11: Advanced Features -->
+      <article id="post-11" class="post">
+        <h1>Advanced Features</h1>
+        <p class="tagline">Time-travel, state machines, and beyond</p>
+        <hr>
+
+        <p>Beyond the core agent functionality, Descartes offers powerful advanced features for debugging, state management, and distributed execution.</p>
+
+        <h2>Time-Travel Debugging</h2>
+        <p>Every agent action is recorded. Time-travel lets you:</p>
+        <ul>
+          <li><strong>Replay</strong> past execution</li>
+          <li><strong>Inspect</strong> any moment in history</li>
+          <li><strong>Restore</strong> to previous states</li>
+          <li><strong>Audit</strong> decision-making</li>
+        </ul>
+
+        <h3>Using Time-Travel</h3>
+<pre><code># List history events
+descartes history a1b2c3
+
+# Show specific event
+descartes history a1b2c3 --event evt_123
+
+# Restore to point in time
+descartes restore a1b2c3 --to "2025-01-15T10:30:00Z"</code></pre>
+
+        <hr>
+
+        <h2>Brain and Body Restoration</h2>
+        <p>Descartes separates agent state into "brain" (memory/context) and "body" (code/files).</p>
+        <ul>
+          <li><strong>Brain Restore</strong>: Reconstruct agent mental state from events</li>
+          <li><strong>Body Restore</strong>: Git-based code state recovery</li>
+        </ul>
+<pre><code># Restore both brain and body to specific point
+descartes restore a1b2c3 --to evt_abc123 --include-code</code></pre>
+
+        <hr>
+
+        <h2>State Machines</h2>
+        <p>Agent lifecycle is managed by compile-time verified state machines using the <code>statig</code> crate.</p>
+<pre><code>Idle ──▶ Initializing ──▶ Running ◀──▶ Thinking
+                              │              │
+                              ├──▶ Paused ◀──┤
+                              │              │
+                              ├──▶ Completed
+                              ├──▶ Failed
+                              └──▶ Terminated</code></pre>
+
+        <hr>
+
+        <h2>DAG Execution</h2>
+        <p>Task dependencies form a Directed Acyclic Graph for optimal parallel execution:</p>
+<pre><code>Wave 1: [A]           # No dependencies
+Wave 2: [B, C]        # Both depend on A
+Wave 3: [D, E]        # Depend on B or C
+Wave 4: [F]           # Depends on D and E</code></pre>
+
+        <hr>
+
+        <h2>Distributed Execution with ZeroMQ</h2>
+        <p>For large workloads, agents can run across multiple machines:</p>
+<pre><code># Start ZMQ server on remote machine
+descartes daemon --zmq-bind tcp://0.0.0.0:5555
+
+# Spawn agent on remote
+descartes spawn \
+  --task "Process batch data" \
+  --remote tcp://machine-a:5555
+
+# Health check
+descartes remote health tcp://machine-a:5555</code></pre>
+
+        <hr>
+
+        <h2>Persistent Memory (Thoughts)</h2>
+        <p>Agents can persist knowledge across sessions:</p>
+<pre><code>~/.descartes/thoughts/
+├── research/
+│   └── 2025-01-15-auth-patterns.md
+└── plans/
+    └── 2025-01-15-feature-x.md</code></pre>
+
+<pre><code># List thoughts
+descartes thoughts list
+
+# Search thoughts
+descartes thoughts search "authentication"</code></pre>
+
+        <hr>
+
+        <h2>Distributed File Locking</h2>
+        <p>When multiple agents work on the same codebase, a lease manager provides:</p>
+        <ul>
+          <li><strong>TTL-based</strong> — Leases expire automatically</li>
+          <li><strong>Agent-scoped</strong> — Tied to specific agent</li>
+          <li><strong>File-granular</strong> — Lock individual files</li>
+        </ul>
+
+        <hr>
+
+        <h2>Secrets and Encryption</h2>
+        <p>Secure credential management:</p>
+        <ul>
+          <li><strong>Algorithm:</strong> AES-256-GCM</li>
+          <li><strong>Key Derivation:</strong> Argon2id</li>
+          <li><strong>Per-secret salts and nonces</strong></li>
+          <li><strong>Access audit logging</strong></li>
+        </ul>
+
+        <hr>
+
+        <h2>Debugging Tools</h2>
+<pre><code># Break when agent reads specific file
+descartes debug a1b2c3 --break "tool.name == 'read' &amp;&amp; tool.args.path contains 'secret'"
+
+# Break on error
+descartes debug a1b2c3 --break "event.type == 'error'"</code></pre>
+
+        <hr>
+
+        <h2>Performance Tuning</h2>
+<pre><code>[performance]
+max_concurrent_agents = 5
+connection_pool_size = 10
+enable_response_cache = true
+cache_ttl_secs = 300</code></pre>
+
+<pre><code># Enable Prometheus metrics
+descartes daemon --metrics-port 9090</code></pre>
+
+        <hr>
+        <p><em>From simple tasks to enterprise-scale orchestration—Descartes scales with you.</em></p>
+      </article>
+
+      <!-- Post 12: Iterative Loops -->
+      <article id="post-12" class="post">
+        <h1>Iterative Loops</h1>
+        <p class="tagline">Autonomous task execution with automatic completion detection</p>
+        <hr>
+
+        <p>What if your agent could keep working until the job is actually done? Not just run once and hope, but iterate, learn from its progress, and signal when it has truly completed the task.</p>
+
+        <p>Descartes' iterative loop system implements the "Ralph Wiggum" pattern: repeatedly execute a command until completion is detected.</p>
+
+        <h2>Quick Start</h2>
+<pre><code>descartes loop start \
+  --command "claude -p" \
+  --prompt "Implement authentication. Output &lt;promise&gt;COMPLETE&lt;/promise&gt; when done." \
+  --max-iterations 20</code></pre>
+        <p>The agent will:</p>
+        <ol>
+          <li>Execute the command with your prompt</li>
+          <li>Check output for the completion promise</li>
+          <li>If not found, run again with iteration context</li>
+          <li>Repeat until promise detected or limit reached</li>
+        </ol>
+
+        <hr>
+
+        <h2>CLI Commands</h2>
+
+        <h3>loop start</h3>
+<pre><code>descartes loop start \
+  --command "claude -p" \
+  --prompt "Your task description" \
+  --completion-promise "DONE" \
+  --max-iterations 10 \
+  --backend claude \
+  --auto-commit</code></pre>
+
+        <table>
+          <tr><th>Flag</th><th>Default</th><th>Description</th></tr>
+          <tr><td><code>--command</code></td><td>(required)</td><td>Command to execute</td></tr>
+          <tr><td><code>--prompt</code></td><td>(required)</td><td>Task prompt</td></tr>
+          <tr><td><code>--completion-promise</code></td><td><code>COMPLETE</code></td><td>Completion signal text</td></tr>
+          <tr><td><code>--max-iterations</code></td><td><code>20</code></td><td>Safety limit</td></tr>
+          <tr><td><code>--backend</code></td><td><code>generic</code></td><td><code>claude</code>, <code>opencode</code>, or <code>generic</code></td></tr>
+          <tr><td><code>--auto-commit</code></td><td><code>false</code></td><td>Git commit after each iteration</td></tr>
+        </table>
+
+        <h3>Other Commands</h3>
+<pre><code># Check status
+descartes loop status
+
+# Resume interrupted loop
+descartes loop resume
+
+# Cancel running loop
+descartes loop cancel</code></pre>
+
+        <hr>
+
+        <h2>Completion Detection</h2>
+        <p>Two formats are recognized:</p>
+        <p><strong>Tagged format (recommended):</strong></p>
+<pre><code>&lt;promise&gt;COMPLETE&lt;/promise&gt;</code></pre>
+        <p><strong>Plain text (case-insensitive):</strong></p>
+<pre><code>COMPLETE</code></pre>
+
+        <h3>Exit Conditions</h3>
+        <table>
+          <tr><th>Exit Reason</th><th>Description</th></tr>
+          <tr><td><code>CompletionPromiseDetected</code></td><td>Success - promise found</td></tr>
+          <tr><td><code>MaxIterationsReached</code></td><td>Safety limit hit</td></tr>
+          <tr><td><code>UserCancelled</code></td><td>User interrupted</td></tr>
+          <tr><td><code>Error</code></td><td>Command failed</td></tr>
+        </table>
+
+        <hr>
+
+        <h2>Backend Configuration</h2>
+
+        <h3>Claude Backend</h3>
+<pre><code>descartes loop start \
+  --command "claude" \
+  --backend claude \
+  --prompt "Your task"</code></pre>
+
+        <h3>OpenCode Backend</h3>
+<pre><code>descartes loop start \
+  --command "opencode" \
+  --backend opencode \
+  --prompt "Your task"</code></pre>
+
+        <h3>Generic Backend</h3>
+<pre><code>descartes loop start \
+  --command "python agent.py" \
+  --backend generic \
+  --prompt "Your task"</code></pre>
+
+        <hr>
+
+        <h2>Git Integration</h2>
+<pre><code>descartes loop start \
+  --command "claude -p" \
+  --prompt "Implement feature X" \
+  --auto-commit</code></pre>
+        <p>Commits use the template: <code>loop: iteration {iteration}</code></p>
+
+        <hr>
+
+        <h2>SCUD Integration</h2>
+        <p>For SCUD-based task tracking, use wave-based execution:</p>
+<pre><code>Wave 1: [Task A]           # No dependencies
+Wave 2: [Task B, Task C]   # Both depend on A
+Wave 3: [Task D]           # Depends on B and C</code></pre>
+        <p>Each wave executes when dependencies are satisfied. Tasks flow through: <code>pending → in-progress → done</code> (or <code>blocked</code>).</p>
+
+        <hr>
+
+        <h2>Best Practices</h2>
+        <ol>
+          <li><strong>Set Appropriate Limits</strong>: Always set <code>--max-iterations</code></li>
+          <li><strong>Use Tagged Completion Promises</strong>: Reduces false positives</li>
+          <li><strong>Enable Auto-Commit for Long Tasks</strong>: Preserves progress</li>
+          <li><strong>Monitor with Status Command</strong>: <code>watch -n 5 descartes loop status</code></li>
+          <li><strong>Use Ctrl+C for Graceful Stop</strong>: Finishes current iteration</li>
+        </ol>
+
+        <hr>
+        <p><em>Keep iterating until it's right.</em></p>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const navLinks = document.querySelectorAll('nav a[data-post]');
+      const posts = document.querySelectorAll('.post');
+
+      navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const postId = this.dataset.post;
+
+          // Update nav active state
+          navLinks.forEach(l => l.classList.remove('active'));
+          this.classList.add('active');
+
+          // Show selected post, hide others
+          posts.forEach(p => p.classList.remove('active'));
+          document.getElementById('post-' + postId).classList.add('active');
+
+          // Scroll to top of main content
+          document.querySelector('main').scrollTop = 0;
+          window.scrollTo(0, 0);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
