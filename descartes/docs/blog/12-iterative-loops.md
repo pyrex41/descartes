@@ -315,11 +315,20 @@ This starts a SCUD-aware loop that:
 
 Use these commands directly in Claude Code:
 
-```
-/ralph-wiggum:ralph-loop my-feature --plan thoughts/shared/plans/my-feature.md
-/ralph-wiggum:cancel-ralph
-/ralph-wiggum:help
-```
+| Command | Description |
+|---------|-------------|
+| `/rw:loop <tag> [options]` | Start a SCUD loop for the given tag |
+| `/rw:cancel-ralph` | Cancel the active loop |
+| `/rw:help` | Show available commands and usage |
+
+**Options for loop:**
+- `--plan <path>` - Implementation plan document
+- `--spec <path>` - Additional spec files (can repeat)
+- `--max-iterations <n>` - Safety limit (default: 100)
+- `--tune` / `--no-tune` - Enable/disable auto-tuning (default: enabled)
+- `--max-tune-attempts <n>` - Retries before human checkpoint (default: 3)
+
+See the command source files at `.claude/commands/rw/` for full details.
 
 ### Wave-Based Execution
 
@@ -611,6 +620,7 @@ The loop handles SIGINT gracefully, finishing the current iteration before stopp
 
 ## Next Steps
 
+- **[Tune the Guitar](13-tune-the-guitar.md)** - Automatic prompt refinement for failing tasks
 - **[Flow Workflow](07-flow-workflow.md)** - PRD to code automation using iterative loops
 - **[Sub-Agent Tracking](10-subagent-tracking.md)** - Monitor agents spawned during loops
 - **[Advanced Features](11-advanced-features.md)** - Time-travel and state restoration

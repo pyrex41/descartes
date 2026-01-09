@@ -20,6 +20,7 @@
 | Track sub-agents | [Sub-Agent Tracking](10-subagent-tracking.md) |
 | Explore advanced features | [Advanced Features](11-advanced-features.md) |
 | Run iterative loops | [Iterative Loops](12-iterative-loops.md) |
+| Tune the guitar (prompt refinement) | [Tune the Guitar](13-tune-the-guitar.md) |
 
 ---
 
@@ -82,6 +83,10 @@
 12. **[Iterative Loops](12-iterative-loops.md)**
 
     Autonomous task execution with the Ralph Wiggum pattern: repeatedly execute commands until completion detection, with SCUD integration for wave-based task tracking.
+
+13. **[Tune the Guitar](13-tune-the-guitar.md)**
+
+    Automatic prompt refinement for failing tasks. When tasks don't pass verification, a tuner agent analyzes failures and suggests prompt improvements.
 
 ---
 
