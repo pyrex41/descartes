@@ -1,12 +1,14 @@
 //! CLI command for iterative agent loops (ralph-style)
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{ArgAction, Args, Subcommand};
 use descartes_core::{
     IterativeExitReason, IterativeLoop, IterativeLoopConfig, IterativeLoopState,
     LoopBackendConfig, LoopGitConfig, ScudIterativeLoop, ScudLoopConfig, LoopSpecConfig,
+    TaskTuneState,
 };
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Debug, Subcommand)]
 pub enum LoopCommand {
@@ -18,6 +20,8 @@ pub enum LoopCommand {
     Status(LoopStatusArgs),
     /// Cancel a running loop
     Cancel(LoopCancelArgs),
+    /// Review and tune failed tasks
+    Tune(LoopTuneArgs),
 }
 
 #[derive(Debug, Args)]
@@ -73,6 +77,18 @@ pub struct LoopStartArgs {
     /// Verification command (default: cargo check && cargo test)
     #[arg(long)]
     pub verify: Option<String>,
+
+    /// Enable automatic prompt tuning on failure (default: true)
+    #[arg(long, default_value = "true")]
+    pub tune: bool,
+
+    /// Max auto-tune attempts before human checkpoint (default: 3)
+    #[arg(long, default_value = "3")]
+    pub max_tune_attempts: u32,
+
+    /// Disable tuning (shorthand for --tune=false)
+    #[arg(long)]
+    pub no_tune: bool,
 }
 
 #[derive(Debug, Args)]
@@ -96,12 +112,36 @@ pub struct LoopCancelArgs {
     pub state_file: Option<PathBuf>,
 }
 
+#[derive(Debug, Args)]
+pub struct LoopTuneArgs {
+    /// Show all attempt variants
+    #[arg(long)]
+    pub show_variants: bool,
+
+    /// Select a variant by number (1-indexed)
+    #[arg(long)]
+    pub select: Option<u32>,
+
+    /// Edit the prompt manually
+    #[arg(long)]
+    pub edit: bool,
+
+    /// Path to tune state file
+    #[arg(long)]
+    pub state_file: Option<PathBuf>,
+
+    /// Output format: text, json, markdown
+    #[arg(long, default_value = "text")]
+    pub format: String,
+}
+
 pub async fn execute(cmd: &LoopCommand) -> Result<()> {
     match cmd {
         LoopCommand::Start(args) => handle_start(args).await,
         LoopCommand::Resume(args) => handle_resume(args).await,
         LoopCommand::Status(args) => handle_status(args).await,
         LoopCommand::Cancel(args) => handle_cancel(args).await,
+        LoopCommand::Tune(args) => handle_tune(args).await,
     }
 }
 
@@ -110,10 +150,18 @@ async fn handle_start(args: &LoopStartArgs) -> Result<()> {
 
     // Check if SCUD tag is provided
     if let Some(tag) = args.scud_tag.clone() {
+        use descartes_core::TuneConfig;
+
         // Use SCUD-aware loop
+        let tune_enabled = args.tune && !args.no_tune;
         println!("{}", "Starting SCUD iterative loop...".cyan());
         println!("  SCUD tag: {}", tag.yellow());
         println!("  Max tokens: {}", args.max_spec_tokens);
+        println!(
+            "  Tuning: {} (max {} attempts)",
+            if tune_enabled { "enabled".green() } else { "disabled".dimmed() },
+            args.max_tune_attempts
+        );
         if let Some(ref plan) = args.plan {
             println!("  Plan: {:?}", plan);
         }
@@ -130,6 +178,11 @@ async fn handle_start(args: &LoopStartArgs) -> Result<()> {
             spec: LoopSpecConfig {
                 additional_specs: args.spec_file.clone(),
                 max_spec_tokens: Some(args.max_spec_tokens),
+                ..Default::default()
+            },
+            tune: TuneConfig {
+                enabled: tune_enabled,
+                max_attempts: args.max_tune_attempts,
                 ..Default::default()
             },
             ..Default::default()
@@ -312,6 +365,165 @@ async fn handle_cancel(args: &LoopCancelArgs) -> Result<()> {
     tokio::fs::write(&state_file, content).await?;
 
     println!("{}", "Loop cancelled. State updated.".green());
+
+    Ok(())
+}
+
+async fn handle_tune(args: &LoopTuneArgs) -> Result<()> {
+    use colored::Colorize;
+
+    let state_file = args
+        .state_file
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(".scud/tune-state.json"));
+
+    let content = tokio::fs::read_to_string(&state_file)
+        .await
+        .context("No tune state found. Is there a task awaiting tune?")?;
+    let mut state: TaskTuneState = serde_json::from_str(&content)?;
+
+    // Display variants if showing or no specific action requested
+    if args.show_variants || (!args.edit && args.select.is_none()) {
+        println!(
+            "{}",
+            format!("Task {}: {}", state.task_id, state.task_title)
+                .cyan()
+                .bold()
+        );
+        println!("{}", "=".repeat(60).dimmed());
+        println!();
+
+        for attempt in &state.attempts {
+            let status = if attempt.verification_passed {
+                "✓ PASSED".green()
+            } else {
+                "✗ FAILED".red()
+            };
+
+            println!(
+                "{} Attempt {} {}",
+                "─".repeat(20).dimmed(),
+                attempt.attempt,
+                status
+            );
+            println!();
+
+            if args.format == "text" {
+                // Truncated view
+                println!("{}", "Prompt (truncated):".yellow());
+                println!(
+                    "{}",
+                    attempt.prompt.chars().take(500).collect::<String>()
+                );
+                if attempt.prompt.len() > 500 {
+                    println!("...");
+                }
+                println!();
+
+                println!("{}", "Verification Error:".red());
+                println!(
+                    "{}",
+                    attempt.verification_stderr.chars().take(300).collect::<String>()
+                );
+                println!();
+
+                if let Some(ref refinement) = attempt.suggested_refinement {
+                    println!("{}", "Suggested Refinement:".green());
+                    println!("{}", refinement);
+                    println!();
+                }
+            } else if args.format == "json" {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&attempt).unwrap_or_default()
+                );
+            } else if args.format == "markdown" {
+                // Full markdown output
+                println!("### Prompt\n```\n{}\n```\n", attempt.prompt);
+                println!(
+                    "### Error\n```\n{}\n```\n",
+                    attempt.verification_stderr
+                );
+                if let Some(ref diff) = attempt.git_diff {
+                    println!("### Diff\n```diff\n{}\n```\n", diff);
+                }
+            }
+        }
+
+        println!("{}", "─".repeat(60).dimmed());
+        println!();
+        println!("Commands:");
+        println!(
+            "  {} - Select variant N to retry",
+            "descartes loop tune --select N".cyan()
+        );
+        println!(
+            "  {} - Edit prompt manually",
+            "descartes loop tune --edit".cyan()
+        );
+        println!(
+            "  {} - Resume with selected variant",
+            "descartes loop resume".cyan()
+        );
+    }
+
+    if let Some(variant) = args.select {
+        if variant < 1 || variant > state.attempts.len() as u32 {
+            return Err(anyhow::anyhow!(
+                "Invalid variant number. Choose 1-{}",
+                state.attempts.len()
+            ));
+        }
+
+        state.selected_variant = Some(variant);
+        let content = serde_json::to_string_pretty(&state)?;
+        tokio::fs::write(&state_file, content).await?;
+
+        println!(
+            "{}",
+            format!(
+                "Selected variant {}. Run `descartes loop resume` to continue.",
+                variant
+            )
+            .green()
+        );
+    }
+
+    if args.edit {
+        // Open editor for manual prompt editing
+        let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vim".to_string());
+
+        // Write current best prompt to temp file
+        let temp_path = state_file.with_extension("prompt.md");
+        let best_prompt = state
+            .attempts
+            .last()
+            .map(|a| a.prompt.clone())
+            .unwrap_or_default();
+
+        tokio::fs::write(&temp_path, &best_prompt).await?;
+
+        // Open editor
+        let status = Command::new(&editor)
+            .arg(&temp_path)
+            .status()
+            .context("Failed to open editor")?;
+
+        if status.success() {
+            let edited = tokio::fs::read_to_string(&temp_path).await?;
+            state.custom_prompt = Some(edited);
+
+            let content = serde_json::to_string_pretty(&state)?;
+            tokio::fs::write(&state_file, content).await?;
+
+            println!(
+                "{}",
+                "Custom prompt saved. Run `descartes loop resume` to continue.".green()
+            );
+        }
+
+        tokio::fs::remove_file(&temp_path).await.ok();
+    }
 
     Ok(())
 }

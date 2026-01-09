@@ -21,6 +21,7 @@
 | Explore advanced features | [Advanced Features](11-advanced-features.md) |
 | Run iterative loops | [Iterative Loops](12-iterative-loops.md) |
 | Tune the guitar (prompt refinement) | [Tune the Guitar](13-tune-the-guitar.md) |
+| Choose between Flow and RW | [Choosing Your Workflow](14-choosing-your-workflow.md) |
 
 ---
 
@@ -87,6 +88,10 @@
 13. **[Tune the Guitar](13-tune-the-guitar.md)**
 
     Automatic prompt refinement for failing tasks. When tasks don't pass verification, a tuner agent analyzes failures and suggests prompt improvements.
+
+14. **[Choosing Your Workflow: Flow vs RW](14-choosing-your-workflow.md)**
+
+    Compare two philosophies for autonomous development: Flow's multi-session pipeline with handoffs versus RW's iterative refinement loop. Includes decision matrix and hybrid approaches.
 
 ---
 

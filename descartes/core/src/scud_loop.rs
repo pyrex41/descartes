@@ -166,6 +166,10 @@ pub struct ScudLoopConfig {
     /// Spec configuration for context loading
     #[serde(default)]
     pub spec: LoopSpecConfig,
+
+    /// Tuning configuration for "tune the guitar" feedback loop
+    #[serde(default)]
+    pub tune: TuneConfig,
 }
 
 fn default_max_per_task() -> u32 {
@@ -186,6 +190,8 @@ pub enum TaskExecutionResult {
     Success,
     Blocked(String),
     Unknown,
+    /// Task needs human tuning intervention
+    AwaitingTune(TaskTuneState),
 }
 
 impl Default for ScudLoopConfig {
@@ -202,6 +208,7 @@ impl Default for ScudLoopConfig {
             auto_commit_waves: true,
             state_file: None,
             spec: LoopSpecConfig::default(),
+            tune: TuneConfig::default(),
         }
     }
 }
@@ -278,6 +285,101 @@ pub struct BlockedTask {
     pub blocked_at: DateTime<Utc>,
 }
 
+/// A single attempt at executing a task (for tuning)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskAttempt {
+    /// Attempt number (1-indexed)
+    pub attempt: u32,
+
+    /// The prompt/spec used for this attempt
+    pub prompt: String,
+
+    /// Agent output (truncated if too long)
+    pub agent_output: String,
+
+    /// Verification stdout
+    pub verification_stdout: String,
+
+    /// Verification stderr
+    pub verification_stderr: String,
+
+    /// Whether verification passed
+    pub verification_passed: bool,
+
+    /// Git diff of changes made (if any)
+    pub git_diff: Option<String>,
+
+    /// Suggested refinement for next attempt (from tuner agent)
+    pub suggested_refinement: Option<String>,
+
+    /// Timestamp
+    pub attempted_at: DateTime<Utc>,
+}
+
+/// State for task tuning (persisted separately)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskTuneState {
+    /// Task being tuned
+    pub task_id: u32,
+    pub task_title: String,
+
+    /// All attempts made
+    pub attempts: Vec<TaskAttempt>,
+
+    /// Currently selected variant (for resume)
+    pub selected_variant: Option<u32>,
+
+    /// Custom prompt override (from human)
+    pub custom_prompt: Option<String>,
+
+    /// When tuning started
+    pub started_at: DateTime<Utc>,
+}
+
+/// Configuration for "tune the guitar" feedback loop
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TuneConfig {
+    /// Enable automatic prompt tuning on failure
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Max auto-tune attempts before human checkpoint
+    #[serde(default = "default_tune_attempts")]
+    pub max_attempts: u32,
+
+    /// Max tokens of agent output to include in tuning context
+    #[serde(default = "default_tune_output_tokens")]
+    pub max_output_tokens: usize,
+
+    /// Include git diff in tuning context
+    #[serde(default = "default_true")]
+    pub include_git_diff: bool,
+
+    /// Path for tune state file
+    #[serde(default)]
+    pub tune_state_file: Option<PathBuf>,
+}
+
+fn default_tune_attempts() -> u32 {
+    3
+}
+
+fn default_tune_output_tokens() -> usize {
+    2000
+}
+
+impl Default for TuneConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_attempts: default_tune_attempts(),
+            max_output_tokens: default_tune_output_tokens(),
+            include_git_diff: true,
+            tune_state_file: None,
+        }
+    }
+}
+
 impl Default for ScudLoopState {
     fn default() -> Self {
         Self {
@@ -302,6 +404,8 @@ impl Default for ScudLoopState {
 pub struct ScudIterativeLoop {
     config: ScudLoopConfig,
     state: ScudLoopState,
+    /// Pending tune state from human intervention
+    pending_tune_state: Option<TaskTuneState>,
 }
 
 impl ScudIterativeLoop {
@@ -322,7 +426,11 @@ impl ScudIterativeLoop {
             ..Default::default()
         };
 
-        Ok(Self { config, state })
+        Ok(Self {
+            config,
+            state,
+            pending_tune_state: None,
+        })
     }
 
     /// Resume from existing state file
@@ -333,10 +441,57 @@ impl ScudIterativeLoop {
         let state: ScudLoopState =
             serde_json::from_str(&content).context("Failed to parse state file")?;
 
-        Ok(Self {
+        let mut executor = Self {
             config: state.config.clone(),
             state,
-        })
+            pending_tune_state: None,
+        };
+
+        // Check for tune state
+        executor.load_tune_state().await?;
+
+        Ok(executor)
+    }
+
+    /// Load tune state if exists
+    async fn load_tune_state(&mut self) -> Result<()> {
+        let tune_path = self
+            .config
+            .tune
+            .tune_state_file
+            .clone()
+            .unwrap_or_else(|| self.config.working_directory.join(".scud/tune-state.json"));
+
+        if tune_path.exists() {
+            let content = tokio::fs::read_to_string(&tune_path).await?;
+            let tune_state: TaskTuneState = serde_json::from_str(&content)?;
+            info!(
+                "Loaded tune state for task {}: selected_variant={:?}, custom_prompt={}",
+                tune_state.task_id,
+                tune_state.selected_variant,
+                tune_state.custom_prompt.is_some()
+            );
+            self.pending_tune_state = Some(tune_state);
+        }
+
+        Ok(())
+    }
+
+    /// Clear tune state file
+    async fn clear_tune_state(&self) -> Result<()> {
+        let tune_path = self
+            .config
+            .tune
+            .tune_state_file
+            .clone()
+            .unwrap_or_else(|| self.config.working_directory.join(".scud/tune-state.json"));
+
+        if tune_path.exists() {
+            tokio::fs::remove_file(&tune_path).await?;
+            info!("Cleared tune state file");
+        }
+
+        Ok(())
     }
 
     /// Get current wave number
@@ -682,8 +837,8 @@ impl ScudIterativeLoop {
             // Mark task as in-progress
             self.update_task_status(task.id, "in-progress")?;
 
-            // Execute task with sub-agent
-            let result = self.execute_task(&task).await?;
+            // Execute task with sub-agent (with tuning if enabled)
+            let result = self.execute_task_with_tuning(&task).await?;
 
             match result {
                 TaskExecutionResult::Success => {
@@ -735,6 +890,24 @@ impl ScudIterativeLoop {
                             blocked_at: Utc::now(),
                         });
                     }
+                }
+                TaskExecutionResult::AwaitingTune(tune_state) => {
+                    // Pause loop for human intervention
+                    self.update_task_status(task.id, "awaiting-tune")?;
+                    self.state.exit_reason = Some(IterativeExitReason::AwaitingHumanTune);
+                    self.save_state().await?;
+
+                    return Ok(IterativeLoopResult {
+                        iterations_completed: self.state.iteration_count,
+                        completion_promise_found: false,
+                        completion_text: None,
+                        final_output: format!(
+                            "Task {} awaiting human tune. Run `descartes loop tune` to review {} variants.",
+                            task.id, tune_state.attempts.len()
+                        ),
+                        exit_reason: IterativeExitReason::AwaitingHumanTune,
+                        total_duration: start_time.elapsed(),
+                    });
                 }
             }
 
@@ -941,6 +1114,270 @@ impl ScudIterativeLoop {
 
         Ok(result)
     }
+
+    /// Execute a task with automatic tuning on failure
+    async fn execute_task_with_tuning(&mut self, task: &LoopTask) -> Result<TaskExecutionResult> {
+        // Check if we have a tuned prompt for this task
+        if let Some(ref tune_state) = self.pending_tune_state.clone() {
+            if tune_state.task_id == task.id {
+                let tuned_spec = if let Some(ref custom) = tune_state.custom_prompt {
+                    info!("Using custom prompt from tune state for task {}", task.id);
+                    custom.clone()
+                } else if let Some(variant) = tune_state.selected_variant {
+                    info!("Using variant {} from tune state for task {}", variant, task.id);
+                    tune_state
+                        .attempts
+                        .get((variant - 1) as usize)
+                        .map(|a| a.prompt.clone())
+                        .unwrap_or_else(|| self.build_task_spec(task).unwrap_or_default())
+                } else {
+                    self.build_task_spec(task)?
+                };
+
+                // Clear tune state after use
+                self.pending_tune_state = None;
+                self.clear_tune_state().await?;
+
+                // Execute with tuned prompt (single attempt, verification decides success)
+                let full_prompt = self.build_task_prompt(&tuned_spec, task)?;
+                let output = self.spawn_claude_agent(&full_prompt).await?;
+                let result = self.parse_task_result(&output, task)?;
+                return Ok(result);
+            }
+        }
+
+        if !self.config.tune.enabled {
+            // Fall back to simple execution
+            return self.execute_task(task).await;
+        }
+
+        let mut attempts: Vec<TaskAttempt> = Vec::new();
+        let base_spec = self.build_task_spec(task)?;
+        let mut current_spec = base_spec.clone();
+
+        for attempt_num in 1..=self.config.tune.max_attempts {
+            info!("Task {} attempt {}/{}", task.id, attempt_num, self.config.tune.max_attempts);
+
+            // Build full prompt with any accumulated refinements
+            let full_prompt = self.build_task_prompt(&current_spec, task)?;
+
+            // Execute
+            let output = self.spawn_claude_agent(&full_prompt).await?;
+
+            // Run verification and capture details
+            let (verified, stdout, stderr) = self.run_verification_detailed()?;
+
+            // Capture git diff before potential revert
+            let git_diff = if self.config.tune.include_git_diff {
+                Some(self.get_git_diff()?)
+            } else {
+                None
+            };
+
+            let mut attempt = TaskAttempt {
+                attempt: attempt_num,
+                prompt: current_spec.clone(),
+                agent_output: output.clone(),
+                verification_stdout: stdout,
+                verification_stderr: stderr.clone(),
+                verification_passed: verified,
+                git_diff,
+                suggested_refinement: None,
+                attempted_at: Utc::now(),
+            };
+
+            if verified {
+                attempts.push(attempt);
+                info!("Task {} succeeded on attempt {}", task.id, attempt_num);
+                return Ok(TaskExecutionResult::Success);
+            }
+
+            // Failed - revert changes before retry
+            self.revert_changes()?;
+
+            // Get refinement suggestion (unless last attempt)
+            if attempt_num < self.config.tune.max_attempts {
+                if let Some(refinement) = self.spawn_tuner_agent(task, &attempt).await? {
+                    info!("Tuner suggested refinement: {}", &refinement.chars().take(100).collect::<String>());
+                    attempt.suggested_refinement = Some(refinement.clone());
+
+                    // Apply refinement to prompt
+                    current_spec = format!(
+                        "{}\n\n---\n\n## Additional Guidance (from previous failure)\n\n{}",
+                        base_spec, refinement
+                    );
+                }
+            }
+
+            attempts.push(attempt);
+        }
+
+        // All attempts exhausted - enter human tuning mode
+        warn!("Task {} failed after {} attempts, awaiting human tune", task.id, self.config.tune.max_attempts);
+
+        let tune_state = TaskTuneState {
+            task_id: task.id,
+            task_title: task.title.clone(),
+            attempts,
+            selected_variant: None,
+            custom_prompt: None,
+            started_at: Utc::now(),
+        };
+
+        // Save tune state
+        self.save_tune_state(&tune_state).await?;
+
+        Ok(TaskExecutionResult::AwaitingTune(tune_state))
+    }
+
+    // ========================================================================
+    // "Tune the Guitar" Methods
+    // ========================================================================
+
+    /// Build prompt for the tuner agent that suggests refinements
+    fn build_tuner_prompt(&self, task: &LoopTask, attempt: &TaskAttempt) -> String {
+        let git_diff_section = if let Some(ref diff) = attempt.git_diff {
+            if !diff.is_empty() {
+                format!("### Git Diff\n```diff\n{}\n```", diff)
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        format!(
+            r#"You are analyzing a failed task execution to suggest prompt refinements.
+
+## Original Task
+**ID:** {}
+**Title:** {}
+**Description:** {}
+
+## Prompt Used
+```
+{}
+```
+
+## What Happened
+The agent attempted the task but verification failed.
+
+### Agent Output (truncated)
+```
+{}
+```
+
+### Verification Error
+```
+{}
+```
+
+{}
+
+## Your Job
+Analyze why this failed and suggest a **specific refinement** to the prompt that would help the next attempt succeed.
+
+Focus on:
+1. What the agent misunderstood
+2. Missing context that would help
+3. Specific instructions to add
+4. Edge cases to handle
+
+Output your refinement as a SHORT, ACTIONABLE addition to the prompt (max 500 tokens).
+Start with "REFINEMENT:" on its own line, then the text to add."#,
+            task.id,
+            task.title,
+            task.description.as_deref().unwrap_or("No description"),
+            attempt.prompt,
+            &attempt.agent_output.chars().take(self.config.tune.max_output_tokens).collect::<String>(),
+            attempt.verification_stderr,
+            git_diff_section
+        )
+    }
+
+    /// Parse refinement from tuner agent output
+    fn parse_tuner_output(&self, output: &str) -> Option<String> {
+        if let Some(idx) = output.find("REFINEMENT:") {
+            let refinement = output[idx + 11..].trim();
+            if !refinement.is_empty() {
+                return Some(refinement.to_string());
+            }
+        }
+        None
+    }
+
+    /// Spawn the tuner agent to suggest prompt refinements
+    async fn spawn_tuner_agent(&self, task: &LoopTask, attempt: &TaskAttempt) -> Result<Option<String>> {
+        let prompt = self.build_tuner_prompt(task, attempt);
+
+        info!("Spawning tuner agent to analyze failure for task {}", task.id);
+
+        let output = self.spawn_claude_agent(&prompt).await?;
+
+        Ok(self.parse_tuner_output(&output))
+    }
+
+    /// Get git diff of uncommitted changes
+    fn get_git_diff(&self) -> Result<String> {
+        let output = Command::new("git")
+            .args(["diff", "HEAD"])
+            .current_dir(&self.config.working_directory)
+            .output()
+            .context("Failed to get git diff")?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    /// Revert uncommitted changes (for retry)
+    fn revert_changes(&self) -> Result<()> {
+        Command::new("git")
+            .args(["checkout", "."])
+            .current_dir(&self.config.working_directory)
+            .output()
+            .context("Failed to revert changes")?;
+
+        Command::new("git")
+            .args(["clean", "-fd"])
+            .current_dir(&self.config.working_directory)
+            .output()
+            .context("Failed to clean untracked files")?;
+
+        Ok(())
+    }
+
+    /// Run verification and return detailed output
+    fn run_verification_detailed(&self) -> Result<(bool, String, String)> {
+        if let Some(ref cmd) = self.config.verification_command {
+            let output = Command::new("sh")
+                .args(["-c", cmd])
+                .current_dir(&self.config.working_directory)
+                .output()
+                .context("Failed to run verification command")?;
+
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+            Ok((output.status.success(), stdout, stderr))
+        } else {
+            Ok((true, String::new(), String::new()))
+        }
+    }
+
+    /// Save tune state to file
+    async fn save_tune_state(&self, state: &TaskTuneState) -> Result<()> {
+        let path = self.config.tune.tune_state_file.clone()
+            .unwrap_or_else(|| self.config.working_directory.join(".scud/tune-state.json"));
+
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+
+        let content = serde_json::to_string_pretty(state)?;
+        tokio::fs::write(&path, content).await?;
+
+        info!("Saved tune state to {:?}", path);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1127,6 +1564,7 @@ mod tests {
             auto_commit_waves: false,
             state_file: Some(PathBuf::from("/state.json")),
             spec: LoopSpecConfig::default(),
+            tune: TuneConfig::default(),
         };
         let json = serde_json::to_string(&config).unwrap();
         let parsed: ScudLoopConfig = serde_json::from_str(&json).unwrap();
@@ -1190,6 +1628,7 @@ mod tests {
             auto_commit_waves: false,
             state_file: None,
             spec: LoopSpecConfig::default(),
+            tune: TuneConfig::default(),
         };
 
         let state = ScudLoopState {
@@ -1203,7 +1642,11 @@ mod tests {
             ..Default::default()
         };
 
-        ScudIterativeLoop { config, state }
+        ScudIterativeLoop {
+            config,
+            state,
+            pending_tune_state: None,
+        }
     }
 
     #[test]
@@ -1322,5 +1765,152 @@ mod tests {
             TaskExecutionResult::Unknown => {},
             _ => panic!("Expected Unknown result"),
         }
+    }
+
+    // ========================================================================
+    // Phase 2: Tuner Agent Tests
+    // ========================================================================
+
+    #[test]
+    fn test_parse_tuner_output_success() {
+        let loop_exec = create_test_loop();
+        let output = r#"Looking at the error, it seems the function was called with wrong arguments.
+
+REFINEMENT:
+Add explicit type hints to the function signature and ensure the return type matches the expected interface. Also handle the edge case when input is empty."#;
+
+        let refinement = loop_exec.parse_tuner_output(output);
+        assert!(refinement.is_some());
+        let r = refinement.unwrap();
+        assert!(r.contains("Add explicit type hints"));
+        assert!(r.contains("edge case"));
+    }
+
+    #[test]
+    fn test_parse_tuner_output_no_refinement() {
+        let loop_exec = create_test_loop();
+        let output = "Analysis complete. No clear fix found.";
+
+        let refinement = loop_exec.parse_tuner_output(output);
+        assert!(refinement.is_none());
+    }
+
+    #[test]
+    fn test_parse_tuner_output_empty_refinement() {
+        let loop_exec = create_test_loop();
+        let output = "REFINEMENT:   \n\n";
+
+        let refinement = loop_exec.parse_tuner_output(output);
+        assert!(refinement.is_none());
+    }
+
+    #[test]
+    fn test_build_tuner_prompt() {
+        let loop_exec = create_test_loop();
+        let task = LoopTask {
+            id: 42,
+            title: "Implement feature X".to_string(),
+            description: Some("Add the X feature to module Y".to_string()),
+            status: "in-progress".to_string(),
+            complexity: 3,
+            depends_on: vec![],
+            test_strategy: Some("Unit tests".to_string()),
+        };
+        let attempt = TaskAttempt {
+            attempt: 1,
+            prompt: "Please implement feature X".to_string(),
+            agent_output: "I tried to implement it but got confused".to_string(),
+            verification_stdout: String::new(),
+            verification_stderr: "Error: undefined variable 'foo'".to_string(),
+            verification_passed: false,
+            git_diff: Some("+ let bar = 1;\n- let foo = 2;".to_string()),
+            suggested_refinement: None,
+            attempted_at: Utc::now(),
+        };
+
+        let prompt = loop_exec.build_tuner_prompt(&task, &attempt);
+
+        assert!(prompt.contains("42"));
+        assert!(prompt.contains("Implement feature X"));
+        assert!(prompt.contains("Add the X feature"));
+        assert!(prompt.contains("Please implement feature X"));
+        assert!(prompt.contains("undefined variable 'foo'"));
+        assert!(prompt.contains("let bar = 1"));
+        assert!(prompt.contains("REFINEMENT:"));
+    }
+
+    #[test]
+    fn test_tune_config_defaults() {
+        let config = TuneConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.max_attempts, 3);
+        assert_eq!(config.max_output_tokens, 2000);
+        assert!(config.include_git_diff);
+        assert!(config.tune_state_file.is_none());
+    }
+
+    #[test]
+    fn test_tune_config_serialization() {
+        let config = TuneConfig {
+            enabled: false,
+            max_attempts: 5,
+            max_output_tokens: 3000,
+            include_git_diff: false,
+            tune_state_file: Some(PathBuf::from("/custom/tune.json")),
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let parsed: TuneConfig = serde_json::from_str(&json).unwrap();
+        assert!(!parsed.enabled);
+        assert_eq!(parsed.max_attempts, 5);
+        assert_eq!(parsed.max_output_tokens, 3000);
+    }
+
+    #[test]
+    fn test_task_attempt_serialization() {
+        let attempt = TaskAttempt {
+            attempt: 2,
+            prompt: "Test prompt".to_string(),
+            agent_output: "Agent did stuff".to_string(),
+            verification_stdout: "ok".to_string(),
+            verification_stderr: "err".to_string(),
+            verification_passed: false,
+            git_diff: Some("diff content".to_string()),
+            suggested_refinement: Some("Try X instead".to_string()),
+            attempted_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&attempt).unwrap();
+        let parsed: TaskAttempt = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.attempt, 2);
+        assert_eq!(parsed.prompt, "Test prompt");
+        assert_eq!(parsed.suggested_refinement, Some("Try X instead".to_string()));
+    }
+
+    #[test]
+    fn test_task_tune_state_serialization() {
+        let state = TaskTuneState {
+            task_id: 7,
+            task_title: "Tune test".to_string(),
+            attempts: vec![
+                TaskAttempt {
+                    attempt: 1,
+                    prompt: "First try".to_string(),
+                    agent_output: "Failed".to_string(),
+                    verification_stdout: String::new(),
+                    verification_stderr: "Error".to_string(),
+                    verification_passed: false,
+                    git_diff: None,
+                    suggested_refinement: Some("Try again".to_string()),
+                    attempted_at: Utc::now(),
+                },
+            ],
+            selected_variant: Some(1),
+            custom_prompt: None,
+            started_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&state).unwrap();
+        let parsed: TaskTuneState = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.task_id, 7);
+        assert_eq!(parsed.attempts.len(), 1);
+        assert_eq!(parsed.selected_variant, Some(1));
     }
 }

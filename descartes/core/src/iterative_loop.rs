@@ -252,6 +252,8 @@ pub enum IterativeExitReason {
     ProcessSuccess,
     /// Loop is still running (for state file)
     Running,
+    /// Waiting for human to tune a failed task
+    AwaitingHumanTune,
 }
 
 impl Default for IterativeLoopState {

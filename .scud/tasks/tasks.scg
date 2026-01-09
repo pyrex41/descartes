@@ -3,7 +3,7 @@
 
 @meta {
   name codelayer
-  updated 2025-12-30T05:28:30.833077+00:00
+  updated 2026-01-08T23:30:31.905732+00:00
 }
 
 @nodes
@@ -144,11 +144,78 @@
 ---
 
 # SCUD Graph v1
+# Phase: demo
+
+@meta {
+  name demo
+  updated 2026-01-08T23:30:31.905769+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Audit Current Codebase for Removals | P | 3 | H
+2 | Remove RAG and Semantic Dependencies | P | 5 | H
+3 | Drop Semantic Database Tables | P | 3 | H
+4 | Simplify Internal IPC to Tokio Channels | P | 8 | H
+5 | Design New Event Sourcing SQLite Schema | P | 3 | H
+6 | Implement New SQLite Tables | P | 5 | H
+7 | Refactor to ZMQ-First Data Flow | P | 8 | H
+8 | Simplify Time Travel Feature | P | 5 | M
+9 | Update Observability and Management Logic | P | 5 | M
+10 | Integrate and Test Refactored System | P | 8 | H
+
+@edges
+# dependent -> dependency
+2 -> 1
+3 -> 1
+4 -> 1
+4 -> 2
+5 -> 3
+6 -> 5
+7 -> 4
+7 -> 6
+8 -> 6
+8 -> 7
+9 -> 7
+9 -> 8
+10 -> 2
+10 -> 3
+10 -> 4
+10 -> 6
+10 -> 7
+10 -> 8
+10 -> 9
+
+@details
+1 | description |
+  Review the agent-runner and core modules to identify all files, dependencies, and database tables related to RAG, semantic analysis, and complex IPC that need to be deleted. Document the 'Delete List' including ipc.rs, rag.rs, semantic.rs, knowledge_graph.rs, and 13+ semantic tables. Ensure the audit covers compilation dependencies to reduce binary size.
+2 | description |
+  Delete the specified files (rag.rs, semantic.rs, knowledge_graph.rs) and remove dependencies like lancedb and tantivy from Cargo.toml. Update any import statements in the codebase that reference these removed modules. Verify that the codebase compiles without these components.
+3 | description |
+  Execute SQL commands to drop the 13+ tables related to AST nodes (e.g., semantic_nodes, file_dependencies) from the current database schema. Ensure no foreign keys or references are left dangling. Confirm the schema simplification via a database inspection tool.
+4 | description |
+  Replace the complex internal bus (ipc.rs) with simple Tokio channels that bridge ZMQ sockets to the State Store. Remove Dead Letter Queues and Backpressure logic. Update any code that interacts with the old IPC to use the new channels.
+5 | description |
+  Create a specification for the minimal SQLite schema with three tables: agents (UUID, status, ZMQ address), events (append-only log), and snapshots (for Time Travel with Git commit hash and last event ID). Ensure it focuses on observability and time travel without complex relations.
+6 | description |
+  Write and execute SQL scripts to create the new agents, events, and snapshots tables in SQLite. Migrate any necessary data from old tables if applicable (e.g., agent statuses). Test basic CRUD operations on the new schema.
+7 | description |
+  Update the architecture to use ZMQ as the primary interface: Daemon binds ROUTER socket, agents connect via DEALER. Implement the flow from agent stdout/stderr to ZMQ Message to Daemon to SQLite Event Log to GUI WebSocket. Remove distinctions between local and remote agents.
+8 | description |
+  Refactor the 'Brain' Time Travel to replay only the events table, without restoring complex AST states. Keep 'Body' as standard Git commits via body_restore.rs. Ensure the GUI can time travel by replaying event logs and checking out Git commits.
+9 | description |
+  Adjust the Daemon's role as a 'Traffic Controller' for ZMQ clients, focusing on agent management without semantic analysis. Update GUI interfaces to pull data from the new event log and agent table. Confirm that agent orchestration is lightweight and ZMQ-driven.
+10 | description |
+  Compile the updated codebase, run integration tests for ZMQ communication, database operations, and Time Travel. Verify performance improvements (e.g., faster compilation, reduced memory). Ensure the GUI displays events correctly and agents can be moved to remote servers seamlessly.
+
+---
+
+# SCUD Graph v1
 # Phase: opencode
 
 @meta {
   name opencode
-  updated 2025-12-30T05:28:30.833305+00:00
+  updated 2026-01-08T23:30:31.905781+00:00
 }
 
 @nodes
@@ -389,11 +456,103 @@
 ---
 
 # SCUD Graph v1
+# Phase: ralph
+
+@meta {
+  name ralph
+  updated 2026-01-08T23:30:31.905838+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Add LoopSpecConfig struct to scud_loop.rs | D | 3 | H
+2 | Integrate LoopSpecConfig into ScudLoopConfig | D | 2 | H
+3 | Implement build_task_spec method | X | 5 | H
+3.1 | Implement helper methods and token warning logic | D | 0 | M
+3.2 | Implement build_task_spec method | D | 0 | M
+4 | Implement sub-agent execution methods | X | 5 | H
+4.1 | Define TaskExecutionResult enum | D | 0 | H
+4.2 | Add sub-agent execution methods to ScudIterativeLoop | D | 0 | H
+5 | Update execute_task and main loop for sub-agents | D | 3 | H
+6 | Add SCUD options to CLI loop command | D | 3 | H
+7 | Route CLI to ScudIterativeLoop when SCUD tag provided | D | 3 | H
+8 | Create ralph-loop slash command | D | 3 | H
+9 | Create cancel-ralph and help slash commands | D | 3 | H
+10 | Add unit tests, integration tests, and documentation | X | 5 | M
+10.1 | Implement Unit and Integration Tests | D | 0 | H
+10.2 | Update Documentation | D | 0 | M
+
+@edges
+# dependent -> dependency
+2 -> 1
+3 -> 2
+3.2 -> 3.1
+4 -> 3
+4.2 -> 4.1
+5 -> 4
+7 -> 2
+7 -> 6
+8 -> 7
+9 -> 8
+10 -> 1
+10 -> 2
+10 -> 3
+10 -> 4
+10 -> 5
+10 -> 6
+10 -> 7
+10 -> 8
+10 -> 9
+10.2 -> 10.1
+
+@parents
+# parent: subtasks...
+3: 3.1, 3.2
+4: 4.1, 4.2
+10: 10.1, 10.2
+
+@details
+1 | description |
+  Implement the LoopSpecConfig struct with fields for include_task, include_plan_section, additional_specs, max_spec_tokens, and spec_template. Include Default implementation. This sets up the configuration for spec loading.
+2 | description |
+  Add a spec field of type LoopSpecConfig to ScudLoopConfig with default serde. This allows configuration of spec behavior in the main loop config.
+3 | description |
+  Create the build_task_spec method in ScudIterativeLoop that combines task details, plan sections, and additional specs. Include helpers for format_task_spec and extract_plan_section, with token warning logic.
+3.1 | description |
+  Create the helper methods format_task_spec and extract_plan_section, and implement the token warning logic in the ScudIterativeLoop class. Ensure these are independently testable and handle combining task details, plan sections, and additional specs as needed.
+3.2 | description |
+  Implement the build_task_spec method in ScudIterativeLoop that combines task details, plan sections, and additional specs using the helper methods and incorporating token warning logic.
+4 | description |
+  Add build_task_prompt, spawn_claude_agent, and parse_task_result methods to ScudIterativeLoop. Define TaskExecutionResult enum. This enables spawning Claude agents for task execution with fresh context.
+4.1 | description |
+  Define the TaskExecutionResult enum to represent possible outcomes of task execution by Claude agents.
+4.2 | description |
+  Implement build_task_prompt, spawn_claude_agent, and parse_task_result methods in ScudIterativeLoop to enable spawning Claude agents with fresh context for task execution.
+5 | description |
+  Refactor execute_task to use the new sub-agent spawning. Update the main execute loop to handle TaskExecutionResult variants, including verification and handling blocked tasks.
+6 | description |
+  Extend LoopStartArgs in loop_cmd.rs with --scud-tag, --plan, --spec-file, --max-spec-tokens, and --verify options. This allows CLI invocation with SCUD integration.
+7 | description |
+  Modify execute_start in loop_cmd.rs to detect --scud-tag and instantiate ScudIterativeLoop with appropriate config. Ensure it falls back to generic loop otherwise.
+8 | description |
+  Create .claude/commands/ralph-wiggum/ralph-loop.md with description, arguments parsing, and execution logic to start the loop via Descartes CLI. Include output format for status reporting.
+9 | description |
+  Implement .claude/commands/ralph-wiggum/cancel-ralph.md and help.md with descriptions, execution steps, and output formats. These provide commands to cancel loops and show help.
+10 | description |
+  Write unit tests for spec building and task execution parsing in scud_loop.rs. Create integration test with mock SCUD tasks. Update relevant documentation files like blog posts and README.
+10.1 | description |
+  Write unit tests for spec building and task execution parsing in scud_loop.rs. Create an integration test using mock SCUD tasks to verify end-to-end functionality.
+10.2 | description |
+  Update relevant documentation files, including blog posts and README, to reflect the new tests and any changes in functionality.
+
+---
+
+# SCUD Graph v1
 # Phase: webapp
 
 @meta {
   name webapp
-  updated 2025-12-30T05:28:30.833409+00:00
+  updated 2026-01-08T23:30:31.905856+00:00
 }
 
 @nodes
@@ -517,7 +676,7 @@
 
 @meta {
   name zmq-backbone
-  updated 2025-12-30T05:28:30.833451+00:00
+  updated 2026-01-08T23:30:31.905885+00:00
 }
 
 @nodes

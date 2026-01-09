@@ -14,8 +14,8 @@ Descartes is provider-agnostic by design. Whether you prefer Claude's reasoning,
 | **OpenAI** | Cloud API | GPT-4, GPT-4 Turbo, GPT-3.5 | General purpose |
 | **xAI/Grok** | Cloud API | Grok 4.1, Grok 3 | Fast reasoning |
 | **Ollama** | Local | Llama 2, CodeLlama, Mistral | Privacy, offline |
-| **DeepSeek** | Cloud API | DeepSeek Coder | Code generation |
-| **Groq** | Cloud API | Various | Ultra-fast inference |
+
+> **Note:** DeepSeek and Groq configuration structures exist in the codebase but provider implementations are not yet complete. These will be supported in a future release.
 
 ---
 
@@ -215,8 +215,6 @@ API keys can be set via environment variables (recommended for security):
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `OPENAI_API_KEY` | OpenAI |
 | `XAI_API_KEY` | xAI/Grok |
-| `DEEPSEEK_API_KEY` | DeepSeek |
-| `GROQ_API_KEY` | Groq |
 
 **Priority:**
 1. Environment variable (highest)
