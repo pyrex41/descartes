@@ -10,12 +10,12 @@
 </p>
 
 <p align="center">
+  <a href="docs/blog/"><strong>Blog</strong></a> •
   <a href="docs/QUICKSTART.md">Quickstart</a> •
   <a href="#philosophy">Philosophy</a> •
   <a href="#tools">Tools</a> •
   <a href="#skills">Skills</a> •
-  <a href="docs/FLOW-WORKFLOW.md">Flow Workflow</a> •
-  <a href="docs/">Documentation</a>
+  <a href="docs/FLOW-WORKFLOW.md">Flow Workflow</a>
 </p>
 
 <p align="center">
@@ -401,9 +401,9 @@ descartes loop start \
 
 **Slash commands for Claude Code:**
 ```
-/ralph-wiggum:ralph-loop my-feature --plan thoughts/shared/plans/my-feature.md
-/ralph-wiggum:cancel-ralph
-/ralph-wiggum:help
+/rw:loop my-feature --plan thoughts/shared/plans/my-feature.md
+/rw:cancel-ralph
+/rw:help
 ```
 
 This implements the [Ralph Wiggum technique](https://ghuntley.com/ralph/) by Geoffrey Huntley: external orchestration of AI agents with fresh context per iteration, where agents see their previous work through files and git history.
