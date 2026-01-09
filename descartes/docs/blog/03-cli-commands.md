@@ -49,11 +49,9 @@ descartes spawn --task "Your task description"
 | `--model` | `-m` | Specific model ID | Provider default |
 | `--tool-level` | `-l` | Agent capability level | `orchestrator` |
 | `--stream` | `-s` | Stream output in real-time | `false` |
-| `--output` | `-o` | Custom transcript output path | Auto-generated |
-| `--agent` | `-a` | Agent definition file | None |
-| `--context` | `-c` | Additional context file | None |
+| `--system` | | System prompt/context | None |
+| `--transcript-dir` | | Custom transcript directory | `.scud/sessions` |
 | `--no-spawn` | | Disable sub-agent spawning | `false` |
-| `--attachable` | | Create attach socket for TUI | `false` |
 
 ### Examples
 
@@ -70,14 +68,11 @@ descartes spawn -t "Write documentation" -p openai -m gpt-4-turbo
 # Read-only exploration
 descartes spawn -t "Analyze code quality" --tool-level readonly
 
-# Custom agent definition
-descartes spawn -t "Design the API" --agent ~/.descartes/agents/architect.md
-
 # Prevent sub-agent spawning
 descartes spawn -t "Simple fix" --no-spawn
 
-# Make attachable for external TUI
-descartes spawn -t "Long task" --attachable
+# Custom transcript directory
+descartes spawn -t "Long task" --transcript-dir ./custom-sessions
 ```
 
 ### Tool Levels
@@ -143,12 +138,11 @@ descartes logs <SESSION_ID>
 
 ### Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--follow` | `-f` | Stream logs in real-time |
-| `--format` | | Output format: `text` or `json` |
-| `--limit` | `-n` | Number of entries to show |
-| `--tail` | | Show last N entries |
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--follow` | `-f` | Stream logs in real-time | `false` |
+| `--format` | | Output format: `text` or `json` | `text` |
+| `--limit` | `-l` | Number of entries to show | `100` |
 
 ### Examples
 
@@ -162,8 +156,8 @@ descartes logs a1b2c3 --follow
 # JSON format for parsing
 descartes logs a1b2c3 --format json
 
-# Last 10 entries
-descartes logs a1b2c3 --tail 10
+# Show only 10 entries
+descartes logs a1b2c3 --limit 10
 ```
 
 ---
@@ -183,7 +177,6 @@ descartes kill <SESSION_ID>
 | Option | Description |
 |--------|-------------|
 | `--force` | Send SIGKILL instead of SIGTERM |
-| `--all` | Kill all running agents |
 
 ### Examples
 
@@ -193,9 +186,6 @@ descartes kill a1b2c3
 
 # Force kill unresponsive agent
 descartes kill a1b2c3 --force
-
-# Kill all agents
-descartes kill --all
 ```
 
 ---
@@ -238,20 +228,11 @@ Resume a previously paused agent session.
 descartes resume <SESSION_ID>
 ```
 
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--attach` | Resume and attach TUI immediately |
-
 ### Examples
 
 ```bash
 # Simple resume
 descartes resume a1b2c3
-
-# Resume with TUI attachment
-descartes resume a1b2c3 --attach
 ```
 
 ---
@@ -268,22 +249,23 @@ descartes attach <SESSION_ID>
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--tui` | TUI type: `claude`, `opencode`, or `custom` |
-| `--command` | Custom command for TUI |
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--client` | `-c` | Client type: `claude-code`, `opencode`, or `custom` | `claude-code` |
+| `--launch` | `-l` | Launch the TUI client after obtaining credentials | `false` |
+| `--json` | | Output JSON for scripting | `false` |
 
 ### Examples
 
 ```bash
 # Attach Claude Code
-descartes attach a1b2c3 --tui claude
+descartes attach a1b2c3 --client claude-code
 
-# Attach OpenCode
-descartes attach a1b2c3 --tui opencode
+# Attach OpenCode and launch it
+descartes attach a1b2c3 --client opencode --launch
 
-# Custom TUI
-descartes attach a1b2c3 --tui custom --command "my-tui --session"
+# Get credentials as JSON for scripting
+descartes attach a1b2c3 --json
 ```
 
 ### Attach Protocol
@@ -499,6 +481,16 @@ descartes loop start [OPTIONS]
 | `--auto-commit` | | Git commit after each iteration | `false` |
 | `--timeout` | | Timeout per iteration in seconds | None |
 
+**SCUD-specific options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--scud-tag` | SCUD tag for wave-based execution | None |
+| `--plan` | Implementation plan document path | None |
+| `--spec-file` | Additional spec file (repeatable) | None |
+| `--max-spec-tokens` | Token budget for spec context | `5000` |
+| `--verify` | Verification command after tasks | `cargo check && cargo test` |
+
 **Example:**
 
 ```bash
@@ -510,6 +502,13 @@ descartes loop start \
   --backend claude \
   --auto-commit
 
+# SCUD-aware loop with wave-based execution
+descartes loop start \
+  --scud-tag my-feature \
+  --plan ./thoughts/shared/plans/my-feature.md \
+  --spec-file ./ARCHITECTURE.md \
+  --verify "cargo check && cargo test"
+
 # Generic loop with custom completion text
 descartes loop start \
   --command "python agent.py" \
@@ -517,6 +516,14 @@ descartes loop start \
   --completion-promise "ALL_DONE" \
   --timeout 300
 ```
+
+**Note:** When `--scud-tag` is provided, the loop uses SCUD-aware execution that:
+- Loads tasks from the tag
+- Spawns fresh sub-agents for each task
+- Builds context from task + plan sections + spec files
+- Commits completed work wave-by-wave
+
+See [Iterative Loops documentation](12-iterative-loops.md#scud-integration) for details.
 
 ### loop status
 
@@ -667,8 +674,6 @@ Available on all commands:
 | `ANTHROPIC_API_KEY` | Anthropic API key |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `XAI_API_KEY` | xAI/Grok API key |
-| `DEEPSEEK_API_KEY` | DeepSeek API key |
-| `GROQ_API_KEY` | Groq API key |
 
 ---
 

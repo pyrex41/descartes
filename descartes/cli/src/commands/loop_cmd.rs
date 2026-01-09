@@ -1,10 +1,10 @@
 //! CLI command for iterative agent loops (ralph-style)
 
 use anyhow::Result;
-use clap::{Args, Subcommand};
+use clap::{ArgAction, Args, Subcommand};
 use descartes_core::{
     IterativeExitReason, IterativeLoop, IterativeLoopConfig, IterativeLoopState,
-    LoopBackendConfig, LoopGitConfig,
+    LoopBackendConfig, LoopGitConfig, ScudIterativeLoop, ScudLoopConfig, LoopSpecConfig,
 };
 use std::path::PathBuf;
 
@@ -53,6 +53,26 @@ pub struct LoopStartArgs {
     /// Timeout per iteration in seconds
     #[arg(long)]
     pub timeout: Option<u64>,
+
+    /// Use SCUD-based completion (provide tag name)
+    #[arg(long)]
+    pub scud_tag: Option<String>,
+
+    /// Path to implementation plan document
+    #[arg(long)]
+    pub plan: Option<PathBuf>,
+
+    /// Additional spec files to include in context
+    #[arg(long, action = ArgAction::Append)]
+    pub spec_file: Vec<PathBuf>,
+
+    /// Max tokens for spec section
+    #[arg(long, default_value = "5000")]
+    pub max_spec_tokens: usize,
+
+    /// Verification command (default: cargo check && cargo test)
+    #[arg(long)]
+    pub verify: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -88,72 +108,114 @@ pub async fn execute(cmd: &LoopCommand) -> Result<()> {
 async fn handle_start(args: &LoopStartArgs) -> Result<()> {
     use colored::Colorize;
 
-    println!("{}", "Starting iterative loop...".cyan());
-    println!("  Command: {}", args.command.yellow());
-    println!(
-        "  Prompt: {}...",
-        args.prompt.chars().take(50).collect::<String>().dimmed()
-    );
-    println!("  Max iterations: {}", args.max_iterations);
-    println!(
-        "  Completion promise: {}",
-        format!("<promise>{}</promise>", args.completion_promise).green()
-    );
-    println!();
+    // Check if SCUD tag is provided
+    if let Some(tag) = args.scud_tag.clone() {
+        // Use SCUD-aware loop
+        println!("{}", "Starting SCUD iterative loop...".cyan());
+        println!("  SCUD tag: {}", tag.yellow());
+        println!("  Max tokens: {}", args.max_spec_tokens);
+        if let Some(ref plan) = args.plan {
+            println!("  Plan: {:?}", plan);
+        }
+        if !args.spec_file.is_empty() {
+            println!("  Spec files: {:?}", args.spec_file);
+        }
+        println!();
 
-    // Parse command into command + args
-    let parts: Vec<&str> = args.command.split_whitespace().collect();
-    let (command, cmd_args) = if parts.is_empty() {
-        return Err(anyhow::anyhow!("Command cannot be empty"));
+        let config = ScudLoopConfig {
+            tag,
+            plan_path: args.plan.clone(),
+            working_directory: args.working_dir.clone().unwrap_or_else(|| PathBuf::from(".")),
+            verification_command: args.verify.clone().or(Some("cargo check && cargo test".to_string())),
+            spec: LoopSpecConfig {
+                additional_specs: args.spec_file.clone(),
+                max_spec_tokens: Some(args.max_spec_tokens),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut loop_exec = ScudIterativeLoop::new(config)?;
+        let result = loop_exec.execute().await?;
+
+        println!();
+        println!("{}", "SCUD loop completed!".green());
+        println!("  Exit reason: {:?}", result.exit_reason);
+        println!("  Duration: {:?}", result.total_duration);
+        if result.completion_promise_found {
+            println!("  Completion: All tasks done");
+        }
+
+        Ok(())
     } else {
-        (
-            parts[0].to_string(),
-            parts[1..].iter().map(|s| s.to_string()).collect(),
-        )
-    };
+        // Use generic iterative loop (existing behavior)
+        println!("{}", "Starting iterative loop...".cyan());
+        println!("  Command: {}", args.command.yellow());
+        println!(
+            "  Prompt: {}...",
+            args.prompt.chars().take(50).collect::<String>().dimmed()
+        );
+        println!("  Max iterations: {}", args.max_iterations);
+        println!(
+            "  Completion promise: {}",
+            format!("<promise>{}</promise>", args.completion_promise).green()
+        );
+        println!();
 
-    let config = IterativeLoopConfig {
-        command,
-        args: cmd_args,
-        prompt: args.prompt.clone(),
-        completion_promise: Some(args.completion_promise.clone()),
-        max_iterations: Some(args.max_iterations),
-        working_directory: args.working_dir.clone(),
-        state_file: None,
-        include_iteration_context: true,
-        iteration_timeout_secs: args.timeout,
-        backend: LoopBackendConfig {
-            backend_type: args.backend.clone(),
-            ..Default::default()
-        },
-        git: LoopGitConfig {
-            auto_commit: args.auto_commit,
-            ..Default::default()
-        },
-    };
+        // Parse command into command + args
+        let parts: Vec<&str> = args.command.split_whitespace().collect();
+        let (command, cmd_args) = if parts.is_empty() {
+            return Err(anyhow::anyhow!("Command cannot be empty"));
+        } else {
+            (
+                parts[0].to_string(),
+                parts[1..].iter().map(|s| s.to_string()).collect(),
+            )
+        };
 
-    let mut loop_exec = IterativeLoop::new(config).await?;
+        let config = IterativeLoopConfig {
+            command,
+            args: cmd_args,
+            prompt: args.prompt.clone(),
+            completion_promise: Some(args.completion_promise.clone()),
+            max_iterations: Some(args.max_iterations),
+            working_directory: args.working_dir.clone(),
+            state_file: None,
+            include_iteration_context: true,
+            iteration_timeout_secs: args.timeout,
+            backend: LoopBackendConfig {
+                backend_type: args.backend.clone(),
+                ..Default::default()
+            },
+            git: LoopGitConfig {
+                auto_commit: args.auto_commit,
+                ..Default::default()
+            },
+        };
 
-    // Set up Ctrl+C handler
-    let cancel_handle = loop_exec.cancellation_handle();
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.ok();
-        println!("\n{}", "Received Ctrl+C, finishing current iteration...".yellow());
-        cancel_handle.store(true, std::sync::atomic::Ordering::Relaxed);
-    });
+        let mut loop_exec = IterativeLoop::new(config).await?;
 
-    let result = loop_exec.execute().await?;
+        // Set up Ctrl+C handler
+        let cancel_handle = loop_exec.cancellation_handle();
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.ok();
+            println!("\n{}", "Received Ctrl+C, finishing current iteration...".yellow());
+            cancel_handle.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
 
-    println!();
-    println!("{}", "Loop completed!".green());
-    println!("  Iterations: {}", result.iterations_completed);
-    println!("  Exit reason: {:?}", result.exit_reason);
-    println!("  Duration: {:?}", result.total_duration);
-    if let Some(ref text) = result.completion_text {
-        println!("  Completion text: {}", text);
+        let result = loop_exec.execute().await?;
+
+        println!();
+        println!("{}", "Loop completed!".green());
+        println!("  Iterations: {}", result.iterations_completed);
+        println!("  Exit reason: {:?}", result.exit_reason);
+        println!("  Duration: {:?}", result.total_duration);
+        if let Some(ref text) = result.completion_text {
+            println!("  Completion text: {}", text);
+        }
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 async fn handle_resume(args: &LoopResumeArgs) -> Result<()> {

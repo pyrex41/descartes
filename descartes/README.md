@@ -379,6 +379,37 @@ Features:
 
 **[→ Full Flow Workflow Guide](docs/FLOW-WORKFLOW.md)** — Complete documentation with examples.
 
+## SCUD Iterative Loops (Ralph Wiggum Pattern)
+
+For systematic task execution with fresh context per iteration, use SCUD-aware iterative loops:
+
+```bash
+# Start a loop that executes SCUD tasks wave-by-wave
+descartes loop start \
+    --scud-tag my-feature \
+    --plan ./thoughts/shared/plans/my-feature.md \
+    --spec-file ./ARCHITECTURE.md \
+    --verify "cargo check && cargo test"
+```
+
+**How it works:**
+- Loads pending tasks from the SCUD tag
+- Spawns a fresh sub-agent for each task with complete context
+- Builds specs from task details + plan sections + custom files
+- Runs verification after each task
+- Commits completed work wave-by-wave
+
+**Slash commands for Claude Code:**
+```
+/ralph-wiggum:ralph-loop my-feature --plan thoughts/shared/plans/my-feature.md
+/ralph-wiggum:cancel-ralph
+/ralph-wiggum:help
+```
+
+This implements the [Ralph Wiggum technique](https://ghuntley.com/ralph/) by Geoffrey Huntley: external orchestration of AI agents with fresh context per iteration, where agents see their previous work through files and git history.
+
+**[→ Full Iterative Loops Documentation](docs/blog/12-iterative-loops.md)** — Complete guide with SCUD integration.
+
 ## Architecture
 
 ```

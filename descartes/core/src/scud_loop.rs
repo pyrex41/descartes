@@ -15,8 +15,45 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::Duration;
+use tokio::process::Command as TokioCommand;
 use tracing::{debug, info, warn};
+
+/// Configuration for spec/context loading
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoopSpecConfig {
+    /// Include SCUD task details in spec (default: true)
+    #[serde(default = "default_true")]
+    pub include_task: bool,
+
+    /// Include relevant plan section (default: true)
+    #[serde(default = "default_true")]
+    pub include_plan_section: bool,
+
+    /// Additional spec files to include
+    #[serde(default)]
+    pub additional_specs: Vec<PathBuf>,
+
+    /// Max tokens for combined spec (soft limit, will warn if exceeded)
+    #[serde(default)]
+    pub max_spec_tokens: Option<usize>,
+
+    /// Custom template for combining specs
+    /// Placeholders: {task}, {plan}, {custom}, {verification}
+    #[serde(default)]
+    pub spec_template: Option<String>,
+}
+
+impl Default for LoopSpecConfig {
+    fn default() -> Self {
+        Self {
+            include_task: true,
+            include_plan_section: true,
+            additional_specs: Vec::new(),
+            max_spec_tokens: Some(5000),
+            spec_template: None,
+        }
+    }
+}
 
 /// Statistics from SCUD CLI
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -125,6 +162,10 @@ pub struct ScudLoopConfig {
     /// State file path for persistence
     #[serde(default)]
     pub state_file: Option<PathBuf>,
+
+    /// Spec configuration for context loading
+    #[serde(default)]
+    pub spec: LoopSpecConfig,
 }
 
 fn default_max_per_task() -> u32 {
@@ -137,6 +178,14 @@ fn default_max_total() -> u32 {
 
 fn default_true() -> bool {
     true
+}
+
+/// Result of task execution by Claude agent
+#[derive(Debug, Clone)]
+pub enum TaskExecutionResult {
+    Success,
+    Blocked(String),
+    Unknown,
 }
 
 impl Default for ScudLoopConfig {
@@ -152,6 +201,7 @@ impl Default for ScudLoopConfig {
             verification_command: Some("make check test".to_string()),
             auto_commit_waves: true,
             state_file: None,
+            spec: LoopSpecConfig::default(),
         }
     }
 }
@@ -632,42 +682,60 @@ impl ScudIterativeLoop {
             // Mark task as in-progress
             self.update_task_status(task.id, "in-progress")?;
 
-            // Execute task (placeholder - in real implementation, spawn sub-agent)
-            let success = self.execute_task(&task).await?;
+            // Execute task with sub-agent
+            let result = self.execute_task(&task).await?;
 
-            if success {
-                // Run verification
-                let verified = self.run_verification()?;
-
-                if verified {
-                    // Mark task as done
-                    self.update_task_status(task.id, "done")?;
-                    self.state.tasks_completed += 1;
-                    wave_task_ids.push(task.id);
-                    info!("Task {} completed successfully", task.id);
-                } else {
-                    // Verification failed, mark as blocked
+            match result {
+                TaskExecutionResult::Success => {
+                    // Run verification
+                    let verified = self.run_verification()?;
+                    if verified {
+                        self.update_task_status(task.id, "done")?;
+                        self.state.tasks_completed += 1;
+                        wave_task_ids.push(task.id);
+                        info!("Task {} completed successfully", task.id);
+                    } else {
+                        // Verification failed despite agent claiming success
+                        self.update_task_status(task.id, "blocked")?;
+                        self.state.blocked_tasks.push(BlockedTask {
+                            task_id: task.id,
+                            title: task.title.clone(),
+                            reason: "Verification failed after agent reported success".to_string(),
+                            attempts: 1,
+                            blocked_at: Utc::now(),
+                        });
+                        warn!("Task {} blocked: verification failed", task.id);
+                    }
+                }
+                TaskExecutionResult::Blocked(reason) => {
                     self.update_task_status(task.id, "blocked")?;
                     self.state.blocked_tasks.push(BlockedTask {
                         task_id: task.id,
                         title: task.title.clone(),
-                        reason: "Verification failed".to_string(),
+                        reason,
                         attempts: 1,
                         blocked_at: Utc::now(),
                     });
-                    warn!("Task {} blocked: verification failed", task.id);
+                    warn!("Task {} blocked", task.id);
                 }
-            } else {
-                // Task execution failed
-                self.update_task_status(task.id, "blocked")?;
-                self.state.blocked_tasks.push(BlockedTask {
-                    task_id: task.id,
-                    title: task.title.clone(),
-                    reason: "Execution failed".to_string(),
-                    attempts: 1,
-                    blocked_at: Utc::now(),
-                });
-                warn!("Task {} blocked: execution failed", task.id);
+                TaskExecutionResult::Unknown => {
+                    // Agent didn't signal clearly - run verification to decide
+                    let verified = self.run_verification()?;
+                    if verified {
+                        self.update_task_status(task.id, "done")?;
+                        self.state.tasks_completed += 1;
+                        wave_task_ids.push(task.id);
+                    } else {
+                        self.update_task_status(task.id, "blocked")?;
+                        self.state.blocked_tasks.push(BlockedTask {
+                            task_id: task.id,
+                            title: task.title.clone(),
+                            reason: "Unknown result and verification failed".to_string(),
+                            attempts: 1,
+                            blocked_at: Utc::now(),
+                        });
+                    }
+                }
             }
 
             self.state.iteration_count += 1;
@@ -676,26 +744,202 @@ impl ScudIterativeLoop {
         }
     }
 
-    /// Execute a single task
-    /// In production, this would spawn a sub-agent
-    async fn execute_task(&self, task: &LoopTask) -> Result<bool> {
-        // For now, this is a placeholder
-        // In production, we'd:
-        // 1. Read the plan context for this task
-        // 2. Spawn a sub-agent with task-implementer prompt
-        // 3. Monitor progress
-        // 4. Return success/failure
+    /// Build the spec/context for a task
+    fn build_task_spec(&self, task: &LoopTask) -> Result<String> {
+        let mut parts: Vec<String> = Vec::new();
 
-        info!(
-            "Executing task {} (placeholder - sub-agent implementation pending)",
-            task.id
-        );
+        // 1. Task details from SCUD
+        if self.config.spec.include_task {
+            parts.push(self.format_task_spec(task));
+        }
 
-        // Simulate some work
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // 2. Plan section (find relevant section from plan doc)
+        if self.config.spec.include_plan_section {
+            if let Some(ref plan_path) = self.config.plan_path {
+                if let Ok(plan_section) = self.extract_plan_section(plan_path, task.id) {
+                    parts.push(plan_section);
+                }
+            }
+        }
 
-        // For now, return success (actual implementation will come later)
-        Ok(true)
+        // 3. Additional spec files
+        for spec_path in &self.config.spec.additional_specs {
+            if let Ok(content) = std::fs::read_to_string(spec_path) {
+                parts.push(format!(
+                    "## {}\n\n{}",
+                    spec_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
+                    content
+                ));
+            }
+        }
+
+        // 4. Apply template or default formatting
+        let spec = parts.join("\n\n---\n\n");
+
+        // 5. Warn if exceeds token budget
+        if let Some(max_tokens) = self.config.spec.max_spec_tokens {
+            let estimated_tokens = spec.len() / 4; // rough estimate
+            if estimated_tokens > max_tokens {
+                warn!(
+                    "Spec exceeds token budget: ~{} tokens (max: {})",
+                    estimated_tokens, max_tokens
+                );
+            }
+        }
+
+        Ok(spec)
+    }
+
+    fn format_task_spec(&self, task: &LoopTask) -> String {
+        format!(
+            "# Current Task\n\n\
+            **ID:** {}\n\
+            **Title:** {}\n\
+            **Complexity:** {}\n\n\
+            ## Description\n\n{}\n\n\
+            ## Test Strategy\n\n{}\n\n\
+            ## Dependencies\n\n{}",
+            task.id,
+            task.title,
+            task.complexity,
+            task.description.as_deref().unwrap_or("No description"),
+            task.test_strategy
+                .as_deref()
+                .unwrap_or("No test strategy defined"),
+            if task.depends_on.is_empty() {
+                "None".to_string()
+            } else {
+                task.depends_on
+                    .iter()
+                    .map(|d| format!("- Task {}", d))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+        )
+    }
+
+    fn extract_plan_section(&self, plan_path: &PathBuf, task_id: u32) -> Result<String> {
+        let content = std::fs::read_to_string(plan_path)?;
+
+        // Try to find section matching task ID
+        // Look for patterns like "## Task 5:" or "### 5." or "#### Task 5"
+        let patterns = [
+            format!("## Task {}:", task_id),
+            format!("### {}.", task_id),
+            format!("#### Task {}", task_id),
+            format!("## {}", task_id),
+        ];
+
+        for pattern in &patterns {
+            if let Some(start) = content.find(pattern) {
+                // Find next section header or end
+                let section_content = &content[start..];
+                let end = section_content[pattern.len()..]
+                    .find("\n## ")
+                    .or_else(|| section_content[pattern.len()..].find("\n### "))
+                    .map(|e| e + pattern.len())
+                    .unwrap_or(section_content.len());
+
+                return Ok(format!(
+                    "# Relevant Plan Section\n\n{}",
+                    &section_content[..end].trim()
+                ));
+            }
+        }
+
+        // Fallback: return truncated plan
+        Ok(format!(
+            "# Implementation Plan (truncated)\n\n{}...",
+            &content.chars().take(2000).collect::<String>()
+        ))
+    }
+
+    /// Build the prompt for a task execution by a Claude agent
+    fn build_task_prompt(&self, spec: &str, task: &LoopTask) -> Result<String> {
+        let verification = self
+            .config
+            .verification_command
+            .as_deref()
+            .unwrap_or("echo 'No verification command configured'");
+
+        Ok(format!(
+            "You are implementing SCUD task {} for tag '{}'.\n\n\
+            ## Spec\n\n{}\n\n\
+            ## Verification\n\n\
+            After implementation, run:\n```bash\n{}\n```\n\n\
+            ## Instructions\n\n\
+            1. Implement the task\n\
+            2. Run verification\n\
+            3. If verification passes, output: TASK_COMPLETE\n\
+            4. If blocked after 3 attempts, output: TASK_BLOCKED: <reason>\n\n\
+            Begin implementation.",
+            task.id, self.config.tag, spec, verification
+        ))
+    }
+
+    /// Spawn a Claude agent with the given prompt
+    async fn spawn_claude_agent(&self, prompt: &str) -> Result<String> {
+        let mut cmd = TokioCommand::new("claude");
+        cmd.args(["-p", "--output-format", "text"])
+            .arg(prompt)
+            .current_dir(&self.config.working_directory)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+
+        let output = cmd
+            .output()
+            .await
+            .context("Failed to spawn Claude agent")?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        if !stderr.is_empty() {
+            debug!("Agent stderr: {}", stderr);
+        }
+
+        Ok(stdout)
+    }
+
+    /// Parse the result from a Claude agent's output
+    #[allow(dead_code)]
+    fn parse_task_result(&self, output: &str, _task: &LoopTask) -> Result<TaskExecutionResult> {
+        if output.contains("TASK_COMPLETE") {
+            Ok(TaskExecutionResult::Success)
+        } else if output.contains("TASK_BLOCKED:") {
+            let reason = output
+                .lines()
+                .find(|l| l.contains("TASK_BLOCKED:"))
+                .map(|l| l.replace("TASK_BLOCKED:", "").trim().to_string())
+                .unwrap_or_else(|| "Unknown reason".to_string());
+            Ok(TaskExecutionResult::Blocked(reason))
+        } else {
+            // No explicit signal - check if verification would pass
+            Ok(TaskExecutionResult::Unknown)
+        }
+    }
+
+    /// Execute a single task by spawning a sub-agent
+    async fn execute_task(&self, task: &LoopTask) -> Result<TaskExecutionResult> {
+        info!("Spawning sub-agent for task {}: {}", task.id, task.title);
+
+        // 1. Build spec with fresh context
+        let spec = self.build_task_spec(task)?;
+
+        // 2. Build the prompt from template
+        let prompt = self.build_task_prompt(&spec, task)?;
+
+        // 3. Spawn Claude with the prompt
+        let output = self.spawn_claude_agent(&prompt).await?;
+
+        // 4. Parse result
+        let result = self.parse_task_result(&output, task)?;
+
+        Ok(result)
     }
 }
 
@@ -882,6 +1126,7 @@ mod tests {
             verification_command: Some("cargo test".to_string()),
             auto_commit_waves: false,
             state_file: Some(PathBuf::from("/state.json")),
+            spec: LoopSpecConfig::default(),
         };
         let json = serde_json::to_string(&config).unwrap();
         let parsed: ScudLoopConfig = serde_json::from_str(&json).unwrap();
@@ -929,5 +1174,153 @@ mod tests {
         let parsed: ScudLoopState = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.blocked_tasks.len(), 1);
         assert_eq!(parsed.blocked_tasks[0].reason, "Tests failed");
+    }
+
+    // Helper function to create a minimal test loop instance
+    fn create_test_loop() -> ScudIterativeLoop {
+        let config = ScudLoopConfig {
+            tag: "test-tag".to_string(),
+            plan_path: None,
+            handoff_path: None,
+            max_iterations_per_task: 3,
+            max_total_iterations: 100,
+            working_directory: PathBuf::from("/tmp/test"),
+            use_sub_agents: false,
+            verification_command: Some("cargo check && cargo test".to_string()),
+            auto_commit_waves: false,
+            state_file: None,
+            spec: LoopSpecConfig::default(),
+        };
+
+        let state = ScudLoopState {
+            config: config.clone(),
+            current_wave: 1,
+            total_waves: 1,
+            tasks_completed: 0,
+            tasks_total: 1,
+            iteration_count: 0,
+            started_at: Utc::now(),
+            ..Default::default()
+        };
+
+        ScudIterativeLoop { config, state }
+    }
+
+    #[test]
+    fn test_spec_config_defaults() {
+        let config = LoopSpecConfig::default();
+        assert!(config.include_task);
+        assert!(config.include_plan_section);
+        assert_eq!(config.max_spec_tokens, Some(5000));
+    }
+
+    #[test]
+    fn test_format_task_spec() {
+        let task = LoopTask {
+            id: 1,
+            title: "Test task".to_string(),
+            description: Some("Do the thing".to_string()),
+            status: "pending".to_string(),
+            complexity: 3,
+            depends_on: vec![],
+            test_strategy: Some("Unit tests".to_string()),
+        };
+
+        let loop_exec = create_test_loop();
+        let spec = loop_exec.format_task_spec(&task);
+
+        assert!(spec.contains("Test task"));
+        assert!(spec.contains("Do the thing"));
+        assert!(spec.contains("Unit tests"));
+    }
+
+    #[test]
+    fn test_build_task_prompt() {
+        let task = LoopTask {
+            id: 5,
+            title: "Test task".to_string(),
+            description: Some("Implement feature".to_string()),
+            status: "pending".to_string(),
+            complexity: 2,
+            depends_on: vec![],
+            test_strategy: Some("Run tests".to_string()),
+        };
+        let loop_exec = create_test_loop();
+        let spec = "Test spec content";
+
+        let prompt = loop_exec.build_task_prompt(spec, &task).unwrap();
+
+        assert!(prompt.contains("Test spec content"));
+        assert!(prompt.contains("TASK_COMPLETE"));
+        assert!(prompt.contains("TASK_BLOCKED"));
+        assert!(prompt.contains("cargo check && cargo test"));
+    }
+
+    #[test]
+    fn test_parse_task_result_success() {
+        let loop_exec = create_test_loop();
+        let task = LoopTask {
+            id: 1,
+            title: "Test".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            complexity: 1,
+            depends_on: vec![],
+            test_strategy: None,
+        };
+
+        let output = "Some work was done.\nTASK_COMPLETE\nAll tests passed.";
+        let result = loop_exec.parse_task_result(output, &task).unwrap();
+
+        match result {
+            TaskExecutionResult::Success => {},
+            _ => panic!("Expected Success result"),
+        }
+    }
+
+    #[test]
+    fn test_parse_task_result_blocked() {
+        let loop_exec = create_test_loop();
+        let task = LoopTask {
+            id: 1,
+            title: "Test".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            complexity: 1,
+            depends_on: vec![],
+            test_strategy: None,
+        };
+
+        let output = "Attempted implementation.\nTASK_BLOCKED: missing API credentials\nCannot proceed.";
+        let result = loop_exec.parse_task_result(output, &task).unwrap();
+
+        match result {
+            TaskExecutionResult::Blocked(reason) => {
+                assert!(reason.contains("missing API credentials"));
+            },
+            _ => panic!("Expected Blocked result"),
+        }
+    }
+
+    #[test]
+    fn test_parse_task_result_unknown() {
+        let loop_exec = create_test_loop();
+        let task = LoopTask {
+            id: 1,
+            title: "Test".to_string(),
+            description: None,
+            status: "pending".to_string(),
+            complexity: 1,
+            depends_on: vec![],
+            test_strategy: None,
+        };
+
+        let output = "Did some work. No clear signal here. Maybe it worked?";
+        let result = loop_exec.parse_task_result(output, &task).unwrap();
+
+        match result {
+            TaskExecutionResult::Unknown => {},
+            _ => panic!("Expected Unknown result"),
+        }
     }
 }

@@ -6,7 +6,13 @@
 
 What if your agent could keep working until the job is actually done? Not just run once and hope, but iterate, learn from its progress, and signal when it has truly completed the task.
 
-Descartes' iterative loop system implements the "Ralph Wiggum" pattern: repeatedly execute a command until completion is detected. Named after the technique of having an agent run in a loop, seeing its own previous work, and improving until it signals done.
+Descartes' iterative loop system implements the "Ralph Wiggum" pattern: repeatedly execute a command until completion is detected. Named after [Geoffrey Huntley's technique](https://ghuntley.com/ralph/) of having an agent run in a loop, seeing its own previous work, and improving until it signals done.
+
+**Key principles:**
+- Same specification fed each iteration (fresh context)
+- Agent sees previous work in files and git history
+- External orchestration (not model-managed)
+- Deterministic failures enable systematic improvement
 
 ## Quick Start
 
@@ -286,7 +292,34 @@ In the state file configuration:
 
 ## SCUD Integration
 
-For SCUD-based task tracking, use the specialized `ScudIterativeLoop`.
+For SCUD-based task tracking, Descartes provides a specialized iterative loop system that executes tasks wave-by-wave, spawning fresh sub-agents for each task with complete context from your SCUD tasks, implementation plans, and custom spec files.
+
+### Quick Start with SCUD
+
+```bash
+descartes loop start \
+    --scud-tag my-feature \
+    --plan ./thoughts/shared/plans/my-feature.md \
+    --spec-file ./ARCHITECTURE.md \
+    --verify "cargo check && cargo test"
+```
+
+This starts a SCUD-aware loop that:
+1. Loads all pending tasks from the SCUD tag
+2. Builds task specifications from task details + plan sections + custom files
+3. Spawns a fresh Claude sub-agent for each task
+4. Runs verification after each task
+5. Commits completed work wave-by-wave
+
+### Slash Commands for Claude Code
+
+Use these commands directly in Claude Code:
+
+```
+/ralph-wiggum:ralph-loop my-feature --plan thoughts/shared/plans/my-feature.md
+/ralph-wiggum:cancel-ralph
+/ralph-wiggum:help
+```
 
 ### Wave-Based Execution
 
@@ -298,7 +331,7 @@ Wave 2: [Task B, Task C]   # Both depend on A
 Wave 3: [Task D]           # Depends on B and C
 ```
 
-Each wave executes in parallel when dependencies are satisfied.
+Each wave executes sequentially, with tasks in a wave processed one at a time with fresh context per task.
 
 ### Task Status Tracking
 
@@ -313,6 +346,28 @@ The loop automatically updates task status in `.scud/tasks/{tag}.json`.
 
 ### Configuration
 
+The SCUD loop system accepts CLI flags that map to configuration:
+
+```bash
+descartes loop start \
+    --scud-tag feature-x \
+    --plan ./thoughts/shared/plans/feature-x.md \
+    --spec-file ./ARCHITECTURE.md \
+    --spec-file ./docs/patterns.md \
+    --max-spec-tokens 5000 \
+    --verify "cargo check && cargo test"
+```
+
+| CLI Flag | Default | Description |
+|----------|---------|-------------|
+| `--scud-tag` | (required) | SCUD tag for task tracking |
+| `--plan` | `None` | Implementation plan for context |
+| `--spec-file` | `[]` | Additional spec files (repeatable) |
+| `--max-spec-tokens` | `5000` | Token budget warning threshold |
+| `--verify` | `cargo check && cargo test` | Run after each task |
+
+The underlying Rust configuration structure:
+
 ```rust
 ScudLoopConfig {
     tag: "feature-x",
@@ -320,20 +375,27 @@ ScudLoopConfig {
     max_iterations_per_task: 3,
     max_total_iterations: 100,
     use_sub_agents: true,
-    verification_command: Some("make check test"),
+    verification_command: Some("cargo check && cargo test"),
     auto_commit_waves: true,
+    spec: LoopSpecConfig {
+        include_task: true,
+        include_plan_section: true,
+        additional_specs: vec![PathBuf::from("./ARCHITECTURE.md")],
+        max_spec_tokens: Some(5000),
+        spec_template: None,
+    },
 }
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `tag` | (required) | SCUD tag for task tracking |
-| `plan_path` | `None` | Implementation plan for context |
-| `max_iterations_per_task` | `3` | Retry limit per task |
-| `max_total_iterations` | `100` | Global iteration limit |
-| `use_sub_agents` | `true` | Spawn sub-agents for tasks |
-| `verification_command` | `make check test` | Run after each task |
-| `auto_commit_waves` | `true` | Commit after wave completion |
+### Spec Building
+
+For each task, the loop builds a comprehensive specification by combining:
+
+1. **Task details from SCUD** - Title, description, test strategy, dependencies
+2. **Relevant plan section** - Extracted from the implementation plan document
+3. **Additional spec files** - Architecture docs, patterns, examples
+
+The spec is passed to each sub-agent as its complete context. The agent reads code as needed but receives the task specification upfront.
 
 ### Wave Commits
 

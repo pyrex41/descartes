@@ -214,7 +214,7 @@ pub use iterative_loop::{
 
 pub use scud_loop::{
     ScudIterativeLoop, ScudLoopConfig, ScudLoopState, ScudStats, LoopTask, ScudWave,
-    WaveCommit, BlockedTask,
+    WaveCommit, BlockedTask, LoopSpecConfig,
 };
 
 pub use scud_plugin::{
