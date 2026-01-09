@@ -144,17 +144,19 @@ Every session creates a detailed JSON transcript.
 
 ### Location
 
-Session transcripts are stored in project-local directories:
+Session transcripts are stored in project-local directories. Descartes uses a **shared directory model** with SCUD for convenience:
 
 ```
-.scud/sessions/           # Flow workflow sessions
+.scud/sessions/           # Primary location (when .scud/ exists)
 └── 2025-01-15-10-30-00-a1b2c3.json
 
-.descartes/sessions/      # General agent sessions
+~/.descartes/sessions/    # Fallback (when no .scud/ directory)
 └── 2025-01-15-10-30-00-d4e5f6.json
 ```
 
-The location depends on how the session was spawned. Flow workflow sessions use `.scud/`, while direct `descartes spawn` sessions use `.descartes/`.
+**Location logic:** If a `.scud/` directory exists in your project (indicating SCUD task management is in use), Descartes writes session transcripts to `.scud/sessions/`. Otherwise, it falls back to `~/.descartes/sessions/` in your home directory.
+
+> **Note:** This means Descartes writes its own files into the `.scud/` directory when present. See [Session Storage](#session-storage) below for details on which files belong to which system.
 
 ### Transcript Structure
 
@@ -349,6 +351,24 @@ descartes ps --tree
 
 ## Session Storage
 
+### The Shared Directory Model
+
+Descartes and SCUD share the `.scud/` directory for convenience. This keeps all project artifacts in one place for easy backup and version control. Here's what each system owns:
+
+| File/Directory | Owner | Purpose |
+|----------------|-------|---------|
+| `.scud/active-tag` | SCUD | Current active epic/tag |
+| `.scud/config.toml` | SCUD | SCUD configuration |
+| `.scud/tasks/` | SCUD | Task definitions (SCG/JSON) |
+| `.scud/workflow-state.json` | SCUD | SCUD workflow state |
+| `.scud/sessions/` | **Descartes** | Session transcripts |
+| `.scud/flow-state.json` | **Descartes** | Flow workflow state |
+| `.scud/loop-state.json` | **Descartes** | Iterative loop state |
+| `.scud/tune-state.json` | **Descartes** | Task tuning state |
+| `.scud/qa-log.json` | **Descartes** | QA monitoring log |
+
+> **Why share?** When using SCUD for task management with Descartes for execution, sharing a directory means one location to manage. You can use `scud` CLI for tasks and `descartes` CLI for agents, with all state colocated.
+
 ### Directory Structure
 
 ```
@@ -357,21 +377,28 @@ descartes ps --tree
 │   ├── descartes.db        # SQLite database
 │   ├── state/              # Agent state snapshots
 │   └── events/             # Event logs
-└── sessions/               # Global session index
+└── sessions/               # Global session fallback
 
-.scud/ (per-project)
-├── sessions/               # Transcript JSON files
+.scud/ (per-project, shared)
+├── active-tag              # [SCUD] Current tag
+├── config.toml             # [SCUD] Configuration
+├── tasks/                  # [SCUD] Task definitions
+│   ├── tasks.scg
+│   └── tasks.json
+├── workflow-state.json     # [SCUD] Workflow state
+├── sessions/               # [DESCARTES] Transcripts
 │   ├── 2025-01-15-10-30-00-a1b2c3.json
 │   └── 2025-01-15-11-00-00-d4e5f6.json
-├── flow-state.json         # Workflow state
-└── workflow-state.json     # SCUD workflow state
+├── flow-state.json         # [DESCARTES] Flow state
+├── loop-state.json         # [DESCARTES] Loop state
+└── tune-state.json         # [DESCARTES] Tune state
 ```
 
 ### Session Discovery
 
 Descartes finds sessions by scanning for:
-- `.descartes/` directories
-- `.scud/` directories
+- `.scud/` directories (primary, shared with SCUD)
+- `.descartes/` directories (legacy/standalone)
 - Session metadata files
 
 ```bash

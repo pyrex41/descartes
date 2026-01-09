@@ -469,21 +469,24 @@ Attempt 4 → Fail → Orchestrator decides
 
 ### Complete Artifact Tree
 
+Flow artifacts are stored in the shared `.scud/` directory. This directory is shared between SCUD (task management) and Descartes (agent execution) for convenience. See [Session Management](05-session-management.md#the-shared-directory-model) for details on which files belong to which system.
+
 ```
 project/
-├── .scud/
-│   ├── flow-state.json           # Flow progress
-│   ├── tasks/
-│   │   └── tasks.scg             # Task definitions
-│   ├── sessions/
-│   │   ├── flow-ingest-xxx.json  # Phase transcripts
+├── .scud/                              # Shared SCUD/Descartes directory
+│   ├── tasks/                          # [SCUD] Task definitions
+│   │   └── tasks.scg
+│   ├── active-tag                      # [SCUD] Current tag
+│   ├── sessions/                       # [DESCARTES] Phase transcripts
+│   │   ├── flow-ingest-xxx.json
 │   │   ├── flow-review-xxx.json
 │   │   └── ...
-│   └── qa-log.json               # QA results
+│   ├── flow-state.json                 # [DESCARTES] Flow progress
+│   └── qa-log.json                     # [DESCARTES] QA results
 ├── thoughts/
 │   └── shared/
 │       ├── plans/
-│       │   ├── TASK-001-xxx.md   # Implementation plans
+│       │   ├── TASK-001-xxx.md         # Implementation plans
 │       │   └── ...
 │       └── reports/
 │           └── 2025-01-15-flow-summary.md

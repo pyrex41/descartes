@@ -203,12 +203,17 @@ my-project/
 ├── .descartes/
 │   ├── config.toml         # Project-specific config
 │   └── session.json        # Session metadata
-├── .scud/
-│   ├── sessions/           # Conversation transcripts
+├── .scud/                   # Shared directory (SCUD + Descartes)
+│   ├── tasks/              # [SCUD] Task definitions
+│   │   └── tasks.scg
+│   ├── sessions/           # [DESCARTES] Conversation transcripts
 │   │   └── 2025-01-15-10-30-00-abc123.json
-│   └── workflow-state.json # Workflow progress
+│   ├── workflow-state.json # [SCUD] Workflow progress
+│   └── flow-state.json     # [DESCARTES] Flow progress
 └── ... your project files
 ```
+
+> **Note:** The `.scud/` directory is shared between SCUD (task management) and Descartes (agent execution). SCUD owns task definitions and workflow state, while Descartes adds session transcripts and flow state. See [Session Management](05-session-management.md#the-shared-directory-model) for details.
 
 ## Transcript Format
 
