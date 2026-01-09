@@ -1,25 +1,14 @@
-# The Pi Philosophy: Why Less is More in AI Agents
+# Building on the Pi Philosophy
 
-*Stripping AI agents down to their essence*
+*How Descartes implements Mario Zechner's minimalist approach to AI coding agents*
 
 ---
 
-## The Problem with Modern AI Agent Frameworks
+## Credit Where It's Due
 
-If you've worked with AI coding agents, you've likely encountered the complexity creep that plagues most frameworks. Typical agent systems come packed with:
+Descartes is heavily inspired by [Mario Zechner's PI Coding Agent](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/). Mario articulated something many of us felt but couldn't put into words: modern AI coding tools have become bloated, and the solution is radical simplicity.
 
-- **40+ specialized tools** for every conceivable operation
-- **10,000+ token system prompts** trying to anticipate every edge case
-- **Complex orchestration layers** that obscure what's actually happening
-- **MCP servers** that add 2-5k tokens per message just for tool definitions
-
-The result? Bloated context windows, unpredictable behavior, and agents that feel like black boxes.
-
-## Enter Descartes: The Pi Philosophy
-
-Descartes takes a radically different approach, inspired by what we call the **Pi Philosophy**—named after the mathematical constant that captures infinite complexity in a simple ratio.
-
-The core insight: **You don't need 40 tools. You need 4.**
+His core insight: **You don't need 40 tools. You need 4.**
 
 ```
 read   → Read any file
@@ -28,70 +17,88 @@ edit   → Surgical text replacement
 bash   → Execute any command
 ```
 
-That's it. These four primitives can accomplish virtually any software engineering task. Need to search code? `bash` with grep. Need to run tests? `bash` with your test runner. Need to commit changes? `bash` with git.
+This isn't our idea. It's Mario's. We're just building on it.
 
-## The Power of Minimalism
+## Why We Built Descartes
 
-### 1. Predictable Behavior
+After reading Mario's post, we wanted to use PI. But we also had specific needs that required building our own implementation:
 
-With only 4 tools, you can actually understand what your agent is doing. Every action is visible, every decision is traceable. There's no magic—just simple operations composed together.
+1. **Multiple LLM providers** — We switch between Anthropic, OpenAI, DeepSeek, and local models depending on the task
+2. **Workflow automation** — We needed a way to go from PRD documents to implemented code with multiple coordinated agents
+3. **Task management integration** — Our projects use SCUD for tracking work, and we wanted agents that understand that
+4. **Team tooling** — GUI for debugging, pause/resume for long tasks, session management
 
-### 2. Reduced Token Overhead
+So Descartes isn't a replacement for PI—it's our implementation of the same philosophy, with features we needed for our workflow.
 
-Compare the token cost:
+## The Problem (Mario's Framing)
 
-| Approach | Tokens per Message |
-|----------|-------------------|
-| MCP Server (40 tools) | 2,000 - 5,000 |
-| Descartes (4 tools) | ~200 |
+Mario described the problem perfectly. Modern agent frameworks come with:
 
-That's a 10-25x reduction in overhead, leaving more context for actual work.
+- **40+ specialized tools** for every conceivable operation
+- **10,000+ token system prompts** trying to anticipate every edge case
+- **MCP servers** that add 2-5k tokens per message just for tool definitions
+- **Opaque execution** where you can't see what the agent actually did
+
+The result: bloated context windows, unpredictable behavior, and agents that feel like black boxes.
+
+## The Pi Philosophy (Mario's Solution)
+
+Mario's PI Coding Agent demonstrated that frontier models don't need extensive hand-holding. They've been trained on massive codebases. Give them basic file operations and shell access, and they figure out the rest.
+
+Key principles from PI that we adopt:
+
+### 1. Minimal Tools
+Four primitives handle virtually any software engineering task. Need to search code? `bash` with grep. Need to run tests? `bash` with your test runner. Need to commit changes? `bash` with git.
+
+### 2. Minimal System Prompts
+PI's system prompt is under 1,000 tokens. Descartes aims for around 200. Frontier models don't need lengthy instructions—they've been RL-trained extensively on coding tasks.
 
 ### 3. Full Observability
+Every action is logged. You can see exactly what happened, replay sessions, and debug failures. No magic, no hidden state.
 
-Every agent action is logged to a JSON transcript. You can replay, audit, and debug any session. No hidden state, no mysterious failures.
+### 4. CLI Tools Over MCP
+As Mario put it, MCP servers inject thousands of tokens into every message whether you use them or not. CLI tools invoked via bash only cost tokens when actually used.
 
-```json
-{
-  "role": "assistant",
-  "tool_calls": [{
-    "name": "bash",
-    "arguments": {"command": "cargo test"}
-  }],
-  "timestamp": "2025-01-15T10:30:00Z"
-}
+## What Descartes Adds
+
+Where Descartes diverges from or extends PI:
+
+### Multi-Provider Support
+Switch between providers without changing your workflow:
+```bash
+descartes spawn --task "Fix the bug" --provider anthropic
+descartes spawn --task "Fix the bug" --provider openai
+descartes spawn --task "Fix the bug" --provider ollama --model llama3
 ```
 
-### 4. Controlled Delegation
-
-When an agent needs to spawn sub-agents, Descartes enforces a strict hierarchy:
-
+### Controlled Sub-Agent Spawning
+When an orchestrator agent needs to delegate, Descartes enforces a strict hierarchy:
 ```
 Orchestrator Agent (can spawn)
     └── Sub-Agent (cannot spawn further)
 ```
+This prevents the recursive explosion that can occur when agents spawn agents that spawn agents.
 
-This prevents the recursive explosion that can occur when agents spawn agents that spawn agents. One level of delegation, no more.
-
-## Skills: Power When You Need It
-
-"But what about complex operations?" you ask.
-
-Descartes introduces **Skills**—CLI tools that agents can invoke via `bash`. Skills are:
-
-- **Lazy-loaded**: Only cost tokens when actually used
-- **Discoverable**: Agents learn about them from documentation
-- **Composable**: Built from standard CLI tools
-- **Extensible**: Drop a script in `~/.descartes/skills/` and it's available
-
-Example skill invocation:
+### Flow Workflow
+A multi-phase system for turning PRDs into implemented code:
 ```bash
-web-search "rust async patterns" 5
+descartes workflow flow --prd docs/requirements.md
 ```
 
-This costs ~50 tokens when invoked, versus 2k+ tokens if it were a permanent tool definition.
+### SCUD Integration
+Native integration with SCUD task tracking, including iterative loops that execute tasks wave-by-wave with verification.
 
-## The Descartes Architecture
+### Pause/Resume
+Long-running tasks can be paused and resumed:
+```bash
+descartes pause <session-id>
+descartes resume <session-id>
+```
+
+### Optional GUI
+A native GUI for visualizing sessions, monitoring progress, and debugging—useful but not required.
+
+## The Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -104,48 +111,42 @@ This costs ~50 tokens when invoked, versus 2k+ tokens if it were a permanent too
 │   │ Provider │  │ Provider│  │ Provider│        │
 │   └─────────┘  └─────────┘  └─────────┘        │
 ├─────────────────────────────────────────────────┤
-│           4 Core Tools + Skills                  │
+│           4 Core Tools (PI's design)            │
 ├─────────────────────────────────────────────────┤
 │         JSON Transcript Storage                  │
 └─────────────────────────────────────────────────┘
 ```
 
+## Skills: Formalizing Mario's Suggestion
+
+Mario rejected MCP servers in favor of using CLI tools directly. Descartes formalizes this as "skills"—CLI tools placed in a specific directory that agents can discover and invoke:
+
+```bash
+# In .descartes/skills/web-search
+#!/bin/bash
+curl -s "https://api.search.com?q=$1" | jq '.results[].title'
+```
+
+This isn't a new concept—it's just a convention for organizing the CLI tools Mario suggested using.
+
 ## What You Get
 
 - **~200 token system prompts** instead of 10k
 - **Full JSON transcripts** of every session
-- **Multiple LLM providers** (Anthropic, OpenAI, Grok, Ollama)
-- **Native GUI** for visualization
+- **Multiple LLM providers** (Anthropic, OpenAI, DeepSeek, Groq, Ollama)
+- **Native GUI** for visualization (optional)
 - **Pause/Resume** for long-running tasks
-- **Sub-agent tracking** without interception
+- **Sub-agent tracking** with controlled delegation
 - **Flow Workflow** for PRD-to-code automation
+- **SCUD integration** for task management
 
-## Philosophy in Practice
+## Further Reading
 
-When you run:
-```bash
-descartes spawn --task "Add authentication to the API"
-```
-
-You get an agent that:
-1. Uses `read` to understand your codebase
-2. Uses `bash` to run tests and check status
-3. Uses `edit` for surgical code changes
-4. Uses `write` for new files when needed
-5. Logs every action to a reviewable transcript
-
-No hidden complexity. No token bloat. Just focused, observable work.
-
----
-
-## Next Steps
-
-Ready to try the Pi Philosophy yourself?
-
+- **[Mario Zechner's PI Coding Agent](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/)** — The original inspiration
 - **[Getting Started →](02-getting-started.md)** — Install and run your first agent
 - **[CLI Reference →](03-cli-commands.md)** — Master the command line
 - **[Flow Workflow →](07-flow-workflow.md)** — Automate PRD to code
 
 ---
 
-*Descartes: Because the best tool is often the simplest one.*
+*Descartes: An implementation of Mario Zechner's Pi philosophy with multi-provider support and workflow automation.*
