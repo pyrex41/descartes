@@ -1,199 +1,101 @@
 //! SCUD integration for task management
 //!
-//! SCUD provides DAG-driven task management with:
+//! Uses the scud-cli crate directly for:
+//! - Task loading/saving
 //! - Dependency tracking
 //! - Wave visualization (parallel execution potential)
-//! - SCG format for token-efficient storage
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::process::Command;
+use std::path::PathBuf;
+
+// Re-export scud types for convenience
+pub use scud::models::{Phase, Task, TaskStatus, Priority};
+pub use scud::storage::Storage;
 
 use crate::{Config, Error, Result};
 
-/// A task from the SCUD task graph
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Task {
-    /// Task ID
-    pub id: String,
-    /// Task title
-    pub title: String,
-    /// Task description
-    pub description: String,
-    /// Current status
-    pub status: TaskStatus,
-    /// Dependencies (task IDs that must complete first)
-    pub dependencies: Vec<String>,
-    /// Tags for categorization
-    pub tags: Vec<String>,
-}
-
-/// Task status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskStatus {
-    Pending,
-    InProgress,
-    Done,
-    Blocked,
-    Deferred,
-}
-
-impl std::fmt::Display for TaskStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TaskStatus::Pending => write!(f, "pending"),
-            TaskStatus::InProgress => write!(f, "in-progress"),
-            TaskStatus::Done => write!(f, "done"),
-            TaskStatus::Blocked => write!(f, "blocked"),
-            TaskStatus::Deferred => write!(f, "deferred"),
-        }
-    }
-}
-
 /// Get the next ready task from SCUD
 pub fn next(config: &Config) -> Result<Option<Task>> {
-    if config.scud.embedded {
-        // Use embedded SCUD logic
-        next_embedded(config)
-    } else {
-        // Shell out to scud binary
-        next_shell(config)
-    }
-}
+    let storage = create_storage(config)?;
 
-/// Get next task using embedded logic
-fn next_embedded(config: &Config) -> Result<Option<Task>> {
-    let tasks = load_tasks(config)?;
-
-    // Find tasks that are pending and have all dependencies done
-    let done_ids: std::collections::HashSet<_> = tasks
-        .iter()
-        .filter(|t| t.status == TaskStatus::Done)
-        .map(|t| t.id.clone())
-        .collect();
-
-    for task in &tasks {
-        if task.status != TaskStatus::Pending {
-            continue;
-        }
-
-        let deps_satisfied = task.dependencies.iter().all(|d| done_ids.contains(d));
-
-        if deps_satisfied {
-            return Ok(Some(task.clone()));
-        }
-    }
-
-    Ok(None)
-}
-
-/// Get next task by shelling out to scud binary
-fn next_shell(config: &Config) -> Result<Option<Task>> {
-    let binary = config
-        .scud
-        .binary
-        .as_deref()
-        .unwrap_or("scud");
-
-    let output = Command::new(binary)
-        .args(["next", "--json"])
-        .current_dir(std::env::current_dir()?)
-        .output()
-        .map_err(|e| Error::Io(e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("No tasks ready") {
+    // Load active group/phase
+    let phase = match storage.load_active_group() {
+        Ok(p) => p,
+        Err(e) => {
+            // If no active group, try to load default tasks
+            tracing::debug!("No active group: {}", e);
             return Ok(None);
         }
-        return Err(Error::Subagent(format!(
-            "scud next failed: {}",
-            stderr
-        )));
-    }
+    };
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let task: Task = serde_json::from_str(&stdout)
-        .map_err(|e| Error::Json(e))?;
-
-    Ok(Some(task))
+    // Find next task with all dependencies met
+    Ok(phase.find_next_task().cloned())
 }
 
 /// Mark a task as complete
 pub fn complete(config: &Config, task_id: &str) -> Result<()> {
-    if config.scud.embedded {
-        complete_embedded(config, task_id)
-    } else {
-        complete_shell(config, task_id)
-    }
-}
+    let storage = create_storage(config)?;
 
-/// Mark complete using embedded logic
-fn complete_embedded(config: &Config, task_id: &str) -> Result<()> {
-    let mut tasks = load_tasks(config)?;
+    // Get active group tag
+    let group_tag = storage.get_active_group()
+        .map_err(|e| Error::Subagent(format!("Failed to get active group: {}", e)))?
+        .ok_or_else(|| Error::Subagent("No active group set".to_string()))?;
 
-    if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
-        task.status = TaskStatus::Done;
-        save_tasks(config, &tasks)?;
+    // Load the group
+    let mut phase = storage.load_group(&group_tag)
+        .map_err(|e| Error::Subagent(format!("Failed to load group: {}", e)))?;
+
+    // Find and update the task
+    if let Some(task) = phase.get_task_mut(task_id) {
+        task.set_status(TaskStatus::Done);
+
+        // Save the updated group
+        storage.update_group(&group_tag, &phase)
+            .map_err(|e| Error::Subagent(format!("Failed to save group: {}", e)))?;
+
         Ok(())
     } else {
         Err(Error::Subagent(format!("Task not found: {}", task_id)))
     }
 }
 
-/// Mark complete by shelling out
-fn complete_shell(config: &Config, task_id: &str) -> Result<()> {
-    let binary = config
-        .scud
-        .binary
-        .as_deref()
-        .unwrap_or("scud");
-
-    let output = Command::new(binary)
-        .args(["done", task_id])
-        .current_dir(std::env::current_dir()?)
-        .output()
-        .map_err(|e| Error::Io(e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::Subagent(format!(
-            "scud done failed: {}",
-            stderr
-        )));
-    }
-
-    Ok(())
-}
-
 /// Get task waves (parallel execution potential)
+/// Returns groups of task IDs that can be executed in parallel
 pub fn waves(config: &Config) -> Result<Vec<Vec<String>>> {
-    if config.scud.embedded {
-        waves_embedded(config)
-    } else {
-        waves_shell(config)
-    }
+    let storage = create_storage(config)?;
+
+    let phase = match storage.load_active_group() {
+        Ok(p) => p,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    // Calculate waves using Kahn's algorithm
+    calculate_waves(&phase)
 }
 
-/// Calculate waves using embedded logic
-fn waves_embedded(config: &Config) -> Result<Vec<Vec<String>>> {
-    let tasks = load_tasks(config)?;
+/// Calculate execution waves from a phase
+fn calculate_waves(phase: &Phase) -> Result<Vec<Vec<String>>> {
+    use std::collections::{HashMap, HashSet};
 
-    // Build dependency graph
+    // Build dependency graph for pending/in-progress tasks only
     let mut in_degree: HashMap<String, usize> = HashMap::new();
     let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
+    let done_ids: HashSet<_> = phase.tasks.iter()
+        .filter(|t| t.status == TaskStatus::Done)
+        .map(|t| t.id.clone())
+        .collect();
 
-    for task in &tasks {
-        if task.status == TaskStatus::Done {
+    for task in &phase.tasks {
+        // Skip done tasks and subtasks
+        if task.status == TaskStatus::Done || task.is_subtask() {
             continue;
         }
 
+        // Initialize in-degree
         in_degree.entry(task.id.clone()).or_insert(0);
 
+        // Count dependencies on non-done tasks
         for dep in &task.dependencies {
-            // Only count dependencies on non-done tasks
-            if tasks.iter().any(|t| t.id == *dep && t.status != TaskStatus::Done) {
+            if !done_ids.contains(dep) {
                 *in_degree.entry(task.id.clone()).or_insert(0) += 1;
                 dependents
                     .entry(dep.clone())
@@ -203,7 +105,7 @@ fn waves_embedded(config: &Config) -> Result<Vec<Vec<String>>> {
         }
     }
 
-    // Kahn's algorithm for topological sort by waves
+    // Kahn's algorithm by waves
     let mut waves = Vec::new();
     let mut current_wave: Vec<String> = in_degree
         .iter()
@@ -212,6 +114,7 @@ fn waves_embedded(config: &Config) -> Result<Vec<Vec<String>>> {
         .collect();
 
     while !current_wave.is_empty() {
+        current_wave.sort(); // Deterministic ordering
         waves.push(current_wave.clone());
 
         let mut next_wave = Vec::new();
@@ -234,163 +137,102 @@ fn waves_embedded(config: &Config) -> Result<Vec<Vec<String>>> {
     Ok(waves)
 }
 
-/// Get waves by shelling out
-fn waves_shell(config: &Config) -> Result<Vec<Vec<String>>> {
-    let binary = config
-        .scud
-        .binary
-        .as_deref()
-        .unwrap_or("scud");
+/// Set task status
+pub fn set_status(config: &Config, task_id: &str, status: TaskStatus) -> Result<()> {
+    let storage = create_storage(config)?;
 
-    let output = Command::new(binary)
-        .args(["waves", "--json"])
-        .current_dir(std::env::current_dir()?)
-        .output()
-        .map_err(|e| Error::Io(e))?;
+    let group_tag = storage.get_active_group()
+        .map_err(|e| Error::Subagent(format!("Failed to get active group: {}", e)))?
+        .ok_or_else(|| Error::Subagent("No active group set".to_string()))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(Error::Subagent(format!(
-            "scud waves failed: {}",
-            stderr
-        )));
-    }
+    let mut phase = storage.load_group(&group_tag)
+        .map_err(|e| Error::Subagent(format!("Failed to load group: {}", e)))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let waves: Vec<Vec<String>> = serde_json::from_str(&stdout)
-        .map_err(|e| Error::Json(e))?;
+    if let Some(task) = phase.get_task_mut(task_id) {
+        task.set_status(status);
 
-    Ok(waves)
-}
+        storage.update_group(&group_tag, &phase)
+            .map_err(|e| Error::Subagent(format!("Failed to save group: {}", e)))?;
 
-/// Load tasks from the SCUD task file
-fn load_tasks(config: &Config) -> Result<Vec<Task>> {
-    let path = &config.scud.task_file;
-
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let content = std::fs::read_to_string(path)?;
-
-    // Check if it's SCG or JSON format
-    if path.extension().map(|e| e == "scg").unwrap_or(false) {
-        parse_scg_tasks(&content)
+        Ok(())
     } else {
-        let tasks: Vec<Task> = serde_json::from_str(&content)
-            .map_err(|e| Error::Json(e))?;
-        Ok(tasks)
+        Err(Error::Subagent(format!("Task not found: {}", task_id)))
     }
 }
 
-/// Save tasks to the SCUD task file
-fn save_tasks(config: &Config, tasks: &[Task]) -> Result<()> {
-    let path = &config.scud.task_file;
+/// Get all tasks from the active group
+pub fn list_tasks(config: &Config) -> Result<Vec<Task>> {
+    let storage = create_storage(config)?;
 
-    // Ensure parent directory exists
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+    match storage.load_active_group() {
+        Ok(phase) => Ok(phase.tasks),
+        Err(_) => Ok(Vec::new()),
     }
+}
 
-    if path.extension().map(|e| e == "scg").unwrap_or(false) {
-        let content = tasks_to_scg(tasks);
-        std::fs::write(path, content)?;
+/// Get a specific task by ID
+pub fn get_task(config: &Config, task_id: &str) -> Result<Option<Task>> {
+    let storage = create_storage(config)?;
+
+    match storage.load_active_group() {
+        Ok(phase) => Ok(phase.get_task(task_id).cloned()),
+        Err(_) => Ok(None),
+    }
+}
+
+/// Get tasks ready to work on (pending with dependencies met)
+pub fn ready_tasks(config: &Config) -> Result<Vec<Task>> {
+    let storage = create_storage(config)?;
+
+    let phase = match storage.load_active_group() {
+        Ok(p) => p,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    let ready: Vec<Task> = phase.tasks.iter()
+        .filter(|t| {
+            t.status == TaskStatus::Pending &&
+            t.has_dependencies_met(&phase.tasks) &&
+            !t.is_subtask()
+        })
+        .cloned()
+        .collect();
+
+    Ok(ready)
+}
+
+/// Get blocked tasks (pending but dependencies not met)
+pub fn blocked_tasks(config: &Config) -> Result<Vec<Task>> {
+    let storage = create_storage(config)?;
+
+    let phase = match storage.load_active_group() {
+        Ok(p) => p,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    let blocked: Vec<Task> = phase.tasks.iter()
+        .filter(|t| {
+            t.status == TaskStatus::Pending &&
+            !t.has_dependencies_met(&phase.tasks) &&
+            !t.is_subtask()
+        })
+        .cloned()
+        .collect();
+
+    Ok(blocked)
+}
+
+/// Create a storage instance from config
+fn create_storage(config: &Config) -> Result<Storage> {
+    let project_root = if config.scud.task_file.is_absolute() {
+        config.scud.task_file.parent()
+            .and_then(|p| p.parent())
+            .map(PathBuf::from)
     } else {
-        let content = serde_json::to_string_pretty(tasks)
-            .map_err(|e| Error::Json(e))?;
-        std::fs::write(path, content)?;
-    }
+        Some(std::env::current_dir()?)
+    };
 
-    Ok(())
-}
-
-/// Parse tasks from SCG format
-fn parse_scg_tasks(content: &str) -> Result<Vec<Task>> {
-    let mut tasks = Vec::new();
-    let mut current_task: Option<Task> = None;
-
-    for line in content.lines() {
-        let line = line.trim();
-
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-
-        // Task line: ID:status "title" [deps]
-        if let Some((id_status, rest)) = line.split_once(' ') {
-            let parts: Vec<&str> = id_status.split(':').collect();
-            if parts.len() >= 2 {
-                // Save previous task
-                if let Some(task) = current_task.take() {
-                    tasks.push(task);
-                }
-
-                let id = parts[0].to_string();
-                let status = match parts[1] {
-                    "pending" => TaskStatus::Pending,
-                    "in-progress" => TaskStatus::InProgress,
-                    "done" => TaskStatus::Done,
-                    "blocked" => TaskStatus::Blocked,
-                    "deferred" => TaskStatus::Deferred,
-                    _ => TaskStatus::Pending,
-                };
-
-                // Parse title and dependencies
-                let (title, deps) = if let Some((t, d)) = rest.rsplit_once('[') {
-                    let deps_str = d.trim_end_matches(']');
-                    let deps: Vec<String> = deps_str
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    (t.trim().trim_matches('"').to_string(), deps)
-                } else {
-                    (rest.trim().trim_matches('"').to_string(), Vec::new())
-                };
-
-                current_task = Some(Task {
-                    id,
-                    title,
-                    description: String::new(),
-                    status,
-                    dependencies: deps,
-                    tags: Vec::new(),
-                });
-            }
-        }
-    }
-
-    // Don't forget the last task
-    if let Some(task) = current_task {
-        tasks.push(task);
-    }
-
-    Ok(tasks)
-}
-
-/// Convert tasks to SCG format
-fn tasks_to_scg(tasks: &[Task]) -> String {
-    let mut out = String::new();
-    out.push_str("@tasks\n");
-
-    for task in tasks {
-        let deps = if task.dependencies.is_empty() {
-            String::new()
-        } else {
-            format!(" [{}]", task.dependencies.join(", "))
-        };
-
-        out.push_str(&format!(
-            "{}:{} \"{}\"{}\n",
-            task.id, task.status, task.title, deps
-        ));
-
-        if !task.description.is_empty() {
-            out.push_str(&format!("  # {}\n", task.description));
-        }
-    }
-
-    out
+    Ok(Storage::new(project_root))
 }
 
 #[cfg(test)]
@@ -398,24 +240,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_scg_tasks() {
-        let content = r#"
-@tasks
-1:pending "First task"
-2:pending "Second task" [1]
-3:done "Completed task"
-"#;
+    fn test_calculate_waves_simple() {
+        let mut phase = Phase::new("test".to_string());
 
-        let tasks = parse_scg_tasks(content).unwrap();
-        assert_eq!(tasks.len(), 3);
-        assert_eq!(tasks[0].id, "1");
-        assert_eq!(tasks[0].title, "First task");
-        assert_eq!(tasks[1].dependencies, vec!["1"]);
-        assert_eq!(tasks[2].status, TaskStatus::Done);
-    }
+        // Task 1 has no deps
+        let task1 = Task::new("1".to_string(), "Task 1".to_string(), "".to_string());
 
-    #[test]
-    fn test_waves_calculation() {
-        // This would require setting up a mock config
+        // Task 2 depends on 1
+        let mut task2 = Task::new("2".to_string(), "Task 2".to_string(), "".to_string());
+        task2.dependencies = vec!["1".to_string()];
+
+        // Task 3 depends on 1
+        let mut task3 = Task::new("3".to_string(), "Task 3".to_string(), "".to_string());
+        task3.dependencies = vec!["1".to_string()];
+
+        // Task 4 depends on 2 and 3
+        let mut task4 = Task::new("4".to_string(), "Task 4".to_string(), "".to_string());
+        task4.dependencies = vec!["2".to_string(), "3".to_string()];
+
+        phase.add_task(task1);
+        phase.add_task(task2);
+        phase.add_task(task3);
+        phase.add_task(task4);
+
+        let waves = calculate_waves(&phase).unwrap();
+
+        assert_eq!(waves.len(), 3);
+        assert_eq!(waves[0], vec!["1"]);
+        assert_eq!(waves[1], vec!["2", "3"]); // Can run in parallel
+        assert_eq!(waves[2], vec!["4"]);
     }
 }

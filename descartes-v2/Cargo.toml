@@ -18,7 +18,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Async runtime
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "process"] }
 futures = "0.3"
 async-trait = "0.1"
 
@@ -33,9 +33,8 @@ toml = "0.8"
 # HTTP client (for API harnesses)
 reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
 
-# SCG parsing
-nom = "7"
-nom_locate = "4"
+# SCUD task management
+scud-cli = "1.19"
 
 # Logging
 tracing = "0.1"
@@ -50,9 +49,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 dirs = "5"
 shellexpand = "3"
-
-# Process spawning (for CLI harnesses)
-tokio-process = "0.2"
+regex = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"
