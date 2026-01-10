@@ -265,7 +265,7 @@ descartes spawn --task "Fix the bug in main.rs"
 
 # With options
 descartes spawn --task "Refactor auth" \
-  --provider anthropic \              # anthropic, openai, ollama, deepseek, groq
+  --provider anthropic \              # anthropic, grok, openai, ollama
   --model claude-sonnet-4-20250514 \  # specific model
   --tool-level minimal                # orchestrator, minimal, readonly
 ```
@@ -300,13 +300,14 @@ model = "claude-sonnet-4-20250514"
 
 ## Providers
 
-| Provider | Type | Configuration |
-|----------|------|---------------|
-| **Anthropic** | Cloud | `ANTHROPIC_API_KEY` |
-| **OpenAI** | Cloud | `OPENAI_API_KEY` |
-| **DeepSeek** | Cloud | `DEEPSEEK_API_KEY` |
-| **Groq** | Cloud | `GROQ_API_KEY` |
-| **Ollama** | Local | `OLLAMA_ENDPOINT` (default: localhost:11434) |
+| Provider | Type | Status | Configuration |
+|----------|------|--------|---------------|
+| **Anthropic** | Cloud | Primary | `ANTHROPIC_API_KEY` |
+| **Grok (xAI)** | Cloud | Primary | `XAI_API_KEY` |
+| **OpenAI** | Cloud | Available | `OPENAI_API_KEY` |
+| **Ollama** | Local | Available | `OLLAMA_ENDPOINT` (default: localhost:11434) |
+
+See `.descartes/config.toml.example` for full configuration options.
 
 ## Common Workflows
 
@@ -460,6 +461,22 @@ descartes/
 **Optional: Daemon** — Long-running background service for persistent sessions and RPC access. Only needed if you're building integrations or want agents to survive terminal closure.
 
 **Optional: GUI** — Native desktop app for visual monitoring, session management, and debugging. Useful for complex multi-agent workflows, but not required for daily use.
+
+### Component Status
+
+**Core (Actively Developed):**
+- **CLI**: spawn, attach, kill, pause, resume, logs, loop, workflow
+- **Daemon**: RPC server, Claude Code TUI, OpenCode TUI
+- **Core Library**: agent_runner, iterative_loop, scud_loop, session_manager, config
+- **GUI Views**: chat, sessions, loop visualization, swarm monitor, history graph debugger
+- **Providers**: Anthropic (Claude), Grok (xAI)
+
+**Frozen (Complete but Not Active):**
+- **Swank/LISP Debugger** — Full SLIME protocol client for AI-assisted Common Lisp development. See `core/src/swank/FROZEN.md`.
+- **ZMQ Distributed** — ZeroMQ infrastructure for spawning agents on remote machines. See `core/ZMQ_FROZEN.md`.
+
+**External Dependencies:**
+- **SCUD CLI** — Task management CLI, maintained in a separate repository. Install via `cargo install scud`.
 
 ## Development
 

@@ -17,14 +17,25 @@ version = "1.0.0"
 # ============================================================================
 # PROVIDER CONFIGURATION
 # ============================================================================
-# Configure LLM providers: OpenAI, Anthropic, Ollama, DeepSeek, Groq, etc.
+# Configure LLM providers for Descartes.
+#
+# ACTIVELY MAINTAINED:
+#   - anthropic (Claude) - Recommended, primary provider
+#   - grok (xAI) - OpenAI-compatible, fast reasoning models
+#   - claude-code-cli - Headless mode via Claude Code CLI
+#
+# AVAILABLE BUT NOT ACTIVELY DEVELOPED:
+#   - openai - Functional but not primary focus
+#   - ollama - Local inference, useful for development
+#   - deepseek - Listed in config but no provider implementation
+#   - groq - Listed in config but no provider implementation
 
 [providers]
-# Primary provider to use (anthropic, openai, ollama, deepseek, groq)
+# Primary provider to use (anthropic, grok recommended)
 primary = "anthropic"
 
 # ============================================================================
-# Anthropic Claude Provider (Recommended)
+# Anthropic Claude Provider (Recommended - Primary)
 # ============================================================================
 [providers.anthropic]
 enabled = true
@@ -45,7 +56,29 @@ temperature = 0.7
 max_tokens = 4096
 
 # ============================================================================
-# OpenAI Provider
+# Grok Provider (xAI) - Actively Maintained
+# ============================================================================
+# OpenAI-compatible API with fast reasoning models
+[providers.grok]
+enabled = false
+# api_key = "xai-..."  # Or set XAI_API_KEY environment variable
+endpoint = "https://api.x.ai/v1"
+model = "grok-4-1-fast"
+models = [
+    "grok-4-1-fast-reasoning",
+    "grok-4-1-fast",
+    "grok-4-1",
+    "grok-3-latest"
+]
+timeout_secs = 120
+max_retries = 3
+retry_backoff_ms = 1000
+rate_limit_rpm = 60
+temperature = 0.7
+max_tokens = 4096
+
+# ============================================================================
+# OpenAI Provider (Available but not primary)
 # ============================================================================
 [providers.openai]
 enabled = false
@@ -65,8 +98,9 @@ temperature = 0.7
 max_tokens = 4096
 
 # ============================================================================
-# Ollama Local Provider (for local inference)
+# Ollama Local Provider (Available but not primary)
 # ============================================================================
+# Useful for local development and testing without API costs
 [providers.ollama]
 enabled = false
 endpoint = "http://localhost:11434"
@@ -78,8 +112,10 @@ temperature = 0.7
 max_tokens = 4096
 
 # ============================================================================
-# DeepSeek Provider
+# DeepSeek Provider (Config only - no implementation)
 # ============================================================================
+# Note: This provider is listed for configuration compatibility but has no
+# corresponding implementation in core/src/providers.rs
 [providers.deepseek]
 enabled = false
 # api_key = "sk-..."
@@ -92,8 +128,10 @@ temperature = 0.7
 max_tokens = 4096
 
 # ============================================================================
-# Groq Provider
+# Groq Provider (Config only - no implementation)
 # ============================================================================
+# Note: This provider is listed for configuration compatibility but has no
+# corresponding implementation in core/src/providers.rs
 [providers.groq]
 enabled = false
 # api_key = "gsk_..."

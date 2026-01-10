@@ -19,29 +19,27 @@ mod chat_graph_state;
 mod chat_graph_view;
 mod chat_state;
 mod chat_view;
-mod dag_canvas_interactions;
-mod dag_editor;
 mod event_handler;
 mod lisp_debugger;
 mod rpc_client;
 mod session_selector;
 mod session_state;
-mod task_board;
 mod theme;
 mod time_travel;
 mod zmq_subscriber;
+mod history_graph_state;
+mod history_graph_layout;
+mod history_graph_view;
 
 use theme::{colors, container_styles, button_styles, humanlayer_theme};
+use history_graph_state::{HistoryGraphMessage, HistoryGraphState};
 
 use chrono::Utc;
-use dag_editor::{DAGEditorMessage, DAGEditorState};
-use descartes_core::{Task, TaskComplexity, TaskPriority, TaskStatus};
 use descartes_daemon::DescartesEvent;
 use event_handler::EventHandler;
 use lisp_debugger::{LispDebuggerMessage, LispDebuggerState};
 use rpc_client::GuiRpcClient;
 use session_state::{SessionMessage, SessionState};
-use task_board::{KanbanBoard, TaskBoardMessage, TaskBoardState};
 use time_travel::{TimeTravelMessage, TimeTravelState};
 use uuid::Uuid;
 
@@ -82,10 +80,8 @@ struct DescartesGui {
     session_state: SessionState,
     /// Time travel debugger state
     time_travel_state: TimeTravelState,
-    /// Task board state
-    task_board_state: TaskBoardState,
-    /// DAG editor state
-    dag_editor_state: DAGEditorState,
+    /// History graph debugger state
+    history_graph_state: HistoryGraphState,
     /// Chat interface state
     chat_state: chat_state::ChatState,
     /// Chat graph view state
@@ -108,10 +104,8 @@ enum ViewMode {
     Sessions,
     Dashboard,
     Chat,
-    TaskBoard,
     SwarmMonitor,
     Debugger,
-    DagEditor,
 }
 
 /// Messages that drive the application
@@ -132,10 +126,8 @@ enum Message {
     Session(SessionMessage),
     /// Time travel debugger message
     TimeTravel(TimeTravelMessage),
-    /// Task board message
-    TaskBoard(TaskBoardMessage),
-    /// DAG editor message
-    DAGEditor(DAGEditorMessage),
+    /// History graph debugger message
+    HistoryGraph(HistoryGraphMessage),
     /// Chat interface message
     Chat(chat_state::ChatMessage),
     /// Chat graph view message
@@ -144,10 +136,6 @@ enum Message {
     LispDebugger(LispDebuggerMessage),
     /// Load sample history data for demo
     LoadSampleHistory,
-    /// Load sample tasks for demo
-    LoadSampleTasks,
-    /// Load sample DAG for demo
-    LoadSampleDAG,
     /// Clear status message
     ClearStatus,
     /// Show error message
@@ -167,8 +155,7 @@ impl DescartesGui {
             connection_error: None,
             session_state: SessionState::default(),
             time_travel_state: TimeTravelState::default(),
-            task_board_state: TaskBoardState::default(),
-            dag_editor_state: DAGEditorState::default(),
+            history_graph_state: HistoryGraphState::new(),
             chat_state: chat_state::ChatState::new(),
             chat_graph_state: chat_graph_state::ChatGraphState::new(),
             lisp_debugger_state: LispDebuggerState::new(),
@@ -343,12 +330,8 @@ impl DescartesGui {
                 time_travel::update(&mut self.time_travel_state, tt_msg);
                 iced::Task::none()
             }
-            Message::TaskBoard(msg) => {
-                task_board::update(&mut self.task_board_state, msg);
-                iced::Task::none()
-            }
-            Message::DAGEditor(msg) => {
-                dag_editor::update(&mut self.dag_editor_state, msg);
+            Message::HistoryGraph(hg_msg) => {
+                history_graph_state::update(&mut self.history_graph_state, hg_msg);
                 iced::Task::none()
             }
             Message::Chat(msg) => {
@@ -560,16 +543,6 @@ impl DescartesGui {
                 self.load_sample_history();
                 iced::Task::none()
             }
-            Message::LoadSampleTasks => {
-                tracing::info!("Loading sample tasks data");
-                self.load_sample_tasks();
-                iced::Task::none()
-            }
-            Message::LoadSampleDAG => {
-                tracing::info!("Loading sample DAG data");
-                self.load_sample_dag();
-                iced::Task::none()
-            }
             Message::ClearStatus => {
                 self.status_message = None;
                 iced::Task::none()
@@ -624,10 +597,6 @@ impl DescartesGui {
                     self.current_view = ViewMode::Debugger;
                     return iced::Task::none();
                 }
-                Key::Character(c) if c == "6" => {
-                    self.current_view = ViewMode::DagEditor;
-                    return iced::Task::none();
-                }
                 _ => {}
             }
         }
@@ -655,10 +624,6 @@ impl DescartesGui {
                 }
                 Key::Character(c) if c == "5" => {
                     self.current_view = ViewMode::Debugger;
-                    return iced::Task::none();
-                }
-                Key::Character(c) if c == "6" => {
-                    self.current_view = ViewMode::DagEditor;
                     return iced::Task::none();
                 }
                 _ => {}
@@ -703,14 +668,6 @@ impl DescartesGui {
                         return iced::Task::none();
                     }
                 }
-                ViewMode::DagEditor => {
-                    // DAG editor handles its own escape via its message system
-                    dag_editor::update(
-                        &mut self.dag_editor_state,
-                        DAGEditorMessage::KeyPressed(key.clone(), modifiers),
-                    );
-                    return iced::Task::none();
-                }
                 _ => {}
             }
         }
@@ -733,51 +690,47 @@ impl DescartesGui {
         // === VIEW-SPECIFIC SHORTCUTS ===
         match self.current_view {
             ViewMode::Debugger => {
-                // Time Travel shortcuts (only active in Debugger view)
-                // Vim-like: h/l for step, g/G for start/end, j/k for scrubbing
+                // History Graph shortcuts (only active in Debugger view)
+                // Vim-like: h/l for step, g/G for start/end
                 match &key {
-                    // h or Left Arrow: Previous event (vim: left motion)
+                    // h or Left Arrow: Step backward in history
                     Key::Named(Named::ArrowLeft) => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::PrevEvent);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::StepBackward);
                     }
                     Key::Character(c) if c == "h" && !modifiers.control() && !modifiers.alt() => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::PrevEvent);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::StepBackward);
                     }
-                    // l or Right Arrow: Next event (vim: right motion)
+                    // l or Right Arrow: Step forward in history
                     Key::Named(Named::ArrowRight) => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::NextEvent);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::StepForward);
                     }
                     Key::Character(c) if c == "l" && !modifiers.shift() && !modifiers.control() && !modifiers.alt() => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::NextEvent);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::StepForward);
                     }
-                    // g or Home: Jump to start (vim: gg goes to top)
+                    // g or Home: Jump to start
                     Key::Named(Named::Home) => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToStart);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::JumpToStart);
                     }
                     Key::Character(c) if c == "g" && !modifiers.shift() && !modifiers.control() => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToStart);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::JumpToStart);
                     }
-                    // G or End: Jump to end (vim: G goes to bottom)
+                    // G or End: Jump to end
                     Key::Named(Named::End) => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToEnd);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::JumpToEnd);
                     }
                     Key::Character(c) if c == "G" && modifiers.shift() && !modifiers.control() => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::JumpToEnd);
-                    }
-                    // Space: Toggle playback
-                    Key::Character(c) if c == " " => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::TogglePlayback);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::JumpToEnd);
                     }
                     // +/= for zoom in, - for zoom out
                     Key::Character(c) if c == "+" || c == "=" => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::ZoomIn);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::Zoom(1.1));
                     }
                     Key::Character(c) if c == "-" => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::ZoomOut);
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::Zoom(0.9));
                     }
-                    // L (shift+l): Toggle loop (since l is now step forward)
-                    Key::Character(c) if c == "L" && modifiers.shift() && !modifiers.control() => {
-                        time_travel::update(&mut self.time_travel_state, TimeTravelMessage::ToggleLoop);
+                    // r: Reset zoom and pan
+                    Key::Character(c) if c == "r" && !modifiers.control() && !modifiers.shift() => {
+                        history_graph_state::update(&mut self.history_graph_state, HistoryGraphMessage::ResetView);
                     }
                     _ => {}
                 }
@@ -806,14 +759,6 @@ impl DescartesGui {
                     // TODO: Add message scrolling with j/k
                     _ => {}
                 }
-            }
-
-            ViewMode::DagEditor => {
-                // Forward all keyboard events to DAG editor
-                dag_editor::update(
-                    &mut self.dag_editor_state,
-                    DAGEditorMessage::KeyPressed(key.clone(), modifiers),
-                );
             }
 
             ViewMode::Sessions => {
@@ -1041,282 +986,17 @@ impl DescartesGui {
             .with_description("Main execution checkpoint".to_string()),
         ];
 
-        // Update the time travel state
+        // Update the time travel state (kept for backwards compatibility)
         time_travel::update(
             &mut self.time_travel_state,
-            TimeTravelMessage::HistoryLoaded(events, snapshots),
+            TimeTravelMessage::HistoryLoaded(events.clone(), snapshots.clone()),
         );
-    }
 
-    /// Load sample tasks for demonstration
-    fn load_sample_tasks(&mut self) {
-        let now = Utc::now().timestamp();
-
-        // Create sample tasks with various states
-        let mut todo_tasks = vec![];
-        let mut in_progress_tasks = vec![];
-        let mut done_tasks = vec![];
-        let mut blocked_tasks = vec![];
-
-        // Todo tasks
-        todo_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Implement user authentication".to_string(),
-            description: Some("Add JWT-based authentication to the API endpoints".to_string()),
-            status: TaskStatus::Todo,
-            priority: TaskPriority::Critical,
-            complexity: TaskComplexity::Complex,
-            assigned_to: Some("alice".to_string()),
-            dependencies: vec![],
-            created_at: now - 86400,
-            updated_at: now - 3600,
-            metadata: None,
-        });
-
-        todo_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Write unit tests for parser".to_string(),
-            description: Some("Cover edge cases in the expression parser".to_string()),
-            status: TaskStatus::Todo,
-            priority: TaskPriority::High,
-            complexity: TaskComplexity::Moderate,
-            assigned_to: Some("bob".to_string()),
-            dependencies: vec![],
-            created_at: now - 7200,
-            updated_at: now - 7200,
-            metadata: None,
-        });
-
-        todo_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Update documentation".to_string(),
-            description: Some("Refresh API documentation with new endpoints".to_string()),
-            status: TaskStatus::Todo,
-            priority: TaskPriority::Medium,
-            complexity: TaskComplexity::Simple,
-            assigned_to: None,
-            dependencies: vec![],
-            created_at: now - 3600,
-            updated_at: now - 3600,
-            metadata: None,
-        });
-
-        // In Progress tasks
-        in_progress_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Refactor database layer".to_string(),
-            description: Some(
-                "Migrate from SQLite to PostgreSQL for better performance".to_string(),
-            ),
-            status: TaskStatus::InProgress,
-            priority: TaskPriority::High,
-            complexity: TaskComplexity::Epic,
-            assigned_to: Some("alice".to_string()),
-            dependencies: vec![],
-            created_at: now - 172800,
-            updated_at: now - 1800,
-            metadata: None,
-        });
-
-        in_progress_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Design new UI mockups".to_string(),
-            description: Some("Create Figma designs for the dashboard redesign".to_string()),
-            status: TaskStatus::InProgress,
-            priority: TaskPriority::Medium,
-            complexity: TaskComplexity::Moderate,
-            assigned_to: Some("charlie".to_string()),
-            dependencies: vec![],
-            created_at: now - 86400,
-            updated_at: now - 600,
-            metadata: None,
-        });
-
-        // Done tasks
-        done_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Setup CI/CD pipeline".to_string(),
-            description: Some(
-                "Configure GitHub Actions for automated testing and deployment".to_string(),
-            ),
-            status: TaskStatus::Done,
-            priority: TaskPriority::High,
-            complexity: TaskComplexity::Complex,
-            assigned_to: Some("bob".to_string()),
-            dependencies: vec![],
-            created_at: now - 259200,
-            updated_at: now - 86400,
-            metadata: None,
-        });
-
-        done_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Fix login bug".to_string(),
-            description: Some("Resolved issue with session timeout handling".to_string()),
-            status: TaskStatus::Done,
-            priority: TaskPriority::Critical,
-            complexity: TaskComplexity::Simple,
-            assigned_to: Some("alice".to_string()),
-            dependencies: vec![],
-            created_at: now - 172800,
-            updated_at: now - 43200,
-            metadata: None,
-        });
-
-        // Blocked tasks
-        let dep_task_id = Uuid::new_v4();
-        blocked_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Deploy to production".to_string(),
-            description: Some("Waiting for security audit to complete".to_string()),
-            status: TaskStatus::Blocked,
-            priority: TaskPriority::Critical,
-            complexity: TaskComplexity::Moderate,
-            assigned_to: Some("bob".to_string()),
-            dependencies: vec![dep_task_id],
-            created_at: now - 43200,
-            updated_at: now - 3600,
-            metadata: None,
-        });
-
-        blocked_tasks.push(Task {
-            id: Uuid::new_v4(),
-            title: "Optimize image loading".to_string(),
-            description: Some("Blocked on infrastructure team to set up CDN".to_string()),
-            status: TaskStatus::Blocked,
-            priority: TaskPriority::Low,
-            complexity: TaskComplexity::Simple,
-            assigned_to: Some("charlie".to_string()),
-            dependencies: vec![dep_task_id],
-            created_at: now - 86400,
-            updated_at: now - 7200,
-            metadata: None,
-        });
-
-        // Update the task board state
-        let board = KanbanBoard {
-            todo: todo_tasks,
-            in_progress: in_progress_tasks,
-            done: done_tasks,
-            blocked: blocked_tasks,
-        };
-
-        task_board::update(
-            &mut self.task_board_state,
-            TaskBoardMessage::TasksLoaded(board),
+        // Also update the history graph state
+        history_graph_state::update(
+            &mut self.history_graph_state,
+            HistoryGraphMessage::LoadHistory(events, snapshots),
         );
-    }
-
-    /// Load sample DAG for demonstration
-    fn load_sample_dag(&mut self) {
-        use descartes_core::dag::{DAGEdge, DAGNode, EdgeType, DAG};
-
-        let mut dag = DAG::new("Sample Workflow");
-        dag.description =
-            Some("A sample workflow demonstrating DAG editor capabilities".to_string());
-
-        // Create nodes in a workflow pattern
-        // Layer 1: Start node
-        let start_node = DAGNode::new_auto("Start")
-            .with_position(400.0, 50.0)
-            .with_description("Workflow entry point")
-            .with_tag("entry");
-        let start_id = start_node.node_id;
-        dag.add_node(start_node).unwrap();
-
-        // Layer 2: Initial tasks
-        let task1 = DAGNode::new_auto("Load Data")
-            .with_position(200.0, 180.0)
-            .with_description("Load input data from sources")
-            .with_tag("io");
-        let task1_id = task1.node_id;
-        dag.add_node(task1).unwrap();
-
-        let task2 = DAGNode::new_auto("Initialize Config")
-            .with_position(400.0, 180.0)
-            .with_description("Load and validate configuration")
-            .with_tag("config");
-        let task2_id = task2.node_id;
-        dag.add_node(task2).unwrap();
-
-        let task3 = DAGNode::new_auto("Setup Resources")
-            .with_position(600.0, 180.0)
-            .with_description("Allocate necessary resources")
-            .with_tag("setup");
-        let task3_id = task3.node_id;
-        dag.add_node(task3).unwrap();
-
-        // Layer 3: Processing tasks
-        let process1 = DAGNode::new_auto("Validate Data")
-            .with_position(200.0, 310.0)
-            .with_description("Validate input data integrity")
-            .with_tag("validation");
-        let process1_id = process1.node_id;
-        dag.add_node(process1).unwrap();
-
-        let process2 = DAGNode::new_auto("Transform Data")
-            .with_position(400.0, 310.0)
-            .with_description("Apply data transformations")
-            .with_tag("processing");
-        let process2_id = process2.node_id;
-        dag.add_node(process2).unwrap();
-
-        let process3 = DAGNode::new_auto("Generate Reports")
-            .with_position(600.0, 310.0)
-            .with_description("Create analysis reports")
-            .with_tag("reporting");
-        let process3_id = process3.node_id;
-        dag.add_node(process3).unwrap();
-
-        // Layer 4: Aggregation
-        let aggregate = DAGNode::new_auto("Aggregate Results")
-            .with_position(400.0, 440.0)
-            .with_description("Combine all results")
-            .with_tag("aggregation");
-        let aggregate_id = aggregate.node_id;
-        dag.add_node(aggregate).unwrap();
-
-        // Layer 5: End node
-        let end_node = DAGNode::new_auto("Complete")
-            .with_position(400.0, 570.0)
-            .with_description("Workflow completion")
-            .with_tag("exit");
-        let end_id = end_node.node_id;
-        dag.add_node(end_node).unwrap();
-
-        // Create edges (dependencies)
-        // Start to Layer 2
-        dag.add_edge(DAGEdge::dependency(start_id, task1_id))
-            .unwrap();
-        dag.add_edge(DAGEdge::dependency(start_id, task2_id))
-            .unwrap();
-        dag.add_edge(DAGEdge::dependency(start_id, task3_id))
-            .unwrap();
-
-        // Layer 2 to Layer 3
-        dag.add_edge(DAGEdge::dependency(task1_id, process1_id))
-            .unwrap();
-        dag.add_edge(DAGEdge::new(task1_id, process2_id, EdgeType::DataFlow))
-            .unwrap();
-        dag.add_edge(DAGEdge::dependency(task2_id, process2_id))
-            .unwrap();
-        dag.add_edge(DAGEdge::soft_dependency(task3_id, process3_id))
-            .unwrap();
-
-        // Layer 3 to Layer 4
-        dag.add_edge(DAGEdge::dependency(process1_id, aggregate_id))
-            .unwrap();
-        dag.add_edge(DAGEdge::new(process2_id, aggregate_id, EdgeType::DataFlow))
-            .unwrap();
-        dag.add_edge(DAGEdge::dependency(process3_id, aggregate_id))
-            .unwrap();
-
-        // Layer 4 to End
-        dag.add_edge(DAGEdge::new(aggregate_id, end_id, EdgeType::Trigger))
-            .unwrap();
-
-        // Update the DAG editor state
-        dag_editor::update(&mut self.dag_editor_state, DAGEditorMessage::LoadDAG(dag));
     }
 
     fn view(&self) -> Element<Message> {
@@ -1487,15 +1167,26 @@ impl DescartesGui {
 
     /// Render the navigation sidebar
     fn view_navigation(&self) -> Element<Message> {
+        // ============================================================
+        // ACTIVE VIEWS:
+        // - Sessions: Session management (create, select, delete)
+        // - Dashboard: Overview with stats and recent events
+        // - Chat: Agent conversation interface
+        // - Agents (SwarmMonitor): Live agent monitoring
+        // - Debugger: History Graph for visualizing agent execution
+        //
+        // REMOVED (2026-01 Simplification):
+        // - TaskBoard: Kanban-style task view (code deleted)
+        // - DagEditor: Visual workflow design (code deleted)
+        // ============================================================
+
         // Navigation items with icons
         let nav_items = vec![
             (ViewMode::Sessions, "\u{25C6}", "Sessions"),    // ◆
             (ViewMode::Dashboard, "\u{2302}", "Dashboard"),  // ⌂
             (ViewMode::Chat, "\u{2709}", "Chat"),            // ✉
-            // TaskBoard removed - not connected to agent system
             (ViewMode::SwarmMonitor, "\u{25CE}", "Agents"),  // ◎
             (ViewMode::Debugger, "\u{23F1}", "Debugger"),    // ⏱
-            // DagEditor removed - no workflow executor implemented
         ];
 
         let buttons: Vec<Element<Message>> = nav_items
@@ -1563,10 +1254,8 @@ impl DescartesGui {
             ViewMode::Sessions => self.view_sessions(),
             ViewMode::Dashboard => self.view_dashboard(),
             ViewMode::Chat => self.view_chat(),
-            ViewMode::TaskBoard => self.view_task_board(),
             ViewMode::SwarmMonitor => self.view_swarm_monitor(),
             ViewMode::Debugger => self.view_debugger(),
-            ViewMode::DagEditor => self.view_dag_editor(),
         };
 
         container(content)
@@ -1617,15 +1306,10 @@ impl DescartesGui {
             .color(colors::TEXT_SECONDARY);
 
         // Stats cards row
-        let task_count = self.task_board_state.kanban_board.todo.len() +
-            self.task_board_state.kanban_board.in_progress.len() +
-            self.task_board_state.kanban_board.done.len() +
-            self.task_board_state.kanban_board.blocked.len();
-
         let stats_cards = row![
             self.view_stat_card("Agents".to_string(), "0".to_string(), "◎".to_string(), colors::PRIMARY),
             Space::with_width(12),
-            self.view_stat_card("Tasks".to_string(), format!("{}", task_count), "☰".to_string(), colors::INFO),
+            self.view_stat_card("Sessions".to_string(), format!("{}", self.session_state.sessions.len()), "☰".to_string(), colors::INFO),
             Space::with_width(12),
             self.view_stat_card("Events".to_string(), format!("{}", self.recent_events.len()), "◈".to_string(), colors::SUCCESS),
         ];
@@ -1723,17 +1407,7 @@ impl DescartesGui {
                 text("Quick Actions").size(14).color(colors::TEXT_PRIMARY),
                 Space::with_height(12),
                 row![
-                    button(text("Load Sample Tasks").size(12))
-                        .on_press(Message::LoadSampleTasks)
-                        .padding([8, 12])
-                        .style(button_styles::secondary),
-                    Space::with_width(8),
-                    button(text("Load Sample DAG").size(12))
-                        .on_press(Message::LoadSampleDAG)
-                        .padding([8, 12])
-                        .style(button_styles::secondary),
-                    Space::with_width(8),
-                    button(text("Load History").size(12))
+                    button(text("Load Sample History").size(12))
                         .on_press(Message::LoadSampleHistory)
                         .padding([8, 12])
                         .style(button_styles::secondary),
@@ -1781,43 +1455,6 @@ impl DescartesGui {
         .width(Length::Fill)
         .style(container_styles::panel)
         .into()
-    }
-
-    /// Task Board view
-    fn view_task_board(&self) -> Element<Message> {
-        // Check if tasks are loaded
-        let total_tasks = self.task_board_state.kanban_board.todo.len()
-            + self.task_board_state.kanban_board.in_progress.len()
-            + self.task_board_state.kanban_board.done.len()
-            + self.task_board_state.kanban_board.blocked.len();
-
-        if total_tasks == 0 {
-            let title = text("Task Board")
-                .size(28)
-                .color(colors::TEXT_PRIMARY);
-
-            let description = text("No tasks loaded. Load sample tasks to see the Task Board in action.")
-                .size(14)
-                .color(colors::TEXT_SECONDARY);
-
-            let load_sample_btn = button(text("Load Sample Tasks").size(13))
-                .on_press(Message::LoadSampleTasks)
-                .padding([10, 16])
-                .style(button_styles::primary);
-
-            column![
-                title,
-                Space::with_height(8),
-                description,
-                Space::with_height(24),
-                load_sample_btn,
-            ]
-            .spacing(0)
-            .into()
-        } else {
-            // Map task board messages to main messages
-            task_board::view(&self.task_board_state).map(Message::TaskBoard)
-        }
     }
 
     /// Swarm Monitor view - shows active session and daemon status
@@ -1960,70 +1597,44 @@ impl DescartesGui {
 
     /// Debugger view with time travel UI
     fn view_debugger(&self) -> Element<Message> {
-        let title = text("Time Travel Debugger")
+        let title = text("Agent History Graph")
             .size(28)
             .color(colors::TEXT_PRIMARY);
 
-        let subtitle = text("Step through agent execution history")
+        let subtitle = text("Visualize agent execution, causality, and time-travel through history")
             .size(14)
             .color(colors::TEXT_SECONDARY);
 
-        // Add a button to load sample history if no events are loaded
-        let load_sample_btn = if self.time_travel_state.events.is_empty() {
+        // Show graph or empty state based on whether we have nodes
+        let content: Element<Message> = if self.history_graph_state.nodes.is_empty() {
+            // Empty state with load sample button
             column![
+                Space::with_height(32),
+                history_graph_view::view_empty_state().map(Message::HistoryGraph),
                 Space::with_height(16),
                 button(text("Load Sample History").size(13))
                     .on_press(Message::LoadSampleHistory)
                     .padding([10, 16])
                     .style(button_styles::primary),
-                Space::with_height(16),
             ]
+            .align_x(iced::alignment::Horizontal::Center)
+            .into()
         } else {
-            column![]
+            // Show the history graph (need mutable access for layout computation)
+            // Clone the state for view since view() needs mutable access for layout
+            let mut graph_state = self.history_graph_state.clone();
+            history_graph_view::view(&mut graph_state).map(Message::HistoryGraph)
         };
 
         column![
             title,
             Space::with_height(4),
             subtitle,
-            load_sample_btn,
-            // Map time travel messages to main messages
-            time_travel::view(&self.time_travel_state).map(Message::TimeTravel),
+            Space::with_height(8),
+            content,
         ]
         .spacing(0)
         .into()
-    }
-
-    /// DAG Editor view
-    fn view_dag_editor(&self) -> Element<Message> {
-        // Check if DAG is empty
-        if self.dag_editor_state.dag.nodes.is_empty() {
-            let title = text("Workflow Editor")
-                .size(28)
-                .color(colors::TEXT_PRIMARY);
-
-            let subtitle = text("Design and visualize agent workflows as directed acyclic graphs")
-                .size(14)
-                .color(colors::TEXT_SECONDARY);
-
-            let load_sample_btn = button(text("Load Sample Workflow").size(13))
-                .on_press(Message::LoadSampleDAG)
-                .padding([10, 16])
-                .style(button_styles::primary);
-
-            column![
-                title,
-                Space::with_height(4),
-                subtitle,
-                Space::with_height(24),
-                load_sample_btn,
-            ]
-            .spacing(0)
-            .into()
-        } else {
-            // Map DAG editor messages to main messages
-            dag_editor::view(&self.dag_editor_state).map(Message::DAGEditor)
-        }
     }
 }
 

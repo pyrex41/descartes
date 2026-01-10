@@ -1,8 +1,6 @@
 #![allow(mismatched_lifetime_syntaxes)]
 #![allow(dead_code)]
 
-pub mod dag_canvas_interactions;
-pub mod dag_editor;
 pub mod debugger_ui;
 pub mod event_handler;
 pub mod lisp_debugger;
@@ -17,13 +15,12 @@ pub mod zmq_subscriber; // ZMQ SUB client for chat streaming
 pub mod chat_state; // Chat interface state management
 pub mod loop_state; // Iterative loop state management
 pub mod loop_view; // Iterative loop view component
-pub mod task_board;
 pub mod time_travel;
 pub mod time_travel_integration;
+pub mod history_graph_state; // History graph for agent time-travel debugging
+pub mod history_graph_layout; // Layout algorithm for history graph
+pub mod history_graph_view; // Canvas rendering for history graph
 
-pub use dag_editor::{
-    update as dag_editor_update, view as dag_editor_view, DAGEditorMessage, DAGEditorState, Tool,
-};
 pub use event_handler::EventHandler;
 pub use rpc_client::GuiRpcClient;
 pub use rpc_unix_client::GuiUnixRpcClient;
@@ -32,10 +29,6 @@ pub use swarm_monitor::{
     subscription as swarm_monitor_subscription, update as swarm_monitor_update,
     view as swarm_monitor_view, AgentEvent, AgentFilter as SwarmAgentFilter, ConnectionStatus,
     PerformanceStats, SwarmMonitorMessage, SwarmMonitorState,
-};
-pub use task_board::{
-    update as task_board_update, view as task_board_view, KanbanBoard, TaskBoardMessage,
-    TaskBoardState, TaskFilters, TaskSort,
 };
 pub use time_travel::{
     update as time_travel_update, view as time_travel_view, PlaybackState, TimeTravelMessage,
@@ -53,5 +46,10 @@ pub use lisp_debugger::{
     update as lisp_debugger_update, view as lisp_debugger_view, parse_debugger_event,
     LispDebuggerMessage, LispDebuggerState, LispFrame, LispRestart,
 };
+pub use history_graph_state::{
+    update as history_graph_update, HistoryGraphMessage, HistoryGraphState,
+    HistoryGraphNode, HistoryNodeType, HistoryFilter,
+};
+pub use history_graph_view::{view as history_graph_view, view_empty_state as history_graph_empty_view};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
