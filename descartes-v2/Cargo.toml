@@ -52,6 +52,8 @@ dirs = "5"
 shellexpand = "3"
 regex = "1"
 humantime = "2"
+ctrlc = "3"
+shell-words = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -125,6 +125,43 @@ enum Commands {
         #[arg(long, short)]
         output: Option<std::path::PathBuf>,
     },
+
+    /// Start interactive session (persistent CLI)
+    #[command(alias = "i")]
+    Interactive {
+        /// Start with a workflow
+        #[arg(long)]
+        workflow: Option<String>,
+
+        /// Start at a specific stage
+        #[arg(long)]
+        stage: Option<String>,
+    },
+
+    /// Initialize default skills
+    Skills {
+        #[command(subcommand)]
+        action: SkillCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum SkillCommands {
+    /// List available skills
+    List,
+
+    /// Initialize default skill prompts
+    Init {
+        /// Force overwrite existing files
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Show a skill's prompt
+    Show {
+        /// Skill name
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -351,6 +388,123 @@ async fn main() -> Result<()> {
                 info!("Handoff written to {:?}", path);
             } else {
                 println!("{}", handoff);
+            }
+        }
+
+        Commands::Interactive { workflow, stage } => {
+            info!("Starting interactive session");
+            let _ = stage; // Will be used when we implement stage-specific starting
+
+            // Install panic handler
+            descartes::interactive::signals::install_panic_handler();
+
+            // Load workflow config if specified
+            let workflow_config = if let Some(ref name) = workflow {
+                Some(load_workflow_config(Some(name))?)
+            } else {
+                None
+            };
+
+            // Create harness (convert Box to Arc for shared ownership in session)
+            let harness = descartes::harness::create_harness(&config)?;
+            let harness: std::sync::Arc<dyn descartes::Harness> = harness.into();
+
+            // Create session
+            let mut session = descartes::interactive::Session::new(
+                config.clone(),
+                harness,
+                workflow_config,
+            );
+
+            // Install signal handler
+            let signal_handler = descartes::interactive::SignalHandler::new(
+                session.interrupt_flag(),
+                session.shutdown_flag(),
+            );
+            signal_handler.install()?;
+
+            // Run the interactive session
+            session.run().await?;
+        }
+
+        Commands::Skills { action } => {
+            handle_skills_command(action)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle skills subcommands
+fn handle_skills_command(action: SkillCommands) -> Result<()> {
+    match action {
+        SkillCommands::List => {
+            let registry = descartes::interactive::SkillRegistry::new();
+            println!("Available skills:\n");
+            for (name, skill) in registry.list() {
+                let aliases = if skill.aliases.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", skill.aliases.join(", "))
+                };
+                println!("  /{}{}", name, aliases);
+                println!("    {}", skill.description);
+                if let Some(ref cat) = skill.category {
+                    println!("    Category: {}", cat);
+                }
+                println!();
+            }
+        }
+
+        SkillCommands::Init { force } => {
+            let dir = std::path::PathBuf::from(".descartes/skills");
+
+            if dir.exists() && !force {
+                eprintln!("Skills directory already exists. Use --force to overwrite.");
+                return Ok(());
+            }
+
+            descartes::interactive::skills::create_default_skills(&dir)?;
+            info!("Created default skill prompts in {:?}", dir);
+        }
+
+        SkillCommands::Show { name } => {
+            let registry = descartes::interactive::SkillRegistry::new();
+            if let Some(skill) = registry.get(&name) {
+                println!("Skill: {}", skill.name);
+                println!("Description: {}", skill.description);
+                println!("Prompt file: {}", skill.prompt_file.display());
+                if let Some(ref cat) = skill.category {
+                    println!("Category: {}", cat);
+                }
+                if !skill.aliases.is_empty() {
+                    println!("Aliases: {}", skill.aliases.join(", "));
+                }
+                if !skill.variables.is_empty() {
+                    println!("\nVariables:");
+                    for var in &skill.variables {
+                        let required = if var.required { " (required)" } else { "" };
+                        let default = var.default.as_ref()
+                            .map(|d| format!(" [default: {}]", d))
+                            .unwrap_or_default();
+                        println!("  {}{}{}", var.name, required, default);
+                        if let Some(ref desc) = var.description {
+                            println!("    {}", desc);
+                        }
+                    }
+                }
+
+                // Try to show the prompt content
+                if skill.prompt_file.exists() {
+                    println!("\n─── Prompt Content ───");
+                    if let Ok(content) = std::fs::read_to_string(&skill.prompt_file) {
+                        println!("{}", content);
+                    }
+                } else {
+                    println!("\nNote: Prompt file does not exist yet. Run 'descartes skills init' to create it.");
+                }
+            } else {
+                eprintln!("Unknown skill: {}", name);
             }
         }
     }
