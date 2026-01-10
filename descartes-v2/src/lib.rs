@@ -31,17 +31,21 @@
 
 pub mod agent;
 pub mod config;
+pub mod handoff;
 pub mod harness;
 pub mod ralph_loop;
 pub mod scud;
 pub mod transcript;
+pub mod workflow;
 
 // Re-exports for convenience
 pub use agent::{AgentCategory, SubagentResult};
 pub use config::Config;
+pub use handoff::Handoff;
 pub use harness::{Harness, HarnessKind};
 pub use ralph_loop::{LoopConfig, LoopMode};
 pub use transcript::{Transcript, TranscriptEntry};
+pub use workflow::{WorkflowConfig, WorkflowRunner, WorkflowState};
 
 /// Crate-level error type
 #[derive(Debug, thiserror::Error)]
@@ -75,6 +79,15 @@ pub enum Error {
 
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
+
+    #[error("Notification error: {0}")]
+    Notification(String),
+
+    #[error("Command error: {0}")]
+    Command(String),
+
+    #[error("Workflow error: {0}")]
+    Workflow(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

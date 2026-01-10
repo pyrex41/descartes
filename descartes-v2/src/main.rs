@@ -9,6 +9,9 @@ use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use descartes::{Config, LoopConfig, LoopMode, Result};
+use descartes::workflow::{
+    self, default_workflow, GateType, RunOptions, StateManager, WorkflowConfig, WorkflowRunner,
+};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -102,6 +105,100 @@ enum Commands {
 
     /// Show active harness
     Harness,
+
+    /// Workflow orchestration commands
+    Workflow {
+        #[command(subcommand)]
+        action: WorkflowCommands,
+    },
+
+    /// Quick handoff generation
+    Handoff {
+        /// Target stage (plan, implement, validate)
+        target: String,
+
+        /// Extra context to include
+        #[arg(long, short)]
+        extra: Option<String>,
+
+        /// Output to file instead of stdout
+        #[arg(long, short)]
+        output: Option<std::path::PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum WorkflowCommands {
+    /// Run a workflow
+    Run {
+        /// Workflow name (default: from .descartes/workflow.toml)
+        #[arg(long)]
+        workflow: Option<String>,
+
+        /// Step-by-step mode (all gates manual)
+        #[arg(long)]
+        step_by_step: bool,
+
+        /// One-shot mode (all gates auto)
+        #[arg(long)]
+        one_shot: bool,
+
+        /// Start from this stage
+        #[arg(long)]
+        from: Option<String>,
+
+        /// Stop after this stage
+        #[arg(long)]
+        to: Option<String>,
+
+        /// Extra context to inject
+        #[arg(long, short)]
+        extra: Option<String>,
+
+        /// Resume a specific run by ID
+        #[arg(long)]
+        resume: Option<String>,
+
+        /// Dry run (don't execute agents)
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Show workflow status
+    Status {
+        /// Workflow name
+        #[arg(long)]
+        workflow: Option<String>,
+
+        /// Specific run ID
+        #[arg(long)]
+        run: Option<String>,
+    },
+
+    /// List workflow runs
+    List {
+        /// Workflow name
+        #[arg(long)]
+        workflow: Option<String>,
+
+        /// Show only last N runs
+        #[arg(long, default_value = "10")]
+        last: usize,
+    },
+
+    /// Initialize default workflow configuration
+    Init {
+        /// Force overwrite existing config
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Show workflow configuration
+    Config {
+        /// Workflow name
+        #[arg(long)]
+        workflow: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -221,7 +318,154 @@ async fn main() -> Result<()> {
         Commands::Harness => {
             println!("Active harness: {}", config.harness.kind);
         }
+
+        Commands::Workflow { action } => {
+            handle_workflow_command(action, &config).await?;
+        }
+
+        Commands::Handoff { target, extra, output } => {
+            // Determine current stage from context (simplified - uses previous stage)
+            let from_stage = match target.as_str() {
+                "plan" => "research",
+                "implement" => "plan",
+                "validate" => "implement",
+                _ => {
+                    eprintln!("Unknown target stage: {}", target);
+                    return Ok(());
+                }
+            };
+
+            // Load or create workflow config
+            let workflow_config = load_workflow_config(None)?;
+
+            // Generate handoff
+            let handoff = workflow::quick_handoff(
+                &workflow_config,
+                from_stage,
+                extra.as_deref(),
+            ).await?;
+
+            // Output
+            if let Some(path) = output {
+                std::fs::write(&path, &handoff)?;
+                info!("Handoff written to {:?}", path);
+            } else {
+                println!("{}", handoff);
+            }
+        }
     }
 
     Ok(())
+}
+
+/// Handle workflow subcommands
+async fn handle_workflow_command(action: WorkflowCommands, config: &Config) -> Result<()> {
+    match action {
+        WorkflowCommands::Run {
+            workflow,
+            step_by_step,
+            one_shot,
+            from,
+            to,
+            extra,
+            resume,
+            dry_run,
+        } => {
+            let workflow_config = load_workflow_config(workflow.as_deref())?;
+            let harness = descartes::harness::create_harness(config)?;
+
+            let options = RunOptions {
+                step_by_step,
+                one_shot,
+                from_stage: from,
+                to_stage: to,
+                extra_context: extra,
+                resume_id: resume,
+                dry_run,
+                ..Default::default()
+            };
+
+            let runner = WorkflowRunner::new(workflow_config, config.clone(), harness);
+            let state = runner.run(options).await?;
+
+            println!("\n{}", state.summary());
+        }
+
+        WorkflowCommands::Status { workflow, run } => {
+            let state_manager = StateManager::default();
+            let workflow_name = workflow.unwrap_or_else(|| "default".to_string());
+
+            let state = if let Some(run_id) = run {
+                state_manager.load(&workflow_name, &run_id)?
+            } else {
+                state_manager
+                    .find_latest(&workflow_name)?
+                    .ok_or_else(|| descartes::Error::Config("No workflow runs found".to_string()))?
+            };
+
+            println!("{}", state.summary());
+        }
+
+        WorkflowCommands::List { workflow, last } => {
+            let state_manager = StateManager::default();
+            let states = state_manager.list(workflow.as_deref())?;
+
+            for state in states.into_iter().take(last) {
+                println!(
+                    "{} | {} | {:?} | {}",
+                    state.id,
+                    state.workflow,
+                    state.status,
+                    state.started_at.format("%Y-%m-%d %H:%M")
+                );
+            }
+        }
+
+        WorkflowCommands::Init { force } => {
+            let path = std::path::PathBuf::from(".descartes/workflow.toml");
+
+            if path.exists() && !force {
+                eprintln!("Workflow config already exists. Use --force to overwrite.");
+                return Ok(());
+            }
+
+            // Create directory if needed
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
+            // Write default workflow config
+            let default = default_workflow();
+            let content = toml::to_string_pretty(&default)
+                .map_err(|e| descartes::Error::Config(e.to_string()))?;
+            std::fs::write(&path, content)?;
+
+            info!("Created default workflow config at {:?}", path);
+        }
+
+        WorkflowCommands::Config { workflow } => {
+            let workflow_config = load_workflow_config(workflow.as_deref())?;
+            let content = toml::to_string_pretty(&workflow_config)
+                .map_err(|e| descartes::Error::Config(e.to_string()))?;
+            println!("{}", content);
+        }
+    }
+
+    Ok(())
+}
+
+/// Load workflow configuration
+fn load_workflow_config(name: Option<&str>) -> Result<WorkflowConfig> {
+    let path = if let Some(name) = name {
+        std::path::PathBuf::from(format!(".descartes/workflows/{}.toml", name))
+    } else {
+        std::path::PathBuf::from(".descartes/workflow.toml")
+    };
+
+    if path.exists() {
+        WorkflowConfig::load(&path)
+    } else {
+        // Return default workflow
+        Ok(default_workflow())
+    }
 }
