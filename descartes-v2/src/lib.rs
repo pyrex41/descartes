@@ -30,6 +30,7 @@
 //! ```
 
 pub mod agent;
+pub mod baml;
 pub mod config;
 pub mod handoff;
 pub mod harness;
@@ -41,6 +42,7 @@ pub mod workflow;
 
 // Re-exports for convenience
 pub use agent::{AgentCategory, SubagentResult};
+pub use baml::{Decision, DecisionContext, DecisionEngine, LoopDecision};
 pub use config::Config;
 pub use handoff::Handoff;
 pub use harness::{Harness, HarnessKind};

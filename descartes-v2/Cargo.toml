@@ -55,6 +55,10 @@ humantime = "2"
 ctrlc = "3"
 shell-words = "1"
 
+# BAML for structured LLM outputs (optional - requires protoc)
+# Enable with: cargo build --features baml
+# baml = { version = "0.216", optional = true }
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3"
@@ -63,6 +67,8 @@ predicates = "3"
 
 [features]
 default = []
+# BAML integration (requires protoc to be installed)
+# baml = ["dep:baml"]
 # Future: separate harness features if needed
 # opencode = []
 # codex = []
