@@ -20,7 +20,8 @@ function DecideNextAction(
   current_task string? @description("Task in progress"),
   remaining_tasks string[] @description("Tasks not started"),
   blockers string[] @description("Current blockers"),
-  recent_output string @description("What just happened")
+  recent_output string @description("What just happened"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> LoopDecision {
   client GPT4oMini
   prompt #"
@@ -51,6 +52,11 @@ function DecideNextAction(
     ## Recent Output
     {{ recent_output }}
 
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
+    {% endif %}
+
     ## Rules
     - If blockers need human clarification → AskHuman
     - If blockers are technical → Replan
@@ -70,7 +76,8 @@ class SubagentSelection {
 function SelectSubagent(
   task_title string,
   task_description string,
-  available_context string
+  available_context string,
+  additional_context string? @description("Extra context to include in prompt")
 ) -> SubagentSelection {
   client GPT4oMini
   prompt #"
@@ -82,6 +89,11 @@ function SelectSubagent(
 
     ## Available Context
     {{ available_context }}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
+    {% endif %}
 
     ## Subagent Categories
     - searcher: Find files, grep codebase, explore

@@ -18,7 +18,8 @@ function ImplementTask(
   task_id string @description("Task ID being implemented"),
   task_description string @description("What to implement"),
   relevant_code string @description("Existing code context"),
-  acceptance_criteria string[] @description("How to verify success")
+  acceptance_criteria string[] @description("How to verify success"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> ImplementationResult {
   client Claude
   prompt #"
@@ -34,6 +35,11 @@ function ImplementTask(
     {% for criterion in acceptance_criteria %}
     - {{ criterion }}
     {% endfor %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
+    {% endif %}
 
     ## Guidelines
     - Follow existing code patterns
@@ -61,7 +67,8 @@ class Issue {
 
 function ReviewCode(
   code_diff string @description("Git diff of changes"),
-  context string @description("What the code is trying to do")
+  context string @description("What the code is trying to do"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> CodeReviewFeedback {
   client Default
   prompt #"
@@ -74,6 +81,11 @@ function ReviewCode(
     ```diff
     {{ code_diff }}
     ```
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
+    {% endif %}
 
     ## Review Checklist
     - Correctness: Does it do what it's supposed to?

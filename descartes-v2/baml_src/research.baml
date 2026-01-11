@@ -11,7 +11,8 @@ class ResearchFindings {
 function ResearchTopic(
   topic string @description("What to research"),
   codebase_context string @description("Relevant code snippets or file listings"),
-  constraints string? @description("Any constraints or focus areas")
+  constraints string? @description("Any constraints or focus areas"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> ResearchFindings {
   client Claude
   prompt #"
@@ -26,6 +27,11 @@ function ResearchTopic(
     {% if constraints %}
     ## Constraints
     {{ constraints }}
+    {% endif %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
     {% endif %}
 
     Analyze the code and provide your findings.
@@ -45,7 +51,8 @@ class CodeExplanation {
 function ExplainCode(
   code string @description("Code to explain"),
   file_path string @description("Path to the file"),
-  question string? @description("Specific question about the code")
+  question string? @description("Specific question about the code"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> CodeExplanation {
   client Default
   prompt #"
@@ -59,6 +66,11 @@ function ExplainCode(
     {% if question %}
     ## Specific Question
     {{ question }}
+    {% endif %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
     {% endif %}
 
     {{ ctx.output_format }}

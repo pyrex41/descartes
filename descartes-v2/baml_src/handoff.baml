@@ -13,7 +13,8 @@ function GenerateHandoff(
   from_stage string,
   to_stage string,
   work_done string @description("Summary of work completed"),
-  outputs string @description("Files created or modified")
+  outputs string @description("Files created or modified"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> StageHandoff {
   client Default
   prompt #"
@@ -24,6 +25,11 @@ function GenerateHandoff(
 
     ## Outputs
     {{ outputs }}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
+    {% endif %}
 
     Create a clear handoff that gives the next stage everything it needs.
 
@@ -41,7 +47,8 @@ class CommitMessage {
 
 function GenerateCommitMessage(
   diff string @description("Git diff of changes"),
-  context string? @description("Why these changes were made")
+  context string? @description("Why these changes were made"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> CommitMessage {
   client GPT4oMini
   prompt #"
@@ -55,6 +62,11 @@ function GenerateCommitMessage(
     {% if context %}
     ## Context
     {{ context }}
+    {% endif %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
     {% endif %}
 
     Follow conventional commits format.
@@ -75,7 +87,8 @@ class PRDescription {
 function GeneratePRDescription(
   commits string @description("Commit messages in this PR"),
   diff_summary string @description("Summary of all changes"),
-  related_issues string? @description("Related issue numbers")
+  related_issues string? @description("Related issue numbers"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> PRDescription {
   client Default
   prompt #"
@@ -90,6 +103,11 @@ function GeneratePRDescription(
     {% if related_issues %}
     ## Related Issues
     {{ related_issues }}
+    {% endif %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
     {% endif %}
 
     Create a clear PR description that helps reviewers.

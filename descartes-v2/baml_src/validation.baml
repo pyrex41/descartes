@@ -17,7 +17,8 @@ class FailureAnalysis {
 
 function AnalyzeTestResults(
   test_output string @description("Raw test output"),
-  code_context string? @description("Relevant code if helpful")
+  code_context string? @description("Relevant code if helpful"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> TestAnalysis {
   client Default
   prompt #"
@@ -31,6 +32,11 @@ function AnalyzeTestResults(
     {% if code_context %}
     ## Relevant Code
     {{ code_context }}
+    {% endif %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
     {% endif %}
 
     For each failure, explain what went wrong and how to fix it.
@@ -56,7 +62,8 @@ function ValidateImplementation(
   task_description string @description("What was supposed to be done"),
   changes_made string @description("Summary of changes"),
   test_results string? @description("Test output if available"),
-  acceptance_criteria string[] @description("Success criteria")
+  acceptance_criteria string[] @description("Success criteria"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> ValidationResult {
   client Default
   prompt #"
@@ -77,6 +84,11 @@ function ValidateImplementation(
     {% for criterion in acceptance_criteria %}
     - {{ criterion }}
     {% endfor %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
+    {% endif %}
 
     Check each criterion and determine if the implementation is complete.
 

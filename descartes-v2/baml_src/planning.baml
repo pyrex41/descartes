@@ -26,7 +26,8 @@ class ImplementationPlan {
 function CreatePlan(
   objective string @description("What needs to be built or changed"),
   research_context string @description("Findings from research phase"),
-  constraints string? @description("Technical or time constraints")
+  constraints string? @description("Technical or time constraints"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> ImplementationPlan {
   client Claude
   prompt #"
@@ -41,6 +42,11 @@ function CreatePlan(
     {% if constraints %}
     ## Constraints
     {{ constraints }}
+    {% endif %}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
     {% endif %}
 
     ## Guidelines
@@ -62,7 +68,8 @@ class TaskBreakdown {
 
 function BreakdownTask(
   task Task @description("Task to break down"),
-  context string @description("Relevant code or context")
+  context string @description("Relevant code or context"),
+  additional_context string? @description("Extra context to include in prompt")
 ) -> TaskBreakdown {
   client Default
   prompt #"
@@ -76,6 +83,11 @@ function BreakdownTask(
 
     ## Context
     {{ context }}
+
+    {% if additional_context %}
+    ## Additional Context
+    {{ additional_context }}
+    {% endif %}
 
     {{ ctx.output_format }}
   "#
