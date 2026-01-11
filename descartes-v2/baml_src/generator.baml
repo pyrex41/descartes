@@ -1,9 +1,14 @@
 // BAML Generator Configuration
-// Generates typed client code from .baml files
+// Uses REST/OpenAPI approach since native Rust codegen isn't available yet
+// Run: npx @boundaryml/baml dev --preview
+// Server: http://localhost:2024
+// Docs: http://localhost:2024/docs
 
 generator target {
-  // Output to src/baml_client for Rust integration
-  output_dir "../src/baml_client"
-  output_type "rust"
+  output_dir "../baml_client"
+  output_type "rest/openapi"
   version "0.75.0"
+
+  // Generate Rust client via openapi-generator
+  openapi_client_type "rust"
 }
