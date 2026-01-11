@@ -16,9 +16,9 @@ class FailureAnalysis {
 }
 
 function AnalyzeTestResults(
-  test_output string @description("Raw test output"),
-  code_context string? @description("Relevant code if helpful"),
-  additional_context string? @description("Extra context to include in prompt")
+  test_output: string,
+  code_context: string?,
+  additional_context: string?
 ) -> TestAnalysis {
   client Default
   prompt #"
@@ -59,11 +59,11 @@ class CheckResult {
 }
 
 function ValidateImplementation(
-  task_description string @description("What was supposed to be done"),
-  changes_made string @description("Summary of changes"),
-  test_results string? @description("Test output if available"),
-  acceptance_criteria string[] @description("Success criteria"),
-  additional_context string? @description("Extra context to include in prompt")
+  task_description: string,
+  changes_made: string,
+  test_results: string?,
+  acceptance_criteria: string[],
+  additional_context: string?
 ) -> ValidationResult {
   client Default
   prompt #"

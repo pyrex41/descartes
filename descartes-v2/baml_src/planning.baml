@@ -24,10 +24,10 @@ class ImplementationPlan {
 }
 
 function CreatePlan(
-  objective string @description("What needs to be built or changed"),
-  research_context string @description("Findings from research phase"),
-  constraints string? @description("Technical or time constraints"),
-  additional_context string? @description("Extra context to include in prompt")
+  objective: string,
+  research_context: string,
+  constraints: string?,
+  additional_context: string?
 ) -> ImplementationPlan {
   client Claude
   prompt #"
@@ -67,9 +67,9 @@ class TaskBreakdown {
 }
 
 function BreakdownTask(
-  task Task @description("Task to break down"),
-  context string @description("Relevant code or context"),
-  additional_context string? @description("Extra context to include in prompt")
+  task: Task,
+  context: string,
+  additional_context: string?
 ) -> TaskBreakdown {
   client Default
   prompt #"

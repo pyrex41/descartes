@@ -16,12 +16,12 @@ class LoopDecision {
 }
 
 function DecideNextAction(
-  completed_tasks string[] @description("Tasks already done"),
-  current_task string? @description("Task in progress"),
-  remaining_tasks string[] @description("Tasks not started"),
-  blockers string[] @description("Current blockers"),
-  recent_output string @description("What just happened"),
-  additional_context string? @description("Extra context to include in prompt")
+  completed_tasks: string[],
+  current_task: string?,
+  remaining_tasks: string[],
+  blockers: string[],
+  recent_output: string,
+  additional_context: string?
 ) -> LoopDecision {
   client GPT4oMini
   prompt #"
@@ -74,10 +74,10 @@ class SubagentSelection {
 }
 
 function SelectSubagent(
-  task_title string,
-  task_description string,
-  available_context string,
-  additional_context string? @description("Extra context to include in prompt")
+  task_title: string,
+  task_description: string,
+  available_context: string,
+  additional_context: string?
 ) -> SubagentSelection {
   client GPT4oMini
   prompt #"

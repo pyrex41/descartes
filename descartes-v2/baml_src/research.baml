@@ -9,10 +9,10 @@ class ResearchFindings {
 }
 
 function ResearchTopic(
-  topic string @description("What to research"),
-  codebase_context string @description("Relevant code snippets or file listings"),
-  constraints string? @description("Any constraints or focus areas"),
-  additional_context string? @description("Extra context to include in prompt")
+  topic: string,
+  codebase_context: string,
+  constraints: string?,
+  additional_context: string?
 ) -> ResearchFindings {
   client Claude
   prompt #"
@@ -49,10 +49,10 @@ class CodeExplanation {
 }
 
 function ExplainCode(
-  code string @description("Code to explain"),
-  file_path string @description("Path to the file"),
-  question string? @description("Specific question about the code"),
-  additional_context string? @description("Extra context to include in prompt")
+  code: string,
+  file_path: string,
+  question: string?,
+  additional_context: string?
 ) -> CodeExplanation {
   client Default
   prompt #"

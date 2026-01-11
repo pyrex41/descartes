@@ -15,11 +15,11 @@ class ImplementationResult {
 }
 
 function ImplementTask(
-  task_id string @description("Task ID being implemented"),
-  task_description string @description("What to implement"),
-  relevant_code string @description("Existing code context"),
-  acceptance_criteria string[] @description("How to verify success"),
-  additional_context string? @description("Extra context to include in prompt")
+  task_id: string,
+  task_description: string,
+  relevant_code: string,
+  acceptance_criteria: string[],
+  additional_context: string?
 ) -> ImplementationResult {
   client Claude
   prompt #"
@@ -66,9 +66,9 @@ class Issue {
 }
 
 function ReviewCode(
-  code_diff string @description("Git diff of changes"),
-  context string @description("What the code is trying to do"),
-  additional_context string? @description("Extra context to include in prompt")
+  code_diff: string,
+  context: string,
+  additional_context: string?
 ) -> CodeReviewFeedback {
   client Default
   prompt #"
