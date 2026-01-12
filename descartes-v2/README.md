@@ -75,16 +75,17 @@ match decision.action {
 | `CreatePlan` | Generate implementation plans | `ralph_loop.rs` |
 | `GenerateCommitMessage` | Conventional commit messages | `ralph_loop.rs` |
 
-### Regenerating BAML Code
+### Build-Time Code Generation
 
-After modifying `.baml` files:
+The `baml_client/` directory is generated automatically at build time via `build.rs`.
+No manual regeneration needed - just run `cargo build`.
 
-```bash
-cd descartes-v2
-npx @boundaryml/baml generate --from baml_src
-```
+The build script:
+1. Checks if `.baml` files are newer than generated code
+2. Runs `npx @boundaryml/baml generate` if needed
+3. Falls back to `baml` CLI if npx unavailable
 
-This updates `baml_client/baml_client/` with new Rust types and functions.
+**Requirements**: Node.js with npx, or `npm install -g @boundaryml/baml`
 
 ## Project Structure
 
