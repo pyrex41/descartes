@@ -105,13 +105,15 @@ rm baml_src/validation.baml     # 2 unused functions
 ```
 
 ### Rust Client Cleanup
-In `src/baml/mod.rs`, remove:
-- Lines 184-196: `BreakdownTaskRequest`, `TaskBreakdown` types
-- Lines 198-220: `GenerateHandoffRequest`, `StageHandoff` types
-- Lines 246-264: `GeneratePRDescriptionRequest`, `PRDescription` types
-- Lines 293-295: `breakdown_task()` method
-- Lines 299-304: `generate_handoff()` method
-- Lines 313-319: `generate_pr_description()` method
+
+**UPDATE (2026-01-12):** The hand-written HTTP client in `src/baml/mod.rs` has been **deleted** and replaced with native Rust codegen. The generated code is in `baml_client/baml_client/` and is used via:
+
+```rust
+use crate::baml_client::async_client::B;
+let decision = B.DecideNextAction.call(args).await?;
+```
+
+No more request/response types to maintain - BAML generates them automatically.
 
 ---
 
@@ -291,9 +293,12 @@ Or create a separate repo for the daemon/GUI if ever needed.
 
 ## Code References
 
-- `descartes-v2/src/ralph_loop.rs:1-548` - Main orchestration loop
-- `descartes-v2/src/baml/mod.rs:1-337` - BAML HTTP client
+- `descartes-v2/src/ralph_loop.rs` - Main orchestration loop (refactored to use native BAML)
+- `descartes-v2/baml_client/baml_client/` - Generated BAML code (native Rust)
 - `descartes-v2/baml_src/*.baml` - 8 BAML definition files
 - `descartes-v2/src/config.rs:30,267` - Unused fields
 - `descartes-v2/prompts/` - Dead directory
 - `descartes/` - Potentially archivable workspace
+
+**Deleted:**
+- `descartes-v2/src/baml/mod.rs` - Hand-written HTTP client (replaced by native codegen)
