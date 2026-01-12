@@ -165,7 +165,7 @@ impl Default for Config {
             "orchestrator".to_string(),
             CategoryConfig {
                 description: "Loop and subagent orchestration".to_string(),
-                model: "gpt-5-pro".to_string(),
+                model: "opus".to_string(),
                 tools: vec!["read".to_string()],
                 parallel: false,
                 backpressure: false,
