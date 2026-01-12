@@ -29,7 +29,7 @@ function CreatePlan(
   constraints: string?,
   additional_context: string?
 ) -> ImplementationPlan {
-  client Claude
+  client ClaudeCode
   prompt #"
     Create an implementation plan for the following objective.
 

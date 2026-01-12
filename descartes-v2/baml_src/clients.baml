@@ -1,4 +1,5 @@
 // LLM Client Configurations
+// Uses Claude Code headless mode via local proxy
 
 // Retry policy for transient failures
 retry_policy Retry2x {
@@ -9,8 +10,20 @@ retry_policy Retry2x {
   }
 }
 
-// Claude for complex tasks
-client<llm> Claude {
+// Claude Code via local proxy (primary)
+// Start proxy with: cargo run --bin claude-proxy
+client<llm> ClaudeCode {
+  provider openai-generic
+  retry_policy Retry2x
+  options {
+    base_url "http://localhost:8765/v1"
+    model "claude-code"
+    api_key "not-needed"
+  }
+}
+
+// Direct Anthropic API (fallback if proxy unavailable)
+client<llm> ClaudeDirect {
   provider anthropic
   retry_policy Retry2x
   options {
@@ -20,7 +33,7 @@ client<llm> Claude {
   }
 }
 
-// Fast model for simple extractions
+// Fast model for simple extractions (optional)
 client<llm> GPT4oMini {
   provider openai
   retry_policy Retry2x
@@ -31,10 +44,18 @@ client<llm> GPT4oMini {
   }
 }
 
-// Fallback: try fast first, then reliable
+// Default: use Claude Code proxy
 client<llm> Default {
   provider fallback
   options {
-    strategy [GPT4oMini, Claude]
+    strategy [ClaudeCode, ClaudeDirect]
+  }
+}
+
+// Alias for complex tasks
+client<llm> Claude {
+  provider fallback
+  options {
+    strategy [ClaudeCode, ClaudeDirect]
   }
 }

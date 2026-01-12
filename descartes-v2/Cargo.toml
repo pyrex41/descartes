@@ -12,6 +12,10 @@ categories = ["command-line-utilities", "development-tools"]
 name = "descartes"
 path = "src/main.rs"
 
+[[bin]]
+name = "claude-proxy"
+path = "src/bin/claude-proxy.rs"
+
 [lib]
 name = "descartes"
 path = "src/lib.rs"
@@ -33,6 +37,11 @@ toml = "0.8"
 
 # HTTP client (for API harnesses)
 reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
+
+# HTTP server (for claude-proxy)
+hyper = { version = "1", features = ["http1", "server"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
 
 # BAML - AI prompt engineering framework with native Rust codegen
 baml = "0.217"
