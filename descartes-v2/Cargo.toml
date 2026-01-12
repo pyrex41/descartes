@@ -47,7 +47,7 @@ http-body-util = "0.1"
 baml = "0.217"
 
 # SCUD task management
-scud-cli = "1.19"
+scud-cli = "1.31"
 
 # Logging
 tracing = "0.1"
