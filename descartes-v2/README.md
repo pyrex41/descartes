@@ -75,17 +75,16 @@ match decision.action {
 | `CreatePlan` | Generate implementation plans | `ralph_loop.rs` |
 | `GenerateCommitMessage` | Conventional commit messages | `ralph_loop.rs` |
 
-### Generated BAML Code
+### Regenerating BAML Code
 
-The `baml_client/` directory contains generated Rust code and is not committed to git.
-After cloning or modifying `.baml` files, regenerate with:
+After modifying `.baml` files:
 
 ```bash
 cd descartes-v2
 npx @boundaryml/baml generate --from baml_src
 ```
 
-This creates/updates `baml_client/baml_client/` with Rust types and functions.
+This updates `baml_client/baml_client/` with new Rust types and functions.
 
 ## Project Structure
 
