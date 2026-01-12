@@ -6,7 +6,7 @@
 //! 3. Subagents for parallel search, single builder, validator backpressure
 //! 4. Commit only when tests pass
 //!
-//! Uses BAML for structured LLM interactions:
+//! Uses BAML for structured LLM interactions (native Rust codegen):
 //! - DecideNextAction: Determines loop flow
 //! - SelectSubagent: Routes tasks to appropriate agents
 //! - GenerateCommitMessage: Creates conventional commits
@@ -16,9 +16,11 @@ use std::process::Command;
 use tracing::{debug, info, warn};
 
 use crate::agent::{spawn_subagent, AgentCategory};
-use crate::baml::{
-    BamlClient, CreatePlanRequest, DecideNextActionRequest, GenerateCommitMessageRequest,
-    NextAction, SelectSubagentRequest, SubagentCategory,
+use crate::baml_client::async_client::B;
+use crate::baml_client::types::{
+    NextAction,
+    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator,
+    Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest,
 };
 use crate::harness::{create_harness, Harness, ResponseChunk, SessionConfig};
 use crate::scud;
@@ -46,8 +48,6 @@ pub struct LoopConfig {
     pub auto_commit: bool,
     /// Whether to auto-push after commit
     pub auto_push: bool,
-    /// BAML server URL (default: http://localhost:2024)
-    pub baml_url: Option<String>,
 }
 
 impl Default for LoopConfig {
@@ -57,7 +57,6 @@ impl Default for LoopConfig {
             max_iterations: None,
             auto_commit: true,
             auto_push: false,
-            baml_url: None,
         }
     }
 }
@@ -66,19 +65,9 @@ impl Default for LoopConfig {
 pub async fn run(loop_config: LoopConfig, config: &Config) -> Result<()> {
     let harness = create_harness(config)?;
 
-    // Create BAML client
-    let baml = match &loop_config.baml_url {
-        Some(url) => BamlClient::with_url(url),
-        None => BamlClient::new(),
-    };
-
-    // Verify BAML server is running
-    match baml.health_check().await {
-        Ok(version) => info!("BAML server connected: {}", version),
-        Err(e) => {
-            warn!("BAML server not available: {}. Loop decisions will use defaults.", e);
-        }
-    }
+    // Initialize BAML runtime (lazy - happens on first call)
+    crate::baml_client::init();
+    info!("BAML native client initialized");
 
     let mut iteration = 0;
     let mut completed_tasks: Vec<String> = Vec::new();
@@ -107,10 +96,10 @@ pub async fn run(loop_config: LoopConfig, config: &Config) -> Result<()> {
         // Run appropriate mode
         let result = match loop_config.mode {
             LoopMode::Plan => {
-                plan_iteration(&*harness, &baml, &mut transcript, config).await
+                plan_iteration(&*harness, &mut transcript, config).await
             }
             LoopMode::Build => {
-                build_iteration(&*harness, &baml, &mut transcript, &loop_config, config, &mut completed_tasks).await
+                build_iteration(&*harness, &mut transcript, &loop_config, config, &mut completed_tasks).await
             }
         };
 
@@ -162,7 +151,6 @@ enum IterationResult {
 /// Run a planning iteration
 async fn plan_iteration(
     harness: &dyn Harness,
-    baml: &BamlClient,
     transcript: &mut Transcript,
     config: &Config,
 ) -> Result<IterationResult> {
@@ -179,15 +167,11 @@ async fn plan_iteration(
         .map(|t| t.title.clone())
         .collect();
 
-    // Use BAML to create a plan
-    let plan_req = CreatePlanRequest {
-        objective: remaining.first().cloned().unwrap_or_else(|| "Analyze project gaps".to_string()),
-        research_context: format!("Completed: {:?}\nRemaining: {:?}", completed, remaining),
-        constraints: None,
-        additional_context: None,
-    };
+    let objective = remaining.first().cloned().unwrap_or_else(|| "Analyze project gaps".to_string());
+    let research_context = format!("Completed: {:?}\nRemaining: {:?}", completed, remaining);
 
-    match baml.create_plan(plan_req).await {
+    // Use native BAML client to create a plan
+    match B.CreatePlan.call(&objective, &research_context, None::<&str>, None::<&str>).await {
         Ok(plan) => {
             info!("Generated plan: {}", plan.goal);
             info!("Approach: {}", plan.approach);
@@ -240,7 +224,6 @@ async fn plan_iteration(
 /// Run a building iteration
 async fn build_iteration(
     harness: &dyn Harness,
-    baml: &BamlClient,
     transcript: &mut Transcript,
     loop_config: &LoopConfig,
     config: &Config,
@@ -254,16 +237,14 @@ async fn build_iteration(
         .collect();
 
     // Use BAML to decide next action
-    let decision_req = DecideNextActionRequest {
-        completed_tasks: completed_tasks.clone(),
-        current_task: None,
-        remaining_tasks: remaining.clone(),
-        blockers: vec![],
-        recent_output: "Starting new iteration".to_string(),
-        additional_context: None,
-    };
-
-    let decision = match baml.decide_next_action(decision_req).await {
+    let decision = match B.DecideNextAction.call(
+        completed_tasks,
+        None::<&str>,
+        &remaining,
+        &Vec::<String>::new(),
+        "Starting new iteration",
+        None::<&str>,
+    ).await {
         Ok(d) => {
             info!("BAML decision: {:?} - {}", d.action, d.reasoning);
             Some(d)
@@ -287,7 +268,7 @@ async fn build_iteration(
             }
             NextAction::Replan => {
                 info!("BAML suggests replanning, switching to plan mode");
-                return plan_iteration(harness, baml, transcript, config).await;
+                return plan_iteration(harness, transcript, config).await;
             }
             _ => {} // Continue or Validate - proceed with build
         }
@@ -306,7 +287,7 @@ async fn build_iteration(
 
     // Phase 1: Use BAML to select subagents dynamically
     info!("Phase 1: Running parallel searchers");
-    let search_results = run_parallel_searches_baml(harness, baml, &task, transcript).await?;
+    let search_results = run_parallel_searches_baml(harness, &task, transcript).await?;
 
     // Phase 2: Single builder
     info!("Phase 2: Running builder");
@@ -333,7 +314,7 @@ async fn build_iteration(
 
     // Git commit using BAML for message generation
     if loop_config.auto_commit {
-        git_commit_baml(baml, &task.title).await?;
+        git_commit_baml(&task.title).await?;
 
         if loop_config.auto_push {
             git_push()?;
@@ -346,29 +327,25 @@ async fn build_iteration(
 /// Run parallel search subagents using BAML for dynamic selection
 async fn run_parallel_searches_baml(
     harness: &dyn Harness,
-    baml: &BamlClient,
     task: &scud::Task,
     transcript: &mut Transcript,
 ) -> Result<Vec<String>> {
     use futures::future::join_all;
 
-    // Use BAML to select subagents
-    let select_req = SelectSubagentRequest {
-        task_title: task.title.clone(),
-        task_description: task.description.clone(),
-        available_context: "Starting fresh iteration, need to search codebase".to_string(),
-        additional_context: None,
-    };
-
     // Try to get BAML suggestions, fall back to defaults
-    let searches: Vec<(AgentCategory, String)> = match baml.select_subagent(select_req).await {
+    let searches: Vec<(AgentCategory, String)> = match B.SelectSubagent.call(
+        &task.title,
+        &task.description,
+        "Starting fresh iteration, need to search codebase",
+        None::<&str>,
+    ).await {
         Ok(selection) => {
             info!("BAML selected {:?} subagent: {}", selection.category, selection.timeout_hint);
             let category = match selection.category {
-                SubagentCategory::Searcher => AgentCategory::Searcher,
-                SubagentCategory::Analyzer => AgentCategory::Analyzer,
-                SubagentCategory::Builder => AgentCategory::Builder,
-                SubagentCategory::Validator => AgentCategory::Validator,
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Ksearcher => AgentCategory::Searcher,
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kanalyzer => AgentCategory::Analyzer,
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kbuilder => AgentCategory::Builder,
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kvalidator => AgentCategory::Validator,
             };
             // Start with BAML suggestion, add standard searches
             vec![
@@ -441,7 +418,7 @@ async fn run_validator(harness: &dyn Harness, transcript: &mut Transcript) -> Re
 }
 
 /// Create a git commit using BAML to generate the message
-async fn git_commit_baml(baml: &BamlClient, fallback_message: &str) -> Result<()> {
+async fn git_commit_baml(fallback_message: &str) -> Result<()> {
     // Stage all changes
     let status = Command::new("git")
         .args(["add", "-A"])
@@ -471,19 +448,25 @@ async fn git_commit_baml(baml: &BamlClient, fallback_message: &str) -> Result<()
         .map_err(Error::Io)?;
     let diff_text = String::from_utf8_lossy(&diff.stdout).to_string();
 
-    // Use BAML to generate commit message
-    let commit_req = GenerateCommitMessageRequest {
-        diff: diff_text,
-        context: Some(fallback_message.to_string()),
-        additional_context: None,
-    };
-
-    let message = match baml.generate_commit_message(commit_req).await {
+    // Use native BAML client to generate commit message
+    let message = match B.GenerateCommitMessage.call(
+        &diff_text,
+        Some(fallback_message),
+        None::<&str>,
+    ).await {
         Ok(msg) => {
             let scope_part = msg.scope.map(|s| format!("({})", s)).unwrap_or_default();
             let breaking = if msg.breaking { "!" } else { "" };
             let body_part = msg.body.map(|b| format!("\n\n{}", b)).unwrap_or_default();
-            format!("{}{}{}: {}{}", msg.commit_type.as_str(), scope_part, breaking, msg.subject, body_part)
+            let type_str = match msg.r#type {
+                Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Kfeat => "feat",
+                Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Kfix => "fix",
+                Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Kdocs => "docs",
+                Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Krefactor => "refactor",
+                Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Ktest => "test",
+                Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Kchore => "chore",
+            };
+            format!("{}{}{}: {}{}", type_str, scope_part, breaking, msg.subject, body_part)
         }
         Err(e) => {
             debug!("BAML commit message generation failed: {}, using fallback", e);
@@ -506,19 +489,6 @@ async fn git_commit_baml(baml: &BamlClient, fallback_message: &str) -> Result<()
     Ok(())
 }
 
-impl crate::baml::CommitType {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::Feat => "feat",
-            Self::Fix => "fix",
-            Self::Docs => "docs",
-            Self::Refactor => "refactor",
-            Self::Test => "test",
-            Self::Chore => "chore",
-        }
-    }
-}
-
 /// Push to remote
 fn git_push() -> Result<()> {
     info!("Pushing to remote");
@@ -526,14 +496,14 @@ fn git_push() -> Result<()> {
     let status = Command::new("git")
         .args(["push"])
         .status()
-        .map_err(|e| Error::Io(e))?;
+        .map_err(Error::Io)?;
 
     if !status.success() {
         // Try with -u origin
         let branch_output = Command::new("git")
             .args(["branch", "--show-current"])
             .output()
-            .map_err(|e| Error::Io(e))?;
+            .map_err(Error::Io)?;
 
         let branch = String::from_utf8_lossy(&branch_output.stdout)
             .trim()

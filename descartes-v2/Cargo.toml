@@ -34,6 +34,9 @@ toml = "0.8"
 # HTTP client (for API harnesses)
 reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
 
+# BAML - AI prompt engineering framework with native Rust codegen
+baml = "0.217"
+
 # SCUD task management
 scud-cli = "1.19"
 
