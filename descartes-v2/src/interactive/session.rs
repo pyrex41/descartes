@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::{mpsc, watch};
-use tracing::{debug, info, warn};
+use tokio::sync::mpsc;
+use tracing::{info, warn};
 
 use crate::agent::{AgentCategory, SubagentResult};
 use crate::harness::Harness;
@@ -511,7 +511,7 @@ impl Session {
 
     /// Start an agent
     async fn start_agent(&mut self, category: AgentCategory, prompt: String) -> Result<()> {
-        let (control_tx, mut control_rx) = mpsc::channel::<AgentControl>(10);
+        let (control_tx, control_rx) = mpsc::channel::<AgentControl>(10);
         let (event_tx, event_rx) = mpsc::channel::<AgentEvent>(100);
 
         self.control_tx = Some(control_tx);

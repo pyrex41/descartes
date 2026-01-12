@@ -1,0 +1,103 @@
+prompts_dir = "prompts"
+
+[harness]
+kind = "claude-code"
+
+[harness.claude_code]
+model = ""
+headless = false
+dangerously_skip_permissions = false
+
+[harness.opencode]
+
+[harness.codex]
+
+[categories.searcher]
+description = "Fast parallel code search"
+model = "sonnet"
+tools = [
+    "read",
+    "bash",
+]
+parallel = true
+backpressure = false
+
+[categories.builder]
+description = "Code implementation"
+model = "opus"
+tools = [
+    "read",
+    "write",
+    "edit",
+    "bash",
+]
+parallel = false
+backpressure = false
+
+[categories.analyzer]
+description = "Deep code analysis"
+model = "sonnet"
+tools = ["read"]
+parallel = true
+backpressure = false
+
+[categories.validator]
+description = "Test runner (backpressure gate)"
+model = "sonnet"
+tools = ["bash"]
+parallel = false
+backpressure = true
+
+[categories.planner]
+description = "Task planning and breakdown"
+model = "opus"
+tools = [
+    "read",
+    "bash",
+]
+parallel = false
+backpressure = false
+
+[ralph_loop]
+use_fast_first = true
+always_review = false
+heuristic = "prefer_speed"
+
+[categories.fast-builder]
+description = "Fast code implementation"
+model = "grok-code-fast-1"
+tools = [
+    "read",
+    "write",
+    "edit",
+    "bash",
+]
+parallel = false
+backpressure = false
+
+[categories.builder-reviewer]
+description = "Deep review and fixes"
+model = "opus"
+tools = [
+    "read",
+    "edit",
+    "bash",
+]
+parallel = false
+backpressure = false
+
+[categories.orchestrator]
+description = "Loop and subagent orchestration"
+model = "gpt-5-pro"
+tools = ["read"]
+parallel = false
+backpressure = false
+
+[scud]
+task_file = ".scud/scud.scg"
+embedded = false
+
+[transcripts]
+directory = ".descartes/transcripts"
+format = "scg"
+max_keep = 0

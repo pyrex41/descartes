@@ -1,0 +1,15 @@
+@transcript
+id: "4e7c3919-c1f2-4269-9df2-fce4228d7097"
+harness: "claude-code"
+model: ""
+started: 2026-01-12T15:27:12.782440+00:00
+parent: null
+
+@messages
+1:user "Create a plan. Completed: [], Remaining: []"
+
+@metrics
+tokens_in: 0
+tokens_out: 0
+duration_ms: 3981
+tools_called: 0

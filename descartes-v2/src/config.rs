@@ -17,6 +17,10 @@ pub struct Config {
     #[serde(default)]
     pub categories: HashMap<String, CategoryConfig>,
 
+    /// Ralph loop orchestration settings
+    #[serde(default)]
+    pub ralph_loop: RalphLoopConfig,
+
     /// SCUD integration settings
     #[serde(default)]
     pub scud: ScudConfig,
@@ -32,6 +36,36 @@ pub struct Config {
 
 fn default_prompts_dir() -> PathBuf {
     PathBuf::from("prompts")
+}
+
+/// Ralph loop orchestration configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RalphLoopConfig {
+    /// Whether to try fast-builder first for applicable tasks
+    #[serde(default)]
+    pub use_fast_first: bool,
+
+    /// Whether to always review fast-builder changes
+    #[serde(default)]
+    pub always_review: bool,
+
+    /// Heuristic for orchestration decisions
+    #[serde(default = "default_heuristic")]
+    pub heuristic: String,
+}
+
+fn default_heuristic() -> String {
+    "prefer_speed".to_string()
+}
+
+impl Default for RalphLoopConfig {
+    fn default() -> Self {
+        Self {
+            use_fast_first: true,
+            always_review: false,
+            heuristic: default_heuristic(),
+        }
+    }
 }
 
 impl Default for Config {
@@ -103,9 +137,46 @@ impl Default for Config {
             },
         );
 
+        categories.insert(
+            "fast-builder".to_string(),
+            CategoryConfig {
+                description: "Fast code implementation".to_string(),
+                model: "grok-code-fast-1".to_string(),
+                tools: vec!["read".to_string(), "write".to_string(), "edit".to_string(), "bash".to_string()],
+                parallel: false,
+                backpressure: false,
+                prompt_template: None,
+            },
+        );
+
+        categories.insert(
+            "builder-reviewer".to_string(),
+            CategoryConfig {
+                description: "Deep review and fixes".to_string(),
+                model: "opus".to_string(),
+                tools: vec!["read".to_string(), "edit".to_string(), "bash".to_string()],
+                parallel: false,
+                backpressure: false,
+                prompt_template: None,
+            },
+        );
+
+        categories.insert(
+            "orchestrator".to_string(),
+            CategoryConfig {
+                description: "Loop and subagent orchestration".to_string(),
+                model: "gpt-5-pro".to_string(),
+                tools: vec!["read".to_string()],
+                parallel: false,
+                backpressure: false,
+                prompt_template: None,
+            },
+        );
+
         Self {
             harness: HarnessConfig::default(),
             categories,
+            ralph_loop: RalphLoopConfig::default(),
             scud: ScudConfig::default(),
             transcripts: TranscriptConfig::default(),
             prompts_dir: default_prompts_dir(),

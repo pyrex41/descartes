@@ -10,7 +10,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 use descartes::{Config, LoopConfig, LoopMode, Result};
 use descartes::workflow::{
-    self, default_workflow, GateType, RunOptions, StateManager, WorkflowConfig, WorkflowRunner,
+    self, default_workflow, RunOptions, StateManager, WorkflowConfig, WorkflowRunner,
 };
 
 #[derive(Parser)]

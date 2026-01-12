@@ -12,10 +12,11 @@
 //! - GenerateCommitMessage: Creates conventional commits
 
 use futures::StreamExt;
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tracing::{debug, info, warn};
 
-use crate::agent::{spawn_subagent, AgentCategory};
+use crate::agent::{spawn_subagent, AgentCategory, SubagentResult};
 use crate::baml_client::async_client::B;
 use crate::baml_client::types::{
     NextAction,
@@ -26,6 +27,54 @@ use crate::harness::{create_harness, Harness, ResponseChunk, SessionConfig};
 use crate::scud;
 use crate::transcript::Transcript;
 use crate::{Config, Error, Result};
+
+/// Task-specific overrides parsed from task body
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskOverrides {
+    /// Override category (e.g. "fast-builder", "builder")
+    pub category: Option<String>,
+    /// Disable review even if config says to review
+    pub disable_review: Option<bool>,
+}
+
+impl TaskOverrides {
+    /// Parse overrides from task description/body
+    /// Supports YAML frontmatter (---\ncategory: fast-builder\n---) or inline comments (// override: category=fast-builder)
+    pub fn parse(body: &str) -> Self {
+        // Try YAML frontmatter first
+        if let Some(yaml_end) = body.find("\n---") {
+            if body.starts_with("---\n") {
+                let yaml_str = &body[4..yaml_end];
+                if let Ok(overrides) = serde_yaml::from_str::<TaskOverrides>(yaml_str) {
+                    return overrides;
+                }
+            }
+        }
+
+        // Fallback to inline comment parsing
+        let mut category = None;
+        let mut disable_review = None;
+
+        for line in body.lines() {
+            let line = line.trim();
+            if line.starts_with("// override:") {
+                let rest = &line[12..].trim();
+                for kv in rest.split(',') {
+                    let kv = kv.trim();
+                    if let Some((key, value)) = kv.split_once('=') {
+                        match key.trim() {
+                            "category" => category = Some(value.trim().to_string()),
+                            "disable_review" => disable_review = value.trim().parse().ok(),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        Self { category, disable_review }
+    }
+}
 
 /// Loop mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -285,21 +334,81 @@ async fn build_iteration(
 
     info!("Working on task {}: {}", task.id, task.title);
 
+    // Parse task overrides from body
+    let overrides = TaskOverrides::parse(&task.description);
+    info!("Task overrides: {:?}", overrides);
+
     // Phase 1: Use BAML to select subagents dynamically
     info!("Phase 1: Running parallel searchers");
     let search_results = run_parallel_searches_baml(harness, &task, transcript).await?;
 
-    // Phase 2: Single builder
-    info!("Phase 2: Running builder");
-    let build_result = run_builder(harness, &task, &search_results, transcript).await?;
+    // Decide implementation category (override > BAML > config)
+    let impl_category = if let Some(cat) = &overrides.category {
+        cat.clone()
+    } else {
+        // Use BAML orchestrator to suggest category
+        match B.SelectSubagent.call(
+            &task.title,
+            &task.description,
+            "Choose implementation category",
+            Some(&config.ralph_loop.heuristic),
+        ).await {
+            Ok(selection) => {
+                info!("BAML selected category: {:?}", selection.category);
+                match selection.category {
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kbuilder => "builder".to_string(),
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kanalyzer => "analyzer".to_string(),
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Ksearcher => "searcher".to_string(),
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kvalidator => "validator".to_string(),
+                }
+            }
+            Err(e) => {
+                debug!("BAML category selection failed: {}, using heuristic", e);
+                if config.ralph_loop.use_fast_first {
+                    "fast-builder".to_string()
+                } else {
+                    "builder".to_string()
+                }
+            }
+        }
+    };
 
-    if !build_result {
-        warn!("Builder failed");
+    info!("Using implementation category: {}", impl_category);
+
+    // Phase 2: Implementation
+    info!("Phase 2: Running {}", impl_category);
+    let impl_result = run_builder(harness, &task, &search_results, &impl_category, transcript).await?;
+
+    if !impl_result.success {
+        warn!("{} failed", impl_category);
         return Ok(IterationResult::ValidationFailed);
     }
 
-    // Phase 3: Validator (backpressure)
-    info!("Phase 3: Running validator");
+    // Capture implementation summary
+    let impl_summary = impl_result.summary();
+
+    // Stage changes for review
+    if Command::new("git").args(["add", "-A"]).status().map_err(Error::Io)?.success() {
+        // Phase 3: Conditional review
+        let needs_review = config.ralph_loop.always_review ||
+                          (impl_category == "fast-builder" && overrides.disable_review != Some(true));
+
+        if needs_review {
+            info!("Phase 3: Running reviewer");
+            let review_passed = run_reviewer(harness, &task, &search_results, &impl_summary, &config.ralph_loop.heuristic, transcript).await?;
+            if !review_passed {
+                warn!("Review failed");
+                return Ok(IterationResult::ValidationFailed);
+            }
+        } else {
+            info!("Skipping review as configured");
+        }
+    } else {
+        warn!("git add failed");
+    }
+
+    // Phase 4: Validator (backpressure)
+    info!("Phase 4: Running validator");
     let validation_passed = run_validator(harness, transcript).await?;
 
     if !validation_passed {
@@ -392,8 +501,19 @@ async fn run_builder(
     harness: &dyn Harness,
     task: &scud::Task,
     search_context: &[String],
+    category: &str,
     transcript: &mut Transcript,
-) -> Result<bool> {
+) -> Result<SubagentResult> {
+    // Map category string to AgentCategory
+    let agent_category = match category {
+        "fast-builder" => AgentCategory::FastBuilder,
+        "builder" => AgentCategory::Builder,
+        _ => {
+            warn!("Unknown category '{}', falling back to Builder", category);
+            AgentCategory::Builder
+        }
+    };
+
     // Construct prompt with task and context (no markdown file loading)
     let context_str = search_context.join("\n\n---\n\n");
     let prompt = format!(
@@ -401,7 +521,35 @@ async fn run_builder(
         task.title, task.description, context_str
     );
 
-    let result = spawn_subagent(harness, AgentCategory::Builder, prompt, Some(transcript)).await?;
+    let result = spawn_subagent(harness, agent_category, prompt, Some(transcript)).await?;
+
+    Ok(result)
+}
+
+/// Run the reviewer subagent for fast-builder changes
+async fn run_reviewer(
+    harness: &dyn Harness,
+    task: &scud::Task,
+    search_context: &[String],
+    impl_summary: &str,
+    heuristic: &str,
+    transcript: &mut Transcript,
+) -> Result<bool> {
+    // Get staged changes for review
+    let diff_output = Command::new("git")
+        .args(["diff", "--cached"])
+        .output()
+        .map_err(Error::Io)?;
+    let diff = String::from_utf8_lossy(&diff_output.stdout);
+
+    // Construct review prompt
+    let context_str = search_context.join("\n\n---\n\n");
+    let prompt = format!(
+        "## Task\n\n**{}**: {}\n\n## Context from Search\n\n{}\n\n## Implementation Summary\n\n{}\n\n## Changes Made\n\n```\n{}\n```\n\n## Instructions\n\nReview the implementation for quality, correctness, architecture, security, and edge cases. Edit minimally if needed. Heuristic: {}\n\nConfirm the changes are appropriate and complete the task properly.",
+        task.title, task.description, context_str, impl_summary, diff, heuristic
+    );
+
+    let result = spawn_subagent(harness, AgentCategory::BuilderReviewer, prompt, Some(transcript)).await?;
 
     Ok(result.success)
 }
@@ -515,4 +663,41 @@ fn git_push() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_overrides_yaml_frontmatter() {
+        let body = "---\ncategory: fast-builder\ndisable_review: true\n---\nFix the login bug.";
+        let overrides = TaskOverrides::parse(body);
+        assert_eq!(overrides.category, Some("fast-builder".to_string()));
+        assert_eq!(overrides.disable_review, Some(true));
+    }
+
+    #[test]
+    fn test_task_overrides_inline_comment() {
+        let body = "// override: category=builder,disable_review=false\nImplement feature X.";
+        let overrides = TaskOverrides::parse(body);
+        assert_eq!(overrides.category, Some("builder".to_string()));
+        assert_eq!(overrides.disable_review, Some(false));
+    }
+
+    #[test]
+    fn test_task_overrides_no_overrides() {
+        let body = "Just a regular task description without any overrides.";
+        let overrides = TaskOverrides::parse(body);
+        assert_eq!(overrides.category, None);
+        assert_eq!(overrides.disable_review, None);
+    }
+
+    #[test]
+    fn test_task_overrides_partial() {
+        let body = "---\ncategory: fast-builder\n---\nOnly category specified.";
+        let overrides = TaskOverrides::parse(body);
+        assert_eq!(overrides.category, Some("fast-builder".to_string()));
+        assert_eq!(overrides.disable_review, None);
+    }
 }

@@ -6,7 +6,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::{Error, Result};
 
 /// A registered command
 #[derive(Debug, Clone)]

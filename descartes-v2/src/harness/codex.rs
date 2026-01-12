@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use super::{
     Harness, HarnessKind, ResponseChunk, ResponseStream, SessionConfig, SessionHandle,
-    SubagentRequest, SubagentResult, ToolCall, ToolResult,
+    SubagentRequest, SubagentResult, ToolCall,
 };
 use crate::config::CodexConfig;
 use crate::{Error, Result};

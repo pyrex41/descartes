@@ -70,8 +70,10 @@ impl Default for GateConfig {
 /// Types of gates
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum GateType {
     /// Automatically continue without waiting
+    #[default]
     Auto,
     /// Always wait for manual approval
     Manual,
@@ -79,27 +81,19 @@ pub enum GateType {
     Notify,
 }
 
-impl Default for GateType {
-    fn default() -> Self {
-        GateType::Auto
-    }
-}
 
 /// What to do when a notify gate times out
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TimeoutAction {
     /// Continue to next stage
+    #[default]
     Continue,
     /// Stay paused, require explicit approval
     Pause,
 }
 
-impl Default for TimeoutAction {
-    fn default() -> Self {
-        TimeoutAction::Continue
-    }
-}
 
 /// Transition configuration between stages
 #[derive(Debug, Clone, Serialize, Deserialize)]

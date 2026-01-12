@@ -16,6 +16,10 @@ pub enum AgentCategory {
     Analyzer,
     /// Code implementation (Opus, full tools)
     Builder,
+    /// Fast code implementation (Grok, full tools)
+    FastBuilder,
+    /// Deep review and fixes (Opus, review tools)
+    BuilderReviewer,
     /// Test runner with backpressure (Sonnet, bash only)
     Validator,
     /// Task planning and breakdown (Opus, read + bash)
@@ -38,11 +42,11 @@ impl AgentCategory {
     /// Get the recommended model tier for this category
     pub fn model_tier(&self) -> ModelTier {
         match self {
-            AgentCategory::Searcher | AgentCategory::Analyzer | AgentCategory::Validator => {
-                ModelTier::Fast // Sonnet-tier
+            AgentCategory::Searcher | AgentCategory::Analyzer | AgentCategory::Validator | AgentCategory::FastBuilder => {
+                ModelTier::Fast
             }
-            AgentCategory::Builder | AgentCategory::Planner => {
-                ModelTier::Strong // Opus-tier
+            AgentCategory::Builder | AgentCategory::Planner | AgentCategory::BuilderReviewer => {
+                ModelTier::Strong
             }
             AgentCategory::Custom(_) => ModelTier::Fast, // Default to cheaper
         }
@@ -54,6 +58,8 @@ impl AgentCategory {
             AgentCategory::Searcher => "searcher",
             AgentCategory::Analyzer => "analyzer",
             AgentCategory::Builder => "builder",
+            AgentCategory::FastBuilder => "fast-builder",
+            AgentCategory::BuilderReviewer => "builder-reviewer",
             AgentCategory::Validator => "validator",
             AgentCategory::Planner => "planner",
             AgentCategory::Custom(name) => name,
@@ -75,6 +81,8 @@ impl FromStr for AgentCategory {
             "searcher" | "search" => Ok(AgentCategory::Searcher),
             "analyzer" | "analyse" | "analyze" => Ok(AgentCategory::Analyzer),
             "builder" | "build" | "implement" | "implementer" => Ok(AgentCategory::Builder),
+            "fast-builder" | "fastbuilder" | "fast" => Ok(AgentCategory::FastBuilder),
+            "builder-reviewer" | "reviewer" | "review" => Ok(AgentCategory::BuilderReviewer),
             "validator" | "validate" | "test" | "tester" => Ok(AgentCategory::Validator),
             "planner" | "plan" | "planning" => Ok(AgentCategory::Planner),
             other => Ok(AgentCategory::Custom(other.to_string())),
@@ -136,12 +144,17 @@ mod tests {
         assert!(AgentCategory::Searcher.is_parallel());
         assert!(AgentCategory::Analyzer.is_parallel());
         assert!(!AgentCategory::Builder.is_parallel());
+        assert!(!AgentCategory::FastBuilder.is_parallel());
+        assert!(!AgentCategory::BuilderReviewer.is_parallel());
         assert!(!AgentCategory::Validator.is_parallel());
     }
 
     #[test]
     fn test_backpressure() {
         assert!(!AgentCategory::Searcher.is_backpressure());
+        assert!(!AgentCategory::Builder.is_backpressure());
+        assert!(!AgentCategory::FastBuilder.is_backpressure());
+        assert!(!AgentCategory::BuilderReviewer.is_backpressure());
         assert!(AgentCategory::Validator.is_backpressure());
     }
 }

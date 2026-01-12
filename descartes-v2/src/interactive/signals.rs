@@ -5,7 +5,7 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::Result;
 

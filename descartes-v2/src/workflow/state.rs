@@ -196,13 +196,13 @@ impl WorkflowState {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
         }
 
         let content = serde_yaml::to_string(self)
             .map_err(|e| Error::Config(format!("Failed to serialize workflow state: {}", e)))?;
         std::fs::write(path, content)
-            .map_err(|e| Error::Io(e))
+            .map_err(Error::Io)
     }
 
     /// Get the state file path for this workflow
@@ -405,7 +405,7 @@ impl StateManager {
 
         let prefix = format!("{}-", workflow);
         let mut entries: Vec<_> = std::fs::read_dir(&dir)
-            .map_err(|e| Error::Io(e))?
+            .map_err(Error::Io)?
             .filter_map(|e| e.ok())
             .filter(|e| {
                 e.file_name()
@@ -438,8 +438,8 @@ impl StateManager {
 
         let mut states = Vec::new();
 
-        for entry in std::fs::read_dir(&dir).map_err(|e| Error::Io(e))? {
-            let entry = entry.map_err(|e| Error::Io(e))?;
+        for entry in std::fs::read_dir(&dir).map_err(Error::Io)? {
+            let entry = entry.map_err(Error::Io)?;
             let path = entry.path();
 
             if path.extension().map(|e| e == "yaml").unwrap_or(false) {

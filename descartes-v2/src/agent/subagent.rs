@@ -5,7 +5,7 @@ use tracing::{debug, info, warn};
 
 use super::AgentCategory;
 use crate::harness::{
-    Harness, ResponseChunk, SessionConfig, SubagentMetrics, SubagentRequest,
+    Harness, ResponseChunk, SessionConfig, SubagentMetrics,
 };
 use crate::transcript::Transcript;
 use crate::Result;
@@ -202,10 +202,8 @@ pub async fn spawn_parallel(
 
     // Record all subagents in parent transcript
     if let Some(parent) = parent_transcript {
-        for result in &results {
-            if let Ok(r) = result {
-                parent.record_subagent_completion(&r.session_id, r.success);
-            }
+        for r in results.iter().flatten() {
+            parent.record_subagent_completion(&r.session_id, r.success);
         }
     }
 

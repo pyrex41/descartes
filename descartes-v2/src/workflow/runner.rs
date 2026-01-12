@@ -7,15 +7,14 @@
 //! - Pre/post hooks
 //! - State persistence
 
-use std::path::PathBuf;
 use tokio::process::Command;
 use tracing::{debug, error, info, warn};
 
 use super::config::{GateType, WorkflowConfig};
 use super::gate::{ApprovalMethod, CliGate, GateController, GateResult};
 use super::notify::{create_channels, Notification};
-use super::state::{StateManager, StageStatus, WorkflowState, WorkflowStatus};
-use crate::handoff::{Handoff, HandoffBuilder};
+use super::state::{StateManager, StageStatus, WorkflowState};
+use crate::handoff::HandoffBuilder;
 use crate::harness::{Harness, SessionConfig};
 use crate::{Config, Error, Result};
 
@@ -97,8 +96,7 @@ impl WorkflowRunner {
         let start_stage = options
             .from_stage
             .as_ref()
-            .or(Some(&state.current_stage))
-            .unwrap();
+            .unwrap_or(&state.current_stage);
 
         let start_idx = stages
             .iter()

@@ -30,7 +30,7 @@
 
 use chrono::{DateTime, Utc};
 
-use super::{Transcript, TranscriptEntry, TranscriptMetrics, SubagentRef};
+use super::{Transcript, TranscriptEntry, SubagentRef};
 use crate::{Error, Result};
 
 /// Convert a transcript to SCG format

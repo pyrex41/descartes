@@ -99,6 +99,22 @@ impl AgentCategory {
                 backpressure: false,
                 prompt_template: None,
             },
+            AgentCategory::FastBuilder => CategoryConfig {
+                description: "Fast code implementation".to_string(),
+                model: "grok-code-fast-1".to_string(),
+                tools: vec!["read".to_string(), "write".to_string(), "edit".to_string(), "bash".to_string()],
+                parallel: false,
+                backpressure: false,
+                prompt_template: None,
+            },
+            AgentCategory::BuilderReviewer => CategoryConfig {
+                description: "Deep review and fixes".to_string(),
+                model: "opus".to_string(),
+                tools: vec!["read".to_string(), "edit".to_string(), "bash".to_string()],
+                parallel: false,
+                backpressure: false,
+                prompt_template: None,
+            },
             AgentCategory::Custom(_) => CategoryConfig {
                 description: "Custom agent category".to_string(),
                 model: "sonnet".to_string(),
