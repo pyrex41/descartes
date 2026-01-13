@@ -90,7 +90,8 @@ impl Transcript {
 
     /// Record a user message
     pub fn record_user_message(&mut self, message: &str) {
-        self.entries.push(TranscriptEntry::User(message.to_string()));
+        self.entries
+            .push(TranscriptEntry::User(message.to_string()));
     }
 
     /// Record an assistant message
@@ -107,8 +108,7 @@ impl Transcript {
                 if let Some(TranscriptEntry::Assistant(last)) = self.entries.last_mut() {
                     last.push_str(text);
                 } else {
-                    self.entries
-                        .push(TranscriptEntry::Assistant(text.clone()));
+                    self.entries.push(TranscriptEntry::Assistant(text.clone()));
                 }
             }
             ResponseChunk::ToolCall(tool) => {
@@ -327,7 +327,9 @@ pub async fn replay(transcript: &Transcript, speed: f32) -> Result<()> {
             TranscriptEntry::ToolCall { name, id, .. } => {
                 println!("\x1b[33m[TOOL]\x1b[0m {} ({})", name, id);
             }
-            TranscriptEntry::ToolResult { content, success, .. } => {
+            TranscriptEntry::ToolResult {
+                content, success, ..
+            } => {
                 let status = if *success { "OK" } else { "FAIL" };
                 println!("\x1b[32m[{}]\x1b[0m {}", status, truncate(content, 100));
             }

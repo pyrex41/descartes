@@ -1,0 +1,92 @@
+# SCUD Graph v1
+# Phase: ralph
+# Archived: 2026-01-13
+
+@meta {
+  name ralph
+  id_format sequential
+  updated 2026-01-13T19:10:55.781041+00:00
+  archived 2026-01-13
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Add LoopSpecConfig struct to scud_loop.rs | D | 3 | H
+2 | Integrate LoopSpecConfig into ScudLoopConfig | D | 2 | H
+3 | Implement build_task_spec method | X | 5 | H
+3.1 | Implement helper methods and token warning logic | D | 0 | M
+3.2 | Implement build_task_spec method | D | 0 | M
+4 | Implement sub-agent execution methods | X | 5 | H
+4.1 | Define TaskExecutionResult enum | D | 0 | H
+4.2 | Add sub-agent execution methods to ScudIterativeLoop | D | 0 | H
+5 | Update execute_task and main loop for sub-agents | D | 3 | H
+6 | Add SCUD options to CLI loop command | D | 3 | H
+7 | Route CLI to ScudIterativeLoop when SCUD tag provided | D | 3 | H
+8 | Create ralph-loop slash command | D | 3 | H
+9 | Create cancel-ralph and help slash commands | D | 3 | H
+10 | Add unit tests, integration tests, and documentation | X | 5 | M
+10.1 | Implement Unit and Integration Tests | D | 0 | H
+10.2 | Update Documentation | D | 0 | M
+
+@edges
+# dependent -> dependency
+2 -> 1
+3 -> 2
+3.2 -> 3.1
+4 -> 3
+4.2 -> 4.1
+5 -> 4
+7 -> 2
+7 -> 6
+8 -> 7
+9 -> 8
+10 -> 1
+10 -> 2
+10 -> 3
+10 -> 4
+10 -> 5
+10 -> 6
+10 -> 7
+10 -> 8
+10 -> 9
+10.2 -> 10.1
+
+@parents
+# parent: subtasks...
+3: 3.1, 3.2
+4: 4.1, 4.2
+10: 10.1, 10.2
+
+@details
+1 | description |
+  Implement the LoopSpecConfig struct with fields for include_task, include_plan_section, additional_specs, max_spec_tokens, and spec_template. Include Default implementation. This sets up the configuration for spec loading.
+2 | description |
+  Add a spec field of type LoopSpecConfig to ScudLoopConfig with default serde. This allows configuration of spec behavior in the main loop config.
+3 | description |
+  Create the build_task_spec method in ScudIterativeLoop that combines task details, plan sections, and additional specs. Include helpers for format_task_spec and extract_plan_section, with token warning logic.
+3.1 | description |
+  Create the helper methods format_task_spec and extract_plan_section, and implement the token warning logic in the ScudIterativeLoop class. Ensure these are independently testable and handle combining task details, plan sections, and additional specs as needed.
+3.2 | description |
+  Implement the build_task_spec method in ScudIterativeLoop that combines task details, plan sections, and additional specs using the helper methods and incorporating token warning logic.
+4 | description |
+  Add build_task_prompt, spawn_claude_agent, and parse_task_result methods to ScudIterativeLoop. Define TaskExecutionResult enum. This enables spawning Claude agents for task execution with fresh context.
+4.1 | description |
+  Define the TaskExecutionResult enum to represent possible outcomes of task execution by Claude agents.
+4.2 | description |
+  Implement build_task_prompt, spawn_claude_agent, and parse_task_result methods in ScudIterativeLoop to enable spawning Claude agents with fresh context for task execution.
+5 | description |
+  Refactor execute_task to use the new sub-agent spawning. Update the main execute loop to handle TaskExecutionResult variants, including verification and handling blocked tasks.
+6 | description |
+  Extend LoopStartArgs in loop_cmd.rs with --scud-tag, --plan, --spec-file, --max-spec-tokens, and --verify options. This allows CLI invocation with SCUD integration.
+7 | description |
+  Modify execute_start in loop_cmd.rs to detect --scud-tag and instantiate ScudIterativeLoop with appropriate config. Ensure it falls back to generic loop otherwise.
+8 | description |
+  Create .claude/commands/ralph-wiggum/ralph-loop.md with description, arguments parsing, and execution logic to start the loop via Descartes CLI. Include output format for status reporting.
+9 | description |
+  Implement .claude/commands/ralph-wiggum/cancel-ralph.md and help.md with descriptions, execution steps, and output formats. These provide commands to cancel loops and show help.
+10 | description |
+  Write unit tests for spec building and task execution parsing in scud_loop.rs. Create integration test with mock SCUD tasks. Update relevant documentation files like blog posts and README.
+10.1 | description |
+  Write unit tests for spec building and task execution parsing in scud_loop.rs. Create an integration test using mock SCUD tasks to verify end-to-end functionality.
+10.2 | description |
+  Update relevant documentation files, including blog posts and README, to reflect the new tests and any changes in functionality.

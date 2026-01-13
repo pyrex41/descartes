@@ -6,7 +6,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-
 /// A registered command
 #[derive(Debug, Clone)]
 pub struct Command {
@@ -118,12 +117,15 @@ impl CommandInvocation {
         let args: Vec<String> = if raw_args.is_empty() {
             Vec::new()
         } else {
-            shell_words::split(&raw_args).unwrap_or_else(|_| {
-                raw_args.split_whitespace().map(String::from).collect()
-            })
+            shell_words::split(&raw_args)
+                .unwrap_or_else(|_| raw_args.split_whitespace().map(String::from).collect())
         };
 
-        Some(Self { name, args, raw_args })
+        Some(Self {
+            name,
+            args,
+            raw_args,
+        })
     }
 
     /// Get first argument
@@ -133,7 +135,9 @@ impl CommandInvocation {
 
     /// Check if a flag is present
     pub fn has_flag(&self, flag: &str) -> bool {
-        self.args.iter().any(|a| a == flag || a == &format!("--{}", flag))
+        self.args
+            .iter()
+            .any(|a| a == flag || a == &format!("--{}", flag))
     }
 }
 
@@ -367,9 +371,11 @@ impl ResolvedCommand {
     /// Get skill info if this is a skill command
     pub fn as_skill(&self) -> Option<(&PathBuf, Option<&str>, bool)> {
         match &self.command.kind {
-            CommandKind::Skill { prompt_file, category, auto_start } => {
-                Some((prompt_file, category.as_deref(), *auto_start))
-            }
+            CommandKind::Skill {
+                prompt_file,
+                category,
+                auto_start,
+            } => Some((prompt_file, category.as_deref(), *auto_start)),
             _ => None,
         }
     }

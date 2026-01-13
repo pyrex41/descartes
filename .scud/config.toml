@@ -1,4 +1,13 @@
 [llm]
-provider = "xai"
-model = "grok-code-fast-1"
 max_tokens = 4096
+model = "grok-code-fast-1"
+provider = "xai"
+
+[swarm.backpressure]
+commands = [
+    "cargo build --release",
+    "cargo test",
+    "cargo clippy -- -D warnings",
+]
+stop_on_failure = true
+timeout_secs = 300

@@ -144,7 +144,10 @@ impl ClaudeCodeHarness {
                         json.get("name").and_then(|n| n.as_str()),
                         json.get("id").and_then(|i| i.as_str()),
                     ) {
-                        let args = json.get("input").cloned().unwrap_or(serde_json::Value::Null);
+                        let args = json
+                            .get("input")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null);
 
                         // Check for subagent spawn patterns
                         if self.is_subagent_tool(name) {
@@ -169,7 +172,10 @@ impl ClaudeCodeHarness {
                             .and_then(|c| c.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let success = !json.get("is_error").and_then(|e| e.as_bool()).unwrap_or(false);
+                        let success = !json
+                            .get("is_error")
+                            .and_then(|e| e.as_bool())
+                            .unwrap_or(false);
 
                         return Some(ResponseChunk::ToolResult(ToolResult {
                             tool_call_id: id.to_string(),
@@ -262,7 +268,10 @@ impl ClaudeCodeHarness {
     async fn execute_claude(
         &self,
         args: Vec<String>,
-    ) -> Result<(Child, tokio::io::Lines<BufReader<tokio::process::ChildStdout>>)> {
+    ) -> Result<(
+        Child,
+        tokio::io::Lines<BufReader<tokio::process::ChildStdout>>,
+    )> {
         debug!("Running: {} {:?}", self.binary, args);
 
         let mut child = Command::new(&self.binary)
@@ -329,7 +338,10 @@ impl Harness for ClaudeCodeHarness {
     async fn send(&self, session: &SessionHandle, message: &str) -> Result<ResponseStream> {
         // Check if we have prior context for this session
         let sessions = self.sessions.lock().await;
-        let has_context = sessions.get(&session.id).map(|s| !s.messages.is_empty()).unwrap_or(false);
+        let has_context = sessions
+            .get(&session.id)
+            .map(|s| !s.messages.is_empty())
+            .unwrap_or(false);
         drop(sessions);
 
         let args = self.build_args(session, message, has_context);
@@ -345,10 +357,14 @@ impl Harness for ClaudeCodeHarness {
                     let mut sessions = self.sessions.lock().await;
                     if let Some(state) = sessions.get_mut(&session.id) {
                         // Append to last assistant message or create new one
-                        if let Some(ConversationMessage::Assistant(last)) = state.messages.last_mut() {
+                        if let Some(ConversationMessage::Assistant(last)) =
+                            state.messages.last_mut()
+                        {
                             last.push_str(text);
                         } else {
-                            state.messages.push(ConversationMessage::Assistant(text.clone()));
+                            state
+                                .messages
+                                .push(ConversationMessage::Assistant(text.clone()));
                         }
                     }
                 }
@@ -392,11 +408,7 @@ impl Harness for ClaudeCodeHarness {
         }
     }
 
-    async fn inject_result(
-        &self,
-        session: &SessionHandle,
-        result: SubagentResult,
-    ) -> Result<()> {
+    async fn inject_result(&self, session: &SessionHandle, result: SubagentResult) -> Result<()> {
         // Record the subagent result in session state
         debug!(
             "Injecting subagent result for session {}: {}",
@@ -459,7 +471,8 @@ mod tests {
     fn test_parse_tool_use() {
         let harness = create_test_harness();
 
-        let line = r#"{"type":"tool_use","id":"toolu_123","name":"read","input":{"path":"/test.txt"}}"#;
+        let line =
+            r#"{"type":"tool_use","id":"toolu_123","name":"read","input":{"path":"/test.txt"}}"#;
         let chunk = harness.parse_output_line(line);
 
         assert!(matches!(chunk, Some(ResponseChunk::ToolCall(_))));

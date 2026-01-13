@@ -195,14 +195,12 @@ impl WorkflowState {
     pub fn save(&self, path: &Path) -> Result<()> {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(Error::Io)?;
+            std::fs::create_dir_all(parent).map_err(Error::Io)?;
         }
 
         let content = serde_yaml::to_string(self)
             .map_err(|e| Error::Config(format!("Failed to serialize workflow state: {}", e)))?;
-        std::fs::write(path, content)
-            .map_err(Error::Io)
+        std::fs::write(path, content).map_err(Error::Io)
     }
 
     /// Get the state file path for this workflow
@@ -277,7 +275,13 @@ impl WorkflowState {
     }
 
     /// Record gate approval
-    pub fn gate_approved(&mut self, from: &str, to: &str, method: ApprovalMethod, message: Option<String>) {
+    pub fn gate_approved(
+        &mut self,
+        from: &str,
+        to: &str,
+        method: ApprovalMethod,
+        message: Option<String>,
+    ) {
         let key = format!("{}_to_{}", from, to);
         self.status = WorkflowStatus::Running;
         self.updated_at = Utc::now();
@@ -336,9 +340,9 @@ impl WorkflowState {
 
     /// Check if all stages are complete
     pub fn is_complete(&self) -> bool {
-        self.stages.values().all(|s| {
-            matches!(s.status, StageStatus::Completed | StageStatus::Skipped)
-        })
+        self.stages
+            .values()
+            .all(|s| matches!(s.status, StageStatus::Completed | StageStatus::Skipped))
     }
 
     /// Get summary of workflow progress
@@ -407,11 +411,7 @@ impl StateManager {
         let mut entries: Vec<_> = std::fs::read_dir(&dir)
             .map_err(Error::Io)?
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.file_name()
-                    .to_string_lossy()
-                    .starts_with(&prefix)
-            })
+            .filter(|e| e.file_name().to_string_lossy().starts_with(&prefix))
             .collect();
 
         // Sort by modification time (newest first)

@@ -46,8 +46,8 @@ http-body-util = "0.1"
 # BAML - AI prompt engineering framework with native Rust codegen
 baml = "0.217"
 
-# SCUD task management
-scud-cli = "1.31"
+# SCUD task management (use local path for latest features)
+scud = { package = "scud-cli", path = "../../scud/scud-cli" }
 
 # Logging
 tracing = "0.1"
@@ -56,6 +56,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Error handling
 thiserror = "1"
 anyhow = "1"
+
+# Terminal UI
+crossterm = "0.28"
 
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }

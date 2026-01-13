@@ -40,7 +40,10 @@ pub enum SessionState {
 #[derive(Debug, Clone)]
 pub enum AgentControl {
     /// Start the agent with given prompt
-    Start { category: AgentCategory, prompt: String },
+    Start {
+        category: AgentCategory,
+        prompt: String,
+    },
     /// Pause the agent
     Pause,
     /// Resume a paused agent
@@ -605,7 +608,9 @@ impl Session {
                 }
             }
             SessionState::AgentPaused => {
-                self.print_system("\nAgent already paused. Use /cancel to abort or /resume to continue.");
+                self.print_system(
+                    "\nAgent already paused. Use /cancel to abort or /resume to continue.",
+                );
             }
             _ => {
                 self.print_system("\nUse /exit to quit");

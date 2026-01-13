@@ -81,7 +81,6 @@ pub enum GateType {
     Notify,
 }
 
-
 /// What to do when a notify gate times out
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -93,7 +92,6 @@ pub enum TimeoutAction {
     /// Stay paused, require explicit approval
     Pause,
 }
-
 
 /// Transition configuration between stages
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,10 +145,7 @@ pub enum AutoContext {
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum NotificationConfig {
     /// Telegram bot notification
-    Telegram {
-        bot_token: String,
-        chat_id: String,
-    },
+    Telegram { bot_token: String, chat_id: String },
     /// Slack webhook notification
     Slack {
         webhook_url: String,

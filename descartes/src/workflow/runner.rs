@@ -13,7 +13,7 @@ use tracing::{debug, error, info, warn};
 use super::config::{GateType, WorkflowConfig};
 use super::gate::{ApprovalMethod, CliGate, GateController, GateResult};
 use super::notify::{create_channels, Notification};
-use super::state::{StateManager, StageStatus, WorkflowState};
+use super::state::{StageStatus, StateManager, WorkflowState};
 use crate::handoff::HandoffBuilder;
 use crate::harness::{Harness, SessionConfig};
 use crate::{Config, Error, Result};
@@ -93,10 +93,7 @@ impl WorkflowRunner {
 
         // Determine starting stage
         let stages = self.workflow_config.stages();
-        let start_stage = options
-            .from_stage
-            .as_ref()
-            .unwrap_or(&state.current_stage);
+        let start_stage = options.from_stage.as_ref().unwrap_or(&state.current_stage);
 
         let start_idx = stages
             .iter()
@@ -340,24 +337,30 @@ impl WorkflowRunner {
             GateType::Manual => {
                 // Use CLI gate for manual approval
                 let result = CliGate::prompt(&notification).await?;
-                if let GateResult::Approved { ref method, ref message } = result {
+                if let GateResult::Approved {
+                    ref method,
+                    ref message,
+                } = result
+                {
                     state.gate_approved(from, to, method.clone(), message.clone());
                 }
                 Ok(result)
             }
             GateType::Notify => {
                 // Create notification channels
-                let channels = create_channels(
-                    &self.workflow_config.notifications,
-                    &gate_config.notify,
-                );
+                let channels =
+                    create_channels(&self.workflow_config.notifications, &gate_config.notify);
 
                 // Create gate controller
                 let mut controller = GateController::new(gate_config.clone(), channels);
 
                 // Check gate
                 let result = controller.check(&notification).await?;
-                if let GateResult::Approved { ref method, ref message } = result {
+                if let GateResult::Approved {
+                    ref method,
+                    ref message,
+                } = result
+                {
                     state.gate_approved(from, to, method.clone(), message.clone());
                 }
                 Ok(result)
@@ -437,10 +440,13 @@ impl WorkflowRunner {
     /// Get previous stage
     fn get_previous_stage(&self, current: &str) -> Option<&str> {
         let stages = self.workflow_config.stages();
-        stages
-            .iter()
-            .position(|s| s == current)
-            .and_then(|i| if i > 0 { Some(stages[i - 1].as_str()) } else { None })
+        stages.iter().position(|s| s == current).and_then(|i| {
+            if i > 0 {
+                Some(stages[i - 1].as_str())
+            } else {
+                None
+            }
+        })
     }
 
     /// Get model for a stage

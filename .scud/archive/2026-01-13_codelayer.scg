@@ -1,0 +1,145 @@
+# SCUD Graph v1
+# Phase: codelayer
+# Archived: 2026-01-13
+
+@meta {
+  name codelayer
+  id_format sequential
+  updated 2026-01-13T19:10:55.780826+00:00
+  archived 2026-01-13
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Add subdirectory support to ThoughtsStorage | X | 3 | H
+1.1 | Add subdirectory constants and ensure directory creation | P | 0 | H
+1.2 | Implement save methods for research and plans | P | 0 | H
+1.3 | Implement list methods for research and plans | P | 0 | H
+2 | Add markdown frontmatter parsing | P | 2 | H
+3 | Create AgentDefinition struct and loader | X | 5 | H
+3.1 | Define AgentDefinition struct | P | 0 | H
+3.2 | Create AgentDefinitionLoader struct | P | 0 | M
+3.3 | Implement load_agent and list_agents methods | P | 0 | M
+3.4 | Add unit tests for loader functionality | P | 0 | L
+4 | Add new ToolLevel variants | X | 3 | H
+4.1 | Extend ToolLevel enum | P | 0 | H
+4.2 | Update get_tools() method | P | 0 | H
+4.3 | Add system prompts | P | 0 | M
+5 | Wire up agent loader in lib.rs | P | 1 | H
+6 | Create default agent markdown files | P | 2 | H
+7 | Add default agent installation logic | X | 3 | H
+7.1 | Ensure target directory exists | P | 0 | H
+7.2 | Implement ensure_default_agents function | P | 0 | H
+7.3 | Integrate and verify in AgentDefinitionLoader | P | 0 | H
+8 | Integrate agent definitions with spawn_session | X | 5 | H
+8.1 | Modify function signature | P | 0 | H
+8.2 | Implement agent definition loading | P | 0 | H
+8.3 | Integrate agent properties | P | 0 | H
+8.4 | Test and verify integration | P | 0 | M
+9 | Update spawn_session tool definition | P | 2 | H
+10 | Create workflow command definitions | X | 5 | M
+10.1 | Create workflow_commands.rs and define WorkflowCommand struct | P | 0 | H
+10.2 | Implement research_codebase command | P | 0 | H
+10.3 | Implement create_plan command | P | 0 | H
+10.4 | Implement implement_plan command | P | 0 | H
+
+@edges
+# dependent -> dependency
+1.2 -> 1.1
+1.3 -> 1.1
+2 -> 1
+3 -> 2
+3.2 -> 3.1
+3.3 -> 3.2
+3.4 -> 3.3
+4 -> 3
+4.2 -> 4.1
+4.3 -> 4.1
+5 -> 3
+6 -> 4
+7 -> 6
+7.2 -> 7.1
+7.3 -> 7.2
+8 -> 5
+8 -> 7
+8.2 -> 8.1
+8.3 -> 8.2
+8.4 -> 8.3
+9 -> 8
+10 -> 9
+10.2 -> 10.1
+10.3 -> 10.1
+10.4 -> 10.1
+
+@parents
+# parent: subtasks...
+1: 1.1, 1.2, 1.3
+3: 3.1, 3.2, 3.3, 3.4
+4: 4.1, 4.2, 4.3
+7: 7.1, 7.2, 7.3
+8: 8.1, 8.2, 8.3, 8.4
+10: 10.1, 10.2, 10.3, 10.4
+
+@details
+1 | description |
+  Add constants for RESEARCH_DIR and PLANS_DIR, implement save_research, save_plan, list_research, and list_plans methods in thoughts.rs, and ensure directories are created in initialize(). Success: ThoughtsStorage can save and list files in research and plans subdirectories.
+1.1 | description |
+  Add RESEARCH_DIR and PLANS_DIR constants to thoughts.rs. Modify the initialize() method to create these subdirectories if they do not exist.
+1.2 | description |
+  Implement save_research and save_plan methods in thoughts.rs to save files into the respective subdirectories.
+1.3 | description |
+  Implement list_research and list_plans methods in thoughts.rs to list files in the respective subdirectories.
+2 | description |
+  Create MarkdownDocument struct and parse_markdown_with_frontmatter function in thoughts.rs to support YAML frontmatter. Success: Function correctly parses frontmatter and content from markdown strings, verified by unit tests.
+3 | description |
+  Define AgentDefinition struct in new agent_definitions.rs file, create AgentDefinitionLoader with load_agent and list_agents methods. Success: Loader can load and list agent definitions from ~/.descartes/agents/, tested via unit tests.
+3.1 | description |
+  Create the agent_definitions.rs file and define the AgentDefinition struct with appropriate fields (e.g., name, description, etc.) based on requirements.
+3.2 | description |
+  Implement the AgentDefinitionLoader struct in the same file, including initialization and basic setup to handle the ~/.descartes/agents/ directory.
+3.3 | description |
+  Add the load_agent method to load a single agent definition from file and list_agents to list all available definitions in the directory.
+3.4 | description |
+  Write unit tests to verify that the loader can successfully load and list agent definitions, including mock data in the directory.
+4 | description |
+  Extend ToolLevel enum with Researcher and Planner variants in registry.rs, update get_tools() method, and add corresponding system prompts. Success: New tool levels are defined and integrated without breaking existing functionality.
+4.1 | description |
+  Add Researcher and Planner variants to the ToolLevel enum in registry.rs, ensuring the enum is extended without breaking existing functionality.
+4.2 | description |
+  Modify the get_tools() method in registry.rs to handle the new Researcher and Planner variants, integrating them appropriately.
+4.3 | description |
+  Define and add corresponding system prompts for the Researcher and Planner tool levels in registry.rs.
+5 | description |
+  Add pub mod agent_definitions; and re-export AgentDefinition and AgentDefinitionLoader in lib.rs. Success: Module compiles and exports are accessible, verified by cargo check.
+6 | description |
+  Create five markdown files (codebase-locator.md, etc.) in descartes/agents/ with frontmatter and system prompts. Success: Files are created in the correct directory structure with proper content.
+7 | description |
+  Implement ensure_default_agents() in agent_definitions.rs to copy bundled agents to ~/.descartes/agents/ if not present, called from AgentDefinitionLoader::new(). Success: Default agents are installed on first run, verified by manual test.
+7.1 | description |
+  Add logic to create the ~/.descartes/agents/ directory if it doesn't exist, as a prerequisite for copying agents.
+7.2 | description |
+  Implement the ensure_default_agents() function in agent_definitions.rs to copy bundled agents to the target directory only if they are not already present.
+7.3 | description |
+  Call ensure_default_agents() from AgentDefinitionLoader::new() and perform a manual test to verify default agents are installed on first run.
+8 | description |
+  Modify execute_spawn_session in executor.rs to accept an agent parameter, load AgentDefinition, and use its system prompt and tool level. Success: spawn_session can use agent names to configure sessions correctly.
+8.1 | description |
+  Update the execute_spawn_session function signature in executor.rs to accept an agent parameter (e.g., agent name or ID).
+8.2 | description |
+  Add logic to load the AgentDefinition based on the provided agent parameter, ensuring it retrieves the correct agent data.
+8.3 | description |
+  Modify the spawn_session logic to use the loaded AgentDefinition's system prompt and tool level for configuring the session.
+8.4 | description |
+  Test the modified execute_spawn_session to ensure it correctly uses agent names to configure sessions, including edge cases and error handling.
+9 | description |
+  Add agent parameter to spawn_session_tool() properties in definitions.rs with JSON schema. Success: Tool definition includes agent parameter, verified by cargo test.
+10 | description |
+  Define WorkflowCommand struct in new workflow_commands.rs and implement research_codebase, create_plan, and implement_plan commands with step sequences. Success: Workflow commands are defined and can be invoked, tested manually in CLI/TUI.
+10.1 | description |
+  Create a new file named workflow_commands.rs and define the WorkflowCommand struct with necessary fields and traits for workflow command definitions.
+10.2 | description |
+  Implement the research_codebase command within the WorkflowCommand struct, including its step sequences and logic.
+10.3 | description |
+  Implement the create_plan command within the WorkflowCommand struct, including its step sequences and logic.
+10.4 | description |
+  Implement the implement_plan command within the WorkflowCommand struct, including its step sequences and logic.

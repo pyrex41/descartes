@@ -81,10 +81,7 @@ impl GateController {
     }
 
     /// Check the gate and return the result
-    pub async fn check(
-        &mut self,
-        notification: &Notification,
-    ) -> Result<GateResult> {
+    pub async fn check(&mut self, notification: &Notification) -> Result<GateResult> {
         match self.config.gate_type {
             GateType::Auto => {
                 debug!("Gate is auto, continuing immediately");
@@ -179,7 +176,10 @@ impl GateController {
 
         // No response channel - this is a CLI-only flow
         // Return waiting status so CLI can handle it
-        Ok(GateResult::Waiting { started, timeout_at })
+        Ok(GateResult::Waiting {
+            started,
+            timeout_at,
+        })
     }
 
     /// Handle a response from a notification channel
@@ -206,7 +206,10 @@ impl GateController {
             }
             NotificationResponse::ExtendTimeout { source, duration } => {
                 // This should be handled by the caller
-                debug!("Timeout extension requested via {:?}: {:?}", source, duration);
+                debug!(
+                    "Timeout extension requested via {:?}: {:?}",
+                    source, duration
+                );
                 Ok(GateResult::Waiting {
                     started: Instant::now(),
                     timeout_at: Some(Instant::now() + duration),
@@ -263,19 +266,15 @@ impl CliGate {
         let input = input.trim().to_lowercase();
 
         match input.as_str() {
-            "a" | "approve" | "y" | "yes" | "go" | "" => {
-                Ok(GateResult::Approved {
-                    method: ApprovalMethod::Cli,
-                    message: None,
-                })
-            }
+            "a" | "approve" | "y" | "yes" | "go" | "" => Ok(GateResult::Approved {
+                method: ApprovalMethod::Cli,
+                message: None,
+            }),
             "e" | "edit" => Ok(GateResult::EditRequested),
             "s" | "skip" => Ok(GateResult::Skip),
-            "r" | "reject" | "n" | "no" | "cancel" => {
-                Ok(GateResult::Rejected {
-                    reason: "User rejected".to_string(),
-                })
-            }
+            "r" | "reject" | "n" | "no" | "cancel" => Ok(GateResult::Rejected {
+                reason: "User rejected".to_string(),
+            }),
             _ => {
                 println!("Commands:");
                 println!("  a/approve/y/yes/go - Continue to next stage");

@@ -335,7 +335,9 @@ impl HandoffBuilder {
                     }
                     AutoContext::GitStatus => {
                         if let Ok(status) = self.get_git_status().await {
-                            self.handoff.context.insert("git_status".to_string(), status);
+                            self.handoff
+                                .context
+                                .insert("git_status".to_string(), status);
                         }
                     }
                     AutoContext::TranscriptSummary => {

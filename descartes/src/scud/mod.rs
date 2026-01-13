@@ -8,7 +8,7 @@
 use std::path::PathBuf;
 
 // Re-export scud types for convenience
-pub use scud::models::{Phase, Task, TaskStatus, Priority};
+pub use scud::models::{Phase, Priority, Task, TaskStatus};
 pub use scud::storage::Storage;
 
 use crate::{Config, Error, Result};
@@ -36,12 +36,14 @@ pub fn complete(config: &Config, task_id: &str) -> Result<()> {
     let storage = create_storage(config)?;
 
     // Get active group tag
-    let group_tag = storage.get_active_group()
+    let group_tag = storage
+        .get_active_group()
         .map_err(|e| Error::Subagent(format!("Failed to get active group: {}", e)))?
         .ok_or_else(|| Error::Subagent("No active group set".to_string()))?;
 
     // Load the group
-    let mut phase = storage.load_group(&group_tag)
+    let mut phase = storage
+        .load_group(&group_tag)
         .map_err(|e| Error::Subagent(format!("Failed to load group: {}", e)))?;
 
     // Find and update the task
@@ -49,7 +51,8 @@ pub fn complete(config: &Config, task_id: &str) -> Result<()> {
         task.set_status(TaskStatus::Done);
 
         // Save the updated group
-        storage.update_group(&group_tag, &phase)
+        storage
+            .update_group(&group_tag, &phase)
             .map_err(|e| Error::Subagent(format!("Failed to save group: {}", e)))?;
 
         Ok(())
@@ -79,7 +82,9 @@ fn calculate_waves(phase: &Phase) -> Result<Vec<Vec<String>>> {
     // Build dependency graph for pending/in-progress tasks only
     let mut in_degree: HashMap<String, usize> = HashMap::new();
     let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
-    let done_ids: HashSet<_> = phase.tasks.iter()
+    let done_ids: HashSet<_> = phase
+        .tasks
+        .iter()
         .filter(|t| t.status == TaskStatus::Done)
         .map(|t| t.id.clone())
         .collect();
@@ -141,17 +146,20 @@ fn calculate_waves(phase: &Phase) -> Result<Vec<Vec<String>>> {
 pub fn set_status(config: &Config, task_id: &str, status: TaskStatus) -> Result<()> {
     let storage = create_storage(config)?;
 
-    let group_tag = storage.get_active_group()
+    let group_tag = storage
+        .get_active_group()
         .map_err(|e| Error::Subagent(format!("Failed to get active group: {}", e)))?
         .ok_or_else(|| Error::Subagent("No active group set".to_string()))?;
 
-    let mut phase = storage.load_group(&group_tag)
+    let mut phase = storage
+        .load_group(&group_tag)
         .map_err(|e| Error::Subagent(format!("Failed to load group: {}", e)))?;
 
     if let Some(task) = phase.get_task_mut(task_id) {
         task.set_status(status);
 
-        storage.update_group(&group_tag, &phase)
+        storage
+            .update_group(&group_tag, &phase)
             .map_err(|e| Error::Subagent(format!("Failed to save group: {}", e)))?;
 
         Ok(())
@@ -189,11 +197,13 @@ pub fn ready_tasks(config: &Config) -> Result<Vec<Task>> {
         Err(_) => return Ok(Vec::new()),
     };
 
-    let ready: Vec<Task> = phase.tasks.iter()
+    let ready: Vec<Task> = phase
+        .tasks
+        .iter()
         .filter(|t| {
-            t.status == TaskStatus::Pending &&
-            t.has_dependencies_met(&phase.tasks) &&
-            !t.is_subtask()
+            t.status == TaskStatus::Pending
+                && t.has_dependencies_met(&phase.tasks)
+                && !t.is_subtask()
         })
         .cloned()
         .collect();
@@ -210,11 +220,13 @@ pub fn blocked_tasks(config: &Config) -> Result<Vec<Task>> {
         Err(_) => return Ok(Vec::new()),
     };
 
-    let blocked: Vec<Task> = phase.tasks.iter()
+    let blocked: Vec<Task> = phase
+        .tasks
+        .iter()
         .filter(|t| {
-            t.status == TaskStatus::Pending &&
-            !t.has_dependencies_met(&phase.tasks) &&
-            !t.is_subtask()
+            t.status == TaskStatus::Pending
+                && !t.has_dependencies_met(&phase.tasks)
+                && !t.is_subtask()
         })
         .cloned()
         .collect();
@@ -225,7 +237,10 @@ pub fn blocked_tasks(config: &Config) -> Result<Vec<Task>> {
 /// Create a storage instance from config
 fn create_storage(config: &Config) -> Result<Storage> {
     let project_root = if config.scud.task_file.is_absolute() {
-        config.scud.task_file.parent()
+        config
+            .scud
+            .task_file
+            .parent()
             .and_then(|p| p.parent())
             .map(PathBuf::from)
     } else {

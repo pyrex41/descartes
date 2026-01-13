@@ -43,11 +43,7 @@ fn main() {
             Err(e) => {
                 // npx not available, try baml-cli directly
                 let fallback = Command::new("baml")
-                    .args([
-                        "generate",
-                        "--from",
-                        baml_src.to_str().unwrap(),
-                    ])
+                    .args(["generate", "--from", baml_src.to_str().unwrap()])
                     .current_dir(&manifest_dir)
                     .status();
 

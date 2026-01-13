@@ -118,15 +118,12 @@ struct ToolResultContent {
 impl OpenCodeHarness {
     /// Create a new OpenCode harness
     pub fn new(config: &OpenCodeConfig) -> Result<Self> {
-        let socket_path = config
-            .socket_path
-            .clone()
-            .unwrap_or_else(|| {
-                // Default socket locations
-                let runtime_dir = std::env::var("XDG_RUNTIME_DIR")
-                    .unwrap_or_else(|_| "/tmp".to_string());
-                PathBuf::from(runtime_dir).join("opencode.sock")
-            });
+        let socket_path = config.socket_path.clone().unwrap_or_else(|| {
+            // Default socket locations
+            let runtime_dir =
+                std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+            PathBuf::from(runtime_dir).join("opencode.sock")
+        });
 
         let model = config
             .model
@@ -155,7 +152,11 @@ impl OpenCodeHarness {
     }
 
     /// Send a request and receive response
-    async fn send_request(&self, stream: &mut UnixStream, request: &OpenCodeRequest) -> Result<OpenCodeResponse> {
+    async fn send_request(
+        &self,
+        stream: &mut UnixStream,
+        request: &OpenCodeRequest,
+    ) -> Result<OpenCodeResponse> {
         let mut request_json = serde_json::to_string(request)
             .map_err(|e| Error::Harness(format!("Failed to serialize request: {}", e)))?;
         request_json.push('\n');
@@ -264,7 +265,10 @@ impl OpenCodeHarness {
                 return Some(ResponseChunk::Done);
             }
             "error" => {
-                let msg = response.error.clone().unwrap_or_else(|| "Unknown error".to_string());
+                let msg = response
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| "Unknown error".to_string());
                 return Some(ResponseChunk::Error(msg));
             }
             _ => {
@@ -398,7 +402,8 @@ impl Harness for OpenCodeHarness {
     async fn send(&self, session: &SessionHandle, message: &str) -> Result<ResponseStream> {
         // Get or create connection
         let mut sessions = self.sessions.lock().await;
-        let session_state = sessions.get_mut(&session.id)
+        let session_state = sessions
+            .get_mut(&session.id)
             .ok_or_else(|| Error::Harness("Session not found".to_string()))?;
 
         // Ensure we have a connection
@@ -407,7 +412,9 @@ impl Harness for OpenCodeHarness {
             session_state.stream = Some(stream);
         }
 
-        let stream = session_state.stream.as_mut()
+        let stream = session_state
+            .stream
+            .as_mut()
             .ok_or_else(|| Error::Harness("No connection to OpenCode".to_string()))?;
 
         // Record user message
@@ -462,11 +469,7 @@ impl Harness for OpenCodeHarness {
         }
     }
 
-    async fn inject_result(
-        &self,
-        session: &SessionHandle,
-        result: SubagentResult,
-    ) -> Result<()> {
+    async fn inject_result(&self, session: &SessionHandle, result: SubagentResult) -> Result<()> {
         debug!(
             "Injecting subagent result for OpenCode session {}: {}",
             result.session_id,
@@ -475,10 +478,9 @@ impl Harness for OpenCodeHarness {
 
         let mut sessions = self.sessions.lock().await;
         if let Some(session_state) = sessions.get_mut(&session.id) {
-            session_state.history.push(format!(
-                "subagent_result: {}",
-                result.output
-            ));
+            session_state
+                .history
+                .push(format!("subagent_result: {}", result.output));
 
             // Send result to OpenCode if connected
             if let Some(stream) = session_state.stream.as_mut() {
@@ -490,7 +492,10 @@ impl Harness for OpenCodeHarness {
                     model: None,
                     options: {
                         let mut opts = HashMap::new();
-                        opts.insert("tool_call_id".to_string(), serde_json::json!(result.session_id));
+                        opts.insert(
+                            "tool_call_id".to_string(),
+                            serde_json::json!(result.session_id),
+                        );
                         opts.insert("success".to_string(), serde_json::json!(result.success));
                         opts
                     },

@@ -165,17 +165,156 @@ file = ".scud/scud.scg"
 
 ## Usage
 
-### Run the Ralph Loop
+### Ralph Command
+
+The `ralph` command is the main entry point for executing SCUD tasks using the Ralph Wiggum loop pattern. It provides fresh-context-per-task execution with wave-based parallelism and backpressure validation.
+
+#### Basic Usage
 
 ```bash
-# Build mode (default) - implement tasks
-descartes run --mode build
+# Execute tasks from an existing SCUD tag
+descartes ralph --scud-tag my-feature
 
-# Plan mode - analyze gaps, update task graph
-descartes run --mode plan
+# Initialize from a PRD and execute
+descartes ralph --prd ./docs/prd.md
 
-# Single iteration
-descartes run --max-iterations 1
+# Preview execution plan without running agents
+descartes ralph --scud-tag my-feature --dry-run
+```
+
+#### PRD Initialization
+
+Initialize tasks directly from a Product Requirements Document:
+
+```bash
+# Basic PRD initialization (creates tag from filename)
+descartes ralph --prd ./docs/feature-prd.md
+
+# Custom tag name and task count
+descartes ralph --prd ./docs/prd.md --tag my-feature --num-tasks 15
+
+# Skip expansion or dependency checks
+descartes ralph --prd ./docs/prd.md --no-expand --no-check-deps
+```
+
+When using `--prd`, Descartes automatically runs:
+1. `scud parse <prd> --tag <tag>` - Generate tasks from PRD
+2. `scud expand --tag <tag>` - Break complex tasks into subtasks (unless `--no-expand`)
+3. `scud check-deps --fix --tag <tag>` - Validate dependencies (unless `--no-check-deps`)
+
+#### Spec Configuration
+
+Provide additional context for each task using the "fixed spec allocation" pattern (~5k tokens):
+
+```bash
+# Include an implementation plan document
+descartes ralph --scud-tag my-feature --plan ./docs/IMPLEMENTATION.md
+
+# Include multiple spec files
+descartes ralph --scud-tag my-feature \
+    --spec-file ./docs/ARCHITECTURE.md \
+    --spec-file ./docs/API_CONTRACTS.md
+
+# Adjust token budget for specs
+descartes ralph --scud-tag my-feature --max-spec-tokens 8000
+```
+
+The spec is built from:
+- **Task details** from SCUD (ID, title, description, dependencies)
+- **Plan section** extracted from the plan document matching the task ID
+- **Additional specs** from `--spec-file` arguments
+
+#### Execution Options
+
+```bash
+# Custom verification command (overrides backpressure config)
+descartes ralph --scud-tag my-feature --verify "npm test"
+
+# Use a different harness
+descartes ralph --scud-tag my-feature --harness opencode  # or: codex
+
+# Override the model
+descartes ralph --scud-tag my-feature --model opus
+
+# Adjust tasks per round (for rate limiting)
+descartes ralph --scud-tag my-feature --round-size 3
+
+# Skip validation between waves
+descartes ralph --scud-tag my-feature --no-validate
+
+# Specify working directory
+descartes ralph --scud-tag my-feature --working-dir /path/to/project
+```
+
+#### Complete Example
+
+```bash
+# Full workflow: PRD → Tasks → Execution
+descartes ralph \
+    --prd ./docs/auth-feature-prd.md \
+    --tag auth-feature \
+    --num-tasks 12 \
+    --plan ./docs/auth-implementation-plan.md \
+    --spec-file ./docs/security-guidelines.md \
+    --verify "cargo test && cargo clippy" \
+    --harness claude-code \
+    --model sonnet \
+    --round-size 5
+```
+
+### How It Works
+
+The Ralph Wiggum loop implements a fresh-context-per-task execution pattern:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. Load SCUD tag and compute execution waves (DAG order)  │
+└────────────────────────────┬────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. For each wave:                                          │
+│     ┌───────────────────────────────────────────────────┐   │
+│     │  For each task (in rounds):                       │   │
+│     │    • Build fresh spec (task + plan + custom)      │   │
+│     │    • Spawn agent with fresh session               │   │
+│     │    • Execute task implementation                  │   │
+│     │    • Mark done/failed/blocked in SCUD             │   │
+│     └───────────────────────────────────────────────────┘   │
+│     • Run backpressure validation (if enabled)              │
+│     • Mark failed tasks if validation fails                 │
+└────────────────────────────┬────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. Repeat until all tasks complete or no progress          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key principles:**
+- **Fresh context each task**: No accumulated history, prevents drift
+- **Wave-based execution**: Tasks execute in dependency order
+- **Backpressure validation**: Build/test/lint between waves
+- **Failed task tracking**: Validation failures mark tasks for retry
+
+### Other Commands
+
+```bash
+# Run a single build iteration
+descartes run
+
+# Run a single planning iteration
+descartes plan
+
+# Run the continuous loop (legacy)
+descartes loop [--plan] [--max N]
+
+# Get next ready task from SCUD
+descartes next
+
+# Show task waves
+descartes waves
+
+# Spawn a subagent manually
+descartes spawn <category> "<prompt>"
 ```
 
 ### Interactive Mode
@@ -189,23 +328,6 @@ descartes interactive
 # /status - Show current state
 # /quit   - Exit
 ```
-
-## Ralph Loop Flow
-
-### Build Mode
-
-1. **Get Next Task**: Query SCUD for ready task
-2. **BAML Decision**: Ask `DecideNextAction` what to do
-3. **Parallel Search**: Spawn searcher subagents for context
-4. **Build**: Single builder subagent implements the task
-5. **Validate**: Validator runs tests (backpressure gate)
-6. **Commit**: If tests pass, commit with BAML-generated message
-
-### Plan Mode
-
-1. **Get State**: List completed and remaining tasks
-2. **BAML Plan**: Call `CreatePlan` with context
-3. **Update Graph**: Record plan in transcript
 
 ## Environment Variables
 

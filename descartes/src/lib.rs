@@ -32,21 +32,36 @@
 pub mod agent;
 pub mod baml_client;
 pub mod config;
+pub mod context_handoff;
 pub mod handoff;
 pub mod harness;
 pub mod interactive;
+pub mod ralph_executor;
 pub mod ralph_loop;
+pub mod ralph_tui;
 pub mod scud;
+pub mod spec;
 pub mod transcript;
 pub mod workflow;
 
 // Re-exports for convenience
-pub use agent::{AgentCategory, SubagentResult};
+pub use agent::{
+    AgentCategory, AgentHandle, AgentRegistry, RegistryStatus, SubagentResult, TerminalType,
+};
 pub use config::Config;
+pub use context_handoff::{
+    estimate_tokens, summarize_agent_progress, ContextMonitor, HandoffContext,
+};
 pub use handoff::Handoff;
 pub use harness::{Harness, HarnessKind};
 pub use interactive::{Session, SessionState, SkillRegistry};
+pub use ralph_executor::{RalphExecutor, TaskResult};
 pub use ralph_loop::{LoopConfig, LoopMode};
+pub use ralph_tui::{RalphTui, TuiAction, WaveProgress};
+pub use spec::{
+    apply_spec_template, build_prompt, build_task_spec, extract_plan_section, format_task_spec,
+    SpecConfig,
+};
 pub use transcript::{Transcript, TranscriptEntry};
 pub use workflow::{WorkflowConfig, WorkflowRunner, WorkflowState};
 

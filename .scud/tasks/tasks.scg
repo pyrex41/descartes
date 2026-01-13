@@ -1,499 +1,53 @@
 # SCUD Graph v1
-# Phase: codelayer
+# Phase: backpressure
 
 @meta {
-  name codelayer
-  updated 2026-01-08T23:30:31.905732+00:00
+  name backpressure
+  id_format sequential
+  updated 2026-01-13T21:32:47.764062+00:00
 }
 
 @nodes
 # id | title | status | complexity | priority
-1 | Add subdirectory support to ThoughtsStorage | X | 3 | H
-1.1 | Add subdirectory constants and ensure directory creation | P | 0 | H
-1.2 | Implement save methods for research and plans | P | 0 | H
-1.3 | Implement list methods for research and plans | P | 0 | H
-2 | Add markdown frontmatter parsing | P | 2 | H
-3 | Create AgentDefinition struct and loader | X | 5 | H
-3.1 | Define AgentDefinition struct | P | 0 | H
-3.2 | Create AgentDefinitionLoader struct | P | 0 | M
-3.3 | Implement load_agent and list_agents methods | P | 0 | M
-3.4 | Add unit tests for loader functionality | P | 0 | L
-4 | Add new ToolLevel variants | X | 3 | H
-4.1 | Extend ToolLevel enum | P | 0 | H
-4.2 | Update get_tools() method | P | 0 | H
-4.3 | Add system prompts | P | 0 | M
-5 | Wire up agent loader in lib.rs | P | 1 | H
-6 | Create default agent markdown files | P | 2 | H
-7 | Add default agent installation logic | X | 3 | H
-7.1 | Ensure target directory exists | P | 0 | H
-7.2 | Implement ensure_default_agents function | P | 0 | H
-7.3 | Integrate and verify in AgentDefinitionLoader | P | 0 | H
-8 | Integrate agent definitions with spawn_session | X | 5 | H
-8.1 | Modify function signature | P | 0 | H
-8.2 | Implement agent definition loading | P | 0 | H
-8.3 | Integrate agent properties | P | 0 | H
-8.4 | Test and verify integration | P | 0 | M
-9 | Update spawn_session tool definition | P | 2 | H
-10 | Create workflow command definitions | X | 5 | M
-10.1 | Create workflow_commands.rs and define WorkflowCommand struct | P | 0 | H
-10.2 | Implement research_codebase command | P | 0 | H
-10.3 | Implement create_plan command | P | 0 | H
-10.4 | Implement implement_plan command | P | 0 | H
+1 | Add Repair Loop State Machine to RalphExecutor | X | 5 | H
+1.1 | Define Repair Loop State Machine Schema | P | 0 | H
+1.2 | Implement State Machine in RalphExecutor Logic | P | 0 | H
+2 | Implement Error Parsing for Build and Test Output | X | 5 | H
+2.1 | Define Error Data Structure | P | 0 | H
+2.2 | Implement Parsers for Cargo Commands | P | 0 | M
+3 | Create RepairAgent Prompt Builder | P | 3 | H
+4 | Integrate Repair Agents with Harness System | X | 5 | H
+4.1 | Modify Agent Spawning Logic for Repair Subagents | P | 0 | H
+4.2 | Implement Execution Management with Timeouts and Synchronization | P | 0 | H
+5 | Implement Smart Error Grouping Strategies | P | 3 | M
+6 | Add Repair Configuration to Config File | P | 2 | L
+7 | Implement Failure Handling Mechanisms | X | 5 | H
+7.1 | Implement Failure Detection Mechanisms | P | 0 | H
+7.2 | Implement Response and Revert Logic | D | 0 | H
+8 | Add BLOCKED State and User Notifications | P | 3 | M
+9 | Implement Observability Features | P | 3 | M
+10 | Test End-to-End Repair Loop Integration | X | 8 | H
+10.1 | Prepare Integration Test Scenarios and Setup | P | 0 | H
+10.2 | Execute Tests and Validate Success Criteria | P | 0 | H
 
 @edges
 # dependent -> dependency
 1.2 -> 1.1
-1.3 -> 1.1
-2 -> 1
-3 -> 2
-3.2 -> 3.1
-3.3 -> 3.2
-3.4 -> 3.3
-4 -> 3
-4.2 -> 4.1
-4.3 -> 4.1
-5 -> 3
-6 -> 4
-7 -> 6
-7.2 -> 7.1
-7.3 -> 7.2
-8 -> 5
-8 -> 7
-8.2 -> 8.1
-8.3 -> 8.2
-8.4 -> 8.3
-9 -> 8
-10 -> 9
-10.2 -> 10.1
-10.3 -> 10.1
-10.4 -> 10.1
-
-@parents
-# parent: subtasks...
-1: 1.1, 1.2, 1.3
-3: 3.1, 3.2, 3.3, 3.4
-4: 4.1, 4.2, 4.3
-7: 7.1, 7.2, 7.3
-8: 8.1, 8.2, 8.3, 8.4
-10: 10.1, 10.2, 10.3, 10.4
-
-@details
-1 | description |
-  Add constants for RESEARCH_DIR and PLANS_DIR, implement save_research, save_plan, list_research, and list_plans methods in thoughts.rs, and ensure directories are created in initialize(). Success: ThoughtsStorage can save and list files in research and plans subdirectories.
-1.1 | description |
-  Add RESEARCH_DIR and PLANS_DIR constants to thoughts.rs. Modify the initialize() method to create these subdirectories if they do not exist.
-1.2 | description |
-  Implement save_research and save_plan methods in thoughts.rs to save files into the respective subdirectories.
-1.3 | description |
-  Implement list_research and list_plans methods in thoughts.rs to list files in the respective subdirectories.
-2 | description |
-  Create MarkdownDocument struct and parse_markdown_with_frontmatter function in thoughts.rs to support YAML frontmatter. Success: Function correctly parses frontmatter and content from markdown strings, verified by unit tests.
-3 | description |
-  Define AgentDefinition struct in new agent_definitions.rs file, create AgentDefinitionLoader with load_agent and list_agents methods. Success: Loader can load and list agent definitions from ~/.descartes/agents/, tested via unit tests.
-3.1 | description |
-  Create the agent_definitions.rs file and define the AgentDefinition struct with appropriate fields (e.g., name, description, etc.) based on requirements.
-3.2 | description |
-  Implement the AgentDefinitionLoader struct in the same file, including initialization and basic setup to handle the ~/.descartes/agents/ directory.
-3.3 | description |
-  Add the load_agent method to load a single agent definition from file and list_agents to list all available definitions in the directory.
-3.4 | description |
-  Write unit tests to verify that the loader can successfully load and list agent definitions, including mock data in the directory.
-4 | description |
-  Extend ToolLevel enum with Researcher and Planner variants in registry.rs, update get_tools() method, and add corresponding system prompts. Success: New tool levels are defined and integrated without breaking existing functionality.
-4.1 | description |
-  Add Researcher and Planner variants to the ToolLevel enum in registry.rs, ensuring the enum is extended without breaking existing functionality.
-4.2 | description |
-  Modify the get_tools() method in registry.rs to handle the new Researcher and Planner variants, integrating them appropriately.
-4.3 | description |
-  Define and add corresponding system prompts for the Researcher and Planner tool levels in registry.rs.
-5 | description |
-  Add pub mod agent_definitions; and re-export AgentDefinition and AgentDefinitionLoader in lib.rs. Success: Module compiles and exports are accessible, verified by cargo check.
-6 | description |
-  Create five markdown files (codebase-locator.md, etc.) in descartes/agents/ with frontmatter and system prompts. Success: Files are created in the correct directory structure with proper content.
-7 | description |
-  Implement ensure_default_agents() in agent_definitions.rs to copy bundled agents to ~/.descartes/agents/ if not present, called from AgentDefinitionLoader::new(). Success: Default agents are installed on first run, verified by manual test.
-7.1 | description |
-  Add logic to create the ~/.descartes/agents/ directory if it doesn't exist, as a prerequisite for copying agents.
-7.2 | description |
-  Implement the ensure_default_agents() function in agent_definitions.rs to copy bundled agents to the target directory only if they are not already present.
-7.3 | description |
-  Call ensure_default_agents() from AgentDefinitionLoader::new() and perform a manual test to verify default agents are installed on first run.
-8 | description |
-  Modify execute_spawn_session in executor.rs to accept an agent parameter, load AgentDefinition, and use its system prompt and tool level. Success: spawn_session can use agent names to configure sessions correctly.
-8.1 | description |
-  Update the execute_spawn_session function signature in executor.rs to accept an agent parameter (e.g., agent name or ID).
-8.2 | description |
-  Add logic to load the AgentDefinition based on the provided agent parameter, ensuring it retrieves the correct agent data.
-8.3 | description |
-  Modify the spawn_session logic to use the loaded AgentDefinition's system prompt and tool level for configuring the session.
-8.4 | description |
-  Test the modified execute_spawn_session to ensure it correctly uses agent names to configure sessions, including edge cases and error handling.
-9 | description |
-  Add agent parameter to spawn_session_tool() properties in definitions.rs with JSON schema. Success: Tool definition includes agent parameter, verified by cargo test.
-10 | description |
-  Define WorkflowCommand struct in new workflow_commands.rs and implement research_codebase, create_plan, and implement_plan commands with step sequences. Success: Workflow commands are defined and can be invoked, tested manually in CLI/TUI.
-10.1 | description |
-  Create a new file named workflow_commands.rs and define the WorkflowCommand struct with necessary fields and traits for workflow command definitions.
-10.2 | description |
-  Implement the research_codebase command within the WorkflowCommand struct, including its step sequences and logic.
-10.3 | description |
-  Implement the create_plan command within the WorkflowCommand struct, including its step sequences and logic.
-10.4 | description |
-  Implement the implement_plan command within the WorkflowCommand struct, including its step sequences and logic.
-
----
-
-# SCUD Graph v1
-# Phase: demo
-
-@meta {
-  name demo
-  updated 2026-01-08T23:30:31.905769+00:00
-}
-
-@nodes
-# id | title | status | complexity | priority
-1 | Audit Current Codebase for Removals | P | 3 | H
-2 | Remove RAG and Semantic Dependencies | P | 5 | H
-3 | Drop Semantic Database Tables | P | 3 | H
-4 | Simplify Internal IPC to Tokio Channels | P | 8 | H
-5 | Design New Event Sourcing SQLite Schema | P | 3 | H
-6 | Implement New SQLite Tables | P | 5 | H
-7 | Refactor to ZMQ-First Data Flow | P | 8 | H
-8 | Simplify Time Travel Feature | P | 5 | M
-9 | Update Observability and Management Logic | P | 5 | M
-10 | Integrate and Test Refactored System | P | 8 | H
-
-@edges
-# dependent -> dependency
-2 -> 1
-3 -> 1
-4 -> 1
-4 -> 2
-5 -> 3
-6 -> 5
-7 -> 4
-7 -> 6
-8 -> 6
-8 -> 7
-9 -> 7
-9 -> 8
-10 -> 2
-10 -> 3
-10 -> 4
-10 -> 6
-10 -> 7
-10 -> 8
-10 -> 9
-
-@details
-1 | description |
-  Review the agent-runner and core modules to identify all files, dependencies, and database tables related to RAG, semantic analysis, and complex IPC that need to be deleted. Document the 'Delete List' including ipc.rs, rag.rs, semantic.rs, knowledge_graph.rs, and 13+ semantic tables. Ensure the audit covers compilation dependencies to reduce binary size.
-2 | description |
-  Delete the specified files (rag.rs, semantic.rs, knowledge_graph.rs) and remove dependencies like lancedb and tantivy from Cargo.toml. Update any import statements in the codebase that reference these removed modules. Verify that the codebase compiles without these components.
-3 | description |
-  Execute SQL commands to drop the 13+ tables related to AST nodes (e.g., semantic_nodes, file_dependencies) from the current database schema. Ensure no foreign keys or references are left dangling. Confirm the schema simplification via a database inspection tool.
-4 | description |
-  Replace the complex internal bus (ipc.rs) with simple Tokio channels that bridge ZMQ sockets to the State Store. Remove Dead Letter Queues and Backpressure logic. Update any code that interacts with the old IPC to use the new channels.
-5 | description |
-  Create a specification for the minimal SQLite schema with three tables: agents (UUID, status, ZMQ address), events (append-only log), and snapshots (for Time Travel with Git commit hash and last event ID). Ensure it focuses on observability and time travel without complex relations.
-6 | description |
-  Write and execute SQL scripts to create the new agents, events, and snapshots tables in SQLite. Migrate any necessary data from old tables if applicable (e.g., agent statuses). Test basic CRUD operations on the new schema.
-7 | description |
-  Update the architecture to use ZMQ as the primary interface: Daemon binds ROUTER socket, agents connect via DEALER. Implement the flow from agent stdout/stderr to ZMQ Message to Daemon to SQLite Event Log to GUI WebSocket. Remove distinctions between local and remote agents.
-8 | description |
-  Refactor the 'Brain' Time Travel to replay only the events table, without restoring complex AST states. Keep 'Body' as standard Git commits via body_restore.rs. Ensure the GUI can time travel by replaying event logs and checking out Git commits.
-9 | description |
-  Adjust the Daemon's role as a 'Traffic Controller' for ZMQ clients, focusing on agent management without semantic analysis. Update GUI interfaces to pull data from the new event log and agent table. Confirm that agent orchestration is lightweight and ZMQ-driven.
-10 | description |
-  Compile the updated codebase, run integration tests for ZMQ communication, database operations, and Time Travel. Verify performance improvements (e.g., faster compilation, reduced memory). Ensure the GUI displays events correctly and agents can be moved to remote servers seamlessly.
-
----
-
-# SCUD Graph v1
-# Phase: opencode
-
-@meta {
-  name opencode
-  updated 2026-01-08T23:30:31.905781+00:00
-}
-
-@nodes
-# id | title | status | complexity | priority
-1 | Implement core attach API endpoint | X | 5 | H
-1.1 | Define request and response schemas | P | 0 | H
-1.2 | Implement verification and security logic | P | 0 | H
-1.3 | Implement the RPC endpoint | P | 0 | H
-1.4 | Add tests and documentation | P | 0 | M
-2 | Add CLI attach command | X | 3 | H
-2.1 | Define CLI command structure and argument parsing | P | 0 | H
-2.2 | Implement attach API call and error handling | P | 0 | H
-2.3 | Test command integration and error scenarios | P | 0 | M
-3 | Implement local OpenCode launch | X | 5 | H
-3.1 | Modify CLI Command Structure | P | 0 | H
-3.2 | Set Up Environment Variables | P | 0 | H
-3.3 | Implement Process Spawning | P | 0 | H
-3.4 | Test and Verify Implementation | P | 0 | M
-4 | Develop remote attach helper script | X | 5 | H
-4.1 | Create SSH Connection Script | P | 0 | H
-4.2 | Implement Environment Export and Launch Logic | P | 0 | H
-4.3 | Package Script with CLI | P | 0 | M
-4.4 | Test and Validate PTY Forwarding | P | 0 | M
-5 | Integrate session metadata display | X | 8 | M
-5.1 | Define session metadata schema | P | 0 | H
-5.2 | Implement metadata retrieval logic | P | 0 | H
-5.3 | Extend OpenCode UI for side panel display | P | 0 | H
-5.4 | Add detach banner functionality | P | 0 | H
-5.5 | Test and document integration | P | 0 | M
-6 | Add command hooks in OpenCode | X | 5 | M
-6.1 | Define Socket Interface for Descartes Daemon | P | 0 | H
-6.2 | Implement Core Logic for Commands | P | 0 | H
-6.3 | Add Command Hooks in OpenCode | P | 0 | H
-6.4 | Test and Validate Commands | P | 0 | M
-7 | Implement resilience features | X | 8 | M
-7.1 | Define state preservation schema | P | 0 | H
-7.2 | Implement heartbeat ping mechanism | P | 0 | H
-7.3 | Add auto-retry on unexpected exits | P | 0 | H
-7.4 | Handle cleanup on heartbeat loss | P | 0 | H
-7.5 | Integrate and test resilience features | P | 0 | H
-8 | Add observability and telemetry | X | 5 | L
-8.1 | Define Telemetry Schemas and Metrics Structure | P | 0 | H
-8.2 | Integrate Metrics Collection | P | 0 | H
-8.3 | Implement Structured Logging | P | 0 | M
-8.4 | Add User Satisfaction Prompts and Performance Verification | P | 0 | M
-9 | Handle technical considerations | X | 8 | H
-9.1 | Define attach_manifest.json schema and models | P | 0 | H
-9.2 | Implement PTY bridging | P | 0 | H
-9.3 | Implement file synchronization checks | P | 0 | H
-9.4 | Implement token handling and security | P | 0 | H
-9.5 | Integrate feature flag and cross-setup functionality | P | 0 | H
-10 | Develop documentation and testing | X | 5 | M
-10.1 | Identify and outline attach flows and use cases | P | 0 | H
-10.2 | Create user guides and compatibility matrix | P | 0 | H
-10.3 | Develop support playbooks | P | 0 | M
-10.4 | Write unit and integration tests for attach flows | P | 0 | H
-
-@edges
-# dependent -> dependency
-1.2 -> 1.1
-1.3 -> 1.1
-1.3 -> 1.2
-1.4 -> 1.3
 2 -> 1
 2.2 -> 2.1
-2.3 -> 2.2
 3 -> 2
-3.2 -> 3.1
-3.3 -> 3.2
-3.4 -> 3.3
-4 -> 2
-4.2 -> 4.1
-4.3 -> 4.2
-4.4 -> 4.3
-5 -> 3
-5 -> 4
-5.2 -> 5.1
-5.3 -> 5.2
-5.4 -> 5.3
-5.5 -> 5.4
-6 -> 1
-6 -> 5
-6.2 -> 6.1
-6.3 -> 6.2
-6.4 -> 6.3
-7 -> 6
-7.2 -> 7.1
-7.3 -> 7.1
-7.3 -> 7.2
-7.4 -> 7.2
-7.5 -> 7.3
-7.5 -> 7.4
-8 -> 7
-8.2 -> 8.1
-8.3 -> 8.1
-8.4 -> 8.2
-8.4 -> 8.3
-9 -> 3
-9 -> 4
-9.2 -> 9.1
-9.3 -> 9.1
-9.4 -> 9.1
-9.5 -> 9.2
-9.5 -> 9.3
-9.5 -> 9.4
-10 -> 1
-10 -> 2
-10 -> 3
-10 -> 4
-10 -> 5
-10 -> 6
-10 -> 7
-10 -> 8
-10 -> 9
-10.2 -> 10.1
-10.3 -> 10.1
-10.4 -> 10.1
-
-@parents
-# parent: subtasks...
-1: 1.1, 1.2, 1.3, 1.4
-2: 2.1, 2.2, 2.3
-3: 3.1, 3.2, 3.3, 3.4
-4: 4.1, 4.2, 4.3, 4.4
-5: 5.1, 5.2, 5.3, 5.4, 5.5
-6: 6.1, 6.2, 6.3, 6.4
-7: 7.1, 7.2, 7.3, 7.4, 7.5
-8: 8.1, 8.2, 8.3, 8.4
-9: 9.1, 9.2, 9.3, 9.4, 9.5
-10: 10.1, 10.2, 10.3, 10.4
-
-@details
-1 | description |
-  Create the `agent.attach.opencode` RPC endpoint in the Descartes daemon to handle attach requests, returning a token and connection spec. This endpoint must verify agent pause state and enforce security controls. Success criteria: Endpoint responds correctly to valid requests and rejects unauthorized ones.
-1.1 | description |
-  Create the data models for the attach request (e.g., agent ID, credentials) and response (token and connection spec) in the Descartes daemon, ensuring they align with RPC standards.
-1.2 | description |
-  Develop the core logic to verify the agent's pause state and enforce security controls (e.g., authentication, authorization) for attach requests.
-1.3 | description |
-  Add the `agent.attach.opencode` RPC endpoint to the Descartes daemon, integrating the verification logic to handle requests, return token and spec for valid attaches, and reject unauthorized ones.
-1.4 | description |
-  Write unit and integration tests for the endpoint to verify correct responses to valid/invalid requests, and document the endpoint usage and API details.
-2 | description |
-  Extend the Descartes CLI to include `descartes agents attach opencode <agent-id> [--ssh user@host]` command. It should call the attach API, handle errors, and prepare for launch. Success criteria: Command parses arguments correctly and initiates attach flow without errors.
-2.1 | description |
-  Add the 'attach opencode' subcommand to the CLI with required <agent-id> argument and optional [--ssh user@host] flag, ensuring proper argument validation and parsing.
-2.2 | description |
-  Integrate the call to the attach API within the command logic, including handling of API responses, errors, and preparation for launch flow.
-2.3 | description |
-  Verify that the command parses arguments correctly, initiates the attach flow without errors, and handles edge cases through unit and integration tests.
-3 | description |
-  Modify the CLI to spawn the OpenCode binary locally with environment variables for attach sockets, repo root, and token. Ensure the process is launched in attached mode. Success criteria: Local attach command successfully starts OpenCode with the correct environment.
-3.1 | description |
-  Update the CLI to recognize and parse the local attach command, ensuring it can accept necessary parameters like repo root and token.
-3.2 | description |
-  Implement code to set environment variables for attach sockets, repo root, and token based on CLI inputs.
-3.3 | description |
-  Add logic to spawn the OpenCode binary locally using the configured environment variables and ensure it runs in attached mode.
-3.4 | description |
-  Create unit tests and integration tests to verify the local attach command starts OpenCode with correct environment, meeting success criteria.
-4 | description |
-  Create a helper script for remote launches that SSHs into the host, exports environment variables, and launches OpenCode. Package it with the CLI for SSH workflows. Success criteria: Script executes successfully on remote hosts with proper PTY forwarding.
-4.1 | description |
-  Write the initial script that establishes an SSH connection to the remote host, ensuring basic setup for remote execution.
-4.2 | description |
-  Add functionality to the script to export necessary environment variables and launch OpenCode on the remote host.
-4.3 | description |
-  Integrate the helper script into the CLI package for SSH workflows, ensuring it can be invoked as part of the CLI.
-4.4 | description |
-  Test the script on remote hosts to ensure successful execution with proper PTY forwarding and meet the success criteria.
-5 | description |
-  Implement logic to provide agent summary, pending tasks, and attach instructions in the OpenCode side panel, including a detach banner. This requires extending OpenCode's UI integration. Success criteria: Metadata displays correctly upon attach in OpenCode.
-5.1 | description |
-  Create or extend data models/schemas to represent agent summary, pending tasks, attach instructions, and detach banner state in the session metadata structure.
-5.2 | description |
-  Develop backend logic to fetch or compute agent summary, pending tasks, and attach instructions based on session data.
-5.3 | description |
-  Integrate UI components into OpenCode's side panel to display the session metadata (agent summary, pending tasks, attach instructions) upon attach.
-5.4 | description |
-  Implement the detach banner in the OpenCode side panel, including logic for detachment and UI updates.
-5.5 | description |
-  Write unit tests for metadata logic, integration tests for UI display, and update documentation for the new features, ensuring success criteria are met.
-6 | description |
-  Implement `/descartes log` and `/descartes resume` commands within OpenCode to append notes to logs and resume sessions. These should interact with Descartes daemon via sockets. Success criteria: Commands execute and update agent state appropriately.
-6.1 | description |
-  Research and define the socket communication protocol and interface to interact with the Descartes daemon, including message formats for appending logs and resuming sessions.
-6.2 | description |
-  Develop the core logic functions to handle appending notes to logs and resuming sessions by sending appropriate socket messages to the Descartes daemon and updating agent state.
-6.3 | description |
-  Integrate the /descartes log and /descartes resume commands into OpenCode's command system, wiring them to the core logic functions for execution.
-6.4 | description |
-  Test the commands to ensure they execute correctly, interact with the daemon via sockets, and update agent state as per success criteria.
-7 | description |
-  Add heartbeat pings, auto-retry on unexpected exits, and state preservation. Ensure cleanup on heartbeat loss. Success criteria: Sessions remain stable and recoverable after interruptions.
-7.1 | description |
-  Create a schema or model to define how session state will be serialized and stored for recovery purposes.
-7.2 | description |
-  Develop the core logic for sending and receiving heartbeat pings between components to detect active sessions.
-7.3 | description |
-  Implement logic to automatically retry failed operations or reconnect after unexpected exits, using the state preservation schema.
-7.4 | description |
-  Add functionality to detect heartbeat loss and perform necessary cleanup, ensuring sessions are properly terminated and resources released.
-7.5 | description |
-  Integrate all resilience components, add unit and integration tests to verify sessions remain stable and recoverable after interruptions, and document the implementation.
-8 | description |
-  Integrate metrics for attachment attempts, success rates, and events, plus structured logging for auditing. Include user satisfaction prompts post-detach. Success criteria: Telemetry data is collected and accessible without performance impact.
-8.1 | description |
-  Create schemas for metrics (attachment attempts, success rates, events) and structured logging formats for auditing. Ensure they are designed to avoid performance overhead.
-8.2 | description |
-  Implement collection of metrics for attachment attempts, success rates, and events in the relevant code paths, using the defined schemas.
-8.3 | description |
-  Add structured logging for auditing purposes across the application, ensuring it integrates with the telemetry schemas without impacting performance.
-8.4 | description |
-  Integrate user satisfaction prompts post-detach and conduct tests to verify that telemetry data is collected and accessible without performance impact.
-9 | description |
-  Implement PTY bridging, file sync checks, token handling, and `attach_manifest.json` for extensibility. Add feature flag `feature.attach.opencode`. Success criteria: Attachments work across local/remote setups with security and sync validations.
-9.1 | description |
-  Create the schema for attach_manifest.json to support extensibility, including models for parsing and validating the manifest structure.
-9.2 | description |
-  Develop PTY bridging functionality to enable pseudo-terminal attachment for interactive sessions in attachments.
-9.3 | description |
-  Add logic for file sync checks, including validation mechanisms to ensure files are in sync across local and remote setups.
-9.4 | description |
-  Handle token management for secure access, including validation and error handling for security in attachment processes.
-9.5 | description |
-  Add the feature.attach.opencode flag, integrate all components (PTY, sync, tokens, manifest) for local/remote setups, and ensure attachments work with validations; include unit and integration tests.
-10 | description |
-  Create user guides, compatibility matrix, and support playbooks. Write unit and integration tests for all attach flows. Success criteria: Documentation covers all use cases, and tests pass for prototype, beta, and GA milestones.
-10.1 | description |
-  Analyze all attach flows in the system and outline the use cases they support, including any edge cases or milestones (prototype, beta, GA). This provides the foundation for documentation and testing.
-10.2 | description |
-  Develop user guides that cover all outlined use cases and a compatibility matrix detailing supported environments and versions.
-10.3 | description |
-  Write support playbooks for troubleshooting and maintenance related to the attach flows, ensuring coverage of all use cases.
-10.4 | description |
-  Implement unit tests for individual components of attach flows and integration tests for end-to-end scenarios, ensuring tests pass for prototype, beta, and GA milestones.
-
----
-
-# SCUD Graph v1
-# Phase: ralph
-
-@meta {
-  name ralph
-  updated 2026-01-08T23:30:31.905838+00:00
-}
-
-@nodes
-# id | title | status | complexity | priority
-1 | Add LoopSpecConfig struct to scud_loop.rs | D | 3 | H
-2 | Integrate LoopSpecConfig into ScudLoopConfig | D | 2 | H
-3 | Implement build_task_spec method | X | 5 | H
-3.1 | Implement helper methods and token warning logic | D | 0 | M
-3.2 | Implement build_task_spec method | D | 0 | M
-4 | Implement sub-agent execution methods | X | 5 | H
-4.1 | Define TaskExecutionResult enum | D | 0 | H
-4.2 | Add sub-agent execution methods to ScudIterativeLoop | D | 0 | H
-5 | Update execute_task and main loop for sub-agents | D | 3 | H
-6 | Add SCUD options to CLI loop command | D | 3 | H
-7 | Route CLI to ScudIterativeLoop when SCUD tag provided | D | 3 | H
-8 | Create ralph-loop slash command | D | 3 | H
-9 | Create cancel-ralph and help slash commands | D | 3 | H
-10 | Add unit tests, integration tests, and documentation | X | 5 | M
-10.1 | Implement Unit and Integration Tests | D | 0 | H
-10.2 | Update Documentation | D | 0 | M
-
-@edges
-# dependent -> dependency
-2 -> 1
-3 -> 2
-3.2 -> 3.1
+3 -> 5
 4 -> 3
 4.2 -> 4.1
-5 -> 4
-7 -> 2
-7 -> 6
+5 -> 2
+5 -> 6
+6 -> 1
+7 -> 1
+7 -> 4
+7.2 -> 7.1
 8 -> 7
-9 -> 8
+9 -> 1
+9 -> 4
 10 -> 1
 10 -> 2
 10 -> 3
@@ -507,286 +61,214 @@
 
 @parents
 # parent: subtasks...
-3: 3.1, 3.2
+1: 1.1, 1.2
+2: 2.1, 2.2
 4: 4.1, 4.2
+7: 7.1, 7.2
 10: 10.1, 10.2
 
 @details
 1 | description |
-  Implement the LoopSpecConfig struct with fields for include_task, include_plan_section, additional_specs, max_spec_tokens, and spec_template. Include Default implementation. This sets up the configuration for spec loading.
+  Extend the RalphExecutor to include states like VALIDATING, REPAIRING, and BLOCKED. Implement the state transitions as per the flow diagram, ensuring the system blocks wave progression on backpressure failure and loops through repairs until success or max retries. This task involves updating the core execution logic to halt at validation failures.
+1.1 | description |
+  Add the new states (VALIDATING, REPAIRING, BLOCKED) to the RalphExecutor's state machine definition, including the transition rules and conditions as per the flow diagram. Ensure the schema supports halting on validation failures and retry logic.
+1.2 | description |
+  Update the core execution logic in RalphExecutor to integrate the state machine, implement transitions, block wave progression on backpressure failure, and loop through repairs until success or maximum retries are reached.
 2 | description |
-  Add a spec field of type LoopSpecConfig to ScudLoopConfig with default serde. This allows configuration of spec behavior in the main loop config.
-3 | description |
-  Create the build_task_spec method in ScudIterativeLoop that combines task details, plan sections, and additional specs. Include helpers for format_task_spec and extract_plan_section, with token warning logic.
-3.1 | description |
-  Create the helper methods format_task_spec and extract_plan_section, and implement the token warning logic in the ScudIterativeLoop class. Ensure these are independently testable and handle combining task details, plan sections, and additional specs as needed.
-3.2 | description |
-  Implement the build_task_spec method in ScudIterativeLoop that combines task details, plan sections, and additional specs using the helper methods and incorporating token warning logic.
-4 | description |
-  Add build_task_prompt, spawn_claude_agent, and parse_task_result methods to ScudIterativeLoop. Define TaskExecutionResult enum. This enables spawning Claude agents for task execution with fresh context.
-4.1 | description |
-  Define the TaskExecutionResult enum to represent possible outcomes of task execution by Claude agents.
-4.2 | description |
-  Implement build_task_prompt, spawn_claude_agent, and parse_task_result methods in ScudIterativeLoop to enable spawning Claude agents with fresh context for task execution.
-5 | description |
-  Refactor execute_task to use the new sub-agent spawning. Update the main execute loop to handle TaskExecutionResult variants, including verification and handling blocked tasks.
-6 | description |
-  Extend LoopStartArgs in loop_cmd.rs with --scud-tag, --plan, --spec-file, --max-spec-tokens, and --verify options. This allows CLI invocation with SCUD integration.
-7 | description |
-  Modify execute_start in loop_cmd.rs to detect --scud-tag and instantiate ScudIterativeLoop with appropriate config. Ensure it falls back to generic loop otherwise.
-8 | description |
-  Create .claude/commands/ralph-wiggum/ralph-loop.md with description, arguments parsing, and execution logic to start the loop via Descartes CLI. Include output format for status reporting.
-9 | description |
-  Implement .claude/commands/ralph-wiggum/cancel-ralph.md and help.md with descriptions, execution steps, and output formats. These provide commands to cancel loops and show help.
-10 | description |
-  Write unit tests for spec building and task execution parsing in scud_loop.rs. Create integration test with mock SCUD tasks. Update relevant documentation files like blog posts and README.
-10.1 | description |
-  Write unit tests for spec building and task execution parsing in scud_loop.rs. Create an integration test using mock SCUD tasks to verify end-to-end functionality.
-10.2 | description |
-  Update relevant documentation files, including blog posts and README, to reflect the new tests and any changes in functionality.
-
----
-
-# SCUD Graph v1
-# Phase: webapp
-
-@meta {
-  name webapp
-  updated 2026-01-08T23:30:31.905856+00:00
-}
-
-@nodes
-# id | title | status | complexity | priority
-1 | Add shared types for REST and RPC | P | 3 | H
-2 | Implement Project Store with SQLite | X | 5 | H
-2.1 | Set up Project Model and SQLite Schema with Migrations | P | 0 | H
-2.2 | Implement CRUD Operations and Unit Tests | P | 0 | H
-3 | Add REST endpoint handlers | X | 5 | H
-3.1 | Implement Project CRUD Handlers | P | 0 | H
-3.2 | Implement Wave Execution Logic and Integration | P | 0 | H
-4 | Update HTTP router with REST routes | P | 3 | H
-5 | Integrate WebSocket server | P | 3 | H
-6 | Create Fly.io Machines API client | X | 5 | H
-6.1 | Implement API models and HTTP client setup | P | 0 | H
-6.2 | Implement core API functions and unit tests | P | 0 | H
-7 | Update agent spawn handler for cloud | P | 3 | H
-8 | Create worker binary | X | 5 | H
-8.1 | Set up worker project structure and Cargo.toml | P | 0 | H
-8.2 | Implement main.rs and integrate core functionality | P | 0 | H
-9 | Build worker Docker image | P | 2 | H
-10 | Configure worker Fly.io app | P | 1 | M
-11 | Set up Elm project structure | P | 2 | H
-12 | Implement Elm main app with routing | X | 8 | H
-12.1 | Set up Elm application with Browser.application, URL routing, and page handling | P | 0 | H
-12.2 | Integrate session management and WebSocket ports | P | 0 | H
-13 | Configure TailwindCSS for Elm | P | 3 | M
-14 | Deploy orchestrator to Fly.io | X | 5 | H
-14.1 | Set up deployment configuration and containerization | P | 0 | H
-14.2 | Deploy to Fly.io and verify functionality | P | 0 | H
-
-@edges
-# dependent -> dependency
-2 -> 1
-2.2 -> 2.1
-3 -> 1
-3 -> 2
-3.2 -> 3.1
-4 -> 3
-5 -> 4
-6.2 -> 6.1
-7 -> 6
-8.2 -> 8.1
-9 -> 8
-10 -> 9
-12 -> 11
-12.2 -> 12.1
-13 -> 11
-14 -> 5
-14 -> 7
-14 -> 10
-14.2 -> 14.1
-
-@parents
-# parent: subtasks...
-2: 2.1, 2.2
-3: 3.1, 3.2
-6: 6.1, 6.2
-8: 8.1, 8.2
-12: 12.1, 12.2
-14: 14.1, 14.2
-
-@details
-1 | description |
-  Create shared request/response types for both Unix socket RPC and HTTP handlers in descartes/daemon/src/types.rs. Include Project, Wave, ExecuteWaveRequest, and Cost tracking types as specified. Verify types compile and serialize correctly.
-2 | description |
-  Create project_store.rs with SQLite-backed storage for projects, including create, list, get, and delete operations. Run migrations and ensure CRUD works via unit tests.
+  Create parsers to extract errors from 'cargo build', 'cargo test', and 'cargo clippy' outputs. Parse details like file names, line numbers, error types, and messages into structured data for repair agents.
 2.1 | description |
-  Define the Project struct and create the SQLite schema in project_store.rs. Implement database migrations to set up the projects table.
+  Create a structured data model or schema to represent parsed errors, including fields for file names, line numbers, error types, and messages. Ensure the structure is extensible to support additional fields for future checks.
 2.2 | description |
-  Implement create, list, get, and delete operations for projects in SQLite. Add unit tests to verify all CRUD functionality works correctly.
+  Develop parsers for 'cargo build', 'cargo test', and 'cargo clippy' outputs to extract and map error details into the defined structured data. Handle various error formats and ensure the parsers are modular for easy extension.
 3 | description |
-  Extend handlers.rs with project CRUD handlers (create, list, get, parse PRD) and wave execution logic. Ensure handlers integrate with existing RpcHandlers and return proper responses.
-3.1 | description |
-  Extend handlers.rs to add REST endpoint handlers for project CRUD operations: create, list, get, and parse PRD. Ensure proper request handling and response structures.
-3.2 | description |
-  Add wave execution logic to handlers.rs and ensure all handlers integrate with existing RpcHandlers, returning proper responses.
+  Build a function to generate prompts for repair agents, including error context, file context, wave task context (what tasks were attempting to accomplish), and verification commands. Ensure prompts are clear and focused on fixing specific issues without proceeding to other tasks.
 4 | description |
-  Modify server.rs to add REST routes for projects, PRD parsing, and health check in handle_http_request. Include WebSocket upgrade handling for event streaming.
+  Modify the agent spawning logic to create repair subagents when backpressure fails. Handle spawning multiple agents in parallel based on configuration, and manage their execution with timeouts. Ensure repair agents run synchronously before re-validation.
+4.1 | description |
+  Update the agent spawning logic to detect backpressure failure and spawn repair subagents. Implement parallel spawning of multiple agents based on configuration settings.
+4.2 | description |
+  Add logic to manage repair agent execution with timeouts, ensure they run synchronously, and integrate with re-validation process.
 5 | description |
-  Wire WebSocket event server into RpcServer::run() in server.rs, using a separate port for WebSocket connections. Test that WebSocket starts alongside HTTP server.
+  Add logic to group errors using three strategies: individual errors (one agent per error), file-based grouping (all errors in same file to one agent), or single agent mode (one agent gets all errors). Implement configuration-driven selection between strategies.
 6 | description |
-  Implement fly_machines.rs with HTTP client for spawning, getting, stopping, and destroying Fly.io machines. Include unit tests with mocked responses.
-6.1 | description |
-  Define the data models and structures for Fly.io machines API responses and requests. Set up the HTTP client with necessary authentication and base configurations in fly_machines.rs.
-6.2 | description |
-  Implement the functions for spawning, getting, stopping, and destroying Fly.io machines using the HTTP client. Add unit tests with mocked responses to verify functionality.
+  Update .scud/config.toml to include all backpressure and repair settings: commands, stop_on_failure, timeout_secs, enabled, max_repair_rounds, max_parallel_repairs, repair_timeout_secs, and group_errors_by. Implement config loading and validation for these parameters.
 7 | description |
-  Modify handle_spawn_agent in handlers.rs to support cloud spawning via Fly.io when cloud=true. Integrate with fly client and emit events.
+  Add detection for max repair rounds, timeouts with fresh context retry, circular repairs (same error recurring), and regressions (increasing error counts). Implement logic to retry, try different grouping strategy on regression, or escalate to BLOCKED state. Include revert functionality for problematic changes.
+7.1 | description |
+  Add logic to detect max repair rounds exceeded, repair agent timeouts, circular repairs (same error keeps recurring), and regressions (error count increasing). Track error history to identify patterns.
+7.2 | description |
+  Add logic to retry failed repairs with fresh context on timeout, try different grouping strategy when regressions detected, escalate to BLOCKED state when max retries exceeded, and notify user for circular repairs. Include revert functionality to undo problematic changes.
 8 | description |
-  Set up worker/Cargo.toml and main.rs for minimal task execution, including SCUD integration, agent spawning, and callback to orchestrator. Ensure binary builds and runs.
-8.1 | description |
-  Create the worker directory, initialize Cargo.toml with necessary dependencies for SCUD integration, agent spawning, and orchestrator communication. Ensure the project is properly configured for building a binary.
-8.2 | description |
-  Write main.rs to include minimal task execution logic, SCUD integration, agent spawning, and callback to orchestrator. Test that the binary builds and runs successfully.
+  Implement the BLOCKED state when repairs fail after max attempts. Add notifications to alert users via TUI or logs about blocked waves requiring manual intervention. Ensure the system halts progression and provides detailed failure context.
 9 | description |
-  Create worker/Dockerfile with multi-stage build, SCUD CLI installation, and runtime setup. Verify image builds and pushes to registry.
+  Add repair metrics to TUI showing repair count, success rate, and current repair progress. Implement detailed logging of repair attempts with full error context. Generate structured repair summary after completion showing total repairs attempted, success/failure breakdown, and time spent.
 10 | description |
-  Create worker/fly.toml for ephemeral worker deployment. Test deployment configuration without full deploy.
-11 | description |
-  Create webapp directory with src/, static/, elm.json, and basic file structure. Initialize Elm project and ensure it compiles.
-12 | description |
-  Build Main.elm with Browser.application setup, URL routing, session management, and page handling. Include WebSocket ports integration.
-12.1 | description |
-  Create Main.elm with Browser.application initialization, define URL parsing and routing logic, set up page models and views for different routes, and implement basic navigation.
-12.2 | description |
-  Add session management logic to handle user sessions (e.g., login/logout), implement WebSocket ports for real-time communication, and integrate them into the application update logic.
-13 | description |
-  Set up tailwind.config.js, postcss.config.js, package.json, and generate TW/Utilities.elm. Verify Tailwind builds CSS utilities.
-14 | description |
-  Create daemon/Dockerfile, fly.toml, and database migrations. Deploy to Fly.io and verify API endpoints are accessible.
-14.1 | description |
-  Create the Dockerfile for the daemon, configure fly.toml for Fly.io deployment, and prepare database migrations.
-14.2 | description |
-  Deploy the orchestrator to Fly.io using the prepared configurations and verify that API endpoints are accessible.
+  Conduct integration tests to verify the full repair loop: wave completion, backpressure check, agent spawning, repairs, re-validation, and progression or blocking. Test various failure modes including timeouts, regressions, and circular repairs. Validate system correctly handles each scenario.
+10.1 | description |
+  Design and set up test cases covering the full repair loop, including wave completion, backpressure checks, agent spawning, repairs, re-validation, progression, and blocking. Include scenarios for various failure modes and edge cases to simulate real-world conditions.
+10.2 | description |
+  Run the integration tests, monitor the repair loop execution, and analyze results to verify handling of failure modes and achievement of success criteria, such as auto-repairing 80% of simple errors. Document findings and any necessary adjustments.
 
 ---
 
 # SCUD Graph v1
-# Phase: zmq-backbone
+# Phase: migrate
 
 @meta {
-  name zmq-backbone
-  updated 2026-01-08T23:30:31.905885+00:00
+  name migrate
+  id_format sequential
+  updated 2026-01-13T21:32:47.764106+00:00
 }
 
 @nodes
 # id | title | status | complexity | priority
-1 | Delete agent-runner crate | P | 3 | H
-1.1 | Remove agent-runner directory | P | 0 | H
-1.2 | Update workspace Cargo.toml | P | 0 | H
-1.3 | Update GUI Cargo.toml and verify stubs | P | 0 | H
-1.4 | Verify build succeeds | P | 0 | H
-2 | Simplify IPC system | P | 5 | H
-2.1 | Delete core/src/ipc.rs | P | 0 | H
-2.2 | Create channel_bridge.rs replacement | P | 0 | H
-2.3 | Update lib.rs exports | P | 0 | H
-2.4 | Update IPC consumers to use new modules | P | 0 | H
-2.5 | Delete IPC benchmarks | P | 0 | M
-3 | Simplify database schema | P | 5 | H
-3.1 | Create simplification migration SQL | P | 0 | H
-3.2 | Update state_store.rs for new schema | P | 0 | H
-3.3 | Update agent_history.rs for simplified events | P | 0 | M
-3.4 | Verify time travel still works | P | 0 | H
-4 | Add ZMQ benchmarks | P | 3 | M
-4.1 | Create zmq_benchmarks.rs | P | 0 | H
-4.2 | Update core/Cargo.toml bench targets | P | 0 | H
-4.3 | Verify benchmarks run | P | 0 | M
-5 | Cleanup and verification | P | 2 | M
-5.1 | Update README documentation | P | 0 | M
-5.2 | Run full test suite | P | 0 | H
-5.3 | Verify daemon starts and GUI connects | P | 0 | H
-5.4 | Measure binary size and compile time improvements | P | 0 | L
+1 | Create Spec Configuration System | X | 8 | H
+1.1 | Implement SpecConfig struct with all fields | D | 0 | H
+1.2 | Implement build_task_spec with helpers and token warning | D | 0 | H
+2 | Export Spec Module from lib.rs | D | 1 | L
+3 | Add Ralph Command Variant to CLI | D | 3 | H
+4 | Implement Ralph command handler with PRD initialization | X | 5 | H
+4.1 | Add Ralph match arm with PRD initialization logic | D | 0 | H
+4.2 | Build SpecConfig and create executor in handler | D | 0 | H
+5 | Create RalphExecutor Struct and Basic Methods | X | 8 | H
+5.1 | Define RalphExecutor Struct and new() Constructor | D | 0 | H
+5.2 | Implement compute_waves using Kahn's algorithm | D | 0 | M
+6 | Implement Task Execution Logic | X | 8 | H
+6.1 | Implement build_prompt with verification placeholder | D | 0 | H
+6.2 | Implement execute_task with fresh session lifecycle | D | 0 | H
+7 | Implement Main Run Loop | X | 13 | H
+7.1 | Implement Wave Computation | D | 0 | H
+7.2 | Implement round execution with SCUD backpressure validation | D | 0 | H
+7.3 | Add Progress Output and Agent Visibility | X | 8 | H
+7.3.1 | Create AgentRegistry module with spawn/track/focus methods | D | 0 | H
+7.3.2 | Add Zellij terminal backend for pane spawning | D | 0 | H
+7.3.3 | Implement orchestrator TUI with crossterm | D | 0 | M
+7.3.4 | Integrate TUI with run() loop and keyboard controls | D | 0 | H
+8 | Implement Dry Run Mode | X | 5 | M
+8.1 | Add dry_run method signature to RalphExecutor | D | 0 | H
+8.2 | Implement dry_run with formatted output and summary | D | 0 | H
+9 | Export RalphExecutor from lib.rs | D | 1 | L
+10 | Add Unit and Integration Tests | X | 5 | M
+10.1 | Add Unit Tests to ralph_executor.rs | D | 0 | H
+10.2 | Add Integration Test to tests/ralph_integration.rs | D | 0 | H
+11 | Update Documentation and README | D | 3 | L
+12 | Verify Build and Manual Tests | X | 5 | H
+12.1 | Verify Cargo Build | D | 0 | H
+12.2 | Run Manual Tests and Verify CLI | D | 0 | H
+13 | Implement Agent Context Handoff | D | 5 | H
 
 @edges
 # dependent -> dependency
 1.2 -> 1.1
-1.3 -> 1.2
-1.4 -> 1.3
 2 -> 1
-2.2 -> 2.1
-2.3 -> 2.2
-2.4 -> 2.3
-2.5 -> 2.1
-3 -> 2
-3.2 -> 3.1
-3.3 -> 3.1
-3.4 -> 3.2
-3.4 -> 3.3
-4 -> 2
+3 -> 1
+4 -> 3
 4.2 -> 4.1
-4.3 -> 4.2
-5 -> 3
-5 -> 4
+5 -> 1
 5.2 -> 5.1
-5.3 -> 5.2
-5.4 -> 5.3
+6 -> 5
+6.2 -> 6.1
+7 -> 6
+7.2 -> 7.1
+7.3 -> 7.1
+7.3 -> 7.2
+7.3.2 -> 7.3.1
+7.3.3 -> 7.3.1
+7.3.4 -> 7.3.2
+7.3.4 -> 7.3.3
+8 -> 7
+8.2 -> 8.1
+9 -> 5
+10 -> 7
+10 -> 8
+10.2 -> 10.1
+11 -> 3
+11 -> 4
+12 -> 2
+12 -> 9
+12 -> 10
+12 -> 11
+12.2 -> 12.1
+13 -> 6
 
 @parents
 # parent: subtasks...
-1: 1.1, 1.2, 1.3, 1.4
-2: 2.1, 2.2, 2.3, 2.4, 2.5
-3: 3.1, 3.2, 3.3, 3.4
-4: 4.1, 4.2, 4.3
-5: 5.1, 5.2, 5.3, 5.4
+1: 1.1, 1.2
+4: 4.1, 4.2
+5: 5.1, 5.2
+6: 6.1, 6.2
+7: 7.1, 7.2, 7.3
+7.3: 7.3.1, 7.3.2, 7.3.3, 7.3.4
+8: 8.1, 8.2
+10: 10.1, 10.2
+12: 12.1, 12.2
 
 @details
 1 | description |
-  Remove the entire agent-runner crate and all references. This eliminates ~6,100 lines of RAG/semantic analysis code and heavy dependencies (lancedb, tantivy, tree-sitter). Success: cargo build --workspace succeeds with 4 crates.
+  Implement the SpecConfig struct and build_task_spec function in src/spec.rs, including support for task details, plan extraction, and custom files. Ensure it handles token limits and template application.
 1.1 | description |
-  Delete the descartes/agent-runner/ directory entirely including src/, migrations/, tests/, examples/, and Cargo.toml.
+  Define the SpecConfig struct in src/spec.rs with fields: include_task (bool), plan_path (Option<PathBuf>), additional_specs (Vec<PathBuf>), max_spec_tokens (Option<usize>), and spec_template (Option<String>). Include Default implementation and builder methods with_plan() and with_spec_file().
 1.2 | description |
-  Update descartes/Cargo.toml workspace members from ["core", "cli", "gui", "agent-runner", "daemon"] to ["core", "cli", "gui", "daemon"].
-1.3 | description |
-  Remove agent-runner feature and optional dependency from gui/Cargo.toml. The existing #[cfg(not(feature = "agent-runner"))] stubs will become the default.
-1.4 | description |
-  Run cargo build --workspace and cargo test --workspace to verify everything compiles and tests pass.
+  Create build_task_spec function that combines task details via format_task_spec(), plan sections via extract_plan_section() with pattern matching (## Task X:, ### X., #### Task X, ## X), and custom files. Include token estimation (~4 chars per token) with warning log when spec exceeds max_spec_tokens budget. Implement apply_spec_template() for placeholder substitution ({task}, {plan}, {custom}, {verification}).
 2 | description |
-  Delete the complex IPC system (~1,000 lines) and replace with minimal Tokio channel bridge. ZMQ handles agent communication; keep EventBus for GUI streaming. Success: No ipc module references remain, build succeeds.
-2.1 | description |
-  Delete core/src/ipc.rs (1,049 lines) containing MessageBus, DeadLetterQueue, BackpressureController, MessageRouter, and transport implementations.
-2.2 | description |
-  Create core/src/channel_bridge.rs with minimal InternalMessage struct and ChannelBridge using tokio mpsc channels for simple internal coordination.
-2.3 | description |
-  Update core/src/lib.rs to remove ipc module export and add channel_bridge module export.
-2.4 | description |
-  Search for and update any files importing from ipc module to use channel_bridge, zmq_*, or events modules as appropriate.
-2.5 | description |
-  Delete core/benches/ipc_latency.rs and core/benches/ipc_throughput.rs, update Cargo.toml to remove these bench targets.
+  Add the spec module export to src/lib.rs to make it accessible within the crate.
 3 | description |
-  Create migration that drops 26 RAG/semantic tables and establishes simplified 3-table event sourcing schema (agents, events, snapshots). Keep secrets and lease tables. Success: Fresh DB has correct schema, time travel works.
-3.1 | description |
-  Create core/migrations/100_zmq_backbone_simplify.sql that drops semantic/RAG tables and creates simplified agents, events, snapshots tables with indexes.
-3.2 | description |
-  Update state_store.rs apply_migrations() to use new migration, remove references to deleted tables, simplify event storage queries.
-3.3 | description |
-  Update agent_history.rs to use the simplified events table structure, ensure AgentHistoryEvent maps correctly to new schema.
-3.4 | description |
-  Test time travel functionality: create events, create snapshot, verify rewind/restore works with new schema.
+  Add the Ralph variant to the Commands enum in src/main.rs with all specified CLI options like scud_tag, prd, plan, spec_files, etc.
 4 | description |
-  Replace deleted IPC benchmarks with ZMQ-focused benchmarks measuring serialization and roundtrip performance. Success: cargo bench --bench zmq_benchmarks runs and reports metrics.
+  Add match arm for Commands::Ralph in main() that handles PRD initialization flow: determine tag, run scud parse/expand/check-deps commands when --prd provided (respecting --no-expand and --no-check-deps flags), build SpecConfig from CLI options, create RalphExecutor, and dispatch to dry_run() or run() based on flags.
 4.1 | description |
-  Create core/benches/zmq_benchmarks.rs with benchmarks for MessagePack serialization, deserialization, and roundtrip of ZmqMessage types.
+  Add match arm for Commands::Ralph that handles --prd flag by running scud parse, scud expand (unless --no-expand), and scud check-deps --fix (unless --no-check-deps) in sequence. Determine final tag from --scud-tag or PRD filename.
 4.2 | description |
-  Update core/Cargo.toml to add zmq_benchmarks bench target and remove old ipc_* targets.
-4.3 | description |
-  Run cargo bench --bench zmq_benchmarks and verify benchmarks complete with reasonable performance (<1ms serialization).
+  Build SpecConfig from CLI options (--plan, --spec-file, --max-spec-tokens), using PRD path as fallback plan. Create RalphExecutor with config and dispatch to dry_run() or run() based on --dry-run flag.
 5 | description |
-  Final cleanup: update documentation, run full verification, measure improvements. Success: All tests pass, daemon runs, GUI connects, improvements documented.
+  Implement the RalphExecutor struct in src/ralph_executor.rs with new() constructor, compute_waves(), and task marking methods (in_progress, done, failed, blocked).
 5.1 | description |
-  Update descartes/README.md to reflect new 4-crate architecture, ZMQ-first design, and simplified database model.
+  Define the RalphExecutor struct in src/ralph_executor.rs and implement the new() constructor method to initialize the struct.
 5.2 | description |
-  Run cargo test --workspace, cargo clippy --workspace, cargo fmt --all -- --check to verify code quality.
-5.3 | description |
-  Start daemon with cargo run --bin descartes-daemon, verify it accepts connections. Start GUI with cargo run --bin descartes-gui, verify it connects.
-5.4 | description |
-  Compare binary sizes and compile times before/after refactor, document improvements in plan or README.
+  Implement compute_waves() method using Kahn's algorithm for topological sort: build in-degree map and dependents graph, process tasks with zero in-degree into waves, update degrees as tasks complete. Filter for pending, non-expanded tasks only.
+6 | description |
+  Add the execute_task() and build_prompt() methods to RalphExecutor, handling fresh harness sessions, prompt building, and result parsing.
+6.1 | description |
+  Add build_prompt() method that formats the task spec, SCUD tag, verification command (from backpressure config or explicit --verify), and instructions including TASK_BLOCKED output format for blocked scenarios.
+6.2 | description |
+  Add execute_task() method that: marks task in_progress, builds fresh spec via build_task_spec(), creates SessionConfig with model/working_dir, starts harness session, sends prompt, collects stream response, closes session, and parses result for TASK_BLOCKED: pattern to return TaskResult enum.
+7 | description |
+  Add the run() method to RalphExecutor, including wave computation, round execution, validation with backpressure, and progress output.
+7.1 | description |
+  Add logic to the run() method for computing waves in RalphExecutor.
+7.2 | description |
+  Add round execution logic that processes tasks in chunks of round_size, then runs validation using scud::backpressure::{BackpressureConfig, run_validation} between waves. Mark all completed tasks as failed if validation fails.
+7.3 | description |
+  Implement full progress visibility system with agent registry, Zellij terminal backend, and interactive TUI for watching/attaching to running agents.
+7.3.1 | description |
+  Create src/agent_registry.rs with AgentHandle struct (id, task_id, pane_name, status, spawned_at), AgentStatus enum, TerminalType enum (Zellij, Tmux, Kitty, Headless), and AgentRegistry with spawn(), get_by_task(), update_status(), list_running(), focus() methods.
+7.3.2 | description |
+  Add Zellij terminal backend: spawn_zellij() creates tab if needed via 'zellij action new-tab --name', spawns named panes via 'zellij action new-pane --name task-{id} --direction right', sets SCUD_TASK_ID env var. Add focus_zellij_pane() for attach functionality.
+7.3.3 | description |
+  Create src/ralph_tui.rs with RalphTui struct using crossterm for terminal UI. Implement run() loop with 100ms poll, render() showing wave progress and agent status list, keyboard handlers for [1-9] attach, [v] validate, [q] quit.
+7.3.4 | description |
+  Integrate TUI into RalphExecutor::run(): spawn orchestrator in first pane, spawn agents via registry, update TUI on status changes, handle keyboard input for attach (focus pane) and manual validation trigger.
+8 | description |
+  Add the dry_run() method to RalphExecutor to display execution plan without spawning agents.
+8.1 | description |
+  Define the dry_run() method in the RalphExecutor class with appropriate parameters and return type to support displaying the execution plan.
+8.2 | description |
+  Add logic to display execution plan showing Tag, Harness, Validate status, then each wave with rounds and tasks. Include Summary section with total Waves, Tasks, and Rounds counts. End with 'No agents spawned (dry-run mode)' message.
+9 | description |
+  Add the ralph_executor module export to src/lib.rs.
+10 | description |
+  Create unit tests in ralph_executor.rs and integration test in tests/ralph_integration.rs, ensuring cargo test passes.
+10.1 | description |
+  Implement unit tests within the ralph_executor.rs file to test individual components and functions.
+10.2 | description |
+  Create an integration test in tests/ralph_integration.rs to test the interaction between components and ensure cargo test passes.
+11 | description |
+  Update README.md with Ralph command documentation, examples, and how-it-works section, ensuring --help shows complete info.
+12 | description |
+  Ensure cargo build passes, run manual tests like dry-run command, and verify CLI help and basic execution.
+12.1 | description |
+  Run 'cargo build' and ensure it passes without errors.
+12.2 | description |
+  Execute manual tests such as dry-run command, and verify CLI help and basic execution.
+13 | description |
+  Monitor agent context usage during task execution. At ~60% context window, summarize progress, kill the agent, and spawn a fresh agent with the summary. This avoids auto-compaction which loses granular context. Implement: context_usage_monitor(), summarize_agent_progress(), and handoff_to_new_agent() in execute_task flow.

@@ -42,9 +42,10 @@ impl AgentCategory {
     /// Get the recommended model tier for this category
     pub fn model_tier(&self) -> ModelTier {
         match self {
-            AgentCategory::Searcher | AgentCategory::Analyzer | AgentCategory::Validator | AgentCategory::FastBuilder => {
-                ModelTier::Fast
-            }
+            AgentCategory::Searcher
+            | AgentCategory::Analyzer
+            | AgentCategory::Validator
+            | AgentCategory::FastBuilder => ModelTier::Fast,
             AgentCategory::Builder | AgentCategory::Planner | AgentCategory::BuilderReviewer => {
                 ModelTier::Strong
             }

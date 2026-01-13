@@ -4,12 +4,15 @@
 //! - Agent categories with configurable defaults
 //! - Subagent spawning with 1-level depth limit
 //! - Tool definitions (read, write, edit, bash)
+//! - Agent registry for tracking spawned agents
 
 mod category;
+mod registry;
 mod subagent;
 mod tools;
 
 pub use category::AgentCategory;
+pub use registry::{AgentHandle, AgentRegistry, FocusCommand, RegistryStatus, TerminalType};
 pub use subagent::{spawn_subagent, SubagentResult};
 pub use tools::{Tool, ToolSet};
 
@@ -102,7 +105,12 @@ impl AgentCategory {
             AgentCategory::FastBuilder => CategoryConfig {
                 description: "Fast code implementation".to_string(),
                 model: "grok-code-fast-1".to_string(),
-                tools: vec!["read".to_string(), "write".to_string(), "edit".to_string(), "bash".to_string()],
+                tools: vec![
+                    "read".to_string(),
+                    "write".to_string(),
+                    "edit".to_string(),
+                    "bash".to_string(),
+                ],
                 parallel: false,
                 backpressure: false,
                 prompt_template: None,

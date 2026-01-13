@@ -70,7 +70,9 @@ struct Usage {
     total_tokens: u32,
 }
 
-async fn handle_request(req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+async fn handle_request(
+    req: Request<hyper::body::Incoming>,
+) -> Result<Response<Full<Bytes>>, Infallible> {
     let path = req.uri().path();
 
     // Health check
@@ -111,7 +113,8 @@ async fn handle_request(req: Request<hyper::body::Incoming>) -> Result<Response<
     };
 
     // Build prompt from messages
-    let prompt: String = chat_req.messages
+    let prompt: String = chat_req
+        .messages
         .iter()
         .map(|m| match m.role.as_str() {
             "system" => format!("System: {}", m.content),
@@ -122,7 +125,10 @@ async fn handle_request(req: Request<hyper::body::Incoming>) -> Result<Response<
         .collect::<Vec<_>>()
         .join("\n\n");
 
-    eprintln!("Calling Claude Code with prompt ({} chars)...", prompt.len());
+    eprintln!(
+        "Calling Claude Code with prompt ({} chars)...",
+        prompt.len()
+    );
 
     // Call Claude Code headless (print mode, no interactive tools)
     let output = Command::new("claude")
@@ -149,10 +155,13 @@ async fn handle_request(req: Request<hyper::body::Incoming>) -> Result<Response<
 
     // Build response
     let response = ChatResponse {
-        id: format!("chatcmpl-{}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()),
+        id: format!(
+            "chatcmpl-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        ),
         object: "chat.completion".to_string(),
         created: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

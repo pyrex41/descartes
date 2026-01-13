@@ -544,6 +544,7 @@ dependencies = [
  "baml",
  "chrono",
  "clap",
+ "crossterm",
  "ctrlc",
  "dirs 5.0.1",
  "futures",
@@ -2205,9 +2206,7 @@ dependencies = [
 
 [[package]]
 name = "scud-cli"
-version = "1.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f27626b21e3c166f7309d466e640f83d005c0e02df1a297efe7f4d22eada9eb5"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "atty",

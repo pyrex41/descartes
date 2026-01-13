@@ -357,10 +357,7 @@ impl Harness for CodexHarness {
             config.model
         };
 
-        info!(
-            "Starting Codex session {} with model {}",
-            session_id, model
-        );
+        info!("Starting Codex session {} with model {}", session_id, model);
 
         // Initialize session with system prompt if provided
         let mut messages = Vec::new();
@@ -395,7 +392,8 @@ impl Harness for CodexHarness {
     async fn send(&self, session: &SessionHandle, message: &str) -> Result<ResponseStream> {
         // Get session state
         let mut sessions = self.sessions.lock().await;
-        let session_state = sessions.get_mut(&session.id)
+        let session_state = sessions
+            .get_mut(&session.id)
             .ok_or_else(|| Error::Harness("Session not found".to_string()))?;
 
         // Add user message
@@ -420,7 +418,8 @@ impl Harness for CodexHarness {
 
         // Send request
         let url = format!("{}/chat/completions", self.api_base);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .json(&request)
             .send()
@@ -461,8 +460,10 @@ impl Harness for CodexHarness {
                         // Handle tool calls
                         if let Some(tool_calls) = choice.delta.tool_calls {
                             for tc in tool_calls {
-                                let entry = current_tool_calls.entry(tc.index)
-                                    .or_insert_with(|| (String::new(), String::new(), String::new()));
+                                let entry =
+                                    current_tool_calls.entry(tc.index).or_insert_with(|| {
+                                        (String::new(), String::new(), String::new())
+                                    });
 
                                 if let Some(id) = tc.id {
                                     entry.0 = id;
@@ -484,7 +485,9 @@ impl Harness for CodexHarness {
                                 // Emit accumulated tool calls
                                 for (_, (id, name, args)) in current_tool_calls.drain() {
                                     if self.is_subagent_function(&name) {
-                                        if let Some(req) = self.extract_subagent_request(&name, &args) {
+                                        if let Some(req) =
+                                            self.extract_subagent_request(&name, &args)
+                                        {
                                             chunks.push(ResponseChunk::SubagentSpawn(req));
                                             continue;
                                         }
@@ -543,11 +546,7 @@ impl Harness for CodexHarness {
         }
     }
 
-    async fn inject_result(
-        &self,
-        session: &SessionHandle,
-        result: SubagentResult,
-    ) -> Result<()> {
+    async fn inject_result(&self, session: &SessionHandle, result: SubagentResult) -> Result<()> {
         debug!(
             "Injecting subagent result for Codex session {}: {}",
             result.session_id,
@@ -611,7 +610,9 @@ mod tests {
         };
 
         let args = r#"{"task": "find all tests", "agent_type": "searcher"}"#;
-        let req = harness.extract_subagent_request("dispatch_agent", args).unwrap();
+        let req = harness
+            .extract_subagent_request("dispatch_agent", args)
+            .unwrap();
 
         assert_eq!(req.prompt, "find all tests");
         assert_eq!(req.category, "searcher");

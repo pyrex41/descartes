@@ -4,14 +4,14 @@
 
 use std::str::FromStr;
 
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use descartes::{Config, LoopConfig, LoopMode, Result};
 use descartes::workflow::{
     self, default_workflow, RunOptions, StateManager, WorkflowConfig, WorkflowRunner,
 };
+use descartes::{Config, LoopConfig, LoopMode, Result};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -142,6 +142,76 @@ enum Commands {
     Skills {
         #[command(subcommand)]
         action: SkillCommands,
+    },
+
+    /// Run Ralph Wiggum loop for SCUD tasks
+    Ralph {
+        /// SCUD tag to execute (required unless --prd creates it)
+        #[arg(long)]
+        scud_tag: Option<String>,
+
+        // === PRD Initialization Options ===
+        /// Initialize tasks from PRD document (runs scud parse, expand, check-deps)
+        #[arg(long)]
+        prd: Option<std::path::PathBuf>,
+
+        /// Number of tasks to generate from PRD (default: 10)
+        #[arg(long, default_value = "10")]
+        num_tasks: u32,
+
+        /// Tag name for new tasks (required with --prd, defaults to filename)
+        #[arg(long)]
+        tag: Option<String>,
+
+        /// Skip task expansion (don't run scud expand)
+        #[arg(long)]
+        no_expand: bool,
+
+        /// Skip dependency check (don't run scud check-deps)
+        #[arg(long)]
+        no_check_deps: bool,
+
+        // === Spec Configuration Options ===
+        /// Path to implementation plan document for spec context
+        #[arg(long)]
+        plan: Option<std::path::PathBuf>,
+
+        /// Additional spec files to include (can be repeated)
+        #[arg(long = "spec-file", action = ArgAction::Append)]
+        spec_files: Vec<std::path::PathBuf>,
+
+        /// Max tokens for spec section (default: 5000)
+        #[arg(long, default_value = "5000")]
+        max_spec_tokens: usize,
+
+        // === Execution Options ===
+        /// Verification command for backpressure (default: auto-detect)
+        #[arg(long)]
+        verify: Option<String>,
+
+        /// Harness to use: claude-code, opencode, codex (default: claude-code)
+        #[arg(long, default_value = "claude-code")]
+        harness: String,
+
+        /// Model to use (default: from config)
+        #[arg(long)]
+        model: Option<String>,
+
+        /// Maximum tasks per round (default: 5)
+        #[arg(long, default_value = "5")]
+        round_size: usize,
+
+        /// Skip validation between waves
+        #[arg(long)]
+        no_validate: bool,
+
+        /// Show execution plan without running
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Working directory (default: current)
+        #[arg(long)]
+        working_dir: Option<std::path::PathBuf>,
     },
 }
 
@@ -299,8 +369,7 @@ async fn main() -> Result<()> {
             info!("Spawning {} subagent", category);
             let cat = descartes::agent::AgentCategory::from_str(&category)?;
             let harness = descartes::harness::create_harness(&config)?;
-            let result =
-                descartes::agent::spawn_subagent(&*harness, cat, prompt, None).await?;
+            let result = descartes::agent::spawn_subagent(&*harness, cat, prompt, None).await?;
             println!("{}", result.summary());
         }
 
@@ -321,12 +390,10 @@ async fn main() -> Result<()> {
             descartes::transcript::replay(&transcript, speed).await?;
         }
 
-        Commands::Next => {
-            match descartes::scud::next(&config)? {
-                Some(task) => println!("Next task: {} - {}", task.id, task.title),
-                None => println!("No tasks ready"),
-            }
-        }
+        Commands::Next => match descartes::scud::next(&config)? {
+            Some(task) => println!("Next task: {} - {}", task.id, task.title),
+            None => println!("No tasks ready"),
+        },
 
         Commands::Complete { task_id } => {
             descartes::scud::complete(&config, &task_id)?;
@@ -345,12 +412,10 @@ async fn main() -> Result<()> {
             info!("Initialized .descartes directory");
         }
 
-        Commands::Config => {
-            match toml::to_string_pretty(&config) {
-                Ok(s) => println!("{}", s),
-                Err(e) => eprintln!("Failed to serialize config: {}", e),
-            }
-        }
+        Commands::Config => match toml::to_string_pretty(&config) {
+            Ok(s) => println!("{}", s),
+            Err(e) => eprintln!("Failed to serialize config: {}", e),
+        },
 
         Commands::Harness => {
             println!("Active harness: {}", config.harness.kind);
@@ -360,7 +425,11 @@ async fn main() -> Result<()> {
             handle_workflow_command(action, &config).await?;
         }
 
-        Commands::Handoff { target, extra, output } => {
+        Commands::Handoff {
+            target,
+            extra,
+            output,
+        } => {
             // Determine current stage from context (simplified - uses previous stage)
             let from_stage = match target.as_str() {
                 "plan" => "research",
@@ -376,11 +445,8 @@ async fn main() -> Result<()> {
             let workflow_config = load_workflow_config(None)?;
 
             // Generate handoff
-            let handoff = workflow::quick_handoff(
-                &workflow_config,
-                from_stage,
-                extra.as_deref(),
-            ).await?;
+            let handoff =
+                workflow::quick_handoff(&workflow_config, from_stage, extra.as_deref()).await?;
 
             // Output
             if let Some(path) = output {
@@ -410,11 +476,8 @@ async fn main() -> Result<()> {
             let harness: std::sync::Arc<dyn descartes::Harness> = harness.into();
 
             // Create session
-            let mut session = descartes::interactive::Session::new(
-                config.clone(),
-                harness,
-                workflow_config,
-            );
+            let mut session =
+                descartes::interactive::Session::new(config.clone(), harness, workflow_config);
 
             // Install signal handler
             let signal_handler = descartes::interactive::SignalHandler::new(
@@ -429,6 +492,126 @@ async fn main() -> Result<()> {
 
         Commands::Skills { action } => {
             handle_skills_command(action)?;
+        }
+
+        Commands::Ralph {
+            scud_tag,
+            prd,
+            num_tasks,
+            tag,
+            no_expand,
+            no_check_deps,
+            plan,
+            spec_files,
+            max_spec_tokens,
+            verify,
+            harness,
+            model,
+            round_size,
+            no_validate,
+            dry_run,
+            working_dir,
+        } => {
+            let working_dir =
+                working_dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+            // Task 4.1: Handle PRD initialization
+            let final_tag = if let Some(prd_path) = &prd {
+                // Determine tag name from --tag or PRD filename
+                let tag_name = tag.unwrap_or_else(|| {
+                    prd_path
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "ralph".to_string())
+                });
+
+                info!("Initializing tasks from PRD: {:?}", prd_path);
+
+                // Run scud parse
+                let parse_status = std::process::Command::new("scud")
+                    .args([
+                        "parse",
+                        &prd_path.to_string_lossy(),
+                        "--tag",
+                        &tag_name,
+                        "-n",
+                        &num_tasks.to_string(),
+                    ])
+                    .current_dir(&working_dir)
+                    .status()?;
+
+                if !parse_status.success() {
+                    return Err(descartes::Error::Command("scud parse failed".to_string()));
+                }
+
+                // Run scud expand (unless --no-expand)
+                if !no_expand {
+                    info!("Expanding tasks...");
+                    let expand_status = std::process::Command::new("scud")
+                        .args(["expand", "--all", "--tag", &tag_name])
+                        .current_dir(&working_dir)
+                        .status()?;
+
+                    if !expand_status.success() {
+                        return Err(descartes::Error::Command("scud expand failed".to_string()));
+                    }
+                }
+
+                // Run scud check-deps --fix (unless --no-check-deps)
+                if !no_check_deps {
+                    info!("Checking dependencies...");
+                    let check_status = std::process::Command::new("scud")
+                        .args(["check-deps", "--fix", "--tag", &tag_name])
+                        .current_dir(&working_dir)
+                        .status()?;
+
+                    if !check_status.success() {
+                        return Err(descartes::Error::Command(
+                            "scud check-deps failed".to_string(),
+                        ));
+                    }
+                }
+
+                tag_name
+            } else if let Some(tag) = scud_tag {
+                tag
+            } else {
+                return Err(descartes::Error::Config(
+                    "Either --scud-tag or --prd must be provided".to_string(),
+                ));
+            };
+
+            // Task 4.2: Build SpecConfig from CLI options
+            let mut spec_config = descartes::SpecConfig::new();
+            spec_config.max_spec_tokens = Some(max_spec_tokens);
+
+            // Use PRD as plan if no explicit plan provided
+            if let Some(plan_path) = plan.or_else(|| prd.clone()) {
+                spec_config.plan_path = Some(plan_path);
+            }
+
+            // Add additional spec files
+            for spec_file in spec_files {
+                spec_config.additional_specs.push(spec_file);
+            }
+
+            // Create RalphExecutor and dispatch
+            let executor = descartes::RalphExecutor::new(
+                final_tag,
+                spec_config,
+                verify,
+                harness,
+                model,
+                round_size,
+                !no_validate,
+                working_dir,
+            )?;
+
+            if dry_run {
+                executor.dry_run().await?;
+            } else {
+                executor.run(&config).await?;
+            }
         }
     }
 
@@ -484,7 +667,9 @@ fn handle_skills_command(action: SkillCommands) -> Result<()> {
                     println!("\nVariables:");
                     for var in &skill.variables {
                         let required = if var.required { " (required)" } else { "" };
-                        let default = var.default.as_ref()
+                        let default = var
+                            .default
+                            .as_ref()
                             .map(|d| format!(" [default: {}]", d))
                             .unwrap_or_default();
                         println!("  {}{}{}", var.name, required, default);

@@ -30,7 +30,7 @@
 
 use chrono::{DateTime, Utc};
 
-use super::{Transcript, TranscriptEntry, SubagentRef};
+use super::{SubagentRef, Transcript, TranscriptEntry};
 use crate::{Error, Result};
 
 /// Convert a transcript to SCG format
@@ -67,11 +67,18 @@ pub fn to_scg(transcript: &Transcript) -> String {
             TranscriptEntry::Assistant(msg) => {
                 out.push_str(&format!("{}:assistant {}\n", line_num, quote_string(msg)));
             }
-            TranscriptEntry::ToolCall { name, arguments, id } => {
+            TranscriptEntry::ToolCall {
+                name,
+                arguments,
+                id,
+            } => {
                 let args_str = serde_json::to_string(arguments).unwrap_or_default();
                 out.push_str(&format!(
                     "{}:tool:{} {} # {}\n",
-                    line_num, name, quote_string(&args_str), id
+                    line_num,
+                    name,
+                    quote_string(&args_str),
+                    id
                 ));
             }
             TranscriptEntry::ToolResult {
@@ -125,8 +132,14 @@ pub fn to_scg(transcript: &Transcript) -> String {
     out.push_str("@metrics\n");
     out.push_str(&format!("tokens_in: {}\n", transcript.metrics.tokens_in));
     out.push_str(&format!("tokens_out: {}\n", transcript.metrics.tokens_out));
-    out.push_str(&format!("duration_ms: {}\n", transcript.metrics.duration_ms));
-    out.push_str(&format!("tools_called: {}\n", transcript.metrics.tools_called));
+    out.push_str(&format!(
+        "duration_ms: {}\n",
+        transcript.metrics.duration_ms
+    ));
+    out.push_str(&format!(
+        "tools_called: {}\n",
+        transcript.metrics.tools_called
+    ));
 
     out
 }
@@ -290,7 +303,9 @@ pub fn parse_scg(input: &str) -> Result<Transcript> {
 
                         match msg_type {
                             "user" => {
-                                transcript.entries.push(TranscriptEntry::User(content.to_string()));
+                                transcript
+                                    .entries
+                                    .push(TranscriptEntry::User(content.to_string()));
                             }
                             "assistant" => {
                                 transcript
@@ -298,17 +313,20 @@ pub fn parse_scg(input: &str) -> Result<Transcript> {
                                     .push(TranscriptEntry::Assistant(content.to_string()));
                             }
                             "error" => {
-                                transcript.entries.push(TranscriptEntry::Error(content.to_string()));
+                                transcript
+                                    .entries
+                                    .push(TranscriptEntry::Error(content.to_string()));
                             }
                             t if t.starts_with("tool:") => {
                                 let tool_name = t.trim_start_matches("tool:");
-                                let (args_str, id) = if let Some((a, comment)) = rest.split_once('#') {
-                                    (a.trim().trim_matches('"'), comment.trim())
-                                } else {
-                                    (rest.trim().trim_matches('"'), "")
-                                };
-                                let arguments: serde_json::Value =
-                                    serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
+                                let (args_str, id) =
+                                    if let Some((a, comment)) = rest.split_once('#') {
+                                        (a.trim().trim_matches('"'), comment.trim())
+                                    } else {
+                                        (rest.trim().trim_matches('"'), "")
+                                    };
+                                let arguments: serde_json::Value = serde_json::from_str(args_str)
+                                    .unwrap_or(serde_json::Value::Null);
                                 transcript.entries.push(TranscriptEntry::ToolCall {
                                     name: tool_name.to_string(),
                                     arguments,
@@ -317,11 +335,12 @@ pub fn parse_scg(input: &str) -> Result<Transcript> {
                             }
                             t if t.starts_with("result:") => {
                                 let status = t.trim_start_matches("result:");
-                                let (content_str, id) = if let Some((c, comment)) = rest.split_once('#') {
-                                    (c.trim().trim_matches('"'), comment.trim())
-                                } else {
-                                    (rest.trim().trim_matches('"'), "")
-                                };
+                                let (content_str, id) =
+                                    if let Some((c, comment)) = rest.split_once('#') {
+                                        (c.trim().trim_matches('"'), comment.trim())
+                                    } else {
+                                        (rest.trim().trim_matches('"'), "")
+                                    };
                                 transcript.entries.push(TranscriptEntry::ToolResult {
                                     tool_call_id: id.to_string(),
                                     content: content_str.to_string(),

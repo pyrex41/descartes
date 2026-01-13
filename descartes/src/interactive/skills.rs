@@ -180,14 +180,12 @@ impl SkillRegistry {
             prompt_file: PathBuf::from(".descartes/skills/create_plan.md"),
             category: Some("analyzer".to_string()),
             auto_start: true,
-            variables: vec![
-                SkillVariable {
-                    name: "target".to_string(),
-                    description: Some("Target file or feature to plan".to_string()),
-                    default: None,
-                    required: false,
-                },
-            ],
+            variables: vec![SkillVariable {
+                name: "target".to_string(),
+                description: Some("Target file or feature to plan".to_string()),
+                default: None,
+                required: false,
+            }],
             auto_context: vec!["scud_tasks".to_string()],
             aliases: vec!["plan".to_string(), "cp".to_string()],
         });
@@ -199,14 +197,12 @@ impl SkillRegistry {
             prompt_file: PathBuf::from(".descartes/skills/implement_plan.md"),
             category: Some("builder".to_string()),
             auto_start: true,
-            variables: vec![
-                SkillVariable {
-                    name: "plan".to_string(),
-                    description: Some("Path to the plan file".to_string()),
-                    default: None,
-                    required: false,
-                },
-            ],
+            variables: vec![SkillVariable {
+                name: "plan".to_string(),
+                description: Some("Path to the plan file".to_string()),
+                default: None,
+                required: false,
+            }],
             auto_context: vec!["scud_tasks".to_string(), "scud_waves".to_string()],
             aliases: vec!["implement".to_string(), "ip".to_string()],
         });
@@ -218,14 +214,12 @@ impl SkillRegistry {
             prompt_file: PathBuf::from(".descartes/skills/research.md"),
             category: Some("searcher".to_string()),
             auto_start: true,
-            variables: vec![
-                SkillVariable {
-                    name: "topic".to_string(),
-                    description: Some("Topic or area to research".to_string()),
-                    default: None,
-                    required: true,
-                },
-            ],
+            variables: vec![SkillVariable {
+                name: "topic".to_string(),
+                description: Some("Topic or area to research".to_string()),
+                default: None,
+                required: true,
+            }],
             auto_context: vec![],
             aliases: vec!["r".to_string()],
         });
@@ -249,14 +243,12 @@ impl SkillRegistry {
             prompt_file: PathBuf::from(".descartes/skills/review.md"),
             category: Some("validator".to_string()),
             auto_start: true,
-            variables: vec![
-                SkillVariable {
-                    name: "target".to_string(),
-                    description: Some("File, PR, or branch to review".to_string()),
-                    default: None,
-                    required: false,
-                },
-            ],
+            variables: vec![SkillVariable {
+                name: "target".to_string(),
+                description: Some("File, PR, or branch to review".to_string()),
+                default: None,
+                required: false,
+            }],
             auto_context: vec!["git_diff".to_string()],
             aliases: vec!["rv".to_string()],
         });
@@ -268,14 +260,12 @@ impl SkillRegistry {
             prompt_file: PathBuf::from(".descartes/skills/fix.md"),
             category: Some("builder".to_string()),
             auto_start: true,
-            variables: vec![
-                SkillVariable {
-                    name: "issue".to_string(),
-                    description: Some("Issue description or ID".to_string()),
-                    default: None,
-                    required: true,
-                },
-            ],
+            variables: vec![SkillVariable {
+                name: "issue".to_string(),
+                description: Some("Issue description or ID".to_string()),
+                default: None,
+                required: true,
+            }],
             auto_context: vec![],
             aliases: vec!["f".to_string()],
         });
@@ -287,14 +277,12 @@ impl SkillRegistry {
             prompt_file: PathBuf::from(".descartes/skills/test.md"),
             category: Some("validator".to_string()),
             auto_start: true,
-            variables: vec![
-                SkillVariable {
-                    name: "target".to_string(),
-                    description: Some("Test target or pattern".to_string()),
-                    default: None,
-                    required: false,
-                },
-            ],
+            variables: vec![SkillVariable {
+                name: "target".to_string(),
+                description: Some("Test target or pattern".to_string()),
+                default: None,
+                required: false,
+            }],
             auto_context: vec![],
             aliases: vec!["t".to_string()],
         });

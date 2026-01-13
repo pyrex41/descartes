@@ -222,11 +222,7 @@ pub trait Harness: Send + Sync {
     fn detect_subagent_spawn(&self, chunk: &ResponseChunk) -> Option<SubagentRequest>;
 
     /// Inject a subagent result back into the parent session
-    async fn inject_result(
-        &self,
-        session: &SessionHandle,
-        result: SubagentResult,
-    ) -> Result<()>;
+    async fn inject_result(&self, session: &SessionHandle, result: SubagentResult) -> Result<()>;
 
     /// Close a session
     async fn close_session(&self, session: &SessionHandle) -> Result<()>;
@@ -237,14 +233,10 @@ pub fn create_harness(config: &Config) -> Result<Box<dyn Harness>> {
     let kind: HarnessKind = config.harness.kind.parse()?;
 
     match kind {
-        HarnessKind::ClaudeCode => {
-            Ok(Box::new(ClaudeCodeHarness::new(&config.harness.claude_code)?))
-        }
-        HarnessKind::OpenCode => {
-            Ok(Box::new(OpenCodeHarness::new(&config.harness.opencode)?))
-        }
-        HarnessKind::Codex => {
-            Ok(Box::new(CodexHarness::new(&config.harness.codex)?))
-        }
+        HarnessKind::ClaudeCode => Ok(Box::new(ClaudeCodeHarness::new(
+            &config.harness.claude_code,
+        )?)),
+        HarnessKind::OpenCode => Ok(Box::new(OpenCodeHarness::new(&config.harness.opencode)?)),
+        HarnessKind::Codex => Ok(Box::new(CodexHarness::new(&config.harness.codex)?)),
     }
 }

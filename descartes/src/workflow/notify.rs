@@ -90,7 +90,10 @@ impl Notification {
     /// Format for Telegram
     pub fn format_telegram(&self) -> String {
         let mut msg = format!("🔄 *{}*\n", self.title);
-        msg.push_str(&format!("Stage: {} → {}\n\n", self.from_stage, self.to_stage));
+        msg.push_str(&format!(
+            "Stage: {} → {}\n\n",
+            self.from_stage, self.to_stage
+        ));
 
         if let Some(summary) = &self.summary {
             msg.push_str(&format!("{}\n\n", summary));
@@ -196,13 +199,9 @@ pub enum NotificationResponse {
         reason: String,
     },
     /// Request to edit handoff
-    Edit {
-        source: ApprovalMethod,
-    },
+    Edit { source: ApprovalMethod },
     /// Skip this stage
-    Skip {
-        source: ApprovalMethod,
-    },
+    Skip { source: ApprovalMethod },
     /// Extend the timeout
     ExtendTimeout {
         source: ApprovalMethod,
@@ -242,12 +241,10 @@ impl TelegramChannel {
 
     pub fn from_config(config: &NotificationConfig) -> Option<Self> {
         match config {
-            NotificationConfig::Telegram { bot_token, chat_id } => {
-                Some(Self::new(
-                    Self::resolve_env(bot_token),
-                    Self::resolve_env(chat_id),
-                ))
-            }
+            NotificationConfig::Telegram { bot_token, chat_id } => Some(Self::new(
+                Self::resolve_env(bot_token),
+                Self::resolve_env(chat_id),
+            )),
             _ => None,
         }
     }
@@ -273,10 +270,7 @@ impl NotificationChannel for TelegramChannel {
         notification: &Notification,
         response_tx: mpsc::Sender<NotificationResponse>,
     ) -> Result<()> {
-        let url = format!(
-            "https://api.telegram.org/bot{}/sendMessage",
-            self.bot_token
-        );
+        let url = format!("https://api.telegram.org/bot{}/sendMessage", self.bot_token);
 
         let message = notification.format_telegram();
 
@@ -325,12 +319,13 @@ impl SlackChannel {
 
     pub fn from_config(config: &NotificationConfig) -> Option<Self> {
         match config {
-            NotificationConfig::Slack { webhook_url, channel } => {
-                Some(Self::new(
-                    Self::resolve_env(webhook_url),
-                    channel.as_ref().map(|c| Self::resolve_env(c)),
-                ))
-            }
+            NotificationConfig::Slack {
+                webhook_url,
+                channel,
+            } => Some(Self::new(
+                Self::resolve_env(webhook_url),
+                channel.as_ref().map(|c| Self::resolve_env(c)),
+            )),
             _ => None,
         }
     }

@@ -126,9 +126,8 @@ impl<H: Harness> SubagentProxy<H> {
                 ResponseChunk::SubagentSpawn(nested_req) => {
                     // Block nested spawns
                     warn!("Subagent attempted nested spawn: {:?}", nested_req);
-                    let blocked = SubagentResult::blocked(
-                        "Subagents cannot spawn further subagents",
-                    );
+                    let blocked =
+                        SubagentResult::blocked("Subagents cannot spawn further subagents");
                     self.inner.inject_result(&session, blocked).await?;
                 }
                 ResponseChunk::Done => break,
@@ -147,18 +146,14 @@ impl<H: Harness> SubagentProxy<H> {
         self.inner.close_session(&session).await?;
 
         // Save transcript
-        let transcript_path = self.config.transcript_dir().join(format!(
-            "{}.scg",
-            transcript.id()
-        ));
+        let transcript_path = self
+            .config
+            .transcript_dir()
+            .join(format!("{}.scg", transcript.id()));
         transcript.save_scg(&transcript_path)?;
 
         // Record subagent in parent transcript
-        parent_transcript.record_subagent(
-            transcript.id(),
-            &request.category,
-            &request.prompt,
-        );
+        parent_transcript.record_subagent(transcript.id(), &request.category, &request.prompt);
 
         // Build result
         let result = SubagentResult {
@@ -205,11 +200,7 @@ impl<H: Harness + Clone> Harness for SubagentProxy<H> {
         self.inner.detect_subagent_spawn(chunk)
     }
 
-    async fn inject_result(
-        &self,
-        session: &SessionHandle,
-        result: SubagentResult,
-    ) -> Result<()> {
+    async fn inject_result(&self, session: &SessionHandle, result: SubagentResult) -> Result<()> {
         self.inner.inject_result(session, result).await
     }
 

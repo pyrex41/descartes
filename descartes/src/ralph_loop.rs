@@ -19,8 +19,7 @@ use tracing::{debug, info, warn};
 use crate::agent::{spawn_subagent, AgentCategory, SubagentResult};
 use crate::baml_client::async_client::B;
 use crate::baml_client::types::{
-    NextAction,
-    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator,
+    NextAction, Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator,
     Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest,
 };
 use crate::harness::{create_harness, Harness, ResponseChunk, SessionConfig};
@@ -72,7 +71,10 @@ impl TaskOverrides {
             }
         }
 
-        Self { category, disable_review }
+        Self {
+            category,
+            disable_review,
+        }
     }
 }
 
@@ -121,10 +123,7 @@ pub async fn run(loop_config: LoopConfig, config: &Config) -> Result<()> {
     let mut iteration = 0;
     let mut completed_tasks: Vec<String> = Vec::new();
 
-    info!(
-        "Starting Ralph loop in {:?} mode",
-        loop_config.mode
-    );
+    info!("Starting Ralph loop in {:?} mode", loop_config.mode);
 
     loop {
         // Check iteration limit
@@ -144,20 +143,24 @@ pub async fn run(loop_config: LoopConfig, config: &Config) -> Result<()> {
 
         // Run appropriate mode
         let result = match loop_config.mode {
-            LoopMode::Plan => {
-                plan_iteration(&*harness, &mut transcript, config).await
-            }
+            LoopMode::Plan => plan_iteration(&*harness, &mut transcript, config).await,
             LoopMode::Build => {
-                build_iteration(&*harness, &mut transcript, &loop_config, config, &mut completed_tasks).await
+                build_iteration(
+                    &*harness,
+                    &mut transcript,
+                    &loop_config,
+                    config,
+                    &mut completed_tasks,
+                )
+                .await
             }
         };
 
         // Finalize and save transcript
         transcript.finalize();
-        let transcript_path = config.transcript_dir().join(format!(
-            "{}.scg",
-            transcript.id()
-        ));
+        let transcript_path = config
+            .transcript_dir()
+            .join(format!("{}.scg", transcript.id()));
         if let Err(e) = transcript.save_scg(&transcript_path) {
             warn!("Failed to save transcript: {}", e);
         }
@@ -207,20 +210,29 @@ async fn plan_iteration(
 
     // Get current task state from SCUD
     let tasks = scud::list_tasks(config)?;
-    let completed: Vec<String> = tasks.iter()
+    let completed: Vec<String> = tasks
+        .iter()
         .filter(|t| t.status == scud::TaskStatus::Done)
         .map(|t| t.title.clone())
         .collect();
-    let remaining: Vec<String> = tasks.iter()
+    let remaining: Vec<String> = tasks
+        .iter()
         .filter(|t| t.status != scud::TaskStatus::Done)
         .map(|t| t.title.clone())
         .collect();
 
-    let objective = remaining.first().cloned().unwrap_or_else(|| "Analyze project gaps".to_string());
+    let objective = remaining
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "Analyze project gaps".to_string());
     let research_context = format!("Completed: {:?}\nRemaining: {:?}", completed, remaining);
 
     // Use native BAML client to create a plan
-    match B.CreatePlan.call(&objective, &research_context, None::<&str>, None::<&str>).await {
+    match B
+        .CreatePlan
+        .call(&objective, &research_context, None::<&str>, None::<&str>)
+        .await
+    {
         Ok(plan) => {
             info!("Generated plan: {}", plan.goal);
             info!("Approach: {}", plan.approach);
@@ -230,7 +242,11 @@ async fn plan_iteration(
             transcript.record_assistant_message(&format!(
                 "Plan: {}\n\nTasks:\n{}",
                 plan.goal,
-                plan.tasks.iter().map(|t| format!("- {}: {}", t.id, t.title)).collect::<Vec<_>>().join("\n")
+                plan.tasks
+                    .iter()
+                    .map(|t| format!("- {}: {}", t.id, t.title))
+                    .collect::<Vec<_>>()
+                    .join("\n")
             ));
         }
         Err(e) => {
@@ -239,13 +255,18 @@ async fn plan_iteration(
             let session_config = SessionConfig {
                 model: "opus".to_string(),
                 tools: vec!["read".to_string(), "bash".to_string()],
-                system_prompt: Some("You are a planning agent. Analyze the project and identify gaps.".to_string()),
+                system_prompt: Some(
+                    "You are a planning agent. Analyze the project and identify gaps.".to_string(),
+                ),
                 parent: None,
                 is_subagent: false,
             };
 
             let session = harness.start_session(session_config).await?;
-            let prompt = format!("Create a plan. Completed: {:?}, Remaining: {:?}", completed, remaining);
+            let prompt = format!(
+                "Create a plan. Completed: {:?}, Remaining: {:?}",
+                completed, remaining
+            );
             transcript.record_user_message(&prompt);
 
             let mut response = harness.send(&session, &prompt).await?;
@@ -255,7 +276,8 @@ async fn plan_iteration(
                     ResponseChunk::SubagentSpawn(req) => {
                         info!("Planning spawning {} subagent", req.category);
                         let category: AgentCategory = req.category.parse()?;
-                        let result = spawn_subagent(harness, category, req.prompt, Some(transcript)).await?;
+                        let result =
+                            spawn_subagent(harness, category, req.prompt, Some(transcript)).await?;
                         debug!("Subagent result: {}", result.summary());
                     }
                     ResponseChunk::Done => break,
@@ -280,20 +302,25 @@ async fn build_iteration(
 ) -> Result<IterationResult> {
     // Get current task state from SCUD
     let tasks = scud::list_tasks(config)?;
-    let remaining: Vec<String> = tasks.iter()
+    let remaining: Vec<String> = tasks
+        .iter()
         .filter(|t| t.status != scud::TaskStatus::Done)
         .map(|t| t.title.clone())
         .collect();
 
     // Use BAML to decide next action
-    let decision = match B.DecideNextAction.call(
-        completed_tasks,
-        None::<&str>,
-        &remaining,
-        &Vec::<String>::new(),
-        "Starting new iteration",
-        None::<&str>,
-    ).await {
+    let decision = match B
+        .DecideNextAction
+        .call(
+            completed_tasks,
+            None::<&str>,
+            &remaining,
+            &Vec::<String>::new(),
+            "Starting new iteration",
+            None::<&str>,
+        )
+        .await
+    {
         Ok(d) => {
             info!("BAML decision: {:?} - {}", d.action, d.reasoning);
             Some(d)
@@ -347,19 +374,31 @@ async fn build_iteration(
         cat.clone()
     } else {
         // Use BAML orchestrator to suggest category
-        match B.SelectSubagent.call(
-            &task.title,
-            &task.description,
-            "Choose implementation category",
-            Some(&config.ralph_loop.heuristic),
-        ).await {
+        match B
+            .SelectSubagent
+            .call(
+                &task.title,
+                &task.description,
+                "Choose implementation category",
+                Some(&config.ralph_loop.heuristic),
+            )
+            .await
+        {
             Ok(selection) => {
                 info!("BAML selected category: {:?}", selection.category);
                 match selection.category {
-                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kbuilder => "builder".to_string(),
-                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kanalyzer => "analyzer".to_string(),
-                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Ksearcher => "searcher".to_string(),
-                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kvalidator => "validator".to_string(),
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kbuilder => {
+                        "builder".to_string()
+                    }
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kanalyzer => {
+                        "analyzer".to_string()
+                    }
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Ksearcher => {
+                        "searcher".to_string()
+                    }
+                    Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kvalidator => {
+                        "validator".to_string()
+                    }
                 }
             }
             Err(e) => {
@@ -377,7 +416,8 @@ async fn build_iteration(
 
     // Phase 2: Implementation
     info!("Phase 2: Running {}", impl_category);
-    let impl_result = run_builder(harness, &task, &search_results, &impl_category, transcript).await?;
+    let impl_result =
+        run_builder(harness, &task, &search_results, &impl_category, transcript).await?;
 
     if !impl_result.success {
         warn!("{} failed", impl_category);
@@ -388,14 +428,27 @@ async fn build_iteration(
     let impl_summary = impl_result.summary();
 
     // Stage changes for review
-    if Command::new("git").args(["add", "-A"]).status().map_err(Error::Io)?.success() {
+    if Command::new("git")
+        .args(["add", "-A"])
+        .status()
+        .map_err(Error::Io)?
+        .success()
+    {
         // Phase 3: Conditional review
-        let needs_review = config.ralph_loop.always_review ||
-                          (impl_category == "fast-builder" && overrides.disable_review != Some(true));
+        let needs_review = config.ralph_loop.always_review
+            || (impl_category == "fast-builder" && overrides.disable_review != Some(true));
 
         if needs_review {
             info!("Phase 3: Running reviewer");
-            let review_passed = run_reviewer(harness, &task, &search_results, &impl_summary, &config.ralph_loop.heuristic, transcript).await?;
+            let review_passed = run_reviewer(
+                harness,
+                &task,
+                &search_results,
+                &impl_summary,
+                &config.ralph_loop.heuristic,
+                transcript,
+            )
+            .await?;
             if !review_passed {
                 warn!("Review failed");
                 return Ok(IterationResult::ValidationFailed);
@@ -442,32 +495,59 @@ async fn run_parallel_searches_baml(
     use futures::future::join_all;
 
     // Try to get BAML suggestions, fall back to defaults
-    let searches: Vec<(AgentCategory, String)> = match B.SelectSubagent.call(
-        &task.title,
-        &task.description,
-        "Starting fresh iteration, need to search codebase",
-        None::<&str>,
-    ).await {
+    let searches: Vec<(AgentCategory, String)> = match B
+        .SelectSubagent
+        .call(
+            &task.title,
+            &task.description,
+            "Starting fresh iteration, need to search codebase",
+            None::<&str>,
+        )
+        .await
+    {
         Ok(selection) => {
-            info!("BAML selected {:?} subagent: {}", selection.category, selection.timeout_hint);
+            info!(
+                "BAML selected {:?} subagent: {}",
+                selection.category, selection.timeout_hint
+            );
             let category = match selection.category {
-                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Ksearcher => AgentCategory::Searcher,
-                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kanalyzer => AgentCategory::Analyzer,
-                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kbuilder => AgentCategory::Builder,
-                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kvalidator => AgentCategory::Validator,
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Ksearcher => {
+                    AgentCategory::Searcher
+                }
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kanalyzer => {
+                    AgentCategory::Analyzer
+                }
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kbuilder => {
+                    AgentCategory::Builder
+                }
+                Union4KanalyzerOrKbuilderOrKsearcherOrKvalidator::Kvalidator => {
+                    AgentCategory::Validator
+                }
             };
             // Start with BAML suggestion, add standard searches
             vec![
                 (category, selection.prompt),
-                (AgentCategory::Searcher, format!("Find tests related to: {}", task.title)),
+                (
+                    AgentCategory::Searcher,
+                    format!("Find tests related to: {}", task.title),
+                ),
             ]
         }
         Err(e) => {
             debug!("BAML subagent selection unavailable: {}, using defaults", e);
             vec![
-                (AgentCategory::Searcher, format!("Find existing implementations related to: {}", task.title)),
-                (AgentCategory::Searcher, format!("Find tests related to: {}", task.title)),
-                (AgentCategory::Analyzer, format!("Analyze the codebase structure relevant to: {}", task.title)),
+                (
+                    AgentCategory::Searcher,
+                    format!("Find existing implementations related to: {}", task.title),
+                ),
+                (
+                    AgentCategory::Searcher,
+                    format!("Find tests related to: {}", task.title),
+                ),
+                (
+                    AgentCategory::Analyzer,
+                    format!("Analyze the codebase structure relevant to: {}", task.title),
+                ),
             ]
         }
     };
@@ -549,7 +629,13 @@ async fn run_reviewer(
         task.title, task.description, context_str, impl_summary, diff, heuristic
     );
 
-    let result = spawn_subagent(harness, AgentCategory::BuilderReviewer, prompt, Some(transcript)).await?;
+    let result = spawn_subagent(
+        harness,
+        AgentCategory::BuilderReviewer,
+        prompt,
+        Some(transcript),
+    )
+    .await?;
 
     Ok(result.success)
 }
@@ -558,9 +644,13 @@ async fn run_reviewer(
 async fn run_validator(harness: &dyn Harness, transcript: &mut Transcript) -> Result<bool> {
     let prompt = "Run the test suite and report results. Use `cargo test` or the appropriate test command for this project.";
 
-    let result =
-        spawn_subagent(harness, AgentCategory::Validator, prompt.to_string(), Some(transcript))
-            .await?;
+    let result = spawn_subagent(
+        harness,
+        AgentCategory::Validator,
+        prompt.to_string(),
+        Some(transcript),
+    )
+    .await?;
 
     Ok(result.passed())
 }
@@ -597,11 +687,11 @@ async fn git_commit_baml(fallback_message: &str) -> Result<()> {
     let diff_text = String::from_utf8_lossy(&diff.stdout).to_string();
 
     // Use native BAML client to generate commit message
-    let message = match B.GenerateCommitMessage.call(
-        &diff_text,
-        Some(fallback_message),
-        None::<&str>,
-    ).await {
+    let message = match B
+        .GenerateCommitMessage
+        .call(&diff_text, Some(fallback_message), None::<&str>)
+        .await
+    {
         Ok(msg) => {
             let scope_part = msg.scope.map(|s| format!("({})", s)).unwrap_or_default();
             let breaking = if msg.breaking { "!" } else { "" };
@@ -614,10 +704,16 @@ async fn git_commit_baml(fallback_message: &str) -> Result<()> {
                 Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Ktest => "test",
                 Union6KchoreOrKdocsOrKfeatOrKfixOrKrefactorOrKtest::Kchore => "chore",
             };
-            format!("{}{}{}: {}{}", type_str, scope_part, breaking, msg.subject, body_part)
+            format!(
+                "{}{}{}: {}{}",
+                type_str, scope_part, breaking, msg.subject, body_part
+            )
         }
         Err(e) => {
-            debug!("BAML commit message generation failed: {}, using fallback", e);
+            debug!(
+                "BAML commit message generation failed: {}, using fallback",
+                e
+            );
             fallback_message.to_string()
         }
     };

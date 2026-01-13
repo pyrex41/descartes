@@ -4,9 +4,7 @@ use futures::StreamExt;
 use tracing::{debug, info, warn};
 
 use super::AgentCategory;
-use crate::harness::{
-    Harness, ResponseChunk, SessionConfig, SubagentMetrics,
-};
+use crate::harness::{Harness, ResponseChunk, SessionConfig, SubagentMetrics};
 use crate::transcript::Transcript;
 use crate::Result;
 
@@ -68,11 +66,7 @@ pub async fn spawn_subagent(
     prompt: String,
     parent_transcript: Option<&mut Transcript>,
 ) -> Result<SubagentResult> {
-    info!(
-        "Spawning {} subagent: {}",
-        category,
-        truncate(&prompt, 50)
-    );
+    info!("Spawning {} subagent: {}", category, truncate(&prompt, 50));
 
     let category_config = category.default_config();
 

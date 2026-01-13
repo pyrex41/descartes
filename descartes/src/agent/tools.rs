@@ -149,10 +149,7 @@ impl FromIterator<Tool> for ToolSet {
 
 impl From<Vec<String>> for ToolSet {
     fn from(names: Vec<String>) -> Self {
-        names
-            .iter()
-            .filter_map(|n| Tool::from_name(n))
-            .collect()
+        names.iter().filter_map(|n| Tool::from_name(n)).collect()
     }
 }
 

@@ -142,7 +142,12 @@ impl Default for Config {
             CategoryConfig {
                 description: "Fast code implementation".to_string(),
                 model: "grok-code-fast-1".to_string(),
-                tools: vec!["read".to_string(), "write".to_string(), "edit".to_string(), "bash".to_string()],
+                tools: vec![
+                    "read".to_string(),
+                    "write".to_string(),
+                    "edit".to_string(),
+                    "bash".to_string(),
+                ],
                 parallel: false,
                 backpressure: false,
                 prompt_template: None,
@@ -187,18 +192,16 @@ impl Default for Config {
 impl Config {
     /// Load configuration from file or default locations
     pub fn load(path: Option<&Path>) -> Result<Self> {
-        let config_path = path
-            .map(PathBuf::from)
-            .or_else(|| {
-                // Try .descartes/config.toml in current directory
-                let local = PathBuf::from(".descartes/config.toml");
-                if local.exists() {
-                    return Some(local);
-                }
+        let config_path = path.map(PathBuf::from).or_else(|| {
+            // Try .descartes/config.toml in current directory
+            let local = PathBuf::from(".descartes/config.toml");
+            if local.exists() {
+                return Some(local);
+            }
 
-                // Try ~/.descartes/config.toml
-                dirs::home_dir().map(|h| h.join(".descartes/config.toml"))
-            });
+            // Try ~/.descartes/config.toml
+            dirs::home_dir().map(|h| h.join(".descartes/config.toml"))
+        });
 
         match config_path {
             Some(p) if p.exists() => {
@@ -420,8 +423,8 @@ pub fn init() -> Result<()> {
     let config_path = descartes_dir.join("config.toml");
     if !config_path.exists() {
         let default_config = Config::default();
-        let config_str = toml::to_string_pretty(&default_config)
-            .map_err(|e| Error::Config(e.to_string()))?;
+        let config_str =
+            toml::to_string_pretty(&default_config).map_err(|e| Error::Config(e.to_string()))?;
         std::fs::write(&config_path, config_str)?;
     }
 

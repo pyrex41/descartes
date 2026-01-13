@@ -1,0 +1,67 @@
+# SCUD Graph v1
+# Phase: demo
+# Archived: 2026-01-13
+
+@meta {
+  name demo
+  id_format sequential
+  updated 2026-01-13T19:10:55.780909+00:00
+  archived 2026-01-13
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Audit Current Codebase for Removals | P | 3 | H
+2 | Remove RAG and Semantic Dependencies | P | 5 | H
+3 | Drop Semantic Database Tables | P | 3 | H
+4 | Simplify Internal IPC to Tokio Channels | P | 8 | H
+5 | Design New Event Sourcing SQLite Schema | P | 3 | H
+6 | Implement New SQLite Tables | P | 5 | H
+7 | Refactor to ZMQ-First Data Flow | P | 8 | H
+8 | Simplify Time Travel Feature | P | 5 | M
+9 | Update Observability and Management Logic | P | 5 | M
+10 | Integrate and Test Refactored System | P | 8 | H
+
+@edges
+# dependent -> dependency
+2 -> 1
+3 -> 1
+4 -> 1
+4 -> 2
+5 -> 3
+6 -> 5
+7 -> 4
+7 -> 6
+8 -> 6
+8 -> 7
+9 -> 7
+9 -> 8
+10 -> 2
+10 -> 3
+10 -> 4
+10 -> 6
+10 -> 7
+10 -> 8
+10 -> 9
+
+@details
+1 | description |
+  Review the agent-runner and core modules to identify all files, dependencies, and database tables related to RAG, semantic analysis, and complex IPC that need to be deleted. Document the 'Delete List' including ipc.rs, rag.rs, semantic.rs, knowledge_graph.rs, and 13+ semantic tables. Ensure the audit covers compilation dependencies to reduce binary size.
+2 | description |
+  Delete the specified files (rag.rs, semantic.rs, knowledge_graph.rs) and remove dependencies like lancedb and tantivy from Cargo.toml. Update any import statements in the codebase that reference these removed modules. Verify that the codebase compiles without these components.
+3 | description |
+  Execute SQL commands to drop the 13+ tables related to AST nodes (e.g., semantic_nodes, file_dependencies) from the current database schema. Ensure no foreign keys or references are left dangling. Confirm the schema simplification via a database inspection tool.
+4 | description |
+  Replace the complex internal bus (ipc.rs) with simple Tokio channels that bridge ZMQ sockets to the State Store. Remove Dead Letter Queues and Backpressure logic. Update any code that interacts with the old IPC to use the new channels.
+5 | description |
+  Create a specification for the minimal SQLite schema with three tables: agents (UUID, status, ZMQ address), events (append-only log), and snapshots (for Time Travel with Git commit hash and last event ID). Ensure it focuses on observability and time travel without complex relations.
+6 | description |
+  Write and execute SQL scripts to create the new agents, events, and snapshots tables in SQLite. Migrate any necessary data from old tables if applicable (e.g., agent statuses). Test basic CRUD operations on the new schema.
+7 | description |
+  Update the architecture to use ZMQ as the primary interface: Daemon binds ROUTER socket, agents connect via DEALER. Implement the flow from agent stdout/stderr to ZMQ Message to Daemon to SQLite Event Log to GUI WebSocket. Remove distinctions between local and remote agents.
+8 | description |
+  Refactor the 'Brain' Time Travel to replay only the events table, without restoring complex AST states. Keep 'Body' as standard Git commits via body_restore.rs. Ensure the GUI can time travel by replaying event logs and checking out Git commits.
+9 | description |
+  Adjust the Daemon's role as a 'Traffic Controller' for ZMQ clients, focusing on agent management without semantic analysis. Update GUI interfaces to pull data from the new event log and agent table. Confirm that agent orchestration is lightweight and ZMQ-driven.
+10 | description |
+  Compile the updated codebase, run integration tests for ZMQ communication, database operations, and Time Travel. Verify performance improvements (e.g., faster compilation, reduced memory). Ensure the GUI displays events correctly and agents can be moved to remote servers seamlessly.
