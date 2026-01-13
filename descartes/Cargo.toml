@@ -1,12 +1,12 @@
 [package]
-name = "descartes-workflow"
+name = "descartes-cli"
 version = "0.2.0"
 edition = "2021"
 description = "Visible subagent orchestration with Ralph-Wiggum loops"
 license = "MIT"
 repository = "https://github.com/pyrex41/descartes"
 homepage = "https://github.com/pyrex41/descartes"
-documentation = "https://docs.rs/descartes-workflow"
+documentation = "https://docs.rs/descartes-cli"
 readme = "README.md"
 keywords = ["ai", "agents", "orchestration", "llm", "claude"]
 categories = ["command-line-utilities", "development-tools"]

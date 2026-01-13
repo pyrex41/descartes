@@ -535,7 +535,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "descartes-workflow"
+name = "descartes-cli"
 version = "0.2.0"
 dependencies = [
  "anyhow",
