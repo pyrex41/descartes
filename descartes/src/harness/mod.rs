@@ -230,7 +230,12 @@ pub trait Harness: Send + Sync {
 
 /// Create a harness based on configuration
 pub fn create_harness(config: &Config) -> Result<Box<dyn Harness>> {
-    let kind: HarnessKind = config.harness.kind.parse()?;
+    create_harness_by_name(&config.harness.kind, config)
+}
+
+/// Create a harness by name, using config for settings
+pub fn create_harness_by_name(harness_name: &str, config: &Config) -> Result<Box<dyn Harness>> {
+    let kind: HarnessKind = harness_name.parse()?;
 
     match kind {
         HarnessKind::ClaudeCode => Ok(Box::new(ClaudeCodeHarness::new(

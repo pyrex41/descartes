@@ -13,7 +13,6 @@ use tracing::{info, warn};
 
 use crate::agent::{AgentCategory, SubagentResult};
 use crate::harness::Harness;
-use crate::workflow::WorkflowConfig;
 use crate::{Config, Error, Result};
 
 use super::commands::{
@@ -79,8 +78,6 @@ pub enum AgentEvent {
 pub struct Session {
     /// Application config
     config: Config,
-    /// Workflow config (if in workflow mode)
-    workflow_config: Option<WorkflowConfig>,
     /// Command registry
     commands: CommandRegistry,
     /// Skill registry
@@ -89,7 +86,7 @@ pub struct Session {
     harness: Arc<dyn Harness>,
     /// Current session state
     state: SessionState,
-    /// Current workflow stage (if in workflow mode)
+    /// Current stage (for tracking context)
     current_stage: Option<String>,
     /// Pending context to inject
     pending_context: Vec<String>,
@@ -130,7 +127,6 @@ impl Session {
     pub fn new(
         config: Config,
         harness: Arc<dyn Harness>,
-        workflow_config: Option<WorkflowConfig>,
     ) -> Self {
         let mut commands = CommandRegistry::new();
         let skills = SkillRegistry::new();
@@ -142,7 +138,6 @@ impl Session {
 
         Self {
             config,
-            workflow_config,
             commands,
             skills,
             harness,
@@ -482,33 +477,17 @@ impl Session {
         Ok(())
     }
 
-    /// Handle workflow transition
+    /// Handle stage transition
     async fn handle_transition(&mut self, resolved: &ResolvedCommand) -> Result<()> {
         let to_stage = if !resolved.args.is_empty() {
             resolved.args[0].clone()
         } else {
-            // Determine next stage from workflow config
-            if let Some(ref wf) = self.workflow_config {
-                if let Some(current) = &self.current_stage {
-                    wf.next_stage(current)
-                        .map(|s| s.to_string())
-                        .unwrap_or_default()
-                } else {
-                    wf.stages().first().cloned().unwrap_or_default()
-                }
-            } else {
-                String::new()
-            }
-        };
-
-        if to_stage.is_empty() {
-            self.print_error("No target stage specified and couldn't determine next stage");
+            self.print_error("No target stage specified");
             return Ok(());
-        }
+        };
 
         self.print_system(&format!("Transitioning to stage: {}", to_stage));
         self.current_stage = Some(to_stage);
-        // Actual transition logic would go here
         Ok(())
     }
 
@@ -729,9 +708,6 @@ impl Session {
         }
         println!("Pending context: {} items", self.pending_context.len());
         println!("History entries: {}", self.history.len());
-        if let Some(ref wf) = self.workflow_config {
-            println!("Workflow: {}", wf.workflow.name);
-        }
         println!("──────────────\n");
     }
 

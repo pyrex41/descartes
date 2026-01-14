@@ -60,6 +60,7 @@ impl AgentCategory {
             AgentCategory::Searcher => CategoryConfig {
                 description: "Fast parallel code search".to_string(),
                 model: "sonnet".to_string(),
+                harness: None,
                 tools: vec!["read".to_string(), "bash".to_string()],
                 parallel: true,
                 backpressure: false,
@@ -68,6 +69,7 @@ impl AgentCategory {
             AgentCategory::Analyzer => CategoryConfig {
                 description: "Deep code analysis".to_string(),
                 model: "sonnet".to_string(),
+                harness: None,
                 tools: vec!["read".to_string()],
                 parallel: true,
                 backpressure: false,
@@ -76,6 +78,7 @@ impl AgentCategory {
             AgentCategory::Builder => CategoryConfig {
                 description: "Code implementation".to_string(),
                 model: "opus".to_string(),
+                harness: None,
                 tools: vec![
                     "read".to_string(),
                     "write".to_string(),
@@ -89,6 +92,7 @@ impl AgentCategory {
             AgentCategory::Validator => CategoryConfig {
                 description: "Test runner (backpressure gate)".to_string(),
                 model: "sonnet".to_string(),
+                harness: None,
                 tools: vec!["bash".to_string()],
                 parallel: false,
                 backpressure: true,
@@ -97,14 +101,16 @@ impl AgentCategory {
             AgentCategory::Planner => CategoryConfig {
                 description: "Task planning and breakdown".to_string(),
                 model: "opus".to_string(),
+                harness: None,
                 tools: vec!["read".to_string(), "bash".to_string()],
                 parallel: false,
                 backpressure: false,
                 prompt_template: None,
             },
             AgentCategory::FastBuilder => CategoryConfig {
-                description: "Fast code implementation".to_string(),
-                model: "grok-code-fast-1".to_string(),
+                description: "Fast code implementation via OpenCode".to_string(),
+                model: "xai/grok-code-fast-1".to_string(),
+                harness: Some("opencode".to_string()),
                 tools: vec![
                     "read".to_string(),
                     "write".to_string(),
@@ -118,6 +124,7 @@ impl AgentCategory {
             AgentCategory::BuilderReviewer => CategoryConfig {
                 description: "Deep review and fixes".to_string(),
                 model: "opus".to_string(),
+                harness: None,
                 tools: vec!["read".to_string(), "edit".to_string(), "bash".to_string()],
                 parallel: false,
                 backpressure: false,
@@ -126,6 +133,7 @@ impl AgentCategory {
             AgentCategory::Custom(_) => CategoryConfig {
                 description: "Custom agent category".to_string(),
                 model: "sonnet".to_string(),
+                harness: None,
                 tools: vec!["read".to_string(), "bash".to_string()],
                 parallel: false,
                 backpressure: false,

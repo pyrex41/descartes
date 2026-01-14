@@ -68,15 +68,26 @@ impl Default for RalphLoopConfig {
     }
 }
 
+// Environment variable helpers for category defaults
+fn default_fast_model() -> String {
+    std::env::var("DESCARTES_FAST_MODEL").unwrap_or_else(|_| "xai/grok-code-fast-1".to_string())
+}
+
+fn default_smart_model() -> String {
+    std::env::var("DESCARTES_SMART_MODEL").unwrap_or_else(|_| "opus".to_string())
+}
+
 impl Default for Config {
     fn default() -> Self {
         let mut categories = HashMap::new();
 
+        // Fast categories use opencode (default harness) with grok-code-fast-1
         categories.insert(
             "searcher".to_string(),
             CategoryConfig {
                 description: "Fast parallel code search".to_string(),
-                model: "sonnet".to_string(),
+                model: default_fast_model(),
+                harness: None, // uses global default (opencode)
                 tools: vec!["read".to_string(), "bash".to_string()],
                 parallel: true,
                 backpressure: false,
@@ -88,7 +99,8 @@ impl Default for Config {
             "analyzer".to_string(),
             CategoryConfig {
                 description: "Deep code analysis".to_string(),
-                model: "sonnet".to_string(),
+                model: default_fast_model(),
+                harness: None,
                 tools: vec!["read".to_string()],
                 parallel: true,
                 backpressure: false,
@@ -96,11 +108,13 @@ impl Default for Config {
             },
         );
 
+        // Smart categories use claude-code with opus
         categories.insert(
             "builder".to_string(),
             CategoryConfig {
                 description: "Code implementation".to_string(),
-                model: "opus".to_string(),
+                model: default_smart_model(),
+                harness: Some("claude-code".to_string()), // smart tasks use claude-code
                 tools: vec![
                     "read".to_string(),
                     "write".to_string(),
@@ -117,7 +131,8 @@ impl Default for Config {
             "validator".to_string(),
             CategoryConfig {
                 description: "Test runner (backpressure gate)".to_string(),
-                model: "sonnet".to_string(),
+                model: default_fast_model(),
+                harness: None, // fast
                 tools: vec!["bash".to_string()],
                 parallel: false,
                 backpressure: true,
@@ -129,7 +144,8 @@ impl Default for Config {
             "planner".to_string(),
             CategoryConfig {
                 description: "Task planning and breakdown".to_string(),
-                model: "opus".to_string(),
+                model: default_smart_model(),
+                harness: Some("claude-code".to_string()), // smart tasks use claude-code
                 tools: vec!["read".to_string(), "bash".to_string()],
                 parallel: false,
                 backpressure: false,
@@ -140,8 +156,9 @@ impl Default for Config {
         categories.insert(
             "fast-builder".to_string(),
             CategoryConfig {
-                description: "Fast code implementation".to_string(),
-                model: "grok-code-fast-1".to_string(),
+                description: "Fast code implementation via OpenCode".to_string(),
+                model: default_fast_model(),
+                harness: None, // uses global default (opencode)
                 tools: vec![
                     "read".to_string(),
                     "write".to_string(),
@@ -158,7 +175,8 @@ impl Default for Config {
             "builder-reviewer".to_string(),
             CategoryConfig {
                 description: "Deep review and fixes".to_string(),
-                model: "opus".to_string(),
+                model: default_smart_model(),
+                harness: Some("claude-code".to_string()), // smart tasks use claude-code
                 tools: vec!["read".to_string(), "edit".to_string(), "bash".to_string()],
                 parallel: false,
                 backpressure: false,
@@ -170,7 +188,8 @@ impl Default for Config {
             "orchestrator".to_string(),
             CategoryConfig {
                 description: "Loop and subagent orchestration".to_string(),
-                model: "opus".to_string(),
+                model: default_smart_model(),
+                harness: Some("claude-code".to_string()), // smart tasks use claude-code
                 tools: vec!["read".to_string()],
                 parallel: false,
                 backpressure: false,
@@ -250,7 +269,7 @@ pub struct HarnessConfig {
 }
 
 fn default_harness_kind() -> String {
-    "claude-code".to_string()
+    std::env::var("DESCARTES_HARNESS").unwrap_or_else(|_| "opencode".to_string())
 }
 
 impl Default for HarnessConfig {
@@ -265,7 +284,7 @@ impl Default for HarnessConfig {
 }
 
 /// Claude Code harness configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeCodeConfig {
     /// Path to claude binary (defaults to "claude" in PATH)
     #[serde(default)]
@@ -284,8 +303,19 @@ pub struct ClaudeCodeConfig {
     pub dangerously_skip_permissions: bool,
 }
 
+impl Default for ClaudeCodeConfig {
+    fn default() -> Self {
+        Self {
+            binary: None,
+            model: default_claude_model(),
+            headless: default_true(),
+            dangerously_skip_permissions: false,
+        }
+    }
+}
+
 fn default_claude_model() -> String {
-    "opus".to_string()
+    std::env::var("DESCARTES_CLAUDE_MODEL").unwrap_or_else(|_| "opus".to_string())
 }
 
 fn default_true() -> bool {
@@ -293,19 +323,32 @@ fn default_true() -> bool {
 }
 
 /// OpenCode harness configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenCodeConfig {
-    /// Socket path for IPC
+    /// Path to opencode binary (defaults to "opencode" in PATH)
     #[serde(default)]
-    pub socket_path: Option<PathBuf>,
+    pub binary: Option<String>,
 
-    /// Default model
-    #[serde(default)]
-    pub model: Option<String>,
+    /// Default model (e.g., "anthropic/claude-sonnet")
+    #[serde(default = "default_opencode_model")]
+    pub model: String,
+}
+
+fn default_opencode_model() -> String {
+    std::env::var("DESCARTES_OPENCODE_MODEL").unwrap_or_else(|_| "xai/grok-code-fast-1".to_string())
+}
+
+impl Default for OpenCodeConfig {
+    fn default() -> Self {
+        Self {
+            binary: None,
+            model: default_opencode_model(),
+        }
+    }
 }
 
 /// Codex harness configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexConfig {
     /// API base URL
     #[serde(default)]
@@ -314,6 +357,24 @@ pub struct CodexConfig {
     /// API key (can also be in environment)
     #[serde(default)]
     pub api_key: Option<String>,
+
+    /// Default model to use
+    #[serde(default = "default_codex_model")]
+    pub model: String,
+}
+
+fn default_codex_model() -> String {
+    std::env::var("DESCARTES_CODEX_MODEL").unwrap_or_else(|_| "gpt-4o".to_string())
+}
+
+impl Default for CodexConfig {
+    fn default() -> Self {
+        Self {
+            api_base: None,
+            api_key: None,
+            model: default_codex_model(),
+        }
+    }
 }
 
 /// Agent category configuration
@@ -324,6 +385,11 @@ pub struct CategoryConfig {
 
     /// Default model for this category
     pub model: String,
+
+    /// Harness to use for this category (claude-code, opencode, codex)
+    /// If not set, uses the global harness.kind setting
+    #[serde(default)]
+    pub harness: Option<String>,
 
     /// Tools available to agents in this category
     pub tools: Vec<String>,
@@ -355,6 +421,63 @@ pub struct ScudConfig {
     /// Path to scud binary (if not embedded)
     #[serde(default)]
     pub binary: Option<String>,
+
+    /// SCUD LLM provider (passed as SCUD_PROVIDER env var)
+    #[serde(default)]
+    pub provider: Option<String>,
+
+    /// SCUD LLM model (passed as SCUD_MODEL env var)
+    #[serde(default)]
+    pub model: Option<String>,
+
+    /// SCUD smart provider (passed as SCUD_SMART_PROVIDER env var)
+    #[serde(default)]
+    pub smart_provider: Option<String>,
+
+    /// SCUD smart model (passed as SCUD_SMART_MODEL env var)
+    #[serde(default)]
+    pub smart_model: Option<String>,
+
+    /// SCUD fast provider (passed as SCUD_FAST_PROVIDER env var)
+    #[serde(default)]
+    pub fast_provider: Option<String>,
+
+    /// SCUD fast model (passed as SCUD_FAST_MODEL env var)
+    #[serde(default)]
+    pub fast_model: Option<String>,
+
+    /// SCUD max tokens (passed as SCUD_MAX_TOKENS env var)
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
+}
+
+impl ScudConfig {
+    /// Get environment variables to pass to SCUD subprocess
+    pub fn env_vars(&self) -> Vec<(String, String)> {
+        let mut vars = Vec::new();
+        if let Some(ref v) = self.provider {
+            vars.push(("SCUD_PROVIDER".to_string(), v.clone()));
+        }
+        if let Some(ref v) = self.model {
+            vars.push(("SCUD_MODEL".to_string(), v.clone()));
+        }
+        if let Some(ref v) = self.smart_provider {
+            vars.push(("SCUD_SMART_PROVIDER".to_string(), v.clone()));
+        }
+        if let Some(ref v) = self.smart_model {
+            vars.push(("SCUD_SMART_MODEL".to_string(), v.clone()));
+        }
+        if let Some(ref v) = self.fast_provider {
+            vars.push(("SCUD_FAST_PROVIDER".to_string(), v.clone()));
+        }
+        if let Some(ref v) = self.fast_model {
+            vars.push(("SCUD_FAST_MODEL".to_string(), v.clone()));
+        }
+        if let Some(v) = self.max_tokens {
+            vars.push(("SCUD_MAX_TOKENS".to_string(), v.to_string()));
+        }
+        vars
+    }
 }
 
 fn default_scud_task_file() -> PathBuf {
@@ -367,6 +490,13 @@ impl Default for ScudConfig {
             task_file: default_scud_task_file(),
             embedded: false,
             binary: None,
+            provider: None,
+            model: None,
+            smart_provider: None,
+            smart_model: None,
+            fast_provider: None,
+            fast_model: None,
+            max_tokens: None,
         }
     }
 }

@@ -547,6 +547,7 @@ dependencies = [
  "crossterm",
  "ctrlc",
  "dirs 5.0.1",
+ "dotenvy",
  "futures",
  "http-body-util",
  "humantime",
@@ -665,6 +666,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "either"
@@ -2207,8 +2214,6 @@ dependencies = [
 [[package]]
 name = "scud-cli"
 version = "1.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c37a207c0414d7a88a38a4f2d926db64d478b7dc401afddf005b681250fa9893"
 dependencies = [
  "anyhow",
  "atty",
@@ -2218,6 +2223,7 @@ dependencies = [
  "crossterm",
  "dialoguer",
  "dirs 5.0.1",
+ "dotenvy",
  "fs2",
  "futures",
  "indicatif",

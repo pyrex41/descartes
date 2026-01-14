@@ -42,7 +42,6 @@ pub mod ralph_tui;
 pub mod scud;
 pub mod spec;
 pub mod transcript;
-pub mod workflow;
 
 // Re-exports for convenience
 pub use agent::{
@@ -63,7 +62,6 @@ pub use spec::{
     SpecConfig,
 };
 pub use transcript::{Transcript, TranscriptEntry};
-pub use workflow::{WorkflowConfig, WorkflowRunner, WorkflowState};
 
 /// Crate-level error type
 #[derive(Debug, thiserror::Error)]
@@ -103,9 +101,6 @@ pub enum Error {
 
     #[error("Command error: {0}")]
     Command(String),
-
-    #[error("Workflow error: {0}")]
-    Workflow(String),
 
     #[error("BAML error: {0}")]
     Baml(#[from] ::baml::BamlError),

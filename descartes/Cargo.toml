@@ -75,6 +75,7 @@ regex = "1"
 humantime = "2"
 ctrlc = "3"
 shell-words = "1"
+dotenvy = "0.15"
 
 [build-dependencies]
 walkdir = "2"

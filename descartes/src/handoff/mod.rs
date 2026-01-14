@@ -5,10 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::debug;
-
-use crate::workflow::config::{AutoContext, TransitionConfig};
-use crate::{Error, Result};
 
 /// A handoff between workflow stages
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,10 +256,9 @@ impl Handoff {
     }
 }
 
-/// Builder for creating handoffs with auto-context
+/// Builder for creating handoffs
 pub struct HandoffBuilder {
     handoff: Handoff,
-    transition_config: Option<TransitionConfig>,
 }
 
 impl HandoffBuilder {
@@ -271,17 +266,7 @@ impl HandoffBuilder {
     pub fn new(from: &str, to: &str) -> Self {
         Self {
             handoff: Handoff::new(from, to),
-            transition_config: None,
         }
-    }
-
-    /// Set transition configuration
-    pub fn with_transition_config(mut self, config: TransitionConfig) -> Self {
-        if let Some(cmd) = &config.command {
-            self.handoff.command = Some(cmd.clone());
-        }
-        self.transition_config = Some(config);
-        self
     }
 
     /// Set summary
@@ -308,51 +293,10 @@ impl HandoffBuilder {
         self
     }
 
-    /// Populate auto-context
-    pub async fn populate_auto_context(mut self) -> Result<Self> {
-        if let Some(config) = &self.transition_config {
-            for ctx in &config.auto_context {
-                match ctx {
-                    AutoContext::ScudTasks => {
-                        if let Ok(tasks) = self.get_scud_tasks().await {
-                            self.handoff.context.insert("scud_tasks".to_string(), tasks);
-                        }
-                    }
-                    AutoContext::ScudWaves => {
-                        if let Ok(waves) = self.get_scud_waves().await {
-                            self.handoff.context.insert("scud_waves".to_string(), waves);
-                        }
-                    }
-                    AutoContext::ScudDeps => {
-                        if let Ok(deps) = self.get_scud_deps().await {
-                            self.handoff.context.insert("scud_deps".to_string(), deps);
-                        }
-                    }
-                    AutoContext::GitDiff => {
-                        if let Ok(diff) = self.get_git_diff().await {
-                            self.handoff.context.insert("git_diff".to_string(), diff);
-                        }
-                    }
-                    AutoContext::GitStatus => {
-                        if let Ok(status) = self.get_git_status().await {
-                            self.handoff
-                                .context
-                                .insert("git_status".to_string(), status);
-                        }
-                    }
-                    AutoContext::TranscriptSummary => {
-                        // TODO: Implement transcript summarization
-                        debug!("Transcript summary not yet implemented");
-                    }
-                    AutoContext::Custom(cmd) => {
-                        if let Ok(output) = self.run_custom_context(cmd).await {
-                            self.handoff.context.insert(cmd.clone(), output);
-                        }
-                    }
-                }
-            }
-        }
-        Ok(self)
+    /// Set command
+    pub fn command(mut self, command: &str) -> Self {
+        self.handoff.command = Some(command.to_string());
+        self
     }
 
     /// Build the handoff
@@ -360,76 +304,9 @@ impl HandoffBuilder {
         self.handoff
     }
 
-    /// Render using transition template
+    /// Render the handoff
     pub fn render(self) -> String {
-        if let Some(config) = &self.transition_config {
-            if let Some(template) = &config.handoff_template {
-                return self.handoff.render(template);
-            }
-        }
         self.handoff.render_default()
-    }
-
-    // Helper methods for auto-context
-
-    async fn get_scud_tasks(&self) -> Result<String> {
-        let output = tokio::process::Command::new("scud")
-            .args(["list", "--format", "markdown"])
-            .output()
-            .await
-            .map_err(|e| Error::Command(format!("scud list failed: {}", e)))?;
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    async fn get_scud_waves(&self) -> Result<String> {
-        let output = tokio::process::Command::new("scud")
-            .args(["waves", "--format", "markdown"])
-            .output()
-            .await
-            .map_err(|e| Error::Command(format!("scud waves failed: {}", e)))?;
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    async fn get_scud_deps(&self) -> Result<String> {
-        let output = tokio::process::Command::new("scud")
-            .args(["deps", "--format", "markdown"])
-            .output()
-            .await
-            .map_err(|e| Error::Command(format!("scud deps failed: {}", e)))?;
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    async fn get_git_diff(&self) -> Result<String> {
-        let output = tokio::process::Command::new("git")
-            .args(["diff", "--stat"])
-            .output()
-            .await
-            .map_err(|e| Error::Command(format!("git diff failed: {}", e)))?;
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    async fn get_git_status(&self) -> Result<String> {
-        let output = tokio::process::Command::new("git")
-            .args(["status", "--short"])
-            .output()
-            .await
-            .map_err(|e| Error::Command(format!("git status failed: {}", e)))?;
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    async fn run_custom_context(&self, cmd: &str) -> Result<String> {
-        let output = tokio::process::Command::new("sh")
-            .args(["-c", cmd])
-            .output()
-            .await
-            .map_err(|e| Error::Command(format!("custom context command failed: {}", e)))?;
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 }
 

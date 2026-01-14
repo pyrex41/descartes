@@ -20,7 +20,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::agent::{AgentRegistry, RegistryStatus};
 use crate::context_handoff::{summarize_agent_progress, ContextMonitor, HandoffContext};
-use crate::harness::{create_harness, ResponseChunk, SessionConfig};
+use crate::harness::{create_harness_by_name, ResponseChunk, SessionConfig};
 use crate::ralph_tui::{RalphTui, TuiAction};
 use crate::spec::{build_prompt, build_task_spec, SpecConfig};
 use crate::{Config, Error, Result};
@@ -519,12 +519,15 @@ impl RalphExecutor {
         // Main execution loop with handoff support
         loop {
             // 4. Create harness and session
-            let harness = create_harness(config)?;
+            let harness = create_harness_by_name(&self.harness_name, config)?;
 
-            let model = self
-                .model
-                .clone()
-                .unwrap_or_else(|| config.harness.claude_code.model.clone());
+            // Get default model based on harness type
+            let default_model = match self.harness_name.as_str() {
+                "opencode" => config.harness.opencode.model.clone(),
+                "codex" => config.harness.codex.model.clone(),
+                _ => config.harness.claude_code.model.clone(),
+            };
+            let model = self.model.clone().unwrap_or(default_model);
 
             let session_config = SessionConfig {
                 model,

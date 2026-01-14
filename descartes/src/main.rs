@@ -8,9 +8,6 @@ use clap::{ArgAction, Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use descartes::workflow::{
-    self, default_workflow, RunOptions, StateManager, WorkflowConfig, WorkflowRunner,
-};
 use descartes::{Config, LoopConfig, LoopMode, Result};
 
 #[derive(Parser)]
@@ -106,37 +103,9 @@ enum Commands {
     /// Show active harness
     Harness,
 
-    /// Workflow orchestration commands
-    Workflow {
-        #[command(subcommand)]
-        action: WorkflowCommands,
-    },
-
-    /// Quick handoff generation
-    Handoff {
-        /// Target stage (plan, implement, validate)
-        target: String,
-
-        /// Extra context to include
-        #[arg(long, short)]
-        extra: Option<String>,
-
-        /// Output to file instead of stdout
-        #[arg(long, short)]
-        output: Option<std::path::PathBuf>,
-    },
-
     /// Start interactive session (persistent CLI)
     #[command(alias = "i")]
-    Interactive {
-        /// Start with a workflow
-        #[arg(long)]
-        workflow: Option<String>,
-
-        /// Start at a specific stage
-        #[arg(long)]
-        stage: Option<String>,
-    },
+    Interactive,
 
     /// Initialize default skills
     Skills {
@@ -189,12 +158,12 @@ enum Commands {
         #[arg(long)]
         verify: Option<String>,
 
-        /// Harness to use: claude-code, opencode, codex (default: claude-code)
-        #[arg(long, default_value = "claude-code")]
+        /// Harness to use: claude-code, opencode, codex
+        #[arg(long, env = "DESCARTES_HARNESS", default_value = "claude-code")]
         harness: String,
 
-        /// Model to use (default: from config)
-        #[arg(long)]
+        /// Model to use (default: from config or DESCARTES_MODEL env var)
+        #[arg(long, env = "DESCARTES_MODEL")]
         model: Option<String>,
 
         /// Maximum tasks per round (default: 5)
@@ -234,82 +203,19 @@ enum SkillCommands {
     },
 }
 
-#[derive(Subcommand)]
-enum WorkflowCommands {
-    /// Run a workflow
-    Run {
-        /// Workflow name (default: from .descartes/workflow.toml)
-        #[arg(long)]
-        workflow: Option<String>,
-
-        /// Step-by-step mode (all gates manual)
-        #[arg(long)]
-        step_by_step: bool,
-
-        /// One-shot mode (all gates auto)
-        #[arg(long)]
-        one_shot: bool,
-
-        /// Start from this stage
-        #[arg(long)]
-        from: Option<String>,
-
-        /// Stop after this stage
-        #[arg(long)]
-        to: Option<String>,
-
-        /// Extra context to inject
-        #[arg(long, short)]
-        extra: Option<String>,
-
-        /// Resume a specific run by ID
-        #[arg(long)]
-        resume: Option<String>,
-
-        /// Dry run (don't execute agents)
-        #[arg(long)]
-        dry_run: bool,
-    },
-
-    /// Show workflow status
-    Status {
-        /// Workflow name
-        #[arg(long)]
-        workflow: Option<String>,
-
-        /// Specific run ID
-        #[arg(long)]
-        run: Option<String>,
-    },
-
-    /// List workflow runs
-    List {
-        /// Workflow name
-        #[arg(long)]
-        workflow: Option<String>,
-
-        /// Show only last N runs
-        #[arg(long, default_value = "10")]
-        last: usize,
-    },
-
-    /// Initialize default workflow configuration
-    Init {
-        /// Force overwrite existing config
-        #[arg(long)]
-        force: bool,
-    },
-
-    /// Show workflow configuration
-    Config {
-        /// Workflow name
-        #[arg(long)]
-        workflow: Option<String>,
-    },
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load .env file if present (before anything else)
+    // Tries: .env, .descartes/.env, ~/.descartes/.env
+    if dotenvy::dotenv().is_err() {
+        // Try .descartes/.env
+        let _ = dotenvy::from_filename(".descartes/.env");
+    }
+    // Also try home directory
+    if let Some(home) = dirs::home_dir() {
+        let _ = dotenvy::from_path(home.join(".descartes/.env"));
+    }
+
     let cli = Cli::parse();
 
     // Initialize tracing
@@ -401,10 +307,69 @@ async fn main() -> Result<()> {
         }
 
         Commands::Waves => {
-            let waves = descartes::scud::waves(&config)?;
-            for (i, wave) in waves.iter().enumerate() {
-                println!("Wave {}: {:?}", i + 1, wave);
+            use descartes::scud::{Storage, Task};
+
+            let storage = Storage::new(None);
+            let phase = match storage.load_active_group() {
+                Ok(p) => p,
+                Err(_) => {
+                    println!("No active phase found.");
+                    return Ok(());
+                }
+            };
+
+            let waves_ids = descartes::scud::waves(&config)?;
+            if waves_ids.is_empty() {
+                println!("No pending tasks.");
+                return Ok(());
             }
+
+            const ROUND_SIZE: usize = 5;
+            let total_tasks: usize = waves_ids.iter().map(|w| w.len()).sum();
+            let total_rounds: usize = waves_ids.iter().map(|w| if w.is_empty() { 0 } else { (w.len() + ROUND_SIZE - 1) / ROUND_SIZE }).sum();
+            let total_waves = waves_ids.len();
+            let speedup = if total_rounds == 0 { 1.0f64 } else { total_tasks as f64 / total_rounds as f64 };
+
+            println!("Execution Waves (max {} parallel)", ROUND_SIZE);
+            println!("{}", "═".repeat(50));
+
+            for (wave_idx, wave_ids) in waves_ids.iter().enumerate() {
+                let n_tasks = wave_ids.len();
+                let n_rounds_wave = if n_tasks == 0 { 0 } else { (n_tasks + ROUND_SIZE - 1) / ROUND_SIZE };
+                println!("Wave {}: {} tasks (batched into {} rounds)", wave_idx + 1, n_tasks, n_rounds_wave);
+
+                let rounds: Vec<Vec<&Task>> = wave_ids.chunks(ROUND_SIZE).map(|chunk_ids| {
+                    chunk_ids.iter().filter_map(|id| phase.get_task(id)).collect()
+                }).collect();
+
+                for (round_idx, round_tasks) in rounds.iter().enumerate() {
+                    println!("  Round {}", round_idx + 1);
+                    for task in round_tasks.iter() {
+                        let deps_ids: Vec<_> = task.dependencies.iter()
+                            .filter(|d| phase.get_task(d).is_some())
+                            .cloned()
+                            .collect();
+                        let mut deps_sorted = deps_ids.clone();
+                        deps_sorted.sort_unstable();
+                        let deps_str = deps_sorted.join(", ");
+                        let deps_display = if !deps_ids.is_empty() {
+                            format!(" [{}] <- {}", deps_ids.len(), deps_str)
+                        } else {
+                            String::new()
+                        };
+                        let title_trunc: String = task.title.chars().take(60).collect();
+                        println!("    ○ {} {}{}", task.id, title_trunc, deps_display);
+                    }
+                }
+            }
+
+            println!("\nSummary");
+            println!("{}", "─".repeat(30));
+            println!("  Total tasks:   {}", total_tasks);
+            println!("  Total waves:   {}", total_waves);
+            println!("  Total rounds:  {}", total_rounds);
+            println!("  Speedup:       {:.1}x", speedup);
+            println!("  (from {} sequential to {} parallel rounds)", total_tasks, total_rounds);
         }
 
         Commands::Init => {
@@ -412,64 +377,21 @@ async fn main() -> Result<()> {
             info!("Initialized .descartes directory");
         }
 
-        Commands::Config => match toml::to_string_pretty(&config) {
-            Ok(s) => println!("{}", s),
-            Err(e) => eprintln!("Failed to serialize config: {}", e),
-        },
+        Commands::Config => {
+            let content = toml::to_string_pretty(&config)
+                .map_err(|e| descartes::Error::Config(e.to_string()))?;
+            println!("{}", content);
+        }
 
         Commands::Harness => {
             println!("Active harness: {}", config.harness.kind);
         }
 
-        Commands::Workflow { action } => {
-            handle_workflow_command(action, &config).await?;
-        }
-
-        Commands::Handoff {
-            target,
-            extra,
-            output,
-        } => {
-            // Determine current stage from context (simplified - uses previous stage)
-            let from_stage = match target.as_str() {
-                "plan" => "research",
-                "implement" => "plan",
-                "validate" => "implement",
-                _ => {
-                    eprintln!("Unknown target stage: {}", target);
-                    return Ok(());
-                }
-            };
-
-            // Load or create workflow config
-            let workflow_config = load_workflow_config(None)?;
-
-            // Generate handoff
-            let handoff =
-                workflow::quick_handoff(&workflow_config, from_stage, extra.as_deref()).await?;
-
-            // Output
-            if let Some(path) = output {
-                std::fs::write(&path, &handoff)?;
-                info!("Handoff written to {:?}", path);
-            } else {
-                println!("{}", handoff);
-            }
-        }
-
-        Commands::Interactive { workflow, stage } => {
+        Commands::Interactive => {
             info!("Starting interactive session");
-            let _ = stage; // Will be used when we implement stage-specific starting
 
             // Install panic handler
             descartes::interactive::signals::install_panic_handler();
-
-            // Load workflow config if specified
-            let workflow_config = if let Some(ref name) = workflow {
-                Some(load_workflow_config(Some(name))?)
-            } else {
-                None
-            };
 
             // Create harness (convert Box to Arc for shared ownership in session)
             let harness = descartes::harness::create_harness(&config)?;
@@ -477,7 +399,7 @@ async fn main() -> Result<()> {
 
             // Create session
             let mut session =
-                descartes::interactive::Session::new(config.clone(), harness, workflow_config);
+                descartes::interactive::Session::new(config.clone(), harness);
 
             // Install signal handler
             let signal_handler = descartes::interactive::SignalHandler::new(
@@ -527,6 +449,9 @@ async fn main() -> Result<()> {
 
                 info!("Initializing tasks from PRD: {:?}", prd_path);
 
+                // Get SCUD env vars from config
+                let scud_env_vars = config.scud.env_vars();
+
                 // Run scud parse
                 let parse_status = std::process::Command::new("scud")
                     .args([
@@ -537,6 +462,7 @@ async fn main() -> Result<()> {
                         "-n",
                         &num_tasks.to_string(),
                     ])
+                    .envs(scud_env_vars.clone())
                     .current_dir(&working_dir)
                     .status()?;
 
@@ -549,6 +475,7 @@ async fn main() -> Result<()> {
                     info!("Expanding tasks...");
                     let expand_status = std::process::Command::new("scud")
                         .args(["expand", "--all", "--tag", &tag_name])
+                        .envs(scud_env_vars.clone())
                         .current_dir(&working_dir)
                         .status()?;
 
@@ -562,6 +489,7 @@ async fn main() -> Result<()> {
                     info!("Checking dependencies...");
                     let check_status = std::process::Command::new("scud")
                         .args(["check-deps", "--fix", "--tag", &tag_name])
+                        .envs(scud_env_vars)
                         .current_dir(&working_dir)
                         .status()?;
 
@@ -695,116 +623,4 @@ fn handle_skills_command(action: SkillCommands) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Handle workflow subcommands
-async fn handle_workflow_command(action: WorkflowCommands, config: &Config) -> Result<()> {
-    match action {
-        WorkflowCommands::Run {
-            workflow,
-            step_by_step,
-            one_shot,
-            from,
-            to,
-            extra,
-            resume,
-            dry_run,
-        } => {
-            let workflow_config = load_workflow_config(workflow.as_deref())?;
-            let harness = descartes::harness::create_harness(config)?;
-
-            let options = RunOptions {
-                step_by_step,
-                one_shot,
-                from_stage: from,
-                to_stage: to,
-                extra_context: extra,
-                resume_id: resume,
-                dry_run,
-                ..Default::default()
-            };
-
-            let runner = WorkflowRunner::new(workflow_config, config.clone(), harness);
-            let state = runner.run(options).await?;
-
-            println!("\n{}", state.summary());
-        }
-
-        WorkflowCommands::Status { workflow, run } => {
-            let state_manager = StateManager::default();
-            let workflow_name = workflow.unwrap_or_else(|| "default".to_string());
-
-            let state = if let Some(run_id) = run {
-                state_manager.load(&workflow_name, &run_id)?
-            } else {
-                state_manager
-                    .find_latest(&workflow_name)?
-                    .ok_or_else(|| descartes::Error::Config("No workflow runs found".to_string()))?
-            };
-
-            println!("{}", state.summary());
-        }
-
-        WorkflowCommands::List { workflow, last } => {
-            let state_manager = StateManager::default();
-            let states = state_manager.list(workflow.as_deref())?;
-
-            for state in states.into_iter().take(last) {
-                println!(
-                    "{} | {} | {:?} | {}",
-                    state.id,
-                    state.workflow,
-                    state.status,
-                    state.started_at.format("%Y-%m-%d %H:%M")
-                );
-            }
-        }
-
-        WorkflowCommands::Init { force } => {
-            let path = std::path::PathBuf::from(".descartes/workflow.toml");
-
-            if path.exists() && !force {
-                eprintln!("Workflow config already exists. Use --force to overwrite.");
-                return Ok(());
-            }
-
-            // Create directory if needed
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-
-            // Write default workflow config
-            let default = default_workflow();
-            let content = toml::to_string_pretty(&default)
-                .map_err(|e| descartes::Error::Config(e.to_string()))?;
-            std::fs::write(&path, content)?;
-
-            info!("Created default workflow config at {:?}", path);
-        }
-
-        WorkflowCommands::Config { workflow } => {
-            let workflow_config = load_workflow_config(workflow.as_deref())?;
-            let content = toml::to_string_pretty(&workflow_config)
-                .map_err(|e| descartes::Error::Config(e.to_string()))?;
-            println!("{}", content);
-        }
-    }
-
-    Ok(())
-}
-
-/// Load workflow configuration
-fn load_workflow_config(name: Option<&str>) -> Result<WorkflowConfig> {
-    let path = if let Some(name) = name {
-        std::path::PathBuf::from(format!(".descartes/workflows/{}.toml", name))
-    } else {
-        std::path::PathBuf::from(".descartes/workflow.toml")
-    };
-
-    if path.exists() {
-        WorkflowConfig::load(&path)
-    } else {
-        // Return default workflow
-        Ok(default_workflow())
-    }
 }
