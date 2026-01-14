@@ -1,18 +1,39 @@
-//! Claude Code OpenAI-compatible proxy server
+//! # claude-proxy
 //!
-//! Wraps `claude -p` as an OpenAI-compatible HTTP endpoint for BAML.
+//! OpenAI-compatible HTTP proxy wrapping `claude -p`.
 //!
-//! Usage:
-//!   cargo run --bin claude-proxy
+//! This binary provides an OpenAI API facade over Claude Code CLI,
+//! allowing tools like BAML to use Claude Code as a backend.
 //!
-//! Then configure BAML:
-//!   client<llm> ClaudeCode {
+//! ## Usage
+//!
+//! ```bash
+//! claude-proxy  # Starts server on localhost:8765
+//! ```
+//!
+//! Or with custom port:
+//! ```bash
+//! CLAUDE_PROXY_PORT=9000 claude-proxy
+//! ```
+//!
+//! ## API Endpoints
+//!
+//! - `POST /v1/chat/completions` - Chat completion (non-streaming)
+//! - `GET /` or `GET /health` - Health check
+//!
+//! ## Integration with BAML
+//!
+//! ```text
+//! client<llm> ClaudeCode {
 //!     provider openai-generic
 //!     options {
-//!       base_url "http://localhost:8765/v1"
-//!       model "claude-code"
+//!         base_url "http://localhost:8765/v1"
+//!         model "claude-code"
 //!     }
-//!   }
+//! }
+//! ```
+//!
+//! See `docs/CLAUDE_PROXY.md` for full documentation.
 
 use std::convert::Infallible;
 use std::net::SocketAddr;

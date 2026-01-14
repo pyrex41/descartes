@@ -503,7 +503,7 @@ impl Session {
         let harness = self.harness.clone();
         let config = self.config.clone();
 
-        // Spawn agent runner
+        // Spawn agent runner with control receiver
         tokio::spawn(async move {
             let _ = event_tx
                 .send(AgentEvent::Started {
@@ -511,8 +511,8 @@ impl Session {
                 })
                 .await;
 
-            // Run the agent
-            match crate::agent::spawn_subagent(&*harness, category, prompt, None).await {
+            // Run the agent with control receiver for pause/resume/cancel
+            match crate::agent::spawn_subagent(&*harness, category, prompt, None, Some(control_rx)).await {
                 Ok(result) => {
                     let _ = event_tx.send(AgentEvent::Completed { result }).await;
                 }

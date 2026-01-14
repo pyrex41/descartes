@@ -277,7 +277,7 @@ async fn plan_iteration(
                         info!("Planning spawning {} subagent", req.category);
                         let category: AgentCategory = req.category.parse()?;
                         let result =
-                            spawn_subagent(harness, category, req.prompt, Some(transcript)).await?;
+                            spawn_subagent(harness, category, req.prompt, Some(transcript), None).await?;
                         debug!("Subagent result: {}", result.summary());
                     }
                     ResponseChunk::Done => break,
@@ -554,7 +554,7 @@ async fn run_parallel_searches_baml(
 
     let futures: Vec<_> = searches
         .into_iter()
-        .map(|(category, prompt)| spawn_subagent(harness, category, prompt, None))
+        .map(|(category, prompt)| spawn_subagent(harness, category, prompt, None, None))
         .collect();
 
     let results = join_all(futures).await;
@@ -601,7 +601,7 @@ async fn run_builder(
         task.title, task.description, context_str
     );
 
-    let result = spawn_subagent(harness, agent_category, prompt, Some(transcript)).await?;
+    let result = spawn_subagent(harness, agent_category, prompt, Some(transcript), None).await?;
 
     Ok(result)
 }
@@ -634,6 +634,7 @@ async fn run_reviewer(
         AgentCategory::BuilderReviewer,
         prompt,
         Some(transcript),
+        None,
     )
     .await?;
 
@@ -649,6 +650,7 @@ async fn run_validator(harness: &dyn Harness, transcript: &mut Transcript) -> Re
         AgentCategory::Validator,
         prompt.to_string(),
         Some(transcript),
+        None,
     )
     .await?;
 

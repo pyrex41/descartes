@@ -87,13 +87,23 @@ impl OpenCodeHarness {
     }
 
     /// Parse a JSON line from OpenCode output
+    ///
+    /// Handles both Anthropic SSE format and legacy formats:
+    /// - Anthropic SSE: `content_block_delta`, `message_stop`, etc.
+    /// - Legacy: `text`, `tool_use`, `done`, etc.
     fn parse_output_line(&self, line: &str) -> Option<ResponseChunk> {
         let line = line.trim();
         if line.is_empty() {
             return None;
         }
 
-        let json: serde_json::Value = match serde_json::from_str(line) {
+        // Handle SSE "data: " prefix if present
+        let json_str = line.strip_prefix("data: ").unwrap_or(line);
+        if json_str == "[DONE]" {
+            return Some(ResponseChunk::Done);
+        }
+
+        let json: serde_json::Value = match serde_json::from_str(json_str) {
             Ok(v) => v,
             Err(e) => {
                 debug!("Failed to parse JSON line: {} - {}", e, line);
@@ -101,110 +111,181 @@ impl OpenCodeHarness {
             }
         };
 
-        // Check for different message types
-        if let Some(msg_type) = json.get("type").and_then(|t| t.as_str()) {
-            match msg_type {
-                // Text content
-                "assistant" | "content" | "text" => {
-                    if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
-                        return Some(ResponseChunk::Text(text.to_string()));
-                    }
-                    if let Some(content) = json.get("content").and_then(|c| c.as_str()) {
-                        return Some(ResponseChunk::Text(content.to_string()));
-                    }
-                }
+        let msg_type = json.get("type").and_then(|t| t.as_str())?;
 
-                // Text delta (streaming)
-                "delta" | "content_delta" => {
-                    if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
-                        return Some(ResponseChunk::Text(text.to_string()));
-                    }
-                    if let Some(delta) = json.get("delta") {
-                        if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
-                            return Some(ResponseChunk::Text(text.to_string()));
-                        }
-                    }
-                }
+        match msg_type {
+            // ============ Anthropic SSE Format ============
 
-                // Tool use
-                "tool_use" | "tool_call" => {
-                    if let (Some(name), Some(id)) = (
-                        json.get("name").and_then(|n| n.as_str()),
-                        json.get("id").and_then(|i| i.as_str()),
-                    ) {
-                        let args = json
-                            .get("input")
-                            .or_else(|| json.get("arguments"))
-                            .cloned()
-                            .unwrap_or(serde_json::Value::Null);
-
-                        // Check for subagent spawn patterns
-                        if self.is_subagent_tool(name) {
-                            if let Some(req) = self.extract_subagent_request(name, &args) {
-                                return Some(ResponseChunk::SubagentSpawn(req));
+            // Content block start - may contain initial text or tool_use block
+            "content_block_start" => {
+                if let Some(block) = json.get("content_block") {
+                    let block_type = block.get("type").and_then(|t| t.as_str());
+                    match block_type {
+                        Some("text") => {
+                            // Initial text (usually empty in streaming)
+                            if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    return Some(ResponseChunk::Text(text.to_string()));
+                                }
                             }
                         }
-
-                        return Some(ResponseChunk::ToolCall(ToolCall {
-                            name: name.to_string(),
-                            arguments: args,
-                            id: id.to_string(),
-                        }));
+                        Some("tool_use") => {
+                            // Tool use block with full info
+                            if let (Some(id), Some(name)) = (
+                                block.get("id").and_then(|i| i.as_str()),
+                                block.get("name").and_then(|n| n.as_str()),
+                            ) {
+                                // Input comes in deltas, but we can emit the tool call start
+                                // For now, return None and wait for input deltas
+                                debug!("Tool use block started: {} ({})", name, id);
+                            }
+                        }
+                        _ => {}
                     }
                 }
+                None
+            }
 
-                // Tool result
-                "tool_result" => {
-                    if let Some(id) = json.get("tool_use_id").and_then(|i| i.as_str()) {
-                        let content = json
-                            .get("content")
-                            .and_then(|c| c.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        let success = !json
-                            .get("is_error")
-                            .and_then(|e| e.as_bool())
-                            .unwrap_or(false);
-
-                        return Some(ResponseChunk::ToolResult(ToolResult {
-                            tool_call_id: id.to_string(),
-                            content,
-                            success,
-                        }));
+            // Content block delta - streaming text or tool input
+            "content_block_delta" => {
+                if let Some(delta) = json.get("delta") {
+                    let delta_type = delta.get("type").and_then(|t| t.as_str());
+                    match delta_type {
+                        Some("text_delta") => {
+                            if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                return Some(ResponseChunk::Text(text.to_string()));
+                            }
+                        }
+                        Some("input_json_delta") => {
+                            // Tool input accumulation - logged for debugging
+                            if let Some(partial) = delta.get("partial_json").and_then(|p| p.as_str()) {
+                                debug!("Tool input delta: {}", partial);
+                            }
+                        }
+                        _ => {}
                     }
                 }
+                None
+            }
 
-                // Message complete
-                "done" | "complete" | "end" | "message_stop" => {
-                    return Some(ResponseChunk::Done);
+            // Content block finished
+            "content_block_stop" => {
+                // Could emit accumulated tool call here in the future
+                None
+            }
+
+            // Message complete
+            "message_stop" => Some(ResponseChunk::Done),
+
+            // Message start (metadata)
+            "message_start" => {
+                debug!("Message start: {:?}", json);
+                None
+            }
+
+            // Message delta (stop reason, usage)
+            "message_delta" => {
+                if let Some(delta) = json.get("delta") {
+                    if delta.get("stop_reason").is_some() {
+                        debug!("Stop reason: {:?}", delta.get("stop_reason"));
+                    }
                 }
+                None
+            }
 
-                // Error
-                "error" => {
-                    let msg = json
-                        .get("error")
-                        .and_then(|e| e.get("message"))
-                        .and_then(|m| m.as_str())
-                        .or_else(|| json.get("message").and_then(|m| m.as_str()))
-                        .unwrap_or("Unknown error");
-                    return Some(ResponseChunk::Error(msg.to_string()));
+            // ============ Legacy/Direct Formats ============
+
+            // Direct text content
+            "text" | "assistant" | "content" => {
+                json.get("text")
+                    .or_else(|| json.get("content"))
+                    .and_then(|t| t.as_str())
+                    .map(|s| ResponseChunk::Text(s.to_string()))
+            }
+
+            // Text delta (streaming, non-Anthropic format)
+            "delta" | "content_delta" => {
+                if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
+                    return Some(ResponseChunk::Text(text.to_string()));
                 }
-
-                // Result message (final output)
-                "result" => {
-                    if let Some(text) = json.get("result").and_then(|r| r.as_str()) {
+                if let Some(delta) = json.get("delta") {
+                    if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
                         return Some(ResponseChunk::Text(text.to_string()));
                     }
-                    return Some(ResponseChunk::Done);
+                }
+                None
+            }
+
+            // Tool use (direct format)
+            "tool_use" | "tool_call" => {
+                let name = json.get("name").and_then(|n| n.as_str())?;
+                let id = json.get("id").and_then(|i| i.as_str())?;
+                let args = json
+                    .get("input")
+                    .or_else(|| json.get("arguments"))
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+
+                if self.is_subagent_tool(name) {
+                    if let Some(req) = self.extract_subagent_request(name, &args) {
+                        return Some(ResponseChunk::SubagentSpawn(req));
+                    }
                 }
 
-                _ => {
-                    debug!("Unknown message type: {} - {:?}", msg_type, json);
+                Some(ResponseChunk::ToolCall(ToolCall {
+                    name: name.to_string(),
+                    arguments: args,
+                    id: id.to_string(),
+                }))
+            }
+
+            // Tool result
+            "tool_result" => {
+                let id = json.get("tool_use_id").and_then(|i| i.as_str())?;
+                let content = json
+                    .get("content")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let success = !json
+                    .get("is_error")
+                    .and_then(|e| e.as_bool())
+                    .unwrap_or(false);
+
+                Some(ResponseChunk::ToolResult(ToolResult {
+                    tool_call_id: id.to_string(),
+                    content,
+                    success,
+                }))
+            }
+
+            // Message complete (various formats)
+            "done" | "complete" | "end" => Some(ResponseChunk::Done),
+
+            // Error
+            "error" => {
+                let msg = json
+                    .get("error")
+                    .and_then(|e| e.get("message"))
+                    .and_then(|m| m.as_str())
+                    .or_else(|| json.get("message").and_then(|m| m.as_str()))
+                    .unwrap_or("Unknown error");
+                Some(ResponseChunk::Error(msg.to_string()))
+            }
+
+            // Result message (final output)
+            "result" => {
+                if let Some(text) = json.get("result").and_then(|r| r.as_str()) {
+                    return Some(ResponseChunk::Text(text.to_string()));
                 }
+                Some(ResponseChunk::Done)
+            }
+
+            _ => {
+                debug!("Unknown message type: {} - {:?}", msg_type, json);
+                None
             }
         }
-
-        None
     }
 
     /// Check if a tool call is a subagent spawn
@@ -517,5 +598,63 @@ mod tests {
         let chunk = harness.parse_output_line(line);
 
         assert!(matches!(chunk, Some(ResponseChunk::Done)));
+    }
+
+    #[test]
+    fn test_parse_anthropic_sse_text_delta() {
+        let harness = create_test_harness();
+
+        // Text delta (main streaming format)
+        let line = r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}"#;
+        let chunk = harness.parse_output_line(line);
+        assert!(matches!(chunk, Some(ResponseChunk::Text(ref t)) if t == "Hello"));
+    }
+
+    #[test]
+    fn test_parse_anthropic_sse_message_stop() {
+        let harness = create_test_harness();
+
+        let line = r#"{"type":"message_stop"}"#;
+        let chunk = harness.parse_output_line(line);
+        assert!(matches!(chunk, Some(ResponseChunk::Done)));
+    }
+
+    #[test]
+    fn test_parse_anthropic_sse_with_data_prefix() {
+        let harness = create_test_harness();
+
+        // SSE with data prefix
+        let line = r#"data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"World"}}"#;
+        let chunk = harness.parse_output_line(line);
+        assert!(matches!(chunk, Some(ResponseChunk::Text(ref t)) if t == "World"));
+    }
+
+    #[test]
+    fn test_parse_sse_done_marker() {
+        let harness = create_test_harness();
+
+        let line = "data: [DONE]";
+        let chunk = harness.parse_output_line(line);
+        assert!(matches!(chunk, Some(ResponseChunk::Done)));
+    }
+
+    #[test]
+    fn test_parse_anthropic_sse_message_start_ignored() {
+        let harness = create_test_harness();
+
+        // Message start should return None (metadata only)
+        let line = r#"{"type":"message_start","message":{"id":"msg_123","model":"claude-3"}}"#;
+        let chunk = harness.parse_output_line(line);
+        assert!(chunk.is_none());
+    }
+
+    #[test]
+    fn test_parse_anthropic_sse_content_block_stop_ignored() {
+        let harness = create_test_harness();
+
+        // Content block stop should return None
+        let line = r#"{"type":"content_block_stop","index":0}"#;
+        let chunk = harness.parse_output_line(line);
+        assert!(chunk.is_none());
     }
 }

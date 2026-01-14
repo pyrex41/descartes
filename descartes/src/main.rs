@@ -275,7 +275,7 @@ async fn main() -> Result<()> {
             info!("Spawning {} subagent", category);
             let cat = descartes::agent::AgentCategory::from_str(&category)?;
             let harness = descartes::harness::create_harness(&config)?;
-            let result = descartes::agent::spawn_subagent(&*harness, cat, prompt, None).await?;
+            let result = descartes::agent::spawn_subagent(&*harness, cat, prompt, None, None).await?;
             println!("{}", result.summary());
         }
 

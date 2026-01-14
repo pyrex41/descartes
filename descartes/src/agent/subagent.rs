@@ -1,10 +1,12 @@
 //! Subagent spawning with visibility and depth control
 
 use futures::StreamExt;
+use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
 use super::AgentCategory;
 use crate::harness::{Harness, ResponseChunk, SessionConfig, SubagentMetrics};
+use crate::interactive::AgentControl;
 use crate::transcript::Transcript;
 use crate::Result;
 
@@ -57,6 +59,7 @@ impl SubagentResult {
 /// * `category` - The agent category (determines model, tools)
 /// * `prompt` - The task for the subagent
 /// * `parent_transcript` - Optional parent transcript to link to
+/// * `control_rx` - Optional control receiver for pause/resume/cancel
 ///
 /// # Returns
 /// Result containing the subagent's output and metrics
@@ -65,6 +68,7 @@ pub async fn spawn_subagent(
     category: AgentCategory,
     prompt: String,
     parent_transcript: Option<&mut Transcript>,
+    mut control_rx: Option<mpsc::Receiver<AgentControl>>,
 ) -> Result<SubagentResult> {
     info!("Spawning {} subagent: {}", category, truncate(&prompt, 50));
 
@@ -100,43 +104,92 @@ pub async fn spawn_subagent(
     let mut output = String::new();
     let mut tools_called = 0;
     let mut success = true;
+    let mut paused = false;
+    let mut cancelled = false;
 
-    while let Some(chunk) = response.next().await {
-        // Record chunk in transcript
-        transcript.record_chunk(&chunk);
+    loop {
+        tokio::select! {
+            // Check for control messages (non-blocking)
+            ctrl = async {
+                if let Some(ref mut rx) = control_rx {
+                    rx.recv().await
+                } else {
+                    std::future::pending().await
+                }
+            } => {
+                match ctrl {
+                    Some(AgentControl::Pause) => {
+                        debug!("Subagent paused");
+                        paused = true;
+                    }
+                    Some(AgentControl::Resume) => {
+                        debug!("Subagent resumed");
+                        paused = false;
+                    }
+                    Some(AgentControl::Cancel) | Some(AgentControl::Interrupt { .. }) => {
+                        debug!("Subagent cancelled");
+                        cancelled = true;
+                        break;
+                    }
+                    Some(AgentControl::Start { .. }) => {
+                        // Ignore start messages in an already-running agent
+                    }
+                    None => {
+                        // Channel closed, continue processing
+                    }
+                }
+            }
 
-        match &chunk {
-            ResponseChunk::Text(text) => {
-                output.push_str(text);
-            }
-            ResponseChunk::ToolCall(tool) => {
-                tools_called += 1;
-                debug!("Subagent tool call: {} ({})", tool.name, tool.id);
-            }
-            ResponseChunk::SubagentSpawn(nested_req) => {
-                // Block nested spawns - this is the 1-level enforcement
-                warn!(
-                    "Subagent attempted nested spawn: {} - {}",
-                    nested_req.category,
-                    truncate(&nested_req.prompt, 30)
-                );
+            // Process next chunk from stream (only if not paused)
+            chunk = response.next(), if !paused => {
+                match chunk {
+                    Some(chunk) => {
+                        // Record chunk in transcript
+                        transcript.record_chunk(&chunk);
 
-                let blocked =
-                    crate::harness::SubagentResult::blocked("Subagents cannot spawn subagents");
-                harness.inject_result(&session, blocked).await?;
+                        match &chunk {
+                            ResponseChunk::Text(text) => {
+                                output.push_str(text);
+                            }
+                            ResponseChunk::ToolCall(tool) => {
+                                tools_called += 1;
+                                debug!("Subagent tool call: {} ({})", tool.name, tool.id);
+                            }
+                            ResponseChunk::SubagentSpawn(nested_req) => {
+                                // Block nested spawns - this is the 1-level enforcement
+                                warn!(
+                                    "Subagent attempted nested spawn: {} - {}",
+                                    nested_req.category,
+                                    truncate(&nested_req.prompt, 30)
+                                );
+
+                                let blocked =
+                                    crate::harness::SubagentResult::blocked("Subagents cannot spawn subagents");
+                                harness.inject_result(&session, blocked).await?;
+                            }
+                            ResponseChunk::Error(e) => {
+                                warn!("Subagent error: {}", e);
+                                output = format!("Error: {}", e);
+                                success = false;
+                                break;
+                            }
+                            ResponseChunk::Done => {
+                                debug!("Subagent completed");
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                    None => break,
+                }
             }
-            ResponseChunk::Error(e) => {
-                warn!("Subagent error: {}", e);
-                output = format!("Error: {}", e);
-                success = false;
-                break;
-            }
-            ResponseChunk::Done => {
-                debug!("Subagent completed");
-                break;
-            }
-            _ => {}
         }
+    }
+
+    // If cancelled, mark as unsuccessful with partial output
+    if cancelled {
+        success = false;
+        output = format!("[Cancelled] {}", output);
     }
 
     let duration = start.elapsed();
@@ -187,9 +240,10 @@ pub async fn spawn_parallel(
 
     // We can't easily share the parent transcript across parallel futures,
     // so we'll record after completion
+    // Note: parallel spawns don't support control_rx (no individual control)
     let futures: Vec<_> = requests
         .into_iter()
-        .map(|(category, prompt)| spawn_subagent(harness, category, prompt, None))
+        .map(|(category, prompt)| spawn_subagent(harness, category, prompt, None, None))
         .collect();
 
     let results = join_all(futures).await;

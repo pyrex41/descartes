@@ -1,0 +1,32 @@
+[package]
+name = "descartes-gui"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop GUI for Descartes AI orchestration"
+license = "MIT"
+
+[[bin]]
+name = "descartes-gui"
+path = "src/main.rs"
+
+[dependencies]
+# GUI
+iced = { version = "0.14", features = ["tokio", "advanced", "tester"] }
+
+# Descartes core (includes scud re-export)
+descartes = { path = "../descartes", package = "descartes-cli" }
+
+# Async
+tokio = { version = "1", features = ["full", "sync"] }
+
+# Utilities
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+
+[dev-dependencies]
+iced_test = "0.14"
+
+[patch.crates-io]
+# rfd 0.16.0 exists on GitHub but wasn't published to crates.io
+rfd = { git = "https://github.com/PolyMeilex/rfd", tag = "0.16.0" }
