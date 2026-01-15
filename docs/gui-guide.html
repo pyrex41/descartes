@@ -13,6 +13,7 @@
             --accent: #58a6ff;
             --accent-secondary: #238636;
             --border: #30363d;
+            --warning: #d29922;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -67,6 +68,8 @@
             margin: 16px 0;
             border-radius: 0 8px 8px 0;
         }
+        .callout.warning { border-left-color: var(--warning); }
+        .callout strong { display: block; margin-bottom: 8px; }
 
         table {
             width: 100%;
@@ -117,12 +120,18 @@
 
             <h2>Installation</h2>
 
-            <pre><code># From crates.io
-cargo install descartes-gui
+            <pre><code># Install both CLI and GUI (GUI requires CLI library, but CLI binaries installed separately)
+cargo install descartes-cli descartes-gui
 
 # From source
 cd descartes/descartes-gui
 cargo build --release</code></pre>
+
+            <div class="callout warning">
+                <strong>CLI Not Included</strong>
+                Installing the GUI does not install the <code>descartes</code> CLI binary.
+                Run both <code>cargo install</code> commands to get full functionality.
+            </div>
 
             <h3>System Dependencies</h3>
 
@@ -198,6 +207,22 @@ descartes-gui</code></pre>
                 <li><strong>Completion markers:</strong> Clear indication when agent completes or errors</li>
                 <li><strong>Scrollable history:</strong> Review full agent output session</li>
             </ul>
+
+            <h3>Terminal Attach Mode</h3>
+
+            <p>When running agents in a terminal multiplexer (Zellij, Tmux, Kitty), you can focus on a running agent's pane:</p>
+
+            <ol>
+                <li>Press <strong>1-9</strong> in the Ralph TUI to focus on that agent's pane</li>
+                <li>Descartes detects your terminal type automatically</li>
+                <li>Focus commands: <code>zellij action focus-pane</code>, <code>tmux select-pane</code>, <code>kitty @ focus-window</code></li>
+            </ol>
+
+            <div class="callout">
+                <strong>Multiplexer Required</strong>
+                Attach mode requires running Descartes in a terminal multiplexer. The GUI's Agents view
+                provides Pause/Resume controls as an alternative for headless operation.
+            </div>
 
             <h2>Workflow</h2>
 

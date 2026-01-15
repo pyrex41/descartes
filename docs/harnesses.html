@@ -131,9 +131,9 @@
                 </tr>
                 <tr>
                     <td><code>opencode</code></td>
-                    <td>TUI with IPC</td>
-                    <td>Interactive development</td>
-                    <td>OpenCode, XAI_API_KEY</td>
+                    <td>Headless CLI</td>
+                    <td>Fast iteration with Grok</td>
+                    <td>OpenCode CLI, XAI_API_KEY</td>
                 </tr>
                 <tr>
                     <td><code>codex</code></td>
@@ -164,8 +164,8 @@ default = "claude-code"</code></pre>
                 <pre><code># Install Claude CLI
 npm install -g @anthropic-ai/claude-cli
 
-# Set API key
-export ANTHROPIC_API_KEY=sk-ant-api03-...</code></pre>
+# Authenticate (Descartes delegates to Claude CLI)
+claude login</code></pre>
 
                 <h4>Configuration</h4>
                 <pre><code># descartes.toml
@@ -197,14 +197,17 @@ descartes ralph --scud-tag feature --harness claude-code --model sonnet</code></
 
             <div class="harness-card">
                 <h3>OpenCode Harness</h3>
-                <p>Connects to OpenCode's TUI via IPC. Best for interactive development with visual feedback.</p>
+                <p>Runs OpenCode CLI in headless mode via subprocess. Uses Grok models for fast iteration.</p>
 
                 <h4>Setup</h4>
                 <pre><code># Install OpenCode
 cargo install opencode
 
-# Set API key (xAI/Grok models)
-export XAI_API_KEY=xai-...</code></pre>
+# Set API key for OpenCode CLI (Descartes delegates to OpenCode)
+# For xAI/Grok models:
+export XAI_API_KEY=xai-...
+# Or for Anthropic models:
+export ANTHROPIC_API_KEY=sk-ant-...</code></pre>
 
                 <h4>Configuration</h4>
                 <pre><code># descartes.toml
@@ -222,15 +225,15 @@ descartes ralph --scud-tag feature --harness opencode --model grok-2</code></pre
 
                 <h4>How It Works</h4>
                 <ol>
-                    <li>Starts OpenCode process with IPC channel</li>
-                    <li>Sends prompts via stdin</li>
-                    <li>Receives responses via stdout</li>
-                    <li>OpenCode provides TUI visualization</li>
+                    <li>Spawns <code>opencode run --format json</code> as subprocess</li>
+                    <li>Streams prompts via stdin</li>
+                    <li>Captures JSON responses from stdout</li>
+                    <li>Closes subprocess when task completes</li>
                 </ol>
 
                 <div class="callout">
                     <strong>Best For</strong>
-                    Interactive development where you want to see agent activity. Uses Grok models for fast iteration.
+                    Fast iteration with Grok models. Headless execution like claude-code, but with xAI's infrastructure.
                 </div>
             </div>
 
@@ -308,6 +311,21 @@ max_tokens = 4096</code></pre>
                 </tr>
             </table>
 
+            <h2>Attach Mode</h2>
+
+            <p>All harnesses run headless, but you can attach to running agents via terminal multiplexers:</p>
+
+            <h3>Terminal Multiplexer Attach</h3>
+            <p>When running in Zellij, Tmux, or Kitty:</p>
+            <ul>
+                <li>Press <strong>1-9</strong> in the Ralph TUI to focus on agent panes</li>
+                <li>Descartes auto-detects your terminal type</li>
+                <li>Works with: Zellij, Tmux, Kitty</li>
+            </ul>
+
+            <h3>GUI Attach</h3>
+            <p>The Descartes GUI provides Pause/Resume controls in the Agents view, allowing you to suspend and resume agent execution without a terminal multiplexer.</p>
+
             <h2>Switching Harnesses Mid-Workflow</h2>
 
             <p>You can switch harnesses between tasks or runs:</p>
@@ -362,13 +380,21 @@ stop_on_failure = true</code></pre>
             <h2>Environment Variables</h2>
 
             <table>
-                <tr><th>Variable</th><th>Harness</th><th>Description</th></tr>
-                <tr><td><code>ANTHROPIC_API_KEY</code></td><td>claude-code</td><td>Claude API authentication</td></tr>
-                <tr><td><code>XAI_API_KEY</code></td><td>opencode</td><td>xAI/Grok API authentication</td></tr>
-                <tr><td><code>OPENAI_API_KEY</code></td><td>codex</td><td>OpenAI API authentication</td></tr>
+                <tr><th>Variable</th><th>Used By</th><th>Description</th></tr>
+                <tr><td><code>ANTHROPIC_API_KEY</code></td><td>BAML, opencode CLI</td><td>Required for BAML orchestration (loop mode). OpenCode CLI may also use this.</td></tr>
+                <tr><td><code>XAI_API_KEY</code></td><td>opencode CLI</td><td>OpenCode CLI reads this for xAI/Grok models</td></tr>
+                <tr><td><code>OPENAI_API_KEY</code></td><td>codex harness (direct)</td><td>Descartes reads this directly for Codex harness</td></tr>
                 <tr><td><code>DESCARTES_HARNESS</code></td><td>all</td><td>Default harness selection</td></tr>
                 <tr><td><code>DESCARTES_MODEL</code></td><td>all</td><td>Default model override</td></tr>
             </table>
+
+            <div class="callout">
+                <strong>Authentication Note</strong>
+                The claude-code and opencode harnesses delegate authentication to their respective CLIs.
+                Descartes does not read API keys for these harnesses - run <code>claude login</code> or
+                set environment variables for the underlying CLI tools. Only the codex harness reads
+                <code>OPENAI_API_KEY</code> directly.
+            </div>
 
             <h2>Troubleshooting</h2>
 
@@ -376,8 +402,8 @@ stop_on_failure = true</code></pre>
             <pre><code># Check Claude CLI is installed
 claude --version
 
-# Verify API key
-echo $ANTHROPIC_API_KEY
+# Verify you're logged in
+claude auth status
 
 # Test manually
 claude -p "Hello, world"</code></pre>
@@ -386,11 +412,11 @@ claude -p "Hello, world"</code></pre>
             <pre><code># Check OpenCode is installed
 opencode --version
 
-# Verify xAI key
+# Verify xAI key is set
 echo $XAI_API_KEY
 
-# Check IPC socket
-ls /tmp/opencode-*</code></pre>
+# Test OpenCode directly
+opencode run --help</code></pre>
 
             <h3>Codex API errors</h3>
             <pre><code># Verify API key

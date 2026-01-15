@@ -13,6 +13,7 @@
             --accent: #58a6ff;
             --accent-secondary: #238636;
             --border: #30363d;
+            --warning: #d29922;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -84,6 +85,15 @@
             margin-top: 0;
             font-family: 'SFMono-Regular', Consolas, monospace;
         }
+        .callout {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--accent);
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .callout.warning { border-left-color: var(--warning); }
+        .callout strong { display: block; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -129,11 +139,65 @@
                 </tr>
             </table>
 
+            <h2>Execution Modes</h2>
+
+            <p>Descartes has two distinct execution patterns, each optimized for different workflows:</p>
+
+            <table>
+                <tr>
+                    <th>Aspect</th>
+                    <th><code>descartes ralph</code></th>
+                    <th><code>descartes loop</code></th>
+                </tr>
+                <tr>
+                    <td>Pattern</td>
+                    <td>Fresh context per task</td>
+                    <td>BAML-orchestrated iteration</td>
+                </tr>
+                <tr>
+                    <td>Review Agent</td>
+                    <td>No (intentional for determinism)</td>
+                    <td>Yes (conditional on config)</td>
+                </tr>
+                <tr>
+                    <td>Context Handoff</td>
+                    <td>Yes (at 60% window)</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td>BAML Usage</td>
+                    <td>None</td>
+                    <td>Heavy (4 functions)</td>
+                </tr>
+                <tr>
+                    <td>Best For</td>
+                    <td>CI/CD, large task graphs</td>
+                    <td>Interactive development</td>
+                </tr>
+            </table>
+
+            <div class="callout">
+                <strong>Why Two Modes?</strong>
+                The <code>ralph</code> command prioritizes determinism and parallelism for batch execution.
+                The <code>loop</code> command uses BAML for intelligent decisions and includes an optional
+                review agent for quality-critical work. Choose based on your workflow needs.
+            </div>
+
             <h2>Commands</h2>
 
             <div class="command-section">
                 <h3>descartes ralph</h3>
-                <p>Execute SCUD tasks using the Ralph Wiggum loop pattern. This is the primary command for AI-driven task execution.</p>
+                <p>Execute SCUD tasks with fresh context per task and wave-based parallelism. Best for batch execution and CI/CD.</p>
+
+                <div class="callout">
+                    <strong>Key Characteristics</strong>
+                    <ul style="margin-top: 8px;">
+                        <li><strong>Fresh context</strong>: Each task starts with clean agent session</li>
+                        <li><strong>Context handoff</strong>: Long tasks automatically hand off at 60% context window</li>
+                        <li><strong>No review agent</strong>: Uses backpressure validation instead (intentional for determinism)</li>
+                        <li><strong>Wave parallelism</strong>: Tasks in same wave run in configurable rounds</li>
+                    </ul>
+                </div>
 
                 <h4>PRD Initialization</h4>
                 <table>
@@ -233,7 +297,17 @@ descartes spawn builder "Add rate limiting to the /api/users endpoint"</code></p
 
             <div class="command-section">
                 <h3>descartes loop</h3>
-                <p>Run the Ralph loop continuously.</p>
+                <p>Run BAML-orchestrated iterations with optional review agent. Best for interactive development.</p>
+
+                <div class="callout">
+                    <strong>Key Characteristics</strong>
+                    <ul style="margin-top: 8px;">
+                        <li><strong>BAML decisions</strong>: Uses AI to decide next action (Continue/Replan/Complete/AskHuman)</li>
+                        <li><strong>5-phase pattern</strong>: Parallel search → Builder → Review → Validator → Commit</li>
+                        <li><strong>Review agent</strong>: Optional code review (enable with <code>always_review</code> config)</li>
+                        <li><strong>Dynamic agent selection</strong>: BAML chooses searcher/builder categories</li>
+                    </ul>
+                </div>
 
                 <table>
                     <tr><th>Option</th><th>Description</th></tr>
@@ -246,6 +320,18 @@ descartes loop
 
 # Run 5 planning iterations
 descartes loop --plan --max 5</code></pre>
+
+                <h4>Review Agent Configuration</h4>
+                <p>The review agent is conditional in loop mode:</p>
+                <pre><code># In descartes.toml
+[ralph_loop]
+always_review = true  # Enable review agent for all builds
+
+# Or via task override (YAML frontmatter in task):
+---
+category: fast-builder
+disable_review: true  # Skip review for this task
+---</code></pre>
             </div>
 
             <div class="command-section">

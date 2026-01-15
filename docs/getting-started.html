@@ -113,12 +113,19 @@
 
             <h2>Installation</h2>
 
-            <h3>From crates.io (Recommended)</h3>
-            <pre><code># Install the CLI
-cargo install descartes-cli
+            <h3>CLI Only</h3>
+            <pre><code>cargo install descartes-cli</code></pre>
 
-# Install the GUI (optional)
-cargo install descartes-gui</code></pre>
+            <h3>CLI + GUI</h3>
+            <pre><code># Both commands required - GUI does not install CLI
+cargo install descartes-cli descartes-gui</code></pre>
+
+            <div class="callout">
+                <strong>Note on Packaging</strong>
+                The GUI and CLI are separate crates. The GUI depends on the CLI library but
+                does not install its binaries. This is intentional to keep the CLI lean -
+                the Iced GUI framework adds ~100 transitive dependencies.
+            </div>
 
             <h3>From Source</h3>
             <pre><code>git clone https://github.com/pyrex41/descartes
@@ -127,7 +134,7 @@ cd descartes
 # Build CLI
 cd descartes && cargo build --release
 
-# Build GUI
+# Optional: build GUI too
 cd ../descartes-gui && cargo build --release</code></pre>
 
             <h3>System Dependencies</h3>
