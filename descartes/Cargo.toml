@@ -52,8 +52,8 @@ baml = "0.217"
 
 # SCUD task management
 # Development: use path for latest features
-# Publishing:  change to version (scud = { package = "scud-cli", version = "1.35" })
-scud = { package = "scud-cli", path = "../../scud/scud-cli" }
+# Publishing:  change to version (scud = { package = "scud-cli", version = "1.36" })
+scud = { package = "scud-cli", version = "1.36", path = "../../scud/scud-cli" }
 
 # Logging
 tracing = "0.1"
