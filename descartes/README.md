@@ -2,6 +2,8 @@
 
 A focused Rust implementation of the Swarm pattern (inspired by Ralph Wiggum) for AI agent orchestration.
 
+**[Documentation](https://pyrex41.github.io/descartes/)** | [Getting Started](https://pyrex41.github.io/descartes/getting-started.html) | [Configuration](https://pyrex41.github.io/descartes/configuration.html)
+
 ## Architecture
 
 ```
