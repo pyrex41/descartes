@@ -1,3 +1,7 @@
+[Home](index.md) | [Getting Started](getting-started.md) | [Configuration](configuration.md) | [Swarm](swarm.md) | [Harnesses](harnesses.md) | [Workflows](workflows.md)
+
+---
+
 # Getting Started with Descartes
 
 Descartes is an AI agent orchestration tool that implements the Swarm pattern (inspired by Ralph Wiggum) - a fresh-context-per-task approach that prevents drift and keeps agents focused.
@@ -122,3 +126,7 @@ After each wave, Descartes can run validation commands (tests, lints, builds). I
 - [Swarm Deep Dive](./swarm.md) - Understand the orchestration pattern
 - [Harnesses Guide](./harnesses.md) - Choose the right harness for your tasks
 - [Workflows](./workflows.md) - Common usage patterns
+
+---
+
+← [Home](index.md) | **Next:** [Configuration](configuration.md) →

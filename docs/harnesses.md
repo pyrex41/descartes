@@ -1,3 +1,7 @@
+[Home](index.md) | [Getting Started](getting-started.md) | [Configuration](configuration.md) | [Swarm](swarm.md) | [Harnesses](harnesses.md) | [Workflows](workflows.md)
+
+---
+
 # Harnesses Guide
 
 A harness is the execution environment for an AI agent. Descartes supports multiple harnesses, each with different strengths.
@@ -235,3 +239,7 @@ If tasks are slow:
 2. Use OpenCode for parallelizable work
 3. Check network connectivity to API endpoints
 4. Consider using `--round-size` to batch requests
+
+---
+
+← [Swarm](swarm.md) | **Next:** [Workflows](workflows.md) →

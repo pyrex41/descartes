@@ -1,3 +1,7 @@
+[Home](index.md) | [Getting Started](getting-started.md) | [Configuration](configuration.md) | [Swarm](swarm.md) | [Harnesses](harnesses.md) | [Workflows](workflows.md)
+
+---
+
 # Common Workflows
 
 This guide covers common usage patterns for Descartes.
@@ -331,3 +335,7 @@ If tasks fail repeatedly, improve your spec files:
 - Add more context
 - Clarify requirements
 - Include examples
+
+---
+
+← [Harnesses](harnesses.md) | [Back to Home](index.md)

@@ -1,3 +1,7 @@
+[Home](index.md) | [Getting Started](getting-started.md) | [Configuration](configuration.md) | [Swarm](swarm.md) | [Harnesses](harnesses.md) | [Workflows](workflows.md)
+
+---
+
 # Configuration Guide
 
 Descartes is highly configurable through environment variables, configuration files, and CLI arguments.
@@ -196,3 +200,7 @@ Transcripts are stored per-agent with timestamps:
 ├── 2024-01-14T12-31-00_validator_TASK-001.scg
 └── ...
 ```
+
+---
+
+← [Getting Started](getting-started.md) | **Next:** [Swarm](swarm.md) →

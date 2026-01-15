@@ -1,3 +1,7 @@
+[Home](index.md) | [Getting Started](getting-started.md) | [Configuration](configuration.md) | [Swarm](swarm.md) | [Harnesses](harnesses.md) | [Workflows](workflows.md)
+
+---
+
 # Descartes Documentation
 
 Welcome to the Descartes documentation. Descartes is an AI agent orchestration tool implementing the Swarm pattern (inspired by Ralph Wiggum) for fresh-context-per-task execution.
@@ -122,3 +126,7 @@ descartes transcripts
 
 Descartes is open source. Contributions welcome at:
 https://github.com/pyrex41/descartes
+
+---
+
+**Next:** [Getting Started](getting-started.md) →

@@ -1,3 +1,7 @@
+[Home](index.md) | [Getting Started](getting-started.md) | [Configuration](configuration.md) | [Swarm](swarm.md) | [Harnesses](harnesses.md) | [Workflows](workflows.md)
+
+---
+
 # Swarm Orchestration
 
 Swarm is Descartes' fresh-context-per-task orchestration pattern, inspired by the Ralph Wiggum loop principles.
@@ -251,3 +255,7 @@ Swarm excels when you have:
 ## Learn More
 
 - Original Ralph Wiggum technique: https://ghuntley.com/ralph/
+
+---
+
+← [Configuration](configuration.md) | **Next:** [Harnesses](harnesses.md) →
