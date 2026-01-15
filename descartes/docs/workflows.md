@@ -33,7 +33,7 @@ Add email/password authentication to the application.
 
 ```bash
 # One command does it all:
-descartes ralph \
+descartes swarm \
     --prd ./docs/auth-prd.md \
     --tag auth-feature \
     --verify "cargo test"
@@ -67,7 +67,7 @@ For complex features, generate a plan first.
 
 ```bash
 # Create tasks and generate implementation plan
-descartes ralph \
+descartes swarm \
     --prd ./docs/complex-feature.md \
     --tag complex \
     --plan-only \
@@ -87,7 +87,7 @@ Make manual edits if needed.
 ### Step 3: Execute with Plan
 
 ```bash
-descartes ralph \
+descartes swarm \
     --scud-tag complex \
     --plan ./docs/IMPLEMENTATION_PLAN.md \
     --verify "npm test"
@@ -134,7 +134,7 @@ Use fast models for quick iteration cycles.
 
 ```bash
 # Force fast harness for all tasks
-descartes ralph \
+descartes swarm \
     --scud-tag prototype \
     --harness opencode \
     --model xai/grok-code-fast-1 \
@@ -151,7 +151,7 @@ Good for:
 Use smart models with thorough validation.
 
 ```bash
-descartes ralph \
+descartes swarm \
     --scud-tag production-feature \
     --harness claude-code \
     --model opus \
@@ -178,7 +178,7 @@ descartes spawn analyzer "Analyze the user model structure"
 Or configure high parallelism:
 
 ```bash
-descartes ralph \
+descartes swarm \
     --scud-tag research \
     --round-size 10 \
     --harness opencode
@@ -202,7 +202,7 @@ scud set-status TASK-003 pending
 scud set-status TASK-004 pending
 
 # Re-run
-descartes ralph --scud-tag my-feature
+descartes swarm --scud-tag my-feature
 ```
 
 ### Debug with Transcripts
@@ -245,7 +245,7 @@ echo "All validations passed!"
 ### Use in Ralph Loop
 
 ```bash
-descartes ralph \
+descartes swarm \
     --scud-tag secure-feature \
     --verify "./scripts/validate.sh"
 ```
@@ -258,14 +258,14 @@ Work across multiple related projects.
 
 ```bash
 cd backend/
-descartes ralph --prd ./docs/api-prd.md --tag api-v2
+descartes swarm --prd ./docs/api-prd.md --tag api-v2
 ```
 
 ### Project B: Frontend
 
 ```bash
 cd frontend/
-descartes ralph --prd ./docs/ui-prd.md --tag ui-v2
+descartes swarm --prd ./docs/ui-prd.md --tag ui-v2
 ```
 
 ### Coordinate via Specs
@@ -273,7 +273,7 @@ descartes ralph --prd ./docs/ui-prd.md --tag ui-v2
 Share spec files between projects:
 
 ```bash
-descartes ralph \
+descartes swarm \
     --scud-tag api-v2 \
     --spec-file ../shared/API_CONTRACT.md
 ```
@@ -285,7 +285,7 @@ descartes ralph \
 Begin with a small feature to learn the workflow:
 
 ```bash
-descartes ralph --prd ./docs/small-feature.md --tag test
+descartes swarm --prd ./docs/small-feature.md --tag test
 ```
 
 ### 2. Use Dry Run
@@ -293,7 +293,7 @@ descartes ralph --prd ./docs/small-feature.md --tag test
 Preview before executing:
 
 ```bash
-descartes ralph --scud-tag feature --dry-run
+descartes swarm --scud-tag feature --dry-run
 ```
 
 ### 3. Keep PRDs Focused

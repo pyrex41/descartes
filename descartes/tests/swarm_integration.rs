@@ -1,14 +1,14 @@
-//! Integration tests for Ralph executor and spec components
+//! Integration tests for Swarm executor and spec components
 //!
 //! These tests verify that components work together correctly:
-//! - RalphExecutor initialization with various configs
+//! - SwarmExecutor initialization with various configs
 //! - SpecConfig builder pattern
 //! - compute_waves() integration with mock SCUD data
 //! - dry_run() output format validation
 
 use std::path::PathBuf;
 
-use descartes::{spec::SpecConfig, RalphExecutor};
+use descartes::{spec::SpecConfig, SwarmExecutor};
 use scud::models::{Phase, Task, TaskStatus};
 
 /// Create a test phase with a simple dependency graph for integration testing
@@ -60,9 +60,9 @@ fn create_integration_test_phase() -> Phase {
 }
 
 #[test]
-fn test_ralph_executor_new_with_default_config() {
+fn test_swarm_executor_new_with_default_config() {
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "test-tag".to_string(),
         spec_config,
         None,
@@ -83,9 +83,9 @@ fn test_ralph_executor_new_with_default_config() {
 }
 
 #[test]
-fn test_ralph_executor_new_with_full_config() {
+fn test_swarm_executor_new_with_full_config() {
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "production".to_string(),
         spec_config,
         Some("cargo test && cargo build".to_string()),
@@ -148,7 +148,7 @@ fn test_spec_config_builder_chaining() {
 fn test_compute_waves_integration() {
     let phase = create_integration_test_phase();
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "integration".to_string(),
         spec_config,
         None,
@@ -191,7 +191,7 @@ fn test_compute_waves_with_partial_completion() {
     phase.tasks[1].set_status(TaskStatus::Done);
 
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "integration".to_string(),
         spec_config,
         None,
@@ -220,7 +220,7 @@ fn test_compute_waves_filters_non_pending_tasks() {
     phase.tasks[3].set_status(TaskStatus::Blocked);
 
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "integration".to_string(),
         spec_config,
         None,
@@ -262,7 +262,7 @@ fn test_executor_integration_with_different_round_sizes() {
 
     // Test with round_size = 1
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "integration".to_string(),
         spec_config,
         None,
@@ -285,7 +285,7 @@ fn test_executor_integration_with_different_round_sizes() {
 #[test]
 fn test_executor_integration_with_validation_enabled() {
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "test".to_string(),
         spec_config,
         Some("cargo check".to_string()),
@@ -327,7 +327,7 @@ fn test_compute_waves_with_complex_dependencies() {
     phase.add_task(task_e);
 
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "complex".to_string(),
         spec_config,
         None,
@@ -362,7 +362,7 @@ fn test_compute_waves_ignores_external_dependencies() {
     phase.add_task(task2);
 
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "external".to_string(),
         spec_config,
         None,
@@ -396,7 +396,7 @@ fn test_compute_waves_with_expanded_parent_task() {
     phase.add_task(task2);
 
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "expanded".to_string(),
         spec_config,
         None,
@@ -435,12 +435,12 @@ fn test_spec_config_with_multiple_files() {
 
 #[test]
 fn test_executor_with_spec_config_integration() {
-    // Test that RalphExecutor properly stores SpecConfig
+    // Test that SwarmExecutor properly stores SpecConfig
     let spec_config = SpecConfig::new()
         .with_plan(PathBuf::from("/plan/doc.md"))
         .with_spec_file(PathBuf::from("/spec/context.md"));
 
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "test".to_string(),
         spec_config.clone(),
         None,
@@ -462,7 +462,7 @@ fn test_compute_waves_empty_phase() {
     let phase = Phase::new("empty".to_string());
 
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "empty".to_string(),
         spec_config,
         None,
@@ -489,7 +489,7 @@ fn test_compute_waves_all_tasks_done() {
     }
 
     let spec_config = SpecConfig::default();
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         "integration".to_string(),
         spec_config,
         None,

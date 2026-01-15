@@ -155,11 +155,13 @@ fn quote_string(s: &str) -> String {
 }
 
 /// Parser for SCG format
+#[allow(dead_code)]
 pub struct ScgParser<'a> {
     input: &'a str,
     pos: usize,
 }
 
+#[allow(dead_code)]
 impl<'a> ScgParser<'a> {
     pub fn new(input: &'a str) -> Self {
         Self { input, pos: 0 }

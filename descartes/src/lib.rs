@@ -2,7 +2,7 @@
 //!
 //! A tight Rust binary for AI agent orchestration that combines:
 //! - **SCUD**: DAG-driven task management with token-efficient SCG format
-//! - **Ralph Wiggum**: Deterministic loops with planning/building modes
+//! - **Swarm**: Fresh-context-per-task loops inspired by Ralph Wiggum principles
 //! - **Visible subagents**: Full transcript capture for every subagent
 //!
 //! # Core Philosophy
@@ -13,8 +13,8 @@
 //!
 //! ```text
 //! ┌─────────────────────────────────────────┐
-//! │           Ralph Loop (outer)            │
-//! │  while :; do descartes run ; done       │
+//! │           Swarm Loop (outer)            │
+//! │  descartes swarm --scud-tag <tag>       │
 //! └────────────────────┬────────────────────┘
 //!                      ▼
 //! ┌─────────────────────────────────────────┐
@@ -30,15 +30,13 @@
 //! ```
 
 pub mod agent;
-pub mod baml_client;
 pub mod config;
 pub mod context_handoff;
 pub mod handoff;
 pub mod harness;
 pub mod interactive;
-pub mod ralph_executor;
-pub mod ralph_loop;
-pub mod ralph_tui;
+pub mod swarm_executor;
+pub mod swarm_tui;
 pub mod scud;
 pub mod spec;
 pub mod transcript;
@@ -54,9 +52,8 @@ pub use context_handoff::{
 pub use handoff::Handoff;
 pub use harness::{Harness, HarnessKind};
 pub use interactive::{Session, SessionState, SkillRegistry};
-pub use ralph_executor::{RalphExecutor, TaskResult};
-pub use ralph_loop::{LoopConfig, LoopMode};
-pub use ralph_tui::{RalphTui, TuiAction, WaveProgress};
+pub use swarm_executor::{SwarmExecutor, TaskResult};
+pub use swarm_tui::{SwarmTui, TuiAction, WaveProgress};
 pub use spec::{
     apply_spec_template, build_prompt, build_task_spec, extract_plan_section, format_task_spec,
     SpecConfig,
@@ -101,9 +98,6 @@ pub enum Error {
 
     #[error("Command error: {0}")]
     Command(String),
-
-    #[error("BAML error: {0}")]
-    Baml(#[from] ::baml::BamlError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

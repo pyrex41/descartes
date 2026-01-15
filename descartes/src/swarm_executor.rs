@@ -1,6 +1,6 @@
-//! Ralph Wiggum executor
+//! Swarm executor
 //!
-//! Implements true fresh-context-per-task execution:
+//! Implements fresh-context-per-task execution inspired by the Ralph Wiggum pattern:
 //! 1. Load spec sources (task + plan + custom files)
 //! 2. Get next ready task from SCUD
 //! 3. Spawn agent with fresh prompt (no accumulated context)
@@ -18,10 +18,10 @@ use scud::models::{Phase, Task, TaskStatus};
 use scud::storage::Storage;
 use tracing::{debug, error, info, warn};
 
-use crate::agent::{AgentRegistry, RegistryStatus};
+use crate::agent::RegistryStatus;
 use crate::context_handoff::{summarize_agent_progress, ContextMonitor, HandoffContext};
 use crate::harness::{create_harness_by_name, ResponseChunk, SessionConfig};
-use crate::ralph_tui::{RalphTui, TuiAction};
+use crate::swarm_tui::{SwarmTui, TuiAction};
 use crate::spec::{build_prompt, build_task_spec, SpecConfig};
 use crate::{Config, Error, Result};
 
@@ -40,8 +40,8 @@ pub enum TaskResult {
     },
 }
 
-/// Ralph executor for running SCUD tasks with fresh context per task
-pub struct RalphExecutor {
+/// Swarm executor for running SCUD tasks with fresh context per task
+pub struct SwarmExecutor {
     /// SCUD tag to operate on
     pub scud_tag: String,
     /// Spec configuration for building prompts
@@ -66,8 +66,8 @@ pub struct RalphExecutor {
     pub enable_handoff: bool,
 }
 
-impl RalphExecutor {
-    /// Create a new RalphExecutor
+impl SwarmExecutor {
+    /// Create a new SwarmExecutor
     pub fn new(
         scud_tag: String,
         spec_config: SpecConfig,
@@ -127,7 +127,7 @@ impl RalphExecutor {
         let waves = self.compute_waves(phase);
 
         // Header
-        println!("=== Ralph Execution Plan ===");
+        println!("=== Swarm Execution Plan ===");
         println!();
         println!("Tag:       {}", self.scud_tag);
         println!("Harness:   {}", self.harness_name);
@@ -174,7 +174,7 @@ impl RalphExecutor {
         Ok(())
     }
 
-    /// Run the Ralph loop, executing tasks with fresh context
+    /// Run the Swarm loop, executing tasks with fresh context
     ///
     /// Executes tasks in waves, where each wave contains tasks that can be
     /// executed in parallel. Within each wave, tasks are processed in rounds
@@ -184,7 +184,7 @@ impl RalphExecutor {
     /// are marked as Failed.
     pub async fn run(&self, config: &Config) -> Result<()> {
         info!(
-            "Starting Ralph loop for tag '{}' in {:?}",
+            "Starting Swarm loop for tag '{}' in {:?}",
             self.scud_tag, self.working_dir
         );
 
@@ -219,7 +219,7 @@ impl RalphExecutor {
 
         let total_tasks: usize = waves.iter().map(|w| w.len()).sum();
         println!(
-            "Ralph loop for tag '{}' - {} wave(s), {} task(s)",
+            "Swarm loop for tag '{}' - {} wave(s), {} task(s)",
             self.scud_tag,
             waves.len(),
             total_tasks
@@ -232,7 +232,7 @@ impl RalphExecutor {
             .map(|wave| wave.iter().map(|t| t.id.clone()).collect())
             .collect();
 
-        let mut tui = RalphTui::new();
+        let mut tui = SwarmTui::new();
         tui.set_waves(wave_ids);
 
         let mut completed_count = 0;
@@ -275,7 +275,7 @@ impl RalphExecutor {
                     println!("    Executing: [{}] {}", task.id, task.title);
 
                     // Track agent in registry
-                    let pane_name = format!("ralph-{}", task.id);
+                    let pane_name = format!("swarm-{}", task.id);
                     let agent_handle = tui.registry_mut().spawn(&pane_name, Some(task.id.clone()));
 
                     // Update agent status to running
@@ -451,7 +451,7 @@ impl RalphExecutor {
         println!();
 
         if failed_count > 0 {
-            warn!("Ralph loop completed with {} failed task(s)", failed_count);
+            warn!("Swarm loop completed with {} failed task(s)", failed_count);
         }
 
         Ok(())
@@ -495,13 +495,15 @@ impl RalphExecutor {
         let spec = build_task_spec(&self.spec_config, task)?;
         debug!("Built spec for task {}: {} chars", task.id, spec.len());
 
-        // 3. Build the prompt with verification commands
+        // 3. Build the prompt with verification commands and guidance
+        let guidance = config.guidance.for_context("builder");
         let mut prompt = build_prompt(
             &spec,
             task,
             &self.scud_tag,
             self.verify_command.as_deref(),
             backpressure_commands,
+            guidance.as_deref(),
         );
         debug!("Built prompt for task {}: {} chars", task.id, prompt.len());
 
@@ -844,8 +846,8 @@ mod tests {
         phase
     }
 
-    fn create_executor() -> RalphExecutor {
-        RalphExecutor {
+    fn create_executor() -> SwarmExecutor {
+        SwarmExecutor {
             scud_tag: "test".to_string(),
             spec_config: SpecConfig::default(),
             verify_command: None,
@@ -930,7 +932,7 @@ mod tests {
     #[test]
     fn test_executor_new() {
         let spec_config = SpecConfig::default();
-        let executor = RalphExecutor::new(
+        let executor = SwarmExecutor::new(
             "test-tag".to_string(),
             spec_config,
             Some("cargo test".to_string()),
@@ -953,7 +955,7 @@ mod tests {
     #[test]
     fn test_executor_new_minimal() {
         let spec_config = SpecConfig::default();
-        let executor = RalphExecutor::new(
+        let executor = SwarmExecutor::new(
             "minimal".to_string(),
             spec_config,
             None,
@@ -1200,7 +1202,7 @@ mod tests {
     #[test]
     fn test_parse_task_result_completed() {
         let response = "I've implemented the feature successfully.\n\nAll tests pass.";
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         match result {
             TaskResult::Completed { response: resp } => {
@@ -1214,7 +1216,7 @@ mod tests {
     fn test_parse_task_result_blocked_simple() {
         let response =
             "I tried to implement the feature.\n\nTASK_BLOCKED: Missing dependency on auth module";
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         match result {
             TaskResult::Blocked { reason } => {
@@ -1227,7 +1229,7 @@ mod tests {
     #[test]
     fn test_parse_task_result_blocked_with_whitespace() {
         let response = "  TASK_BLOCKED:   API endpoint unavailable  ";
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         match result {
             TaskResult::Blocked { reason } => {
@@ -1240,7 +1242,7 @@ mod tests {
     #[test]
     fn test_parse_task_result_blocked_no_reason() {
         let response = "TASK_BLOCKED:";
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         match result {
             TaskResult::Blocked { reason } => {
@@ -1253,7 +1255,7 @@ mod tests {
     #[test]
     fn test_parse_task_result_blocked_empty_reason() {
         let response = "TASK_BLOCKED:   ";
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         match result {
             TaskResult::Blocked { reason } => {
@@ -1275,7 +1277,7 @@ Here's what I tried:
 After multiple attempts, I cannot proceed.
 
 TASK_BLOCKED: Requires auth module that doesn't exist yet"#;
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         match result {
             TaskResult::Blocked { reason } => {
@@ -1291,7 +1293,7 @@ TASK_BLOCKED: Requires auth module that doesn't exist yet"#;
         let response = r#"TASK_BLOCKED: First reason (old)
 Some more work...
 TASK_BLOCKED: Final reason"#;
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         match result {
             TaskResult::Blocked { reason } => {
@@ -1306,7 +1308,7 @@ TASK_BLOCKED: Final reason"#;
         // TASK_BLOCKED mentioned mid-line should NOT trigger blocking
         let response = r#"The agent can output TASK_BLOCKED: when stuck.
 But since it's not at the start of a line, this should be Completed."#;
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         // Should be Completed since TASK_BLOCKED is not at line start (after "output ")
         match result {
@@ -1323,7 +1325,7 @@ But since it's not at the start of a line, this should be Completed."#;
     fn test_parse_task_result_completed_with_similar_text() {
         // Text that mentions TASK_BLOCKED but not as a directive
         let response = "If you get stuck, you can output a TASK_BLOCKED message.\nBut I completed the task successfully!";
-        let result = RalphExecutor::parse_task_result(response);
+        let result = SwarmExecutor::parse_task_result(response);
 
         // Should be Completed since TASK_BLOCKED is not at line start
         match result {

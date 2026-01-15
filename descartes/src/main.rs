@@ -1,6 +1,6 @@
 //! Descartes CLI
 //!
-//! Visible subagent orchestration with Ralph-Wiggum loops.
+//! Visible subagent orchestration with Swarm loops.
 
 use std::str::FromStr;
 
@@ -8,7 +8,7 @@ use clap::{ArgAction, Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use descartes::{Config, LoopConfig, LoopMode, Result};
+use descartes::{Config, Result};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -29,23 +29,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run the Ralph loop (continuous iteration)
-    Loop {
-        /// Run in planning mode (analyze gaps, update task graph)
-        #[arg(long)]
-        plan: bool,
-
-        /// Maximum iterations (0 = infinite)
-        #[arg(long, short, default_value = "0")]
-        max: usize,
-    },
-
-    /// Run a single build iteration
-    Run,
-
-    /// Run a single planning iteration
-    Plan,
-
     /// Spawn a subagent manually
     Spawn {
         /// Agent category (searcher, analyzer, builder, validator)
@@ -113,8 +96,8 @@ enum Commands {
         action: SkillCommands,
     },
 
-    /// Run Ralph Wiggum loop for SCUD tasks
-    Ralph {
+    /// Run Swarm loop for SCUD tasks
+    Swarm {
         /// SCUD tag to execute (required unless --prd creates it)
         #[arg(long)]
         scud_tag: Option<String>,
@@ -234,43 +217,6 @@ async fn main() -> Result<()> {
     let config = Config::load(cli.config.as_deref())?;
 
     match cli.command {
-        Commands::Loop { plan, max } => {
-            let mode = if plan {
-                LoopMode::Plan
-            } else {
-                LoopMode::Build
-            };
-            let max_iterations = if max == 0 { None } else { Some(max) };
-
-            let loop_config = LoopConfig {
-                mode,
-                max_iterations,
-                ..Default::default()
-            };
-
-            descartes::ralph_loop::run(loop_config, &config).await?;
-        }
-
-        Commands::Run => {
-            info!("Running single build iteration");
-            let loop_config = LoopConfig {
-                mode: LoopMode::Build,
-                max_iterations: Some(1),
-                ..Default::default()
-            };
-            descartes::ralph_loop::run(loop_config, &config).await?;
-        }
-
-        Commands::Plan => {
-            info!("Running single planning iteration");
-            let loop_config = LoopConfig {
-                mode: LoopMode::Plan,
-                max_iterations: Some(1),
-                ..Default::default()
-            };
-            descartes::ralph_loop::run(loop_config, &config).await?;
-        }
-
         Commands::Spawn { category, prompt } => {
             info!("Spawning {} subagent", category);
             let cat = descartes::agent::AgentCategory::from_str(&category)?;
@@ -416,7 +362,7 @@ async fn main() -> Result<()> {
             handle_skills_command(action)?;
         }
 
-        Commands::Ralph {
+        Commands::Swarm {
             scud_tag,
             prd,
             num_tasks,
@@ -444,7 +390,7 @@ async fn main() -> Result<()> {
                     prd_path
                         .file_stem()
                         .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_else(|| "ralph".to_string())
+                        .unwrap_or_else(|| "swarm".to_string())
                 });
 
                 info!("Initializing tasks from PRD: {:?}", prd_path);
@@ -523,8 +469,8 @@ async fn main() -> Result<()> {
                 spec_config.additional_specs.push(spec_file);
             }
 
-            // Create RalphExecutor and dispatch
-            let executor = descartes::RalphExecutor::new(
+            // Create SwarmExecutor and dispatch
+            let executor = descartes::SwarmExecutor::new(
                 final_tag,
                 spec_config,
                 verify,

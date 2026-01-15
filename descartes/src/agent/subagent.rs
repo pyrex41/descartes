@@ -228,36 +228,6 @@ pub async fn spawn_subagent(
     Ok(result)
 }
 
-/// Spawn multiple subagents in parallel
-pub async fn spawn_parallel(
-    harness: &dyn Harness,
-    requests: Vec<(AgentCategory, String)>,
-    parent_transcript: Option<&mut Transcript>,
-) -> Vec<Result<SubagentResult>> {
-    use futures::future::join_all;
-
-    info!("Spawning {} subagents in parallel", requests.len());
-
-    // We can't easily share the parent transcript across parallel futures,
-    // so we'll record after completion
-    // Note: parallel spawns don't support control_rx (no individual control)
-    let futures: Vec<_> = requests
-        .into_iter()
-        .map(|(category, prompt)| spawn_subagent(harness, category, prompt, None, None))
-        .collect();
-
-    let results = join_all(futures).await;
-
-    // Record all subagents in parent transcript
-    if let Some(parent) = parent_transcript {
-        for r in results.iter().flatten() {
-            parent.record_subagent_completion(&r.session_id, r.success);
-        }
-    }
-
-    results
-}
-
 /// Truncate a string for display
 fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {

@@ -1,18 +1,18 @@
 ---
-description: Explain Ralph Wiggum technique and commands
+description: Explain Swarm technique and commands
 ---
 
-# Ralph Wiggum Help
+# Swarm Help
 
-## What is Ralph?
+## What is Swarm?
 
-The Ralph Wiggum technique (created by Geoffrey Huntley) is an iterative AI development loop:
+Swarm is Descartes' implementation of the Ralph Wiggum technique (created by Geoffrey Huntley) - an iterative AI development loop:
 
 ```bash
 while :; do cat PROMPT.md | claude-code; done
 ```
 
-**Key principles:**
+**Key principles (from Ralph Wiggum):**
 - Same spec fed each iteration (fresh context)
 - Agent sees previous work in files/git
 - External orchestration (not model-managed)
@@ -28,11 +28,11 @@ This implementation uses SCUD tasks as the "fixed spec":
 
 ## Available Commands
 
-### /rw:loop <tag> [options]
+### /swarm:loop <tag> [options]
 
 Start loop for SCUD tag:
 ```
-/rw:loop my-feature --plan ./plan.md
+/swarm:loop my-feature --plan ./plan.md
 ```
 
 Options:
@@ -40,11 +40,11 @@ Options:
 - `--spec <path>` - Additional spec files
 - `--max-iterations <n>` - Safety limit
 
-### /rw:cancel-ralph
+### /swarm:cancel
 
 Stop active loop, preserve state for resume.
 
-### /rw:help
+### /swarm:help
 
 Show this help.
 

@@ -4,7 +4,7 @@
 //! when approaching context window limits. This prevents context overflow
 //! by killing the current agent and spawning a fresh one with a summary.
 
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Estimate token count from text using the 4 chars ≈ 1 token heuristic
 pub fn estimate_tokens(text: &str) -> usize {

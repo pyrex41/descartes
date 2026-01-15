@@ -17,9 +17,9 @@ pub struct Config {
     #[serde(default)]
     pub categories: HashMap<String, CategoryConfig>,
 
-    /// Ralph loop orchestration settings
+    /// Swarm orchestration settings
     #[serde(default)]
-    pub ralph_loop: RalphLoopConfig,
+    pub swarm: SwarmConfig,
 
     /// SCUD integration settings
     #[serde(default)]
@@ -28,6 +28,10 @@ pub struct Config {
     /// Transcript settings
     #[serde(default)]
     pub transcripts: TranscriptConfig,
+
+    /// User guidance configuration
+    #[serde(default)]
+    pub guidance: GuidanceConfig,
 
     /// Path to prompts directory
     #[serde(default = "default_prompts_dir")]
@@ -38,9 +42,9 @@ fn default_prompts_dir() -> PathBuf {
     PathBuf::from("prompts")
 }
 
-/// Ralph loop orchestration configuration
+/// Swarm orchestration configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RalphLoopConfig {
+pub struct SwarmConfig {
     /// Whether to try fast-builder first for applicable tasks
     #[serde(default)]
     pub use_fast_first: bool,
@@ -58,7 +62,7 @@ fn default_heuristic() -> String {
     "prefer_speed".to_string()
 }
 
-impl Default for RalphLoopConfig {
+impl Default for SwarmConfig {
     fn default() -> Self {
         Self {
             use_fast_first: true,
@@ -200,9 +204,10 @@ impl Default for Config {
         Self {
             harness: HarnessConfig::default(),
             categories,
-            ralph_loop: RalphLoopConfig::default(),
+            swarm: SwarmConfig::default(),
             scud: ScudConfig::default(),
             transcripts: TranscriptConfig::default(),
+            guidance: GuidanceConfig::default(),
             prompts_dir: default_prompts_dir(),
         }
     }
@@ -532,6 +537,68 @@ impl Default for TranscriptConfig {
             format: default_transcript_format(),
             max_keep: 0,
         }
+    }
+}
+
+/// User guidance configuration
+///
+/// Allows users to inject custom context into agent prompts without modifying code.
+/// Each field contains markdown text that gets prepended to relevant prompts.
+///
+/// # Example
+///
+/// ```toml
+/// [guidance]
+/// global = "Always follow existing code patterns. Prefer small, focused changes."
+/// builder = "Run tests after making changes. Use cargo check before cargo test."
+/// review = "Check for security issues and edge cases."
+/// validator = "Use cargo test --all-features for full coverage."
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GuidanceConfig {
+    /// Global guidance included in all prompts
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub global: Option<String>,
+
+    /// Guidance specific to builder agents (implementation tasks)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub builder: Option<String>,
+
+    /// Guidance specific to reviewer agents
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<String>,
+
+    /// Guidance specific to validator agents (test running)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validator: Option<String>,
+}
+
+impl GuidanceConfig {
+    /// Get combined guidance for a specific context
+    ///
+    /// Returns global guidance combined with context-specific guidance.
+    pub fn for_context(&self, context: &str) -> Option<String> {
+        let specific = match context {
+            "builder" | "fast-builder" => self.builder.as_deref(),
+            "review" | "builder-reviewer" => self.review.as_deref(),
+            "validator" => self.validator.as_deref(),
+            _ => None,
+        };
+
+        match (self.global.as_deref(), specific) {
+            (Some(g), Some(s)) => Some(format!("{}\n\n{}", g, s)),
+            (Some(g), None) => Some(g.to_string()),
+            (None, Some(s)) => Some(s.to_string()),
+            (None, None) => None,
+        }
+    }
+
+    /// Check if any guidance is configured
+    pub fn has_any(&self) -> bool {
+        self.global.is_some()
+            || self.builder.is_some()
+            || self.review.is_some()
+            || self.validator.is_some()
     }
 }
 

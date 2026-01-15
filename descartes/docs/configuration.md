@@ -85,7 +85,7 @@ tools = ["bash"]
 parallel = false
 backpressure = true  # Creates validation checkpoint
 
-[ralph_loop]
+[swarm]
 use_fast_first = true    # Try fast-builder before smart builder
 always_review = false    # Review fast-builder changes with smart model
 heuristic = "prefer_speed"
@@ -136,19 +136,19 @@ Override any setting via CLI:
 
 ```bash
 # Use a specific harness
-descartes ralph --scud-tag feature --harness claude-code
+descartes swarm --scud-tag feature --harness claude-code
 
 # Override model
-descartes ralph --scud-tag feature --model opus
+descartes swarm --scud-tag feature --model opus
 
 # Custom validation command
-descartes ralph --scud-tag feature --verify "npm test && npm run lint"
+descartes swarm --scud-tag feature --verify "npm test && npm run lint"
 
 # Adjust parallelism
-descartes ralph --scud-tag feature --round-size 5
+descartes swarm --scud-tag feature --round-size 5
 
 # Dry run (preview without execution)
-descartes ralph --scud-tag feature --dry-run
+descartes swarm --scud-tag feature --dry-run
 ```
 
 ## Mixed Harness Strategy

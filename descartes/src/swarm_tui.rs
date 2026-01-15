@@ -1,7 +1,7 @@
-//! Ralph Wiggum orchestrator TUI
+//! Swarm orchestrator TUI
 //!
 //! Terminal UI for monitoring wave progress and agent status using crossterm.
-//! Provides real-time visualization of the Ralph loop execution.
+//! Provides real-time visualization of the Swarm loop execution.
 
 use std::io::{self, Write};
 use std::time::Duration;
@@ -83,8 +83,8 @@ impl WaveProgress {
     }
 }
 
-/// Ralph Wiggum orchestrator TUI
-pub struct RalphTui {
+/// Swarm orchestrator TUI
+pub struct SwarmTui {
     /// Wave progress state
     wave_progress: Option<WaveProgress>,
     /// Agent registry for status tracking
@@ -95,7 +95,7 @@ pub struct RalphTui {
     last_render_height: u16,
 }
 
-impl RalphTui {
+impl SwarmTui {
     /// Create a new TUI instance
     pub fn new() -> Self {
         Self {
@@ -267,7 +267,7 @@ impl RalphTui {
         execute!(
             stdout,
             SetForegroundColor(Color::Cyan),
-            Print("=== Ralph Wiggum Orchestrator ===\n"),
+            Print("=== Swarm Orchestrator ===\n"),
             ResetColor
         )?;
         lines_rendered += 1;
@@ -399,7 +399,7 @@ impl RalphTui {
     }
 }
 
-impl Default for RalphTui {
+impl Default for SwarmTui {
     fn default() -> Self {
         Self::new()
     }
@@ -418,8 +418,8 @@ fn status_color(status: RegistryStatus) -> Color {
 }
 
 /// Create TUI from SCUD config (loads waves automatically)
-pub fn create_tui_from_config(config: &Config) -> Result<RalphTui> {
-    let mut tui = RalphTui::new();
+pub fn create_tui_from_config(config: &Config) -> Result<SwarmTui> {
+    let mut tui = SwarmTui::new();
 
     // Load waves from SCUD
     let waves = crate::scud::waves(config)?;
@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn test_tui_action_from_key() {
-        let tui = RalphTui::new();
+        let tui = SwarmTui::new();
 
         // Test quit
         let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
@@ -492,7 +492,7 @@ mod tests {
             vec!["3".to_string(), "4".to_string()],
         ];
         let mut progress = WaveProgress::new(waves);
-        let tui = RalphTui::new();
+        let tui = SwarmTui::new();
 
         // 0/4 completed
         let bar = tui.render_progress_bar(&progress);
@@ -513,7 +513,7 @@ mod tests {
         let mut registry = AgentRegistry::new();
         let handle = registry.spawn("test-pane", Some("task-1".to_string()));
 
-        let tui = RalphTui::with_registry(registry);
+        let tui = SwarmTui::with_registry(registry);
         assert_eq!(tui.registry().list_all().len(), 1);
         assert_eq!(tui.registry().list_all()[0].id, handle.id);
     }

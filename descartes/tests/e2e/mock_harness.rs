@@ -26,6 +26,18 @@ pub enum MockResponse {
 
     /// Task times out
     Timeout,
+
+    /// Task requests subagent spawn (US-30, US-31)
+    SubagentSpawn { category: String, task: String },
+
+    /// Validation failed (US-35)
+    ValidationFailed { errors: Vec<String> },
+
+    /// Review required (US-36)
+    ReviewRequired { changes: String },
+
+    /// Tool call response
+    ToolCall { tool_name: String, arguments: serde_json::Value },
 }
 
 impl Default for MockResponse {
@@ -100,10 +112,26 @@ impl MockHarness {
             .collect()
     }
 
+    /// Get the total number of calls made
+    pub fn call_count(&self) -> usize {
+        self.call_log.lock().unwrap().len()
+    }
+
+    /// Clear all recorded calls
+    pub fn clear_calls(&self) {
+        self.call_log.lock().unwrap().clear();
+    }
+
+    /// Check if any calls were made
+    pub fn was_called(&self) -> bool {
+        !self.call_log.lock().unwrap().is_empty()
+    }
+
     /// Extract task ID from a message (looks for "Task X:" pattern)
     fn extract_task_id(message: &str) -> Option<String> {
-        // Look for patterns like "Task 1:", "Task 1.2:", etc.
-        let re = regex::Regex::new(r"Task\s+(\d+(?:\.\d+)*):").ok()?;
+        // Look for patterns like "Task 1:", "Task 1.2:", "Task complex:", etc.
+        // Allow numeric IDs, word IDs, or mixed
+        let re = regex::Regex::new(r"Task\s+([a-zA-Z0-9_.-]+):").ok()?;
         re.captures(message)
             .map(|c| c.get(1).unwrap().as_str().to_string())
     }
@@ -183,6 +211,34 @@ impl Harness for MockHarness {
             }
             MockResponse::Timeout => {
                 vec![ResponseChunk::Error("Request timed out".to_string())]
+            }
+            MockResponse::SubagentSpawn { category, task } => {
+                vec![
+                    ResponseChunk::Text(format!("SPAWN_SUBAGENT: category={}, task={}", category, task)),
+                    ResponseChunk::Done,
+                ]
+            }
+            MockResponse::ValidationFailed { errors } => {
+                vec![
+                    ResponseChunk::Text(format!("VALIDATION_FAILED: {}", errors.join(", "))),
+                    ResponseChunk::Done,
+                ]
+            }
+            MockResponse::ReviewRequired { changes } => {
+                vec![
+                    ResponseChunk::Text(format!("REVIEW_REQUIRED: {}", changes)),
+                    ResponseChunk::Done,
+                ]
+            }
+            MockResponse::ToolCall { tool_name, arguments } => {
+                vec![
+                    ResponseChunk::ToolCall(descartes::harness::ToolCall {
+                        id: "mock-tool-call".to_string(),
+                        name: tool_name,
+                        arguments,
+                    }),
+                    ResponseChunk::Done,
+                ]
             }
         };
 

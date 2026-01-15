@@ -1,12 +1,12 @@
 # Descartes Documentation
 
-Welcome to the Descartes documentation. Descartes is an AI agent orchestration tool implementing the Ralph Wiggum loop pattern for fresh-context-per-task execution.
+Welcome to the Descartes documentation. Descartes is an AI agent orchestration tool implementing the Swarm pattern (inspired by Ralph Wiggum) for fresh-context-per-task execution.
 
 ## Quick Links
 
 - [Getting Started](./getting-started.md) - Installation and first steps
 - [Configuration](./configuration.md) - Environment variables, config files, categories
-- [Ralph Loop](./ralph-loop.md) - Understanding the orchestration pattern
+- [Swarm Orchestration](./swarm.md) - Understanding the orchestration pattern
 - [Harnesses](./harnesses.md) - OpenCode, Claude Code, and Codex
 - [Workflows](./workflows.md) - Common usage patterns
 
@@ -28,7 +28,7 @@ Unlike traditional loops that accumulate context:
 
 ```
 Traditional: Task 1 → Task 2 → Task 3 → ... → Context overflow
-Ralph Loop:  Task 1 → Fresh → Task 2 → Fresh → Task 3 → ...
+Swarm:       Task 1 → Fresh → Task 2 → Fresh → Task 3 → ...
 ```
 
 Each task gets only the context it needs, nothing more.
@@ -38,7 +38,7 @@ Each task gets only the context it needs, nothing more.
 ```bash
 # CLI help
 descartes --help
-descartes ralph --help
+descartes swarm --help
 
 # Check configuration
 descartes config
@@ -67,7 +67,7 @@ All defaults are configurable via environment variables or config files.
 descartes init
 
 # Create tasks from PRD
-descartes ralph --prd ./docs/feature.md --tag my-feature
+descartes swarm --prd ./docs/feature.md --tag my-feature
 
 # Check progress
 scud stats --tag my-feature
@@ -81,7 +81,7 @@ descartes transcripts
 ```
 ┌─────────────────────────────────────────┐
 │         Descartes CLI                   │
-│  descartes ralph --scud-tag feature     │
+│  descartes swarm --scud-tag feature     │
 └────────────────────┬────────────────────┘
                      │
          ┌───────────┴───────────┐
@@ -94,7 +94,7 @@ descartes transcripts
          └──────────┬───────────┘
                     ▼
 ┌─────────────────────────────────────────┐
-│           Ralph Loop                    │
+│           Swarm Loop                    │
 │  ┌─────────────────────────────────┐    │
 │  │ Wave 1: Tasks A, B, C           │    │
 │  │   → Spawn agents (fresh each)   │    │

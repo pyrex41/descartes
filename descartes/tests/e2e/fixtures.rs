@@ -1,10 +1,28 @@
 //! Test fixtures for e2e integration tests
 //!
-//! Provides utilities for creating temporary SCUD projects.
+//! Provides utilities for creating temporary SCUD projects and complex scenarios.
 
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
+
+/// Sample PRD content for testing parse functionality
+pub const SAMPLE_PRD: &str = r#"# Product Requirements Document: Test Feature
+
+## Overview
+Implement a test feature with multiple components.
+
+## Features
+
+### 1. User Authentication
+Implement user login and registration system.
+
+### 2. Data Processing
+Build data ingestion and transformation pipeline.
+
+### 3. API Endpoints
+Create REST API endpoints for the feature.
+"#;
 
 /// A test project with SCUD initialized
 pub struct TestProject {
@@ -170,6 +188,280 @@ timeout_secs = 60
             }
         }
         "test".to_string()
+    }
+
+    /// Create a project with a large wave structure (for stress testing)
+    pub fn large_wave_project() -> Self {
+        let tasks = r#"# SCUD Graph v1
+# Phase: large
+
+@meta {
+  name large
+  id_format sequential
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Independent A | P | 2 | H
+2 | Independent B | P | 2 | H
+3 | Independent C | P | 2 | H
+4 | Independent D | P | 2 | H
+5 | Wave 2 - depends on 1,2 | P | 3 | H
+6 | Wave 2 - depends on 3,4 | P | 3 | H
+7 | Wave 3 - depends on all | P | 4 | H
+
+@edges
+5 -> 1
+5 -> 2
+6 -> 3
+6 -> 4
+7 -> 5
+7 -> 6
+
+@details
+1 | description |
+  Independent task A
+2 | description |
+  Independent task B
+3 | description |
+  Independent task C
+4 | description |
+  Independent task D
+5 | description |
+  Depends on 1 and 2
+6 | description |
+  Depends on 3 and 4
+7 | description |
+  Final task depending on all previous waves
+"#;
+        Self::with_tasks(tasks)
+    }
+
+    /// Create a project with mixed task statuses (for swarm testing)
+    pub fn mixed_status_project() -> Self {
+        let tasks = r#"# SCUD Graph v1
+# Phase: mixed
+
+@meta {
+  name mixed
+  id_format sequential
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Already done task | D | 2 | H
+2 | In progress task | I | 3 | H
+3 | Pending - ready | P | 2 | M
+4 | Pending - blocked | P | 3 | H
+5 | Blocked task | B | 2 | L
+
+@edges
+4 -> 2
+5 -> 4
+
+@details
+1 | description |
+  This task is already completed
+2 | description |
+  This task is being worked on
+3 | description |
+  This task has no dependencies and is ready
+4 | description |
+  This task is blocked by in-progress task 2
+5 | description |
+  This task is explicitly blocked
+"#;
+        Self::with_tasks(tasks)
+    }
+
+    /// Create a project with task overrides for category testing
+    pub fn task_override_project() -> Self {
+        let project = Self::simple_project();
+
+        // Create a task file with YAML frontmatter override
+        let task_md = r#"---
+category: fast-builder
+disable_review: true
+---
+
+# Task 1: Setup environment
+
+Initialize project structure and dependencies.
+
+## Test Strategy
+Unit tests for configuration loading.
+"#;
+        fs::create_dir_all(project.path.join(".scud/tasks")).unwrap();
+        fs::write(project.path.join(".scud/tasks/task-1.md"), task_md).unwrap();
+
+        project
+    }
+
+    /// Create a project configured for validation testing
+    pub fn validation_project() -> Self {
+        let project = Self::broken_rust_project();
+
+        // Update config with validation settings
+        let config = r#"
+[llm]
+provider = "mock"
+model = "mock-model"
+
+[swarm]
+round_size = 3
+
+[swarm.validation]
+enabled = true
+commands = ["cargo build", "cargo test"]
+stop_on_failure = true
+
+[swarm.backpressure]
+commands = ["cargo build"]
+stop_on_failure = true
+timeout_secs = 60
+"#;
+        fs::write(project.path.join(".scud/config.toml"), config).unwrap();
+
+        project
+    }
+
+    /// Create a project with git initialized (for commit testing)
+    pub fn git_project() -> Self {
+        let project = Self::simple_project();
+
+        // Initialize git repo
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&project.path)
+            .output()
+            .expect("Failed to init git");
+
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(&project.path)
+            .output()
+            .expect("Failed to set git email");
+
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(&project.path)
+            .output()
+            .expect("Failed to set git name");
+
+        // Create initial commit
+        fs::write(project.path.join("README.md"), "# Test Project").unwrap();
+
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&project.path)
+            .output()
+            .expect("Failed to git add");
+
+        std::process::Command::new("git")
+            .args(["commit", "-m", "Initial commit"])
+            .current_dir(&project.path)
+            .output()
+            .expect("Failed to git commit");
+
+        project
+    }
+
+    /// Create a project with transcript directory for replay testing
+    pub fn transcript_project() -> Self {
+        let project = Self::simple_project();
+
+        // Create transcripts directory with sample transcript
+        fs::create_dir_all(project.path.join(".descartes/transcripts")).unwrap();
+
+        let transcript = r#"# Descartes Transcript v1
+# Session: test-session-001
+
+@meta {
+  task_id 1
+  agent_type Builder
+  started_at 2025-01-15T10:00:00Z
+  ended_at 2025-01-15T10:05:00Z
+  status completed
+}
+
+@messages
+H | 2025-01-15T10:00:00Z | Implement the authentication module
+A | 2025-01-15T10:01:00Z | I'll implement the authentication module with JWT tokens.
+A | 2025-01-15T10:02:00Z | @tool_call Edit { file: "src/auth.rs", changes: "..." }
+A | 2025-01-15T10:03:00Z | Implementation complete. Running tests...
+A | 2025-01-15T10:04:00Z | All tests pass. Task completed.
+
+@metrics {
+  tokens_used 1500
+  tool_calls 3
+  iterations 1
+}
+"#;
+        fs::write(
+            project.path.join(".descartes/transcripts/test-session-001.scg"),
+            transcript,
+        )
+        .unwrap();
+
+        project
+    }
+
+    /// Create a multi-phase project for cross-phase dependency testing
+    pub fn multi_phase_project() -> Self {
+        let project = Self::new();
+
+        // Create two phases with cross-phase dependency
+        let phase1 = r#"# SCUD Graph v1
+# Phase: phase1
+
+@meta {
+  name phase1
+  id_format sequential
+}
+
+@nodes
+1 | Core module setup | P | 3 | H
+2 | Database schema | P | 4 | H
+
+@edges
+
+@details
+1 | description |
+  Set up core module structure
+2 | description |
+  Design and implement database schema
+"#;
+
+        let phase2 = r#"# SCUD Graph v1
+# Phase: phase2
+
+@meta {
+  name phase2
+  id_format sequential
+}
+
+@nodes
+1 | API implementation | P | 5 | H
+2 | Frontend integration | P | 4 | M
+
+@edges
+1 -> phase1:2
+2 -> 1
+
+@details
+1 | description |
+  Implement API endpoints (depends on phase1 database)
+2 | description |
+  Integrate frontend with API
+"#;
+
+        fs::write(project.path.join(".scud/tasks/phase1.scg"), phase1).unwrap();
+        fs::write(project.path.join(".scud/tasks/phase2.scg"), phase2).unwrap();
+
+        // Set active tag to phase2
+        fs::write(project.path.join(".scud/active-tag"), "phase2").unwrap();
+
+        project
     }
 }
 

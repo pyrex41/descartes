@@ -58,7 +58,7 @@ tools = [
 parallel = false
 backpressure = false
 
-[ralph_loop]
+[swarm]
 use_fast_first = true
 always_review = false
 heuristic = "prefer_speed"

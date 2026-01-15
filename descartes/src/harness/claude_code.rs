@@ -4,7 +4,7 @@
 //! and subagent spawns. Uses `--output-format stream-json` for structured output.
 
 use async_trait::async_trait;
-use futures::stream::{self, StreamExt};
+use futures::stream;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -35,6 +35,7 @@ pub struct ClaudeCodeHarness {
 
 /// State for an active Claude Code session
 #[derive(Debug)]
+#[allow(dead_code)]
 struct SessionState {
     /// Conversation history for context
     messages: Vec<ConversationMessage>,
@@ -43,6 +44,7 @@ struct SessionState {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum ConversationMessage {
     User(String),
     Assistant(String),

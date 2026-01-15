@@ -1,6 +1,10 @@
-# The Ralph Wiggum Loop
+# Swarm Orchestration
 
-The Ralph Wiggum loop is a fresh-context-per-task orchestration pattern that solves common problems with long-running AI agents.
+Swarm is Descartes' fresh-context-per-task orchestration pattern, inspired by the Ralph Wiggum loop principles.
+
+## Background: The Ralph Wiggum Pattern
+
+The pattern is named after the Simpsons character who famously lives in the moment. The core principle: give each task a completely fresh context to prevent drift, error accumulation, and hallucination creep.
 
 ## The Problem with Traditional Agent Loops
 
@@ -20,9 +24,9 @@ This leads to:
 - **Token exhaustion**: Eventually hits context limits
 - **Hallucination creep**: Agent starts referencing things that don't exist
 
-## The Ralph Wiggum Solution
+## The Swarm Solution
 
-Named after the Simpsons character who famously lives in the moment, the Ralph loop gives each task a completely fresh context:
+Each task gets a completely fresh context:
 
 ```
 Task 1 → Fresh context → Complete → Forget
@@ -134,36 +138,50 @@ If validation fails, tasks in the wave are marked for retry.
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Two Modes: Plan and Build
+## CLI Usage
 
-The Ralph loop supports two modes:
+### Basic Usage
 
-### Build Mode (Default)
-
-Execute tasks directly:
-- Pick ready task from SCUD
-- Spawn implementation agent
-- Complete and mark done
+Execute tasks for a SCUD tag:
 
 ```bash
-descartes ralph --scud-tag feature
+descartes swarm --scud-tag my-feature
 ```
 
-### Plan Mode
+### With Plan Document
 
-Generate implementation plans before building:
-- Analyze the task graph
-- Create detailed plans for each task
-- Write to plan document
+Provide an implementation plan for better context:
 
 ```bash
-descartes ralph --scud-tag feature --plan-only
+descartes swarm --scud-tag feature --plan ./docs/plan.md
 ```
 
-Then build with the plan:
+### With Additional Spec Files
+
+Add more context files:
 
 ```bash
-descartes ralph --scud-tag feature --plan ./docs/plan.md
+descartes swarm --scud-tag feature \
+    --plan ./docs/IMPLEMENTATION.md \
+    --spec-file ./docs/ARCHITECTURE.md \
+    --spec-file ./docs/CONVENTIONS.md
+```
+
+### With Validation
+
+Enable backpressure validation:
+
+```bash
+descartes swarm --scud-tag feature \
+    --verify "cargo test && cargo clippy -- -D warnings"
+```
+
+### Dry Run
+
+Preview execution without running:
+
+```bash
+descartes swarm --scud-tag feature --dry-run
 ```
 
 ## Best Practices
@@ -189,7 +207,7 @@ Use `scud expand` to break down large tasks.
 The spec is all the agent sees. Make it count:
 
 ```bash
-descartes ralph --scud-tag feature \
+descartes swarm --scud-tag feature \
     --plan ./docs/IMPLEMENTATION.md \
     --spec-file ./docs/ARCHITECTURE.md \
     --spec-file ./docs/CONVENTIONS.md
@@ -200,7 +218,7 @@ descartes ralph --scud-tag feature \
 Enable validation to catch issues early:
 
 ```bash
-descartes ralph --scud-tag feature \
+descartes swarm --scud-tag feature \
     --verify "cargo test && cargo clippy -- -D warnings"
 ```
 
@@ -220,12 +238,16 @@ descartes show <transcript-id>
 
 | Pattern | Context | Best For |
 |---------|---------|----------|
-| **Ralph Loop** | Fresh per task | Many focused tasks |
+| **Swarm** | Fresh per task | Many focused tasks |
 | **Continuous Loop** | Accumulating | Single complex task |
 | **Human-in-loop** | Manual checkpoints | High-stakes work |
 
-The Ralph loop excels when you have:
+Swarm excels when you have:
 - Well-defined task graph
 - Many independent tasks
 - Need for reproducibility
 - Quality validation gates
+
+## Learn More
+
+- Original Ralph Wiggum technique: https://ghuntley.com/ralph/

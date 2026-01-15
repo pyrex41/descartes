@@ -1,4 +1,4 @@
-//! Spec configuration for Ralph loop
+//! Spec configuration for Swarm loop
 //!
 //! Implements Geoff's "fixed spec allocation" pattern:
 //! ~5k tokens of persistent context at the start of each prompt.
@@ -261,6 +261,7 @@ pub fn build_task_spec(config: &SpecConfig, task: &Task) -> Result<String> {
 /// Build the full prompt for a Ralph task execution.
 ///
 /// This combines:
+/// - User guidance (global + context-specific)
 /// - Task spec (from `build_task_spec()`)
 /// - SCUD tag context
 /// - Verification command (from backpressure config or explicit --verify)
@@ -273,6 +274,7 @@ pub fn build_task_spec(config: &SpecConfig, task: &Task) -> Result<String> {
 /// * `scud_tag` - The SCUD tag this task belongs to
 /// * `verify_command` - Optional explicit verification command (overrides backpressure)
 /// * `backpressure_commands` - Commands from backpressure config (used if verify_command is None)
+/// * `guidance` - Optional user guidance to prepend to the prompt
 ///
 /// # Returns
 ///
@@ -283,6 +285,7 @@ pub fn build_prompt(
     scud_tag: &str,
     verify_command: Option<&str>,
     backpressure_commands: &[String],
+    guidance: Option<&str>,
 ) -> String {
     // Determine verification command: explicit > backpressure > fallback
     let verification = verify_command
@@ -327,16 +330,21 @@ All commands must pass for the task to be complete."#,
         )
     };
 
+    // Build guidance section if provided
+    let guidance_section = guidance
+        .map(|g| format!("## User Guidance\n\n{}\n\n", g))
+        .unwrap_or_default();
+
     format!(
-        r#"You are implementing SCUD task {} for tag '{}' using the Ralph Wiggum technique.
+        r#"{guidance}You are implementing SCUD task {task_id} for tag '{tag}' using the Swarm technique.
 
 ## Spec
 
-{}
+{spec}
 
 ## Verification Command
 
-{}
+{verification}
 
 ## Instructions
 
@@ -367,7 +375,11 @@ Do NOT use TASK_BLOCKED for:
 - Compilation errors you can debug
 
 Begin implementation."#,
-        task.id, scud_tag, spec, verification_section
+        guidance = guidance_section,
+        task_id = task.id,
+        tag = scud_tag,
+        spec = spec,
+        verification = verification_section
     )
 }
 
@@ -540,13 +552,13 @@ Build instructions.
         let task = sample_task();
         let spec = "# Task Spec\n\nThis is the spec content.";
 
-        let prompt = build_prompt(spec, &task, "test-tag", Some("cargo test"), &[]);
+        let prompt = build_prompt(spec, &task, "test-tag", Some("cargo test"), &[], None);
 
         assert!(prompt.contains("task 1.2"));
         assert!(prompt.contains("tag 'test-tag'"));
         assert!(prompt.contains("cargo test"));
         assert!(prompt.contains("TASK_BLOCKED"));
-        assert!(prompt.contains("Ralph Wiggum technique"));
+        assert!(prompt.contains("Swarm technique"));
     }
 
     #[test]
@@ -560,6 +572,7 @@ Build instructions.
             "feature",
             None,
             &["cargo build".to_string(), "cargo test".to_string()],
+            None,
         );
 
         assert!(prompt.contains("task 1.2"));
@@ -579,6 +592,7 @@ Build instructions.
             "tag",
             Some("npm test"),
             &["cargo build".to_string()],
+            None,
         );
 
         assert!(prompt.contains("npm test"));
@@ -590,7 +604,7 @@ Build instructions.
         let task = sample_task();
         let spec = "# Spec";
 
-        let prompt = build_prompt(spec, &task, "empty", None, &[]);
+        let prompt = build_prompt(spec, &task, "empty", None, &[], None);
 
         assert!(prompt.contains("No verification configured"));
     }
@@ -600,7 +614,7 @@ Build instructions.
         let task = sample_task();
         let spec = "# Spec";
 
-        let prompt = build_prompt(spec, &task, "tag", Some("verify"), &[]);
+        let prompt = build_prompt(spec, &task, "tag", Some("verify"), &[], None);
 
         // Check for blocked protocol documentation
         assert!(prompt.contains("Blocked Task Protocol"));
@@ -614,7 +628,7 @@ Build instructions.
         let task = sample_task();
         let spec = "# Spec";
 
-        let prompt = build_prompt(spec, &task, "single", None, &["cargo test".to_string()]);
+        let prompt = build_prompt(spec, &task, "single", None, &["cargo test".to_string()], None);
 
         assert!(prompt.contains("cargo test"));
         // Should NOT show "All commands must pass" for single command
@@ -626,10 +640,26 @@ Build instructions.
         let task = sample_task();
         let spec = "## Custom Task Details\n\nThis is custom spec content with **markdown**.";
 
-        let prompt = build_prompt(spec, &task, "test", Some("make test"), &[]);
+        let prompt = build_prompt(spec, &task, "test", Some("make test"), &[], None);
 
         // Spec content should be included verbatim
         assert!(prompt.contains("## Custom Task Details"));
         assert!(prompt.contains("This is custom spec content with **markdown**."));
+    }
+
+    #[test]
+    fn test_build_prompt_with_guidance() {
+        let task = sample_task();
+        let spec = "# Spec";
+        let guidance = "Always use Rust best practices.\nPrefer composition over inheritance.";
+
+        let prompt = build_prompt(spec, &task, "tag", Some("cargo test"), &[], Some(guidance));
+
+        // Guidance should appear at the start
+        assert!(prompt.contains("## User Guidance"));
+        assert!(prompt.contains("Always use Rust best practices"));
+        assert!(prompt.contains("Prefer composition over inheritance"));
+        // Should still contain normal prompt elements
+        assert!(prompt.contains("Swarm technique"));
     }
 }

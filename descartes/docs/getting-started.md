@@ -1,22 +1,12 @@
 # Getting Started with Descartes
 
-Descartes is an AI agent orchestration tool that implements the "Ralph Wiggum loop" pattern - a fresh-context-per-task approach that prevents drift and keeps agents focused.
+Descartes is an AI agent orchestration tool that implements the Swarm pattern (inspired by Ralph Wiggum) - a fresh-context-per-task approach that prevents drift and keeps agents focused.
 
 ## Installation
 
 ### Prerequisites
 
 - Rust 1.75+
-- `protoc` (protobuf compiler)
-- Node.js/npm (for BAML CLI)
-
-```bash
-# macOS
-brew install protobuf
-
-# Ubuntu/Debian
-apt-get install protobuf-compiler
-```
 
 ### Build from Source
 
@@ -69,16 +59,16 @@ Parse a PRD (Product Requirements Document) into tasks:
 scud parse ./docs/prd.md --tag my-feature
 ```
 
-### 4. Run the Ralph Loop
+### 4. Run the Swarm Loop
 
-Execute tasks using the Ralph Wiggum loop:
+Execute tasks using the Swarm loop:
 
 ```bash
 # Execute all ready tasks in a tag
-descartes ralph --scud-tag my-feature
+descartes swarm --scud-tag my-feature
 
 # Or initialize from PRD and execute in one command
-descartes ralph --prd ./docs/prd.md --tag my-feature
+descartes swarm --prd ./docs/prd.md --tag my-feature
 ```
 
 ## Understanding the Output
@@ -129,6 +119,6 @@ After each wave, Descartes can run validation commands (tests, lints, builds). I
 ## Next Steps
 
 - [Configuration Guide](./configuration.md) - Customize harnesses, models, and categories
-- [Ralph Loop Deep Dive](./ralph-loop.md) - Understand the orchestration pattern
+- [Swarm Deep Dive](./swarm.md) - Understand the orchestration pattern
 - [Harnesses Guide](./harnesses.md) - Choose the right harness for your tasks
 - [Workflows](./workflows.md) - Common usage patterns

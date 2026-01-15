@@ -38,16 +38,6 @@ impl<H: Harness> SubagentProxy<H> {
         }
     }
 
-    /// Create a child proxy for subagent execution
-    fn child_proxy(&self) -> Self {
-        Self {
-            inner: todo!("Need to clone harness or use Arc"),
-            config: self.config.clone(),
-            depth: self.depth + 1,
-            max_depth: self.max_depth,
-        }
-    }
-
     /// Check if we can spawn a subagent
     fn can_spawn(&self) -> bool {
         self.depth < self.max_depth

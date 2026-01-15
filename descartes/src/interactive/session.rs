@@ -275,7 +275,7 @@ impl Session {
             Some(cmd) => cmd,
             None => {
                 // Check if it might be a skill
-                if let Some(skill) = self.skills.get(&invocation.name) {
+                if let Some(_skill) = self.skills.get(&invocation.name) {
                     self.execute_skill(&invocation.name, &invocation.raw_args)
                         .await?;
                     return Ok(());
@@ -292,20 +292,20 @@ impl Session {
                 self.handle_control_action(*action).await?;
             }
             CommandKind::Skill {
-                prompt_file,
-                category,
-                auto_start,
+                prompt_file: _,
+                category: _,
+                auto_start: _,
             } => {
                 self.execute_skill(&resolved.command.name, &resolved.raw_args)
                     .await?;
             }
             CommandKind::Transition {
-                to_stage,
-                generate_handoff,
+                to_stage: _,
+                generate_handoff: _,
             } => {
                 self.handle_transition(&resolved).await?;
             }
-            CommandKind::Context { context_type } => {
+            CommandKind::Context { context_type: _ } => {
                 self.inject_context(&resolved).await?;
             }
             CommandKind::Builtin(name) => {
@@ -501,7 +501,7 @@ impl Session {
         self.state = SessionState::AgentRunning;
 
         let harness = self.harness.clone();
-        let config = self.config.clone();
+        let _config = self.config.clone();
 
         // Spawn agent runner with control receiver
         tokio::spawn(async move {

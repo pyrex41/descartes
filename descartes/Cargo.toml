@@ -10,7 +10,7 @@ documentation = "https://docs.rs/descartes-cli"
 readme = "README.md"
 keywords = ["ai", "agents", "orchestration", "llm", "claude"]
 categories = ["command-line-utilities", "development-tools"]
-include = ["src/**/*", "baml_src/**/*", "prompts/**/*", "build.rs", "Cargo.toml", "README.md"]
+include = ["src/**/*", "prompts/**/*", "build.rs", "Cargo.toml", "README.md"]
 
 [[bin]]
 name = "descartes"
@@ -47,9 +47,6 @@ hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 http-body-util = "0.1"
 
-# BAML - AI prompt engineering framework with native Rust codegen
-baml = "0.217"
-
 # SCUD task management
 # Development: use path for latest features
 # Publishing:  change to version (scud = { package = "scud-cli", version = "1.36" })
@@ -76,9 +73,6 @@ humantime = "2"
 ctrlc = "3"
 shell-words = "1"
 dotenvy = "0.15"
-
-[build-dependencies]
-walkdir = "2"
 
 [dev-dependencies]
 tokio-test = "0.4"

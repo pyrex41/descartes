@@ -1,10 +1,10 @@
 ---
-description: Start Ralph Wiggum loop for SCUD tag
+description: Start Swarm loop for SCUD tag
 ---
 
-# Ralph Loop
+# Swarm Loop
 
-Start a Geoff-style iterative loop for implementing SCUD tasks.
+Start an iterative loop (inspired by Ralph Wiggum) for implementing SCUD tasks.
 
 ## Arguments
 
@@ -22,12 +22,11 @@ $ARGUMENTS should be a SCUD tag name, optionally followed by flags:
 3. Start the loop via Descartes CLI:
 
 ```bash
-descartes loop start \
+descartes swarm \
     --scud-tag {tag} \
     --plan {plan_path} \
     --spec-file {spec_files...} \
-    --verify "cargo check && cargo test" \
-    --max-tune-attempts 3
+    --verify "cargo check && cargo test"
 ```
 
 4. Monitor progress and report status
@@ -35,7 +34,7 @@ descartes loop start \
 ## Example Usage
 
 ```
-/rw:loop my-feature --plan thoughts/shared/plans/my-feature.md
+/swarm:loop my-feature --plan thoughts/shared/plans/my-feature.md
 ```
 
 ## Tuning Options ("Tune the Guitar")
@@ -50,29 +49,29 @@ When a task fails, the loop automatically:
 
 If a task fails after max attempts, the loop pauses:
 
-1. Run `descartes loop tune` to review all attempts
-2. Select a variant: `descartes loop tune --select 2`
-3. Or edit manually: `descartes loop tune --edit`
-4. Resume: `descartes loop resume`
+1. Run `descartes swarm --tune` to review all attempts
+2. Select a variant: `descartes swarm --tune --select 2`
+3. Or edit manually: `descartes swarm --tune --edit`
+4. Resume: `descartes swarm --resume`
 
 ## Output Format
 
 ```
-Starting Ralph loop for tag: {tag}
+Starting Swarm loop for tag: {tag}
 
-📊 Initial Status:
+Initial Status:
 - Tasks: {pending}/{total}
 - Waves: {total_waves}
 - Tuning: enabled (max 3 attempts)
 
-🔄 Loop running...
-- Use /rw:cancel-ralph to stop
+Loop running...
+- Use /swarm:cancel to stop
 - Progress saved to .scud/loop-state.json
 
 Wave 1: Implementing {n} tasks...
-  ✓ Task 1: {title}
-  ✓ Task 2: {title} (succeeded on attempt 2)
-  ⏸ Task 3: {title} (awaiting tune - 3 attempts failed)
+  Task 1: {title}
+  Task 2: {title} (succeeded on attempt 2)
+  Task 3: {title} (awaiting tune - 3 attempts failed)
 
-Loop paused. Run `descartes loop tune` to review variants.
+Loop paused. Run `descartes swarm --tune` to review variants.
 ```

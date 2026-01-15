@@ -1,19 +1,19 @@
-//! End-to-end tests for Ralph executor
+//! End-to-end tests for Swarm executor
 //!
 //! Tests the integration between Descartes and SCUD task management.
 
 use super::fixtures::TestProject;
 use super::mock_harness::{MockHarness, MockResponse};
 use descartes::spec::SpecConfig;
-use descartes::RalphExecutor;
+use descartes::SwarmExecutor;
 use scud::storage::Storage;
 
-/// Test that RalphExecutor correctly reads tasks from a SCUD project
+/// Test that SwarmExecutor correctly reads tasks from a SCUD project
 #[test]
-fn test_ralph_loads_scud_tasks() {
+fn test_swarm_loads_scud_tasks() {
     let project = TestProject::simple_project();
 
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -44,10 +44,10 @@ fn test_ralph_loads_scud_tasks() {
 
 /// Test that parallel tasks are correctly grouped into waves
 #[test]
-fn test_ralph_parallel_wave_computation() {
+fn test_swarm_parallel_wave_computation() {
     let project = TestProject::parallel_project();
 
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -74,10 +74,10 @@ fn test_ralph_parallel_wave_computation() {
 
 /// Test dry run output format
 #[test]
-fn test_ralph_dry_run_format() {
+fn test_swarm_dry_run_format() {
     let project = TestProject::simple_project();
 
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -114,11 +114,11 @@ fn test_ralph_dry_run_format() {
 
 /// Test that validation flag is respected
 #[test]
-fn test_ralph_validation_config() {
+fn test_swarm_validation_config() {
     let project = TestProject::simple_project();
 
     // Without validation
-    let executor_no_validate = RalphExecutor::new(
+    let executor_no_validate = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -132,7 +132,7 @@ fn test_ralph_validation_config() {
     assert!(!executor_no_validate.validate);
 
     // With validation
-    let executor_validate = RalphExecutor::new(
+    let executor_validate = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         Some("cargo build".to_string()),
@@ -152,7 +152,7 @@ fn test_ralph_validation_config() {
 
 /// Test that SpecConfig integrates correctly with executor
 #[test]
-fn test_ralph_spec_config_integration() {
+fn test_swarm_spec_config_integration() {
     let project = TestProject::simple_project();
 
     // Create a plan file
@@ -163,7 +163,7 @@ fn test_ralph_spec_config_integration() {
         .with_plan(plan_path.clone())
         .with_spec_file(plan_path.clone()); // Add same file as additional spec
 
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         project.tag(),
         spec_config,
         None,
@@ -233,11 +233,11 @@ async fn test_mock_harness_task_responses() {
 
 /// Test round_size chunking behavior
 #[test]
-fn test_ralph_round_size_chunking() {
+fn test_swarm_round_size_chunking() {
     let project = TestProject::parallel_project();
 
     // With round_size = 1, each task runs separately
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -252,7 +252,7 @@ fn test_ralph_round_size_chunking() {
     assert_eq!(executor.round_size, 1);
 
     // With round_size = 10, tasks can run in larger batches
-    let executor_large = RalphExecutor::new(
+    let executor_large = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -269,10 +269,10 @@ fn test_ralph_round_size_chunking() {
 
 /// Test working directory is correctly set
 #[test]
-fn test_ralph_working_directory() {
+fn test_swarm_working_directory() {
     let project = TestProject::simple_project();
 
-    let executor = RalphExecutor::new(
+    let executor = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -289,11 +289,11 @@ fn test_ralph_working_directory() {
 
 /// Test model configuration
 #[test]
-fn test_ralph_model_config() {
+fn test_swarm_model_config() {
     let project = TestProject::simple_project();
 
     // Default model (None)
-    let executor_default = RalphExecutor::new(
+    let executor_default = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,
@@ -307,7 +307,7 @@ fn test_ralph_model_config() {
     assert!(executor_default.model.is_none());
 
     // Specific model
-    let executor_specific = RalphExecutor::new(
+    let executor_specific = SwarmExecutor::new(
         project.tag(),
         SpecConfig::default(),
         None,

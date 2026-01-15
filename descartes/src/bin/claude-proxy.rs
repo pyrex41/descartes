@@ -3,7 +3,7 @@
 //! OpenAI-compatible HTTP proxy wrapping `claude -p`.
 //!
 //! This binary provides an OpenAI API facade over Claude Code CLI,
-//! allowing tools like BAML to use Claude Code as a backend.
+//! allowing OpenAI-compatible tools to use Claude Code as a backend.
 //!
 //! ## Usage
 //!
@@ -21,18 +21,6 @@
 //! - `POST /v1/chat/completions` - Chat completion (non-streaming)
 //! - `GET /` or `GET /health` - Health check
 //!
-//! ## Integration with BAML
-//!
-//! ```text
-//! client<llm> ClaudeCode {
-//!     provider openai-generic
-//!     options {
-//!         base_url "http://localhost:8765/v1"
-//!         model "claude-code"
-//!     }
-//! }
-//! ```
-//!
 //! See `docs/CLAUDE_PROXY.md` for full documentation.
 
 use std::convert::Infallible;
@@ -49,6 +37,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ChatRequest {
     messages: Vec<Message>,
     #[serde(default)]
@@ -224,8 +213,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let listener = TcpListener::bind(addr).await?;
 
     println!("Claude Code proxy listening on http://{}", addr);
-    println!("Configure BAML with:");
-    println!("  base_url \"http://localhost:{}/v1\"", port);
+    println!("OpenAI-compatible endpoint: http://localhost:{}/v1", port);
 
     loop {
         let (stream, _) = listener.accept().await?;

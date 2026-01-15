@@ -21,6 +21,7 @@ use crate::config::CodexConfig;
 use crate::{Error, Result};
 
 /// Codex harness using the OpenAI-compatible API
+#[allow(dead_code)]
 pub struct CodexHarness {
     /// API base URL
     api_base: String,
@@ -100,6 +101,7 @@ struct ChatCompletionRequest {
 
 /// Streaming response chunk
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct StreamChunk {
     id: Option<String>,
     choices: Vec<StreamChoice>,
@@ -108,6 +110,7 @@ struct StreamChunk {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct StreamChoice {
     index: u32,
     delta: Delta,
@@ -115,6 +118,7 @@ struct StreamChoice {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Delta {
     #[serde(default)]
     role: Option<String>,
@@ -125,6 +129,7 @@ struct Delta {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeltaToolCall {
     index: u32,
     #[serde(default)]
@@ -136,6 +141,7 @@ struct DeltaToolCall {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DeltaFunction {
     #[serde(default)]
     name: Option<String>,
@@ -144,6 +150,7 @@ struct DeltaFunction {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Usage {
     prompt_tokens: u32,
     completion_tokens: u32,
@@ -308,7 +315,7 @@ impl CodexHarness {
     }
 
     /// Extract subagent request from function arguments
-    fn extract_subagent_request(&self, name: &str, args_str: &str) -> Option<SubagentRequest> {
+    fn extract_subagent_request(&self, _name: &str, args_str: &str) -> Option<SubagentRequest> {
         let args: serde_json::Value = serde_json::from_str(args_str).ok()?;
 
         let prompt = args

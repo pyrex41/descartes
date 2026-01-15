@@ -18,10 +18,10 @@ A harness is the execution environment for an AI agent. Descartes supports multi
 
 ```bash
 # Use OpenCode explicitly
-descartes ralph --scud-tag feature --harness opencode
+descartes swarm --scud-tag feature --harness opencode
 
 # With custom model
-descartes ralph --scud-tag feature --harness opencode --model xai/grok-3-fast
+descartes swarm --scud-tag feature --harness opencode --model xai/grok-3-fast
 ```
 
 **Configuration:**
@@ -53,10 +53,10 @@ binary = "/path/to/opencode"  # Optional, defaults to PATH
 
 ```bash
 # Use Claude Code explicitly
-descartes ralph --scud-tag feature --harness claude-code
+descartes swarm --scud-tag feature --harness claude-code
 
 # With specific model
-descartes ralph --scud-tag feature --harness claude-code --model sonnet
+descartes swarm --scud-tag feature --harness claude-code --model sonnet
 ```
 
 **Configuration:**
@@ -86,7 +86,7 @@ OpenAI's Codex-style API harness.
 **Default model:** `gpt-4o`
 
 ```bash
-descartes ralph --scud-tag feature --harness codex --model gpt-4o
+descartes swarm --scud-tag feature --harness codex --model gpt-4o
 ```
 
 **Configuration:**

@@ -41,6 +41,7 @@ struct OpenCodeSession {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum ConversationMessage {
     User(String),
     Assistant(String),
