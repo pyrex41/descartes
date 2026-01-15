@@ -201,6 +201,64 @@ Transcripts are stored per-agent with timestamps:
 └── ...
 ```
 
+## Guidance System
+
+The guidance system injects custom context into agent prompts. This lets you provide project-specific instructions that agents will follow.
+
+```toml
+[guidance]
+global = "Always follow existing code patterns. Prefer small, focused changes."
+builder = "Run tests after making changes. Use cargo check before cargo test."
+review = "Check for security issues and edge cases."
+validator = "Use cargo test --all-features for full coverage."
+```
+
+| Field | Used By | Description |
+|-------|---------|-------------|
+| `global` | All agents | Included in every prompt |
+| `builder` | builder, fast-builder | Implementation guidance |
+| `review` | builder-reviewer | Code review criteria |
+| `validator` | validator | Validation approach |
+
+The guidance appears at the top of agent prompts under a "## User Guidance" section. Global guidance is combined with context-specific guidance.
+
+## Backpressure Configuration
+
+Backpressure validation runs after each **round** of tasks (not after each wave). A round is a subset of a wave, controlled by `--round-size` (default: 5).
+
+```toml
+[swarm.backpressure]
+commands = ["cargo build", "cargo test", "cargo clippy -- -D warnings"]
+stop_on_failure = true   # Stop at first failing command
+timeout_secs = 300       # Per-command timeout
+```
+
+### Auto-Detection
+
+If no commands are configured, Descartes auto-detects based on project type:
+
+| Project Type | Detection | Default Commands |
+|--------------|-----------|------------------|
+| **Rust** | `Cargo.toml` | `cargo build`, `cargo test` |
+| **Node.js** | `package.json` | Detected scripts (build, test, lint, typecheck) |
+| **Python** | `pyproject.toml` | `pytest` |
+| **Go** | `go.mod` | `go build ./...`, `go test ./...` |
+
+### CLI Override
+
+Override validation via CLI:
+
+```bash
+descartes swarm --scud-tag feature --verify "cargo test && cargo clippy -- -D warnings"
+```
+
+### Failure Behavior
+
+When validation fails:
+1. All tasks in the current round are marked `Failed`
+2. Wave processing stops
+3. Failed tasks can be retried after fixing issues
+
 ---
 
 ← [Getting Started](getting-started.md) | **Next:** [Swarm](swarm.md) →

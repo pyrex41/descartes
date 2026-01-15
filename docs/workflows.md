@@ -291,6 +291,80 @@ descartes swarm \
     --spec-file ../shared/API_CONTRACT.md
 ```
 
+## Workflow 10: Interactive Mode
+
+Run Descartes interactively for manual control and exploration.
+
+### Starting Interactive Mode
+
+```bash
+descartes interactive
+```
+
+### Interactive Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/pause` | Pause current execution |
+| `/resume` | Resume paused execution |
+| `/cancel` | Cancel current task |
+| `/scud` | Show SCUD task status |
+| `/waves` | Display wave structure |
+| `/diff` | Show pending changes |
+| `/context` | Display current context |
+| `/skill <name>` | Run a skill by name |
+
+### Running Skills
+
+Skills are reusable prompts for common tasks:
+
+```bash
+# In interactive mode
+/skill research "authentication patterns"
+/skill create_plan
+/skill commit
+```
+
+### Built-in Skills
+
+| Skill | Aliases | Description |
+|-------|---------|-------------|
+| `research` | `r` | Research a topic or codebase area |
+| `create_plan` | `plan`, `cp` | Create implementation plan |
+| `implement_plan` | `implement`, `ip` | Implement from plan |
+| `commit` | `c` | Create git commit |
+| `review` | `rv` | Review code changes |
+| `fix` | `f` | Fix an issue |
+| `test` | `t` | Run tests and fix failures |
+
+### Custom Skills
+
+Add custom skills in `.descartes/skills/`:
+
+```markdown
+# .descartes/skills/security-audit.md
+
+Review the following code for security vulnerabilities:
+- SQL injection
+- XSS
+- Authentication bypass
+- Sensitive data exposure
+
+Files to review: {{files}}
+```
+
+Use with `/skill security-audit`.
+
+### Cross-Tool Compatibility
+
+Descartes can load skills from other tools:
+- `.claude/commands/` - Claude Code commands
+- `.opencode/skill/` - OpenCode skills
+- `.codex/skills/` - Codex skills
+
+This means your existing Claude Code slash commands work in Descartes.
+
 ## Tips for Success
 
 ### 1. Start Small

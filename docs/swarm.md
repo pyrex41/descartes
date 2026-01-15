@@ -100,17 +100,26 @@ The agent (builder, fast-builder, etc.) executes with:
 
 ### 5. Backpressure Validation
 
-After each wave completes, validation runs:
+Validation runs after each **round** of tasks. Waves are split into rounds based on `--round-size` (default: 5 tasks per round).
+
+```
+Wave with 12 tasks:
+├── Round 1: Tasks 1-5  → Validate → Pass → Continue
+├── Round 2: Tasks 6-10 → Validate → Pass → Continue
+└── Round 3: Tasks 11-12 → Validate → Done
+```
+
+Validation uses automated commands (not LLM-based review):
 
 ```bash
-# Default: whatever's in the validator category
-cargo test && cargo clippy
+# Auto-detected based on project type
+cargo build && cargo test
 
 # Or custom via --verify
 npm test && npm run lint
 ```
 
-If validation fails, tasks in the wave are marked for retry.
+If validation fails, all tasks in that round are marked `Failed` and wave processing stops. See [Configuration](configuration.md#backpressure-configuration) for details on auto-detection and customization.
 
 ## Execution Flow
 
@@ -122,17 +131,19 @@ If validation fails, tasks in the wave are marked for retry.
                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │ 2. For each wave:                                       │
-│    ┌─────────────────────────────────────────────────┐  │
-│    │ For each task (in rounds of --round-size):     │  │
-│    │   • Build fresh spec (task + plan + files)     │  │
-│    │   • Select harness based on category           │  │
-│    │   • Spawn agent with fresh session             │  │
-│    │   • Execute and capture transcript             │  │
-│    │   • Update SCUD status (done/failed/blocked)   │  │
-│    └─────────────────────────────────────────────────┘  │
+│    Wave splits into rounds (--round-size, default 5)    │
 │                                                         │
-│    • Run backpressure validation                        │
-│    • If failed: mark recent tasks for retry             │
+│    ┌─────────────────────────────────────────────────┐  │
+│    │ For each round:                                 │  │
+│    │   • Execute each task with fresh context       │  │
+│    │   • Build spec (task + plan + files)           │  │
+│    │   • Select harness based on category           │  │
+│    │   • Spawn agent, capture transcript            │  │
+│    │   • Update SCUD status                         │  │
+│    │                                                │  │
+│    │   → Run backpressure validation                │  │
+│    │   → If failed: mark round tasks Failed, stop   │  │
+│    └─────────────────────────────────────────────────┘  │
 └──────────────────────┬──────────────────────────────────┘
                        ▼
 ┌─────────────────────────────────────────────────────────┐
