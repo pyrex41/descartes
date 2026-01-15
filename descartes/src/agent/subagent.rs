@@ -52,6 +52,34 @@ impl SubagentResult {
     }
 }
 
+/// Options for spawning a subagent
+#[derive(Debug, Clone, Default)]
+pub struct SpawnOptions {
+    /// Agent context to inject via system prompt (for Codex) or --append-system-prompt (for Claude Code)
+    pub system_context: Option<String>,
+    /// Agent context to inject via message prefix (for OpenCode)
+    pub message_context: Option<String>,
+    /// Override model from category default
+    pub model: Option<String>,
+}
+
+impl SpawnOptions {
+    /// Create new spawn options with agent context
+    pub fn with_context(system_context: String, message_context: String) -> Self {
+        Self {
+            system_context: Some(system_context.clone()),
+            message_context: Some(message_context),
+            model: None,
+        }
+    }
+
+    /// Set model override
+    pub fn with_model(mut self, model: String) -> Self {
+        self.model = Some(model);
+        self
+    }
+}
+
 /// Spawn a subagent with full transcript capture
 ///
 /// # Arguments
@@ -68,17 +96,47 @@ pub async fn spawn_subagent(
     category: AgentCategory,
     prompt: String,
     parent_transcript: Option<&mut Transcript>,
+    control_rx: Option<mpsc::Receiver<AgentControl>>,
+) -> Result<SubagentResult> {
+    spawn_subagent_with_options(harness, category, prompt, parent_transcript, control_rx, None)
+        .await
+}
+
+/// Spawn a subagent with full transcript capture and custom options
+///
+/// # Arguments
+/// * `harness` - The harness to use for execution
+/// * `category` - The agent category (determines model, tools)
+/// * `prompt` - The task for the subagent
+/// * `parent_transcript` - Optional parent transcript to link to
+/// * `control_rx` - Optional control receiver for pause/resume/cancel
+/// * `options` - Optional spawn options (agent context, model override)
+///
+/// # Returns
+/// Result containing the subagent's output and metrics
+pub async fn spawn_subagent_with_options(
+    harness: &dyn Harness,
+    category: AgentCategory,
+    prompt: String,
+    parent_transcript: Option<&mut Transcript>,
     mut control_rx: Option<mpsc::Receiver<AgentControl>>,
+    options: Option<SpawnOptions>,
 ) -> Result<SubagentResult> {
     info!("Spawning {} subagent: {}", category, truncate(&prompt, 50));
 
     let category_config = category.default_config();
+    let opts = options.unwrap_or_default();
 
-    // Create session config
+    // Determine model (options override > category default)
+    let model = opts.model.unwrap_or_else(|| category_config.model.clone());
+
+    // Create session config with agent context
     let session_config = SessionConfig {
-        model: category_config.model.clone(),
+        model,
         tools: category_config.tools.clone(),
-        system_prompt: None,
+        system_prompt: opts.system_context.clone(), // For Codex
+        append_system_prompt: opts.system_context,  // For Claude Code
+        agent_context: opts.message_context,        // For OpenCode
         parent: None,
         is_subagent: true,
     };

@@ -41,6 +41,8 @@ struct SessionState {
     messages: Vec<ConversationMessage>,
     /// Working directory
     working_dir: Option<String>,
+    /// Agent context to append to system prompt
+    append_system_prompt: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -68,7 +70,13 @@ impl ClaudeCodeHarness {
     }
 
     /// Build command arguments for a session
-    fn build_args(&self, session: &SessionHandle, message: &str, resume: bool) -> Vec<String> {
+    fn build_args(
+        &self,
+        session: &SessionHandle,
+        message: &str,
+        resume: bool,
+        append_system_prompt: Option<&str>,
+    ) -> Vec<String> {
         let mut args = vec![];
 
         // Print mode for streaming JSON output
@@ -92,6 +100,12 @@ impl ClaudeCodeHarness {
         if resume {
             args.push("--resume".to_string());
             args.push(session.id.clone());
+        }
+
+        // Append system prompt for agent context injection
+        if let Some(prompt) = append_system_prompt {
+            args.push("--append-system-prompt".to_string());
+            args.push(prompt.to_string());
         }
 
         args
@@ -259,10 +273,17 @@ impl ClaudeCodeHarness {
             .and_then(|m| m.as_str())
             .map(|s| s.to_string());
 
+        let agent_name = args
+            .get("agent_name")
+            .or_else(|| args.get("agent"))
+            .and_then(|a| a.as_str())
+            .map(|s| s.to_string());
+
         Some(SubagentRequest {
             category,
             prompt: prompt.to_string(),
             model,
+            agent_name,
         })
     }
 
@@ -326,6 +347,7 @@ impl Harness for ClaudeCodeHarness {
             SessionState {
                 messages: Vec::new(),
                 working_dir: None,
+                append_system_prompt: config.append_system_prompt,
             },
         );
 
@@ -340,13 +362,15 @@ impl Harness for ClaudeCodeHarness {
     async fn send(&self, session: &SessionHandle, message: &str) -> Result<ResponseStream> {
         // Check if we have prior context for this session
         let sessions = self.sessions.lock().await;
-        let has_context = sessions
-            .get(&session.id)
+        let session_state = sessions.get(&session.id);
+        let has_context = session_state
             .map(|s| !s.messages.is_empty())
             .unwrap_or(false);
+        let append_prompt = session_state
+            .and_then(|s| s.append_system_prompt.clone());
         drop(sessions);
 
-        let args = self.build_args(session, message, has_context);
+        let args = self.build_args(session, message, has_context, append_prompt.as_deref());
         let (mut child, mut lines) = self.execute_claude(args).await?;
 
         // Collect chunks while streaming (could be improved to true async stream)

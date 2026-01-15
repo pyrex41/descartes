@@ -11,7 +11,8 @@ use super::{
     Harness, HarnessKind, ResponseChunk, ResponseStream, SessionConfig, SessionHandle,
     SubagentRequest, SubagentResult,
 };
-use crate::agent::AgentCategory;
+use crate::agent::{AgentCategory, AgentDefinitionRegistry};
+use crate::interactive::SkillRegistry;
 use crate::transcript::Transcript;
 use crate::{Config, Result};
 
@@ -21,6 +22,10 @@ pub struct SubagentProxy<H: Harness> {
     inner: H,
     /// Configuration
     config: Config,
+    /// Agent definition registry
+    agent_registry: AgentDefinitionRegistry,
+    /// Skill registry for frontmatter generation
+    skill_registry: SkillRegistry,
     /// Current nesting depth (0 = top level)
     depth: usize,
     /// Maximum allowed depth (1 = one level of subagents)
@@ -30,9 +35,22 @@ pub struct SubagentProxy<H: Harness> {
 impl<H: Harness> SubagentProxy<H> {
     /// Create a new proxy wrapping a harness
     pub fn new(inner: H, config: Config) -> Self {
+        // Load agent definitions
+        let mut agent_registry = AgentDefinitionRegistry::new(config.agents.directory.clone())
+            .with_enabled(config.agents.enabled.clone())
+            .with_disabled(config.agents.disabled.clone());
+        if let Err(e) = agent_registry.load() {
+            warn!("Failed to load agent definitions: {}", e);
+        }
+
+        // Load skills
+        let skill_registry = SkillRegistry::new();
+
         Self {
             inner,
             config,
+            agent_registry,
+            skill_registry,
             depth: 0,
             max_depth: 1, // Only allow 1 level of subagents
         }
@@ -73,16 +91,57 @@ impl<H: Harness> SubagentProxy<H> {
             .cloned()
             .unwrap_or_else(|| category.default_config());
 
-        // Determine model
-        let model = request
-            .model
-            .unwrap_or_else(|| category_config.model.clone());
+        // Check for named agent definition
+        let (model, system_prompt, append_system_prompt, agent_context) =
+            if let Some(ref agent_name) = request.agent_name {
+                if let Some(agent_def) = self.agent_registry.get(agent_name) {
+                    debug!("Using agent definition: {}", agent_name);
+
+                    // Generate skill frontmatter for this agent's skills
+                    let skills_frontmatter =
+                        self.skill_registry.generate_frontmatter(&agent_def.skills);
+
+                    // Build full context with skills resolved
+                    let context = agent_def.build_context(&skills_frontmatter);
+
+                    // Model: agent override > request override > category default
+                    let model = agent_def
+                        .model
+                        .clone()
+                        .or(request.model.clone())
+                        .unwrap_or_else(|| category_config.model.clone());
+
+                    // For system_prompt (Codex) and append_system_prompt (Claude Code),
+                    // use the same context. For agent_context (OpenCode), same.
+                    (
+                        model,
+                        Some(context.clone()),
+                        Some(context.clone()),
+                        Some(context),
+                    )
+                } else {
+                    warn!("Agent '{}' not found, using category defaults", agent_name);
+                    let model = request
+                        .model
+                        .clone()
+                        .unwrap_or_else(|| category_config.model.clone());
+                    (model, None, None, None)
+                }
+            } else {
+                let model = request
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| category_config.model.clone());
+                (model, None, None, None)
+            };
 
         // Create session config
         let session_config = SessionConfig {
             model,
             tools: category_config.tools.clone(),
-            system_prompt: None,
+            system_prompt,
+            append_system_prompt,
+            agent_context,
             parent: None, // Will be set when we have parent handle
             is_subagent: true,
         };

@@ -106,6 +106,83 @@ The `[guidance]` section lets you inject custom context into agent prompts witho
 
 Global and context-specific guidance are combined when building prompts.
 
+### Agent Definitions
+
+Define custom agents in `.descartes/agents/<name>/AGENT.md` using YAML frontmatter:
+
+```markdown
+---
+name: code-analyzer
+description: Expert code analysis agent. Use for deep architectural review.
+category: analyzer
+model: opus
+skills:
+  - research
+  - review
+---
+
+# Code Analyzer
+
+You are an expert code analyst.
+
+## Available Skills
+{{skills_frontmatter}}
+
+## Approach
+1. Start by understanding the structure
+2. Identify patterns and anti-patterns
+```
+
+#### Agent Configuration
+
+```toml
+[agents]
+directory = ".descartes/agents"
+
+# Control which agents are available (use EITHER enabled OR disabled)
+# enabled = ["code-analyzer", "security-reviewer"]
+# disabled = ["experimental-agent"]
+```
+
+#### Cross-Tool Compatibility
+
+Descartes automatically discovers agents from multiple locations, enabling seamless use across different AI coding tools:
+
+| Tool | Agent Location | Format |
+|------|---------------|--------|
+| Descartes | `.descartes/agents/<name>/AGENT.md` | YAML frontmatter + markdown |
+| Claude Code | `.claude/agents/<name>/AGENT.md` | YAML frontmatter + markdown |
+| OpenCode | `.opencode/agent/<name>.md` | YAML frontmatter + markdown |
+
+Global agents are also searched in `~/.config/descartes/agents/`, `~/.config/opencode/agent/`, and `~/.claude/agents/`.
+
+#### Agent CLI Commands
+
+```bash
+# List all available agents
+descartes agents list
+
+# Show details of a specific agent
+descartes agents show code-analyzer
+
+# Create example agent structure
+descartes agents init
+descartes agents init --force  # Overwrite existing
+```
+
+### Skills
+
+Skills are reusable prompt snippets that can be included in agent definitions. They're discovered from multiple locations for cross-tool compatibility:
+
+| Tool | Skill Location | Format |
+|------|---------------|--------|
+| Descartes | `.descartes/skills/*.md` | TOML frontmatter or SKILL.md |
+| Claude Code | `.claude/commands/*.md` | Markdown with description header |
+| OpenCode | `.opencode/skill/*.md` | YAML frontmatter |
+| Codex | `.codex/skills/*.md` | YAML frontmatter |
+
+Skills referenced in an agent's `skills:` list are resolved and injected into `{{skills_frontmatter}}` placeholders, giving subagents awareness of available capabilities.
+
 ## Usage
 
 ### Swarm Command

@@ -17,6 +17,10 @@ pub struct Config {
     #[serde(default)]
     pub categories: HashMap<String, CategoryConfig>,
 
+    /// Agent definition configuration
+    #[serde(default)]
+    pub agents: AgentsConfig,
+
     /// Swarm orchestration settings
     #[serde(default)]
     pub swarm: SwarmConfig,
@@ -68,6 +72,39 @@ impl Default for SwarmConfig {
             use_fast_first: true,
             always_review: false,
             heuristic: default_heuristic(),
+        }
+    }
+}
+
+/// Agent definition configuration
+///
+/// Controls loading of agent definitions from `.descartes/agents/<name>/AGENT.md`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentsConfig {
+    /// Directory containing agent definitions
+    #[serde(default = "default_agents_dir")]
+    pub directory: PathBuf,
+
+    /// Explicitly enabled agents (if set, only these are available)
+    /// Use either 'enabled' OR 'disabled', not both
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<Vec<String>>,
+
+    /// Explicitly disabled agents (if set, all others are available)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disabled: Option<Vec<String>>,
+}
+
+fn default_agents_dir() -> PathBuf {
+    PathBuf::from(".descartes/agents")
+}
+
+impl Default for AgentsConfig {
+    fn default() -> Self {
+        Self {
+            directory: default_agents_dir(),
+            enabled: None,
+            disabled: None,
         }
     }
 }
@@ -204,6 +241,7 @@ impl Default for Config {
         Self {
             harness: HarnessConfig::default(),
             categories,
+            agents: AgentsConfig::default(),
             swarm: SwarmConfig::default(),
             scud: ScudConfig::default(),
             transcripts: TranscriptConfig::default(),

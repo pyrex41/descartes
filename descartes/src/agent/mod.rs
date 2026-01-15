@@ -2,18 +2,21 @@
 //!
 //! Provides:
 //! - Agent categories with configurable defaults
+//! - Agent definitions loaded from AGENT.md files
 //! - Subagent spawning with 1-level depth limit
 //! - Tool definitions (read, write, edit, bash)
 //! - Agent registry for tracking spawned agents
 
 mod category;
+mod definition;
 mod registry;
 mod subagent;
 mod tools;
 
 pub use category::AgentCategory;
+pub use definition::{AgentDefinition, AgentDefinitionRegistry};
 pub use registry::{AgentHandle, AgentRegistry, FocusCommand, RegistryStatus, TerminalType};
-pub use subagent::{spawn_subagent, SubagentResult};
+pub use subagent::{spawn_subagent, spawn_subagent_with_options, SpawnOptions, SubagentResult};
 pub use tools::{Tool, ToolSet};
 
 use serde::{Deserialize, Serialize};

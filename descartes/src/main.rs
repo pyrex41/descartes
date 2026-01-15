@@ -96,6 +96,12 @@ enum Commands {
         action: SkillCommands,
     },
 
+    /// Manage agent definitions
+    Agents {
+        #[command(subcommand)]
+        action: AgentCommands,
+    },
+
     /// Run Swarm loop for SCUD tasks
     Swarm {
         /// SCUD tag to execute (required unless --prd creates it)
@@ -183,6 +189,25 @@ enum SkillCommands {
     Show {
         /// Skill name
         name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum AgentCommands {
+    /// List available agent definitions
+    List,
+
+    /// Show details of an agent definition
+    Show {
+        /// Agent name
+        name: String,
+    },
+
+    /// Initialize default agents directory
+    Init {
+        /// Force overwrite existing files
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -362,6 +387,10 @@ async fn main() -> Result<()> {
             handle_skills_command(action)?;
         }
 
+        Commands::Agents { action } => {
+            handle_agents_command(&config, action)?;
+        }
+
         Commands::Swarm {
             scud_tag,
             prd,
@@ -486,6 +515,148 @@ async fn main() -> Result<()> {
             } else {
                 executor.run(&config).await?;
             }
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle agents subcommands
+fn handle_agents_command(config: &Config, action: AgentCommands) -> Result<()> {
+    use descartes::agent::AgentDefinitionRegistry;
+
+    match action {
+        AgentCommands::List => {
+            let mut registry = AgentDefinitionRegistry::new(config.agents.directory.clone())
+                .with_enabled(config.agents.enabled.clone())
+                .with_disabled(config.agents.disabled.clone());
+
+            if let Err(e) = registry.load() {
+                eprintln!("Warning: Failed to load agents: {}", e);
+            }
+
+            if registry.is_empty() {
+                println!("No agents found in {:?}", config.agents.directory);
+                println!("\nTo create agents, add AGENT.md files to subdirectories:");
+                println!("  .descartes/agents/<name>/AGENT.md");
+                println!("\nOr run 'descartes agents init' to create an example.");
+                return Ok(());
+            }
+
+            println!("Available agents:\n");
+            for agent in registry.list() {
+                let model = agent
+                    .model
+                    .as_ref()
+                    .map(|m| format!(" [{}]", m))
+                    .unwrap_or_default();
+                let skills = if agent.skills.is_empty() {
+                    String::new()
+                } else {
+                    format!(" (skills: {})", agent.skills.join(", "))
+                };
+                println!("  {}{}", agent.name, model);
+                println!("    Category: {}", agent.category);
+                println!("    {}{}", agent.description, skills);
+                println!();
+            }
+        }
+
+        AgentCommands::Show { name } => {
+            let mut registry = AgentDefinitionRegistry::new(config.agents.directory.clone())
+                .with_enabled(config.agents.enabled.clone())
+                .with_disabled(config.agents.disabled.clone());
+
+            if let Err(e) = registry.load() {
+                eprintln!("Warning: Failed to load agents: {}", e);
+            }
+
+            if let Some(agent) = registry.get(&name) {
+                println!("Agent: {}", agent.name);
+                println!("Description: {}", agent.description);
+                println!("Category: {}", agent.category);
+                if let Some(ref model) = agent.model {
+                    println!("Model: {}", model);
+                }
+                if let Some(ref tools) = agent.tools {
+                    println!("Tools: {}", tools.join(", "));
+                }
+                if !agent.skills.is_empty() {
+                    println!("Skills: {}", agent.skills.join(", "));
+                }
+                println!("\n─── Instructions ───");
+                println!("{}", agent.instructions);
+            } else {
+                eprintln!("Unknown agent: {}", name);
+                eprintln!(
+                    "\nAvailable agents: {}",
+                    registry
+                        .names()
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+        }
+
+        AgentCommands::Init { force } => {
+            let agents_dir = config.agents.directory.clone();
+            let example_dir = agents_dir.join("code-analyzer");
+
+            if example_dir.exists() && !force {
+                eprintln!(
+                    "Agents directory already exists at {:?}. Use --force to overwrite.",
+                    agents_dir
+                );
+                return Ok(());
+            }
+
+            // Create agents directory structure
+            std::fs::create_dir_all(&example_dir)?;
+
+            // Write example AGENT.md
+            let example_agent = r#"---
+name: code-analyzer
+description: Expert code analysis agent. Use for deep architectural review, security analysis, and understanding complex codebases.
+category: analyzer
+model: opus
+skills:
+  - research
+  - review
+---
+
+# Code Analyzer
+
+You are an expert code analyst. Your role is to provide deep insights into codebases.
+
+## Focus Areas
+- Architecture patterns and anti-patterns
+- Security vulnerabilities
+- Performance implications
+- Code quality and maintainability
+
+## Available Skills
+You have access to the following skills. Invoke them when appropriate:
+{{skills_frontmatter}}
+
+## Approach
+1. Start by understanding the high-level structure
+2. Identify patterns and conventions
+3. Note areas of concern
+4. Provide actionable recommendations
+"#;
+
+            std::fs::write(example_dir.join("AGENT.md"), example_agent)?;
+            info!(
+                "Created example agent definition in {:?}",
+                example_dir.join("AGENT.md")
+            );
+            println!("Created agents directory with example at {:?}", agents_dir);
+            println!("\nYou can now:");
+            println!("  - List agents: descartes agents list");
+            println!("  - Show an agent: descartes agents show code-analyzer");
+            println!("  - Create more agents by adding AGENT.md files to subdirectories");
         }
     }
 

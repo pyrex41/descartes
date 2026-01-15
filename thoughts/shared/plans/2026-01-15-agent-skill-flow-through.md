@@ -67,7 +67,7 @@ Follow Anthropic's progressive disclosure model:
 
 **Changes**:
 
-- [ ] Create `src/agent/definition.rs` - new file for Agent struct and loading
+- [x] Create `src/agent/definition.rs` - new file for Agent struct and loading
   ```rust
   pub struct AgentDefinition {
       pub name: String,           // From YAML frontmatter
@@ -81,13 +81,13 @@ Follow Anthropic's progressive disclosure model:
   }
   ```
 
-- [ ] Create `src/agent/registry.rs` changes (`src/agent/registry.rs:166-387`):
-  - Add `AgentDefinitionRegistry` struct
+- [x] Create `src/agent/registry.rs` changes (`src/agent/registry.rs:166-387`):
+  - Add `AgentDefinitionRegistry` struct (in definition.rs)
   - Add `load_agents(path: &Path)` method
   - Add `get_by_name(name: &str) -> Option<&AgentDefinition>`
   - Add `list_enabled() -> Vec<&AgentDefinition>`
 
-- [ ] Add to `src/config.rs` (~line 40, in Config struct):
+- [x] Add to `src/config.rs` (~line 40, in Config struct):
   ```rust
   pub struct AgentsConfig {
       /// Directory containing agent definitions
@@ -100,7 +100,7 @@ Follow Anthropic's progressive disclosure model:
   }
   ```
 
-- [ ] Create example agent file `.descartes/agents/code-analyzer/AGENT.md`:
+- [x] Create example agent file `.descartes/agents/code-analyzer/AGENT.md`:
   ```markdown
   ---
   name: code-analyzer
@@ -134,13 +134,13 @@ Follow Anthropic's progressive disclosure model:
   ```
 
 **Success Criteria - Automated**:
-- [ ] `cargo check` passes in descartes/descartes
-- [ ] `cargo test agent::definition` passes
-- [ ] New unit tests for YAML frontmatter parsing pass
+- [x] `cargo check` passes in descartes/descartes
+- [x] `cargo test agent::definition` passes
+- [x] New unit tests for YAML frontmatter parsing pass
 
 **Success Criteria - Manual**:
-- [ ] Agent files in `.descartes/agents/` are discovered and loaded
-- [ ] `enabled`/`disabled` filtering works correctly
+- [x] Agent files in `.descartes/agents/` are discovered and loaded
+- [x] `enabled`/`disabled` filtering works correctly
 
 ---
 
@@ -150,7 +150,7 @@ Follow Anthropic's progressive disclosure model:
 
 **Changes**:
 
-- [ ] Add to `src/interactive/skills.rs` (~line 370):
+- [x] Add to `src/interactive/skills.rs` (~line 370):
   ```rust
   impl SkillRegistry {
       /// Generate frontmatter summary for a list of skill names
@@ -171,7 +171,7 @@ Follow Anthropic's progressive disclosure model:
   }
   ```
 
-- [ ] Update `AgentDefinition` to include resolved skill frontmatter:
+- [x] Update `AgentDefinition` to include resolved skill frontmatter:
   ```rust
   impl AgentDefinition {
       /// Build full context with skills resolved
@@ -183,12 +183,12 @@ Follow Anthropic's progressive disclosure model:
   ```
 
 **Success Criteria - Automated**:
-- [ ] `cargo test skills::generate_frontmatter` passes
-- [ ] `{{skills_frontmatter}}` placeholder is replaced correctly
+- [x] `cargo test skills::generate_frontmatter` passes
+- [x] `{{skills_frontmatter}}` placeholder is replaced correctly
 
 **Success Criteria - Manual**:
-- [ ] Generated frontmatter includes all specified skills
-- [ ] Missing skills are silently skipped (not errors)
+- [x] Generated frontmatter includes all specified skills
+- [x] Missing skills are silently skipped (not errors)
 
 ---
 
@@ -198,7 +198,7 @@ Follow Anthropic's progressive disclosure model:
 
 **Changes**:
 
-- [ ] Update `SessionConfig` (`src/harness/mod.rs:38-67`):
+- [x] Update `SessionConfig` (`src/harness/mod.rs:38-67`):
   ```rust
   pub struct SessionConfig {
       pub model: String,
@@ -210,7 +210,7 @@ Follow Anthropic's progressive disclosure model:
   }
   ```
 
-- [ ] Update Claude Code harness (`src/harness/claude_code.rs:70-98`):
+- [x] Update Claude Code harness (`src/harness/claude_code.rs:70-98`):
   ```rust
   fn build_args(&self, session: &SessionHandle, message: &str, resume: bool,
                 append_prompt: Option<&str>) -> Vec<String> {
@@ -227,10 +227,10 @@ Follow Anthropic's progressive disclosure model:
   }
   ```
 
-- [ ] Update Claude Code `send()` (`src/harness/claude_code.rs:340-401`):
+- [x] Update Claude Code `send()` (`src/harness/claude_code.rs:340-401`):
   - Pass `session_config.append_system_prompt` to `build_args()`
 
-- [ ] Update OpenCode harness (`src/harness/opencode.rs:66-88`):
+- [x] Update OpenCode harness (`src/harness/opencode.rs:66-88`):
   - Option A: Use `--append-system-prompt` if available
   - Option B: Prepend context to message as markdown block
   ```rust
@@ -245,17 +245,17 @@ Follow Anthropic's progressive disclosure model:
   }
   ```
 
-- [ ] Codex harness (`src/harness/codex.rs:358-397`) - already supports `system_prompt`:
+- [x] Codex harness (`src/harness/codex.rs:358-397`) - already supports `system_prompt`:
   - Ensure `SessionConfig.system_prompt` is used in `start_session()`
 
 **Success Criteria - Automated**:
-- [ ] `cargo check` passes
-- [ ] Existing harness tests still pass
+- [x] `cargo check` passes
+- [x] Existing harness tests still pass
 
 **Success Criteria - Manual**:
-- [ ] Claude Code subagent receives `--append-system-prompt` with agent context
-- [ ] OpenCode subagent receives context (via message prefix or flag)
-- [ ] Codex subagent receives system_prompt
+- [x] Claude Code subagent receives `--append-system-prompt` with agent context
+- [x] OpenCode subagent receives context (via `<agent-context>` message prefix)
+- [x] Codex subagent receives system_prompt
 
 ---
 
@@ -265,7 +265,7 @@ Follow Anthropic's progressive disclosure model:
 
 **Changes**:
 
-- [ ] Update `SubagentRequest` (`src/harness/mod.rs:108-117`):
+- [x] Update `SubagentRequest` (`src/harness/mod.rs:108-117`):
   ```rust
   pub struct SubagentRequest {
       pub category: String,
@@ -282,7 +282,7 @@ Follow Anthropic's progressive disclosure model:
 
   Add parsing for `agent` or `agent_name` field in tool arguments.
 
-- [ ] Update `spawn_subagent()` (`src/agent/subagent.rs:66-229`):
+- [x] Update `spawn_subagent()` (`src/agent/subagent.rs:66-229`):
   ```rust
   pub async fn spawn_subagent(
       harness: &dyn Harness,
@@ -318,17 +318,17 @@ Follow Anthropic's progressive disclosure model:
   }
   ```
 
-- [ ] Update callers of `spawn_subagent()` to pass agent registry and skill registry
+- [x] Update callers of `spawn_subagent()` to pass agent registry and skill registry
 
 **Success Criteria - Automated**:
-- [ ] `cargo check` passes
-- [ ] `cargo test agent::subagent` passes
-- [ ] Existing spawn tests still pass
+- [x] `cargo check` passes
+- [x] `cargo test agent::subagent` passes
+- [x] Existing spawn tests still pass
 
 **Success Criteria - Manual**:
-- [ ] Spawning with `agent_name` loads that agent's definition
-- [ ] Agent context appears in subagent's system prompt
-- [ ] Skills listed in agent are visible in context
+- [x] Spawning with `agent_name` loads that agent's definition (integrated in proxy.rs)
+- [x] Agent context appears in subagent's system prompt (via SessionConfig fields)
+- [x] Skills listed in agent are visible in context (via generate_frontmatter)
 
 ---
 
@@ -338,7 +338,7 @@ Follow Anthropic's progressive disclosure model:
 
 **Changes**:
 
-- [ ] Update `.descartes/config.toml` template (created by `init`):
+- [x] Update `.descartes/config.toml` template (created by `init`):
   ```toml
   # Agent configuration
   # Agents are defined in .descartes/agents/<name>/AGENT.md
@@ -354,28 +354,29 @@ Follow Anthropic's progressive disclosure model:
   # disabled = ["experimental-agent"]
   ```
 
-- [ ] Add validation in `AgentDefinitionRegistry::load()`:
+- [x] Add validation in `AgentDefinitionRegistry::load()`:
   - Warn if both `enabled` and `disabled` are set (use `enabled`, ignore `disabled`)
   - Log which agents are loaded vs filtered out
 
 - [ ] Update BAML orchestrator prompts (`baml_src/orchestrator.baml`):
   - Add agent list to `SelectSubagent` context
   - Allow selection by agent name in addition to category
+  - (Deferred - BAML integration is separate concern)
 
-- [ ] Add CLI command or interactive option to list available agents:
+- [x] Add CLI command or interactive option to list available agents:
   ```
   descartes agents list
   descartes agents show code-analyzer
   ```
 
 **Success Criteria - Automated**:
-- [ ] `cargo check` passes
-- [ ] Config validation tests pass
+- [x] `cargo check` passes
+- [x] Config validation tests pass
 
 **Success Criteria - Manual**:
-- [ ] Setting `enabled = ["code-analyzer"]` makes only that agent available
-- [ ] Setting `disabled = ["experimental"]` hides only that agent
-- [ ] `descartes agents list` shows available agents
+- [x] Setting `enabled = ["code-analyzer"]` makes only that agent available
+- [x] Setting `disabled = ["experimental"]` hides only that agent
+- [x] `descartes agents list` shows available agents
 
 ---
 

@@ -38,6 +38,8 @@ struct OpenCodeSession {
     session_id: Option<String>,
     /// Conversation history for context
     messages: Vec<ConversationMessage>,
+    /// Agent context to prepend to messages
+    agent_context: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -81,8 +83,14 @@ impl OpenCodeHarness {
             args.push(sid.clone());
         }
 
+        // Prepend agent context to message if provided
+        let full_message = match &session_state.agent_context {
+            Some(ctx) => format!("<agent-context>\n{}\n</agent-context>\n\n{}", ctx, message),
+            None => message.to_string(),
+        };
+
         // The message/prompt
-        args.push(message.to_string());
+        args.push(full_message);
 
         args
     }
@@ -324,10 +332,18 @@ impl OpenCodeHarness {
             .and_then(|m| m.as_str())
             .map(|s| s.to_string());
 
+        // Extract optional agent_name
+        let agent_name = args
+            .get("agent_name")
+            .or_else(|| args.get("agent"))
+            .and_then(|a| a.as_str())
+            .map(|s| s.to_string());
+
         Some(SubagentRequest {
             category,
             prompt: prompt.to_string(),
             model,
+            agent_name,
         })
     }
 
@@ -391,6 +407,7 @@ impl Harness for OpenCodeHarness {
             OpenCodeSession {
                 session_id: None, // Will be set after first interaction
                 messages: Vec::new(),
+                agent_context: config.agent_context,
             },
         );
 

@@ -190,6 +190,8 @@ async fn test_us31_subagent_session_has_parent() {
         model: "mock-model".to_string(),
         tools: vec![],
         system_prompt: None,
+        append_system_prompt: None,
+        agent_context: None,
         parent: Some(parent_handle),
         is_subagent: true,
     };
@@ -244,6 +246,7 @@ fn test_us31_subagent_request_structure() {
         category: "searcher".to_string(),
         prompt: "Find all TODO comments".to_string(),
         model: Some("claude-3-haiku".to_string()),
+        agent_name: None,
     };
 
     assert_eq!(request.category, "searcher");

@@ -149,17 +149,43 @@ pub struct SkillRegistry {
 
 impl SkillRegistry {
     /// Create a new skill registry with default search paths
+    ///
+    /// Searches multiple paths for cross-tool compatibility:
+    /// - Descartes: `.descartes/skills/`
+    /// - Claude Code: `.claude/commands/`, `.claude/skills/`
+    /// - OpenCode: `.opencode/skill/`
+    /// - Codex: `.codex/skills/`
     pub fn new() -> Self {
+        let mut search_paths = vec![
+            // Descartes paths
+            PathBuf::from(".descartes/skills"),
+            // Claude Code paths
+            PathBuf::from(".claude/commands"),
+            PathBuf::from(".claude/skills"),
+            // OpenCode paths
+            PathBuf::from(".opencode/skill"),
+            // Codex paths
+            PathBuf::from(".codex/skills"),
+        ];
+
+        // Add global paths
+        if let Some(config_dir) = dirs::config_dir() {
+            search_paths.push(config_dir.join("descartes/skills"));
+            search_paths.push(config_dir.join("opencode/skill"));
+        }
+
+        // Home directory paths
+        if let Some(home) = dirs::home_dir() {
+            search_paths.push(home.join(".claude/commands"));
+            search_paths.push(home.join(".claude/skills"));
+            search_paths.push(home.join(".codex/skills"));
+            search_paths.push(home.join(".config/opencode/skill"));
+        }
+
         let mut registry = Self {
             skills: HashMap::new(),
             aliases: HashMap::new(),
-            search_paths: vec![
-                PathBuf::from(".descartes/skills"),
-                PathBuf::from(".claude/skills"),
-                dirs::config_dir()
-                    .map(|p| p.join("descartes/skills"))
-                    .unwrap_or_else(|| PathBuf::from("/etc/descartes/skills")),
-            ],
+            search_paths,
         };
 
         // Register built-in skills
@@ -298,8 +324,13 @@ impl SkillRegistry {
     }
 
     /// Load skills from a directory
+    ///
+    /// Supports multiple formats:
+    /// - Descartes: `skills.toml` manifest or `*.skill` files
+    /// - OpenCode/Codex: `<name>/SKILL.md` subdirectories
+    /// - Claude Code: `<name>.md` files in commands directory
     fn load_from_directory(&mut self, dir: &Path) {
-        // Load skill manifest if it exists
+        // Load skill manifest if it exists (Descartes format)
         let manifest_path = dir.join("skills.toml");
         if manifest_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&manifest_path) {
@@ -316,15 +347,149 @@ impl SkillRegistry {
             }
         }
 
-        // Also scan for individual skill files
+        // Scan directory entries
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
+
+                // Format 1: Descartes .skill files
                 if path.extension().map(|e| e == "skill").unwrap_or(false) {
                     self.load_skill_file(&path);
+                    continue;
+                }
+
+                // Format 2: OpenCode/Codex subdirectory with SKILL.md
+                // .opencode/skill/<name>/SKILL.md or .codex/skills/<name>/SKILL.md
+                if path.is_dir() {
+                    let skill_md = path.join("SKILL.md");
+                    if skill_md.exists() {
+                        self.load_skill_md(&skill_md);
+                        continue;
+                    }
+                }
+
+                // Format 3: Claude Code .md files (commands)
+                // .claude/commands/<name>.md
+                if path.is_file() && path.extension().map(|e| e == "md").unwrap_or(false) {
+                    self.load_claude_command(&path);
                 }
             }
         }
+    }
+
+    /// Load a skill from SKILL.md format (OpenCode/Codex)
+    fn load_skill_md(&mut self, path: &Path) {
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        // Get skill name from parent directory
+        let name = match path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => return,
+        };
+
+        // Skip if already registered
+        if self.skills.contains_key(&name) {
+            return;
+        }
+
+        // Parse YAML frontmatter
+        let content = content.trim();
+        if !content.starts_with("---") {
+            return;
+        }
+
+        let rest = &content[3..];
+        let end_pos = match rest.find("\n---") {
+            Some(p) => p,
+            None => return,
+        };
+
+        let frontmatter_str = rest[..end_pos].trim();
+        let _body = rest[end_pos + 4..].trim(); // Body available for future use
+
+        // Parse YAML
+        let yaml: serde_yaml::Value = match serde_yaml::from_str(frontmatter_str) {
+            Ok(y) => y,
+            Err(_) => return,
+        };
+
+        let description = yaml.get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Skill")
+            .to_string();
+
+        // Create skill
+        let skill = Skill {
+            name: name.clone(),
+            description,
+            prompt_file: path.to_path_buf(),
+            category: Some("external".to_string()),
+            variables: vec![],
+            auto_context: vec![],
+            aliases: vec![],
+            auto_start: false,
+        };
+
+        tracing::debug!("Loaded SKILL.md: {} from {}", name, path.display());
+        self.register(skill);
+    }
+
+    /// Load a skill from Claude Code command format (.md file)
+    fn load_claude_command(&mut self, path: &Path) {
+        // Get skill name from filename
+        let name = match path.file_stem().and_then(|s| s.to_str()) {
+            Some(n) => n.to_string(),
+            None => return,
+        };
+
+        // Skip if already registered
+        if self.skills.contains_key(&name) {
+            return;
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        // Claude commands can have frontmatter or just be plain markdown
+        let description = if content.trim().starts_with("---") {
+            // Try to extract description from frontmatter
+            let rest = &content.trim()[3..];
+            if let Some(end_pos) = rest.find("\n---") {
+                let frontmatter_str = rest[..end_pos].trim();
+                if let Ok(yaml) = serde_yaml::from_str::<serde_yaml::Value>(frontmatter_str) {
+                    yaml.get("description")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Claude command")
+                        .to_string()
+                } else {
+                    "Claude command".to_string()
+                }
+            } else {
+                "Claude command".to_string()
+            }
+        } else {
+            // First line as description
+            content.lines().next().unwrap_or("Claude command").to_string()
+        };
+
+        let skill = Skill {
+            name: name.clone(),
+            description,
+            prompt_file: path.to_path_buf(),
+            category: Some("command".to_string()),
+            variables: vec![],
+            auto_context: vec![],
+            aliases: vec![],
+            auto_start: false,
+        };
+
+        tracing::debug!("Loaded Claude command: {} from {}", name, path.display());
+        self.register(skill);
     }
 
     /// Load a single skill file (.skill.toml or .skill)
@@ -382,6 +547,32 @@ impl SkillRegistry {
         if path.exists() {
             self.load_from_directory(&path);
         }
+    }
+
+    /// Generate frontmatter summary for a list of skill names
+    ///
+    /// Returns markdown-formatted skill metadata for injection into agent context.
+    /// Skills that don't exist are silently skipped.
+    pub fn generate_frontmatter(&self, skill_names: &[String]) -> String {
+        let mut lines = vec!["## Available Skills".to_string()];
+
+        for name in skill_names {
+            if let Some(skill) = self.get(name) {
+                let aliases = if skill.aliases.is_empty() {
+                    String::new()
+                } else {
+                    format!(" (aliases: {})", skill.aliases.join(", "))
+                };
+                lines.push(format!("- /{}: {}{}", skill.name, skill.description, aliases));
+            }
+        }
+
+        // If no skills were found, return a minimal message
+        if lines.len() == 1 {
+            lines.push("- No skills available".to_string());
+        }
+
+        lines.join("\n")
     }
 }
 
@@ -616,5 +807,42 @@ mod tests {
         let mut sorted = names.clone();
         sorted.sort();
         assert_eq!(names, sorted);
+    }
+
+    #[test]
+    fn test_generate_frontmatter() {
+        let registry = SkillRegistry::new();
+
+        // Test with known skills
+        let skill_names = vec!["research".to_string(), "review".to_string()];
+        let frontmatter = registry.generate_frontmatter(&skill_names);
+
+        assert!(frontmatter.starts_with("## Available Skills"));
+        assert!(frontmatter.contains("/research:"));
+        assert!(frontmatter.contains("/review:"));
+        // Research has alias "r"
+        assert!(frontmatter.contains("(aliases:"));
+    }
+
+    #[test]
+    fn test_generate_frontmatter_missing_skills() {
+        let registry = SkillRegistry::new();
+
+        // Test with non-existent skills
+        let skill_names = vec!["nonexistent_skill".to_string()];
+        let frontmatter = registry.generate_frontmatter(&skill_names);
+
+        assert!(frontmatter.starts_with("## Available Skills"));
+        assert!(frontmatter.contains("No skills available"));
+    }
+
+    #[test]
+    fn test_generate_frontmatter_empty() {
+        let registry = SkillRegistry::new();
+
+        let frontmatter = registry.generate_frontmatter(&[]);
+
+        assert!(frontmatter.starts_with("## Available Skills"));
+        assert!(frontmatter.contains("No skills available"));
     }
 }

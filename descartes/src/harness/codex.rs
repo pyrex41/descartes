@@ -337,10 +337,17 @@ impl CodexHarness {
             .and_then(|m| m.as_str())
             .map(|s| s.to_string());
 
+        let agent_name = args
+            .get("agent_name")
+            .or_else(|| args.get("agent"))
+            .and_then(|a| a.as_str())
+            .map(|s| s.to_string());
+
         Some(SubagentRequest {
             category,
             prompt: prompt.to_string(),
             model,
+            agent_name,
         })
     }
 }

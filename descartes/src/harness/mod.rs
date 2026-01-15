@@ -41,8 +41,12 @@ pub struct SessionConfig {
     pub model: String,
     /// Tools available to this session
     pub tools: Vec<String>,
-    /// System prompt
+    /// System prompt (for Codex)
     pub system_prompt: Option<String>,
+    /// Append system prompt (for Claude Code --append-system-prompt)
+    pub append_system_prompt: Option<String>,
+    /// Agent context (for OpenCode, prepended to message)
+    pub agent_context: Option<String>,
     /// Parent session (for subagents)
     pub parent: Option<SessionHandle>,
     /// Whether this is a subagent (prevents nested spawning)
@@ -60,6 +64,8 @@ impl Default for SessionConfig {
                 "bash".to_string(),
             ],
             system_prompt: None,
+            append_system_prompt: None,
+            agent_context: None,
             parent: None,
             is_subagent: false,
         }
@@ -114,6 +120,10 @@ pub struct SubagentRequest {
     pub prompt: String,
     /// Requested model (optional)
     pub model: Option<String>,
+    /// Named agent definition (optional)
+    /// If set, the agent's instructions and skills will be injected
+    #[serde(default)]
+    pub agent_name: Option<String>,
 }
 
 /// Result from a subagent execution

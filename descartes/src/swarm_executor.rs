@@ -542,6 +542,8 @@ impl SwarmExecutor {
                     "grep".to_string(),
                 ],
                 system_prompt: None,
+                append_system_prompt: None,
+                agent_context: None,
                 parent: None,
                 is_subagent: false,
             };

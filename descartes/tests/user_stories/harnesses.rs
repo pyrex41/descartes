@@ -36,6 +36,8 @@ fn test_us32_session_config_subagent() {
         model: "claude-3-haiku".to_string(),
         tools: vec!["Read".to_string(), "Bash".to_string()],
         system_prompt: Some("You are a searcher agent".to_string()),
+        append_system_prompt: None,
+        agent_context: None,
         parent: Some(parent),
         is_subagent: true,
     };
