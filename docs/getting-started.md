@@ -57,11 +57,13 @@ Descartes uses SCUD for task management. Initialize SCUD in your project:
 scud init
 ```
 
-Parse a PRD (Product Requirements Document) into tasks:
+Generate tasks from a PRD (Product Requirements Document):
 
 ```bash
-scud parse ./docs/prd.md --tag my-feature
+scud generate ./docs/prd.md --tag my-feature
 ```
+
+This runs the full pipeline: parse → expand → check-deps.
 
 ### 4. Run the Swarm Loop
 

@@ -89,11 +89,11 @@ Write an implementation plan manually or use AI assistance:
 
 Save to `./docs/IMPLEMENTATION_PLAN.md`.
 
-### Step 2: Parse PRD into Tasks
+### Step 2: Generate Tasks from PRD
 
 ```bash
-# Create SCUD tasks from PRD
-scud parse ./docs/complex-feature.md --tag complex
+# Generate SCUD tasks from PRD (parse → expand → check-deps)
+scud generate ./docs/complex-feature.md --tag complex
 
 # Review the generated tasks
 scud list --tag complex
