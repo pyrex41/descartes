@@ -4,6 +4,13 @@ version = "0.1.0"
 edition = "2021"
 description = "Desktop GUI for Descartes AI orchestration"
 license = "MIT"
+repository = "https://github.com/pyrex41/descartes"
+homepage = "https://github.com/pyrex41/descartes"
+documentation = "https://docs.rs/descartes-gui"
+readme = "README.md"
+keywords = ["ai", "agents", "orchestration", "gui", "iced"]
+categories = ["gui", "development-tools"]
+include = ["src/**/*", "Cargo.toml", "README.md"]
 
 [[bin]]
 name = "descartes-gui"
@@ -11,10 +18,10 @@ path = "src/main.rs"
 
 [dependencies]
 # GUI
-iced = { version = "0.14", features = ["tokio", "advanced", "tester"] }
+iced = { version = "0.14", features = ["tokio", "advanced"] }
 
 # Descartes core (includes scud re-export)
-descartes = { path = "../descartes", package = "descartes-cli" }
+descartes = { version = "0.3", path = "../descartes", package = "descartes-cli" }
 
 # Async
 tokio = { version = "1", features = ["full", "sync"] }
@@ -27,6 +34,8 @@ anyhow = "1.0"
 [dev-dependencies]
 iced_test = "0.14"
 
+# Note: This patch is required for local development/testing because
+# iced_tester 0.14 requires rfd 0.16 which was never published to crates.io
+# (jumped from 0.15.4 to 0.17.2). Remove when publishing to crates.io.
 [patch.crates-io]
-# rfd 0.16.0 exists on GitHub but wasn't published to crates.io
 rfd = { git = "https://github.com/PolyMeilex/rfd", tag = "0.16.0" }
