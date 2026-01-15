@@ -61,30 +61,42 @@ scud stats --tag auth-feature
 
 ## Workflow 2: Plan-Then-Build
 
-For complex features, generate a plan first.
+For complex features, create a plan document first, then execute with it.
 
-### Step 1: Generate Plan
+### Step 1: Create Implementation Plan
 
-```bash
-# Create tasks and generate implementation plan
-descartes swarm \
-    --prd ./docs/complex-feature.md \
-    --tag complex \
-    --plan-only \
-    --output ./docs/IMPLEMENTATION_PLAN.md
+Write an implementation plan manually or use AI assistance:
+
+```markdown
+# Complex Feature Implementation Plan
+
+## Phase 1: Database Schema
+- Add user_preferences table
+- Create migration
+
+## Phase 2: API Layer
+- Add GET/POST /api/preferences endpoints
+- Implement validation
+
+## Phase 3: UI Integration
+- Add preferences panel component
+- Wire up API calls
 ```
 
-### Step 2: Review and Refine
+Save to `./docs/IMPLEMENTATION_PLAN.md`.
 
-Open `IMPLEMENTATION_PLAN.md` and review:
-- Task breakdown
-- Implementation approach
-- Risk areas
-- Dependencies
+### Step 2: Parse PRD into Tasks
 
-Make manual edits if needed.
+```bash
+# Create SCUD tasks from PRD
+scud parse ./docs/complex-feature.md --tag complex
 
-### Step 3: Execute with Plan
+# Review the generated tasks
+scud list --tag complex
+scud waves --tag complex
+```
+
+### Step 3: Execute with Plan Context
 
 ```bash
 descartes swarm \
@@ -93,7 +105,7 @@ descartes swarm \
     --verify "npm test"
 ```
 
-The plan document provides context for each task.
+The plan document provides additional context for each task.
 
 ## Workflow 3: Incremental Development
 
@@ -108,10 +120,7 @@ scud next --tag my-feature
 ### Step 2: Execute Single Task
 
 ```bash
-# Run one task
-descartes run --task TASK-001
-
-# Or spawn specific category
+# Spawn a builder agent for a specific task
 descartes spawn builder "Implement TASK-001: Add user validation"
 ```
 
@@ -242,7 +251,7 @@ cargo audit
 echo "All validations passed!"
 ```
 
-### Use in Ralph Loop
+### Use in Swarm Loop
 
 ```bash
 descartes swarm \
@@ -309,8 +318,11 @@ Let SCUD manage dependencies. Don't manually order tasks.
 When things go wrong, transcripts tell the full story:
 
 ```bash
-descartes transcripts --last 5
-descartes show <id>
+# List today's transcripts
+descartes transcripts --today
+
+# View a specific transcript
+descartes show <session-id>
 ```
 
 ### 6. Iterate on Specs

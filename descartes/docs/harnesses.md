@@ -4,7 +4,7 @@ A harness is the execution environment for an AI agent. Descartes supports multi
 
 ## Available Harnesses
 
-### OpenCode (Default)
+### OpenCode
 
 [OpenCode](https://github.com/opencode-ai/opencode) is a fast, lightweight CLI for AI coding tasks.
 
@@ -39,9 +39,9 @@ binary = "/path/to/opencode"  # Optional, defaults to PATH
 - `openai/gpt-4o`
 - Any model supported by OpenCode
 
-### Claude Code
+### Claude Code (CLI Default)
 
-[Claude Code](https://claude.ai/code) is Anthropic's official CLI for Claude.
+[Claude Code](https://claude.ai/code) is Anthropic's official CLI for Claude. This is the default harness when using the CLI.
 
 **Best for:**
 - Complex reasoning tasks

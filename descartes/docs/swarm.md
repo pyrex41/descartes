@@ -227,11 +227,11 @@ descartes swarm --scud-tag feature \
 All agent work is captured in transcripts:
 
 ```bash
-# List recent transcripts
-descartes transcripts
+# List today's transcripts
+descartes transcripts --today
 
 # View a specific transcript
-descartes show <transcript-id>
+descartes show <session-id>
 ```
 
 ## Comparison with Other Patterns
