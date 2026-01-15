@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started - Descartes</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --bg-secondary: #161b22;
+            --text: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-secondary: #238636;
+            --border: #30363d;
+            --warning: #d29922;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+        /* Nav */
+        nav {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+        }
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav .logo { font-weight: 600; font-size: 1.2rem; }
+        nav .links { display: flex; gap: 24px; }
+
+        /* Content */
+        .content { padding: 48px 0; }
+        h1 { font-size: 2.5rem; margin-bottom: 16px; }
+        h2 { font-size: 1.75rem; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        h3 { font-size: 1.25rem; margin: 32px 0 12px; }
+        p { margin-bottom: 16px; }
+        ul, ol { margin: 0 0 16px 24px; }
+        li { margin-bottom: 8px; }
+
+        /* Code */
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+        code {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            background: var(--bg-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        pre code { background: none; padding: 0; }
+
+        /* Callout */
+        .callout {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--accent);
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .callout.warning { border-left-color: var(--warning); }
+        .callout strong { display: block; margin-bottom: 8px; }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th { background: var(--bg-secondary); }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo">Descartes</a>
+            <div class="links">
+                <a href="getting-started.html">Getting Started</a>
+                <a href="cli-reference.html">CLI</a>
+                <a href="gui-guide.html">GUI</a>
+                <a href="harnesses.html">Harnesses</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="container">
+            <h1>Getting Started</h1>
+            <p>This guide walks you through installing Descartes, configuring your environment, and running your first AI-orchestrated workflow.</p>
+
+            <h2>Installation</h2>
+
+            <h3>From crates.io (Recommended)</h3>
+            <pre><code># Install the CLI
+cargo install descartes-cli
+
+# Install the GUI (optional)
+cargo install descartes-gui</code></pre>
+
+            <h3>From Source</h3>
+            <pre><code>git clone https://github.com/pyrex41/descartes
+cd descartes
+
+# Build CLI
+cd descartes && cargo build --release
+
+# Build GUI
+cd ../descartes-gui && cargo build --release</code></pre>
+
+            <h3>System Dependencies</h3>
+
+            <p><strong>Required for all platforms:</strong></p>
+            <ul>
+                <li>Rust 1.75+</li>
+                <li><code>protoc</code> (protobuf compiler) - required by BAML</li>
+                <li>Node.js with npx - for BAML code generation</li>
+            </ul>
+
+            <pre><code># macOS
+brew install protobuf
+
+# Ubuntu/Debian
+sudo apt install protobuf-compiler
+
+# Linux (GUI only)
+sudo apt install libxkbcommon-dev libwayland-dev</code></pre>
+
+            <h2>Configuration</h2>
+
+            <h3>Environment Variables</h3>
+
+            <table>
+                <tr>
+                    <th>Variable</th>
+                    <th>Description</th>
+                    <th>Required</th>
+                </tr>
+                <tr>
+                    <td><code>ANTHROPIC_API_KEY</code></td>
+                    <td>API key for Claude models</td>
+                    <td>Yes (for Claude harness)</td>
+                </tr>
+                <tr>
+                    <td><code>OPENAI_API_KEY</code></td>
+                    <td>API key for OpenAI/Codex models</td>
+                    <td>Yes (for Codex harness)</td>
+                </tr>
+                <tr>
+                    <td><code>XAI_API_KEY</code></td>
+                    <td>API key for xAI/Grok models (SCUD)</td>
+                    <td>Optional</td>
+                </tr>
+                <tr>
+                    <td><code>DESCARTES_HARNESS</code></td>
+                    <td>Default harness: claude-code, opencode, codex</td>
+                    <td>No (defaults to claude-code)</td>
+                </tr>
+                <tr>
+                    <td><code>DESCARTES_MODEL</code></td>
+                    <td>Default model (opus, sonnet, etc.)</td>
+                    <td>No</td>
+                </tr>
+            </table>
+
+            <pre><code># Add to ~/.bashrc or ~/.zshrc
+export ANTHROPIC_API_KEY=sk-ant-api03-...
+
+# Or use a .env file in your project
+echo "ANTHROPIC_API_KEY=sk-ant-api03-..." > .env</code></pre>
+
+            <h3>SCUD Setup</h3>
+
+            <p>Descartes uses SCUD for task management. Initialize SCUD in your project:</p>
+
+            <pre><code># Install SCUD
+cargo install scud-cli
+
+# Initialize in your project
+cd your-project
+scud warmup</code></pre>
+
+            <p>This creates a <code>.scud/</code> directory with task storage and configuration.</p>
+
+            <h2>Your First Run</h2>
+
+            <h3>Option 1: Execute from PRD</h3>
+
+            <p>Start with a Product Requirements Document:</p>
+
+            <pre><code># Create a simple PRD
+cat > feature.md << 'EOF'
+# User Authentication Feature
+
+## Requirements
+1. Add login form with email/password
+2. Implement JWT token generation
+3. Add logout endpoint
+4. Create protected route middleware
+EOF
+
+# Parse and execute
+descartes ralph --prd feature.md</code></pre>
+
+            <p>Descartes will:</p>
+            <ol>
+                <li>Parse the PRD into SCUD tasks</li>
+                <li>Expand complex tasks into subtasks</li>
+                <li>Compute execution waves</li>
+                <li>Execute each task with a fresh agent</li>
+                <li>Run validation between waves</li>
+            </ol>
+
+            <h3>Option 2: Use Existing SCUD Tasks</h3>
+
+            <pre><code># Create tasks manually
+scud add "Implement login form" --tag auth
+scud add "Add JWT middleware" --tag auth --depends-on 1
+
+# Or parse a PRD with SCUD directly
+scud parse feature.md --tag auth
+
+# Then execute with Descartes
+descartes ralph --scud-tag auth</code></pre>
+
+            <h3>Preview Without Executing</h3>
+
+            <pre><code># Dry run shows the execution plan
+descartes ralph --scud-tag auth --dry-run
+
+# Output:
+# Wave 1: [1] Implement login form
+# Wave 2: [2] Add JWT middleware (depends on 1)</code></pre>
+
+            <h2>Understanding the Output</h2>
+
+            <p>During execution, Descartes displays:</p>
+
+            <pre><code>Wave 1/3 ━━━━━━━━━━━━━━━━━━━━ 2/2 tasks
+  [1] Implement login form ............ Done
+  [2] Create user model ............... Done
+
+Running validation: cargo test
+  ✓ All tests passed
+
+Wave 2/3 ━━━━━━━━━━━━━━━━━━━━ 1/1 tasks
+  [3] Add JWT middleware .............. Running</code></pre>
+
+            <div class="callout">
+                <strong>Fresh Context Per Task</strong>
+                Each task gets a completely fresh agent session. This prevents context drift and ensures reproducible execution. The agent receives only the task spec, not history from previous tasks.
+            </div>
+
+            <h2>Next Steps</h2>
+
+            <ul>
+                <li><a href="cli-reference.html">CLI Reference</a> - Full command documentation</li>
+                <li><a href="harnesses.html">Harness Configuration</a> - Switch between Claude Code, OpenCode, and Codex</li>
+                <li><a href="workflow-tutorial.html">Full Loop Tutorial</a> - End-to-end walkthrough with validation</li>
+                <li><a href="gui-guide.html">GUI Guide</a> - Visual control with descartes-gui</li>
+            </ul>
+        </div>
+    </main>
+</body>
+</html>

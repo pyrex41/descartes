@@ -6347,3 +6347,8 @@ dependencies = [
  "syn",
  "winnow",
 ]
+
+[[patch.unused]]
+name = "rfd"
+version = "0.16.0"
+source = "git+https://github.com/PolyMeilex/rfd?tag=0.16.0#5d32eec3a7930eb43b7e864eb773831bbd3d91b4"

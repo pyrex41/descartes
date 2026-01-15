@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GUI Guide - Descartes</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --bg-secondary: #161b22;
+            --text: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-secondary: #238636;
+            --border: #30363d;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+        nav {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+        }
+        nav .container { display: flex; justify-content: space-between; align-items: center; }
+        nav .logo { font-weight: 600; font-size: 1.2rem; }
+        nav .links { display: flex; gap: 24px; }
+
+        .content { padding: 48px 0; }
+        h1 { font-size: 2.5rem; margin-bottom: 16px; }
+        h2 { font-size: 1.75rem; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        h3 { font-size: 1.25rem; margin: 32px 0 12px; }
+        p { margin-bottom: 16px; }
+        ul, ol { margin: 0 0 16px 24px; }
+        li { margin-bottom: 8px; }
+
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+        code {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            background: var(--bg-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        pre code { background: none; padding: 0; }
+
+        .callout {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--accent);
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        th { background: var(--bg-secondary); }
+
+        .mockup {
+            background: #1a1a2e;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.85rem;
+            margin: 16px 0;
+            white-space: pre;
+            overflow-x: auto;
+        }
+        .mockup .header { color: #58a6ff; }
+        .mockup .status { color: #238636; }
+        .mockup .pending { color: #8b949e; }
+        .mockup .btn { color: #f0883e; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <a href="index.html" class="logo">Descartes</a>
+            <div class="links">
+                <a href="getting-started.html">Getting Started</a>
+                <a href="cli-reference.html">CLI</a>
+                <a href="gui-guide.html">GUI</a>
+                <a href="harnesses.html">Harnesses</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="container">
+            <h1>GUI Guide</h1>
+            <p>The Descartes GUI provides visual control over AI agent execution using an Iced-based desktop application.</p>
+
+            <h2>Installation</h2>
+
+            <pre><code># From crates.io
+cargo install descartes-gui
+
+# From source
+cd descartes/descartes-gui
+cargo build --release</code></pre>
+
+            <h3>System Dependencies</h3>
+
+            <p><strong>macOS:</strong> No additional dependencies required.</p>
+
+            <p><strong>Linux:</strong></p>
+            <pre><code>sudo apt install libxkbcommon-dev libwayland-dev</code></pre>
+
+            <h2>Running the GUI</h2>
+
+            <pre><code># Start the GUI
+descartes-gui
+
+# Or run from source
+cargo run --release -p descartes-gui</code></pre>
+
+            <p>The GUI reads task data from SCUD storage at <code>.scud/tasks/tasks.scg</code>. Ensure you have SCUD configured in your project:</p>
+
+            <pre><code>cd your-project
+scud warmup
+descartes-gui</code></pre>
+
+            <h2>Interface Overview</h2>
+
+            <div class="mockup"><span class="header">┌─────────────────────────────────────────────────────────────┐
+│                      Descartes GUI                          │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐                     │
+│  │  Waves  │  │ Agents  │  │ Output  │  ← View Tabs        │
+│  └─────────┘  └─────────┘  └─────────┘                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Wave 1:  [Task A] </span><span class="status">Done</span><span class="header">     [Task B] </span><span class="status">Done</span><span class="header">                │
+│  Wave 2:  [Task C] </span><span class="pending">Pending</span><span class="header">  </span><span class="btn">[Start]</span><span class="header">                        │
+│  Wave 3:  [Task D] </span><span class="pending">Pending</span><span class="header">  (depends on C)                 │
+│                                                             │
+│  </span><span class="btn">[Refresh]</span><span class="header">                                                 │
+├─────────────────────────────────────────────────────────────┤
+│  Status: </span><span class="status">Idle</span><span class="header"> │ Current: None                            │
+│  </span><span class="btn">[Pause]</span><span class="header"> </span><span class="btn">[Cancel]</span><span class="header">                                         │
+└─────────────────────────────────────────────────────────────┘</span></div>
+
+            <h2>Views</h2>
+
+            <h3>Waves View</h3>
+
+            <p>Displays tasks organized by parallel execution waves, computed from SCUD's dependency DAG.</p>
+
+            <ul>
+                <li><strong>Wave grouping:</strong> Tasks with satisfied dependencies are grouped into waves</li>
+                <li><strong>Status display:</strong> Shows task ID, title, and current status (Pending, InProgress, Done)</li>
+                <li><strong>One-click start:</strong> Start button on each pending task to begin agent execution</li>
+                <li><strong>Refresh:</strong> Reload waves from SCUD storage</li>
+            </ul>
+
+            <h3>Agents View</h3>
+
+            <p>Real-time control over running agents:</p>
+
+            <table>
+                <tr><th>Control</th><th>Description</th></tr>
+                <tr><td><strong>Pause</strong></td><td>Suspends agent execution, buffering responses</td></tr>
+                <tr><td><strong>Resume</strong></td><td>Continues paused agent from where it left off</td></tr>
+                <tr><td><strong>Cancel</strong></td><td>Terminates agent execution, marks task for retry</td></tr>
+            </table>
+
+            <h3>Output View</h3>
+
+            <p>Streaming display of agent output:</p>
+
+            <ul>
+                <li><strong>Real-time streaming:</strong> Output appears as the agent generates it</li>
+                <li><strong>Completion markers:</strong> Clear indication when agent completes or errors</li>
+                <li><strong>Scrollable history:</strong> Review full agent output session</li>
+            </ul>
+
+            <h2>Workflow</h2>
+
+            <h3>Starting Tasks</h3>
+
+            <ol>
+                <li>Open the GUI in a project with SCUD tasks</li>
+                <li>The Waves view shows all tasks organized by dependency order</li>
+                <li>Click <strong>Start</strong> on any pending task in Wave 1</li>
+                <li>Switch to Output view to watch agent progress</li>
+                <li>When Wave 1 completes, Wave 2 tasks become available</li>
+            </ol>
+
+            <h3>Controlling Execution</h3>
+
+            <ol>
+                <li>While an agent is running, switch to the Agents view</li>
+                <li>Click <strong>Pause</strong> to suspend execution</li>
+                <li>Review the current state, check output</li>
+                <li>Click <strong>Resume</strong> to continue, or <strong>Cancel</strong> to abort</li>
+            </ol>
+
+            <h3>Refreshing State</h3>
+
+            <p>Click <strong>Refresh</strong> to reload tasks from SCUD. This is useful when:</p>
+            <ul>
+                <li>You've modified tasks outside the GUI (via CLI)</li>
+                <li>Another process has updated task status</li>
+                <li>You want to sync with the latest SCUD state</li>
+            </ul>
+
+            <h2>Configuration</h2>
+
+            <h3>Environment Variables</h3>
+
+            <table>
+                <tr><th>Variable</th><th>Description</th></tr>
+                <tr><td><code>ANTHROPIC_API_KEY</code></td><td>API key for Claude models</td></tr>
+                <tr><td><code>XAI_API_KEY</code></td><td>API key for xAI models (SCUD)</td></tr>
+                <tr><td><code>RUST_LOG</code></td><td>Logging level (e.g., <code>descartes_gui=debug</code>)</td></tr>
+            </table>
+
+            <h2>Testing</h2>
+
+            <p>The GUI includes comprehensive headless tests using <code>iced_test</code>:</p>
+
+            <pre><code>cd descartes-gui
+cargo test</code></pre>
+
+            <table>
+                <tr><th>Category</th><th>Count</th><th>Description</th></tr>
+                <tr><td>Model tests</td><td>8</td><td>Direct state manipulation</td></tr>
+                <tr><td>UI interaction</td><td>8</td><td>Simulator-based click tests</td></tr>
+                <tr><td>Full workflow</td><td>3</td><td>End-to-end scenarios</td></tr>
+                <tr><td>Snapshot</td><td>2</td><td>Visual regression</td></tr>
+            </table>
+
+            <div class="callout">
+                <strong>Note on Testing</strong>
+                The GUI uses the <code>iced_test</code> crate for headless testing. Due to a dependency issue with <code>rfd 0.16</code> (never published to crates.io), local testing requires a patch in <code>Cargo.toml</code>. This patch is automatically removed during publishing.
+            </div>
+
+            <h2>Limitations</h2>
+
+            <p>Current v0.1 limitations:</p>
+
+            <ul>
+                <li>Agent spawning is functional but uses placeholder integration</li>
+                <li>No model configuration UI yet (planned for v0.2)</li>
+                <li>No context supplementation / file drop (planned for v0.3)</li>
+                <li>No tool call visualization (planned for v0.4)</li>
+            </ul>
+
+            <h2>Troubleshooting</h2>
+
+            <h3>GUI won't start</h3>
+            <pre><code># Check SCUD is initialized
+scud warmup
+
+# Verify tasks exist
+scud list
+
+# Check for errors
+RUST_LOG=debug descartes-gui</code></pre>
+
+            <h3>Tasks not loading</h3>
+            <pre><code># Verify SCUD storage exists
+ls .scud/tasks/
+
+# Check file format
+cat .scud/tasks/tasks.scg</code></pre>
+
+            <h3>Linux display issues</h3>
+            <pre><code># Install Wayland dependencies
+sudo apt install libxkbcommon-dev libwayland-dev
+
+# Or try X11 backend
+WAYLAND_DISPLAY= descartes-gui</code></pre>
+        </div>
+    </main>
+</body>
+</html>

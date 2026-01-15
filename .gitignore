@@ -1,7 +1,15 @@
-
-# BMAD-TM Lite
+# Build artifacts
+target/
 descartes/target/
+descartes-gui/target/
 
-# SCUD
-descartes-v2/target/
-descartes-v2/baml_client/
+# BAML generated code (managed by build.rs)
+descartes/baml_client/
+
+# Generated artifacts
+repomix-output.xml
+*.repomix
+
+# IDE settings (optional - uncomment if desired)
+# .zed/
+# .gemini/
