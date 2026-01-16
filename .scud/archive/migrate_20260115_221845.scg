@@ -1,0 +1,161 @@
+# SCUD Graph v1
+# Phase: migrate
+
+@meta {
+  name migrate
+  id_format sequential
+  updated 2026-01-16T04:18:45.057700+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Create Spec Configuration System | X | 8 | H
+1.1 | Implement SpecConfig struct with all fields | D | 0 | H
+1.2 | Implement build_task_spec with helpers and token warning | D | 0 | H
+2 | Export Spec Module from lib.rs | D | 1 | L
+3 | Add Ralph Command Variant to CLI | D | 3 | H
+4 | Implement Ralph command handler with PRD initialization | X | 5 | H
+4.1 | Add Ralph match arm with PRD initialization logic | D | 0 | H
+4.2 | Build SpecConfig and create executor in handler | D | 0 | H
+5 | Create RalphExecutor Struct and Basic Methods | X | 8 | H
+5.1 | Define RalphExecutor Struct and new() Constructor | D | 0 | H
+5.2 | Implement compute_waves using Kahn's algorithm | D | 0 | M
+6 | Implement Task Execution Logic | X | 8 | H
+6.1 | Implement build_prompt with verification placeholder | D | 0 | H
+6.2 | Implement execute_task with fresh session lifecycle | D | 0 | H
+7 | Implement Main Run Loop | X | 13 | H
+7.1 | Implement Wave Computation | D | 0 | H
+7.2 | Implement round execution with SCUD backpressure validation | D | 0 | H
+7.3 | Add Progress Output and Agent Visibility | X | 8 | H
+7.3.1 | Create AgentRegistry module with spawn/track/focus methods | D | 0 | H
+7.3.2 | Add Zellij terminal backend for pane spawning | D | 0 | H
+7.3.3 | Implement orchestrator TUI with crossterm | D | 0 | M
+7.3.4 | Integrate TUI with run() loop and keyboard controls | D | 0 | H
+8 | Implement Dry Run Mode | X | 5 | M
+8.1 | Add dry_run method signature to RalphExecutor | D | 0 | H
+8.2 | Implement dry_run with formatted output and summary | D | 0 | H
+9 | Export RalphExecutor from lib.rs | D | 1 | L
+10 | Add Unit and Integration Tests | X | 5 | M
+10.1 | Add Unit Tests to ralph_executor.rs | D | 0 | H
+10.2 | Add Integration Test to tests/ralph_integration.rs | D | 0 | H
+11 | Update Documentation and README | D | 3 | L
+12 | Verify Build and Manual Tests | X | 5 | H
+12.1 | Verify Cargo Build | D | 0 | H
+12.2 | Run Manual Tests and Verify CLI | D | 0 | H
+13 | Implement Agent Context Handoff | D | 5 | H
+
+@edges
+# dependent -> dependency
+1.2 -> 1.1
+2 -> 1
+3 -> 1
+4 -> 3
+4.2 -> 4.1
+5 -> 1
+5.2 -> 5.1
+6 -> 5
+6.2 -> 6.1
+7 -> 6
+7.2 -> 7.1
+7.3 -> 7.1
+7.3 -> 7.2
+7.3.2 -> 7.3.1
+7.3.3 -> 7.3.1
+7.3.4 -> 7.3.2
+7.3.4 -> 7.3.3
+8 -> 7
+8.2 -> 8.1
+9 -> 5
+10 -> 7
+10 -> 8
+10.2 -> 10.1
+11 -> 3
+11 -> 4
+12 -> 2
+12 -> 9
+12 -> 10
+12 -> 11
+12.2 -> 12.1
+13 -> 6
+
+@parents
+# parent: subtasks...
+1: 1.1, 1.2
+4: 4.1, 4.2
+5: 5.1, 5.2
+6: 6.1, 6.2
+7: 7.1, 7.2, 7.3
+7.3: 7.3.1, 7.3.2, 7.3.3, 7.3.4
+8: 8.1, 8.2
+10: 10.1, 10.2
+12: 12.1, 12.2
+
+@details
+1 | description |
+  Implement the SpecConfig struct and build_task_spec function in src/spec.rs, including support for task details, plan extraction, and custom files. Ensure it handles token limits and template application.
+1.1 | description |
+  Define the SpecConfig struct in src/spec.rs with fields: include_task (bool), plan_path (Option<PathBuf>), additional_specs (Vec<PathBuf>), max_spec_tokens (Option<usize>), and spec_template (Option<String>). Include Default implementation and builder methods with_plan() and with_spec_file().
+1.2 | description |
+  Create build_task_spec function that combines task details via format_task_spec(), plan sections via extract_plan_section() with pattern matching (## Task X:, ### X., #### Task X, ## X), and custom files. Include token estimation (~4 chars per token) with warning log when spec exceeds max_spec_tokens budget. Implement apply_spec_template() for placeholder substitution ({task}, {plan}, {custom}, {verification}).
+2 | description |
+  Add the spec module export to src/lib.rs to make it accessible within the crate.
+3 | description |
+  Add the Ralph variant to the Commands enum in src/main.rs with all specified CLI options like scud_tag, prd, plan, spec_files, etc.
+4 | description |
+  Add match arm for Commands::Ralph in main() that handles PRD initialization flow: determine tag, run scud parse/expand/check-deps commands when --prd provided (respecting --no-expand and --no-check-deps flags), build SpecConfig from CLI options, create RalphExecutor, and dispatch to dry_run() or run() based on flags.
+4.1 | description |
+  Add match arm for Commands::Ralph that handles --prd flag by running scud parse, scud expand (unless --no-expand), and scud check-deps --fix (unless --no-check-deps) in sequence. Determine final tag from --scud-tag or PRD filename.
+4.2 | description |
+  Build SpecConfig from CLI options (--plan, --spec-file, --max-spec-tokens), using PRD path as fallback plan. Create RalphExecutor with config and dispatch to dry_run() or run() based on --dry-run flag.
+5 | description |
+  Implement the RalphExecutor struct in src/ralph_executor.rs with new() constructor, compute_waves(), and task marking methods (in_progress, done, failed, blocked).
+5.1 | description |
+  Define the RalphExecutor struct in src/ralph_executor.rs and implement the new() constructor method to initialize the struct.
+5.2 | description |
+  Implement compute_waves() method using Kahn's algorithm for topological sort: build in-degree map and dependents graph, process tasks with zero in-degree into waves, update degrees as tasks complete. Filter for pending, non-expanded tasks only.
+6 | description |
+  Add the execute_task() and build_prompt() methods to RalphExecutor, handling fresh harness sessions, prompt building, and result parsing.
+6.1 | description |
+  Add build_prompt() method that formats the task spec, SCUD tag, verification command (from backpressure config or explicit --verify), and instructions including TASK_BLOCKED output format for blocked scenarios.
+6.2 | description |
+  Add execute_task() method that: marks task in_progress, builds fresh spec via build_task_spec(), creates SessionConfig with model/working_dir, starts harness session, sends prompt, collects stream response, closes session, and parses result for TASK_BLOCKED: pattern to return TaskResult enum.
+7 | description |
+  Add the run() method to RalphExecutor, including wave computation, round execution, validation with backpressure, and progress output.
+7.1 | description |
+  Add logic to the run() method for computing waves in RalphExecutor.
+7.2 | description |
+  Add round execution logic that processes tasks in chunks of round_size, then runs validation using scud::backpressure::{BackpressureConfig, run_validation} between waves. Mark all completed tasks as failed if validation fails.
+7.3 | description |
+  Implement full progress visibility system with agent registry, Zellij terminal backend, and interactive TUI for watching/attaching to running agents.
+7.3.1 | description |
+  Create src/agent_registry.rs with AgentHandle struct (id, task_id, pane_name, status, spawned_at), AgentStatus enum, TerminalType enum (Zellij, Tmux, Kitty, Headless), and AgentRegistry with spawn(), get_by_task(), update_status(), list_running(), focus() methods.
+7.3.2 | description |
+  Add Zellij terminal backend: spawn_zellij() creates tab if needed via 'zellij action new-tab --name', spawns named panes via 'zellij action new-pane --name task-{id} --direction right', sets SCUD_TASK_ID env var. Add focus_zellij_pane() for attach functionality.
+7.3.3 | description |
+  Create src/ralph_tui.rs with RalphTui struct using crossterm for terminal UI. Implement run() loop with 100ms poll, render() showing wave progress and agent status list, keyboard handlers for [1-9] attach, [v] validate, [q] quit.
+7.3.4 | description |
+  Integrate TUI into RalphExecutor::run(): spawn orchestrator in first pane, spawn agents via registry, update TUI on status changes, handle keyboard input for attach (focus pane) and manual validation trigger.
+8 | description |
+  Add the dry_run() method to RalphExecutor to display execution plan without spawning agents.
+8.1 | description |
+  Define the dry_run() method in the RalphExecutor class with appropriate parameters and return type to support displaying the execution plan.
+8.2 | description |
+  Add logic to display execution plan showing Tag, Harness, Validate status, then each wave with rounds and tasks. Include Summary section with total Waves, Tasks, and Rounds counts. End with 'No agents spawned (dry-run mode)' message.
+9 | description |
+  Add the ralph_executor module export to src/lib.rs.
+10 | description |
+  Create unit tests in ralph_executor.rs and integration test in tests/ralph_integration.rs, ensuring cargo test passes.
+10.1 | description |
+  Implement unit tests within the ralph_executor.rs file to test individual components and functions.
+10.2 | description |
+  Create an integration test in tests/ralph_integration.rs to test the interaction between components and ensure cargo test passes.
+11 | description |
+  Update README.md with Ralph command documentation, examples, and how-it-works section, ensuring --help shows complete info.
+12 | description |
+  Ensure cargo build passes, run manual tests like dry-run command, and verify CLI help and basic execution.
+12.1 | description |
+  Run 'cargo build' and ensure it passes without errors.
+12.2 | description |
+  Execute manual tests such as dry-run command, and verify CLI help and basic execution.
+13 | description |
+  Monitor agent context usage during task execution. At ~60% context window, summarize progress, kill the agent, and spawn a fresh agent with the summary. This avoids auto-compaction which loses granular context. Implement: context_usage_monitor(), summarize_agent_progress(), and handoff_to_new_agent() in execute_task flow.

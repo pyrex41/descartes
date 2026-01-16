@@ -1,0 +1,110 @@
+# SCUD Graph v1
+# Phase: backpressure
+
+@meta {
+  name backpressure
+  id_format sequential
+  updated 2026-01-16T04:18:45.057185+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Add Repair Loop State Machine to RalphExecutor | X | 5 | H
+1.1 | Define Repair Loop State Machine Schema | P | 0 | H
+1.2 | Implement State Machine in RalphExecutor Logic | P | 0 | H
+2 | Implement Error Parsing for Build and Test Output | X | 5 | H
+2.1 | Define Error Data Structure | P | 0 | H
+2.2 | Implement Parsers for Cargo Commands | P | 0 | M
+3 | Create RepairAgent Prompt Builder | P | 3 | H
+4 | Integrate Repair Agents with Harness System | X | 5 | H
+4.1 | Modify Agent Spawning Logic for Repair Subagents | P | 0 | H
+4.2 | Implement Execution Management with Timeouts and Synchronization | P | 0 | H
+5 | Implement Smart Error Grouping Strategies | P | 3 | M
+6 | Add Repair Configuration to Config File | P | 2 | L
+7 | Implement Failure Handling Mechanisms | X | 5 | H
+7.1 | Implement Failure Detection Mechanisms | P | 0 | H
+7.2 | Implement Response and Revert Logic | D | 0 | H
+8 | Add BLOCKED State and User Notifications | P | 3 | M
+9 | Implement Observability Features | P | 3 | M
+10 | Test End-to-End Repair Loop Integration | X | 8 | H
+10.1 | Prepare Integration Test Scenarios and Setup | P | 0 | H
+10.2 | Execute Tests and Validate Success Criteria | P | 0 | H
+
+@edges
+# dependent -> dependency
+1.2 -> 1.1
+2 -> 1
+2.2 -> 2.1
+3 -> 2
+3 -> 5
+4 -> 3
+4.2 -> 4.1
+5 -> 2
+5 -> 6
+6 -> 1
+7 -> 1
+7 -> 4
+7.2 -> 7.1
+8 -> 7
+9 -> 1
+9 -> 4
+10 -> 1
+10 -> 2
+10 -> 3
+10 -> 4
+10 -> 5
+10 -> 6
+10 -> 7
+10 -> 8
+10 -> 9
+10.2 -> 10.1
+
+@parents
+# parent: subtasks...
+1: 1.1, 1.2
+2: 2.1, 2.2
+4: 4.1, 4.2
+7: 7.1, 7.2
+10: 10.1, 10.2
+
+@details
+1 | description |
+  Extend the RalphExecutor to include states like VALIDATING, REPAIRING, and BLOCKED. Implement the state transitions as per the flow diagram, ensuring the system blocks wave progression on backpressure failure and loops through repairs until success or max retries. This task involves updating the core execution logic to halt at validation failures.
+1.1 | description |
+  Add the new states (VALIDATING, REPAIRING, BLOCKED) to the RalphExecutor's state machine definition, including the transition rules and conditions as per the flow diagram. Ensure the schema supports halting on validation failures and retry logic.
+1.2 | description |
+  Update the core execution logic in RalphExecutor to integrate the state machine, implement transitions, block wave progression on backpressure failure, and loop through repairs until success or maximum retries are reached.
+2 | description |
+  Create parsers to extract errors from 'cargo build', 'cargo test', and 'cargo clippy' outputs. Parse details like file names, line numbers, error types, and messages into structured data for repair agents.
+2.1 | description |
+  Create a structured data model or schema to represent parsed errors, including fields for file names, line numbers, error types, and messages. Ensure the structure is extensible to support additional fields for future checks.
+2.2 | description |
+  Develop parsers for 'cargo build', 'cargo test', and 'cargo clippy' outputs to extract and map error details into the defined structured data. Handle various error formats and ensure the parsers are modular for easy extension.
+3 | description |
+  Build a function to generate prompts for repair agents, including error context, file context, wave task context (what tasks were attempting to accomplish), and verification commands. Ensure prompts are clear and focused on fixing specific issues without proceeding to other tasks.
+4 | description |
+  Modify the agent spawning logic to create repair subagents when backpressure fails. Handle spawning multiple agents in parallel based on configuration, and manage their execution with timeouts. Ensure repair agents run synchronously before re-validation.
+4.1 | description |
+  Update the agent spawning logic to detect backpressure failure and spawn repair subagents. Implement parallel spawning of multiple agents based on configuration settings.
+4.2 | description |
+  Add logic to manage repair agent execution with timeouts, ensure they run synchronously, and integrate with re-validation process.
+5 | description |
+  Add logic to group errors using three strategies: individual errors (one agent per error), file-based grouping (all errors in same file to one agent), or single agent mode (one agent gets all errors). Implement configuration-driven selection between strategies.
+6 | description |
+  Update .scud/config.toml to include all backpressure and repair settings: commands, stop_on_failure, timeout_secs, enabled, max_repair_rounds, max_parallel_repairs, repair_timeout_secs, and group_errors_by. Implement config loading and validation for these parameters.
+7 | description |
+  Add detection for max repair rounds, timeouts with fresh context retry, circular repairs (same error recurring), and regressions (increasing error counts). Implement logic to retry, try different grouping strategy on regression, or escalate to BLOCKED state. Include revert functionality for problematic changes.
+7.1 | description |
+  Add logic to detect max repair rounds exceeded, repair agent timeouts, circular repairs (same error keeps recurring), and regressions (error count increasing). Track error history to identify patterns.
+7.2 | description |
+  Add logic to retry failed repairs with fresh context on timeout, try different grouping strategy when regressions detected, escalate to BLOCKED state when max retries exceeded, and notify user for circular repairs. Include revert functionality to undo problematic changes.
+8 | description |
+  Implement the BLOCKED state when repairs fail after max attempts. Add notifications to alert users via TUI or logs about blocked waves requiring manual intervention. Ensure the system halts progression and provides detailed failure context.
+9 | description |
+  Add repair metrics to TUI showing repair count, success rate, and current repair progress. Implement detailed logging of repair attempts with full error context. Generate structured repair summary after completion showing total repairs attempted, success/failure breakdown, and time spent.
+10 | description |
+  Conduct integration tests to verify the full repair loop: wave completion, backpressure check, agent spawning, repairs, re-validation, and progression or blocking. Test various failure modes including timeouts, regressions, and circular repairs. Validate system correctly handles each scenario.
+10.1 | description |
+  Design and set up test cases covering the full repair loop, including wave completion, backpressure checks, agent spawning, repairs, re-validation, progression, and blocking. Include scenarios for various failure modes and edge cases to simulate real-world conditions.
+10.2 | description |
+  Run the integration tests, monitor the repair loop execution, and analyze results to verify handling of failure modes and achievement of success criteria, such as auto-repairing 80% of simple errors. Document findings and any necessary adjustments.
