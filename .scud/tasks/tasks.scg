@@ -4,7 +4,7 @@
 @meta {
   name backpressure
   id_format sequential
-  updated 2026-01-13T21:32:47.764062+00:00
+  updated 2026-01-16T00:01:54.210806+00:00
 }
 
 @nodes
@@ -112,12 +112,106 @@
 ---
 
 # SCUD Graph v1
+# Phase: guiwork
+
+@meta {
+  name guiwork
+  id_format sequential
+  updated 2026-01-16T00:01:54.210875+00:00
+}
+
+@nodes
+# id | title | status | complexity | priority
+1 | Expand ViewMode Enum | P | 2 | H
+2 | Expand AppState Struct | X | 5 | H
+2.1 | Define Supporting Structs Including SettingsState | P | 0 | H
+2.2 | Expand AppState with All New Fields | P | 0 | H
+3 | Extract Waves View | X | 5 | H
+3.1 | Create views/waves.rs file and extract basic function structure | P | 0 | H
+3.2 | Implement full wave visualization, task buttons, and controls | P | 0 | H
+4 | Extract Agents View | P | 3 | H
+5 | Extract Output View | P | 2 | H
+6 | Create Settings View Stub for Phase 3 | P | 1 | M
+7 | Create Skills View Stub for Phase 4 | P | 1 | M
+8 | Create SCUD View Stub for Phase 5 | P | 1 | M
+9 | Create Transcripts View Stub for Phase 6 | P | 1 | M
+10 | Update Views Module and Refactor main.rs | X | 5 | H
+10.1 | Update views/mod.rs with new view modules | P | 0 | H
+10.2 | Refactor main.rs to use extracted view functions | P | 0 | M
+
+@edges
+# dependent -> dependency
+2 -> 1
+2.2 -> 2.1
+3 -> 2
+3 -> 1
+3.2 -> 3.1
+4 -> 2
+4 -> 1
+5 -> 2
+5 -> 1
+6 -> 1
+7 -> 1
+8 -> 1
+9 -> 1
+10 -> 3
+10 -> 4
+10 -> 5
+10 -> 6
+10 -> 7
+10 -> 8
+10 -> 9
+10.2 -> 10.1
+
+@parents
+# parent: subtasks...
+2: 2.1, 2.2
+3: 3.1, 3.2
+10: 10.1, 10.2
+
+@details
+1 | description |
+  Add new variants (Settings, Skills, Scud, Transcripts) to the ViewMode enum in main.rs to support all 7 view tabs. Update any related pattern matching in the file.
+2 | description |
+  Add new fields to AppState in state.rs for configuration, skills, SCUD tasks, transcripts, and swarm execution state. Include all specified structs like SkillInfo, TaskDetail, TranscriptInfo, and ValidationResult.
+2.1 | description |
+  Define new structs SkillInfo, SkillVariable, TaskDetail, TranscriptInfo, ValidationResult, and SettingsState in state.rs with all required fields per PRD Phase 3.2 including SCUD, harness, execution, guidance, and backpressure configuration fields.
+2.2 | description |
+  Add new fields to AppState including: config, config_dirty, skills, selected_skill, skill_args, scud_tags, active_tag, tasks, selected_task, transcripts, selected_transcript, transcript_content, transcript_search, prd_file, swarm_running, current_wave, current_round, validation_results, and settings (SettingsState).
+3 | description |
+  Move the view_waves logic from main.rs into a new views/waves.rs file. Implement the full function with wave visualization, task buttons, and controls, using the updated AppState.
+3.1 | description |
+  Create a new file views/waves.rs and move the basic view_waves function structure from main.rs, including function signature and initial setup, ensuring it compiles without the full implementation.
+3.2 | description |
+  Complete the view_waves function in views/waves.rs by implementing the wave visualization logic, task buttons, and controls, integrating with the updated AppState.
+4 | description |
+  Move the view_agents logic from main.rs into views/agents.rs. Include agent status display, validation results, and controls for pause/resume/cancel.
+5 | description |
+  Move the view_output logic from main.rs into views/output.rs. Implement output buffer display with clear and copy buttons.
+6 | description |
+  Create views/settings.rs with placeholder view function. This stub will be replaced with full Settings implementation in Phase 3 covering SCUD tag selection, harness/model config, execution settings, guidance fields, and backpressure configuration.
+7 | description |
+  Create views/skills.rs with placeholder view function. This stub will be replaced with full Skills implementation in Phase 4 including skills browser with listing, detail view, variable input, and execution via SkillRegistry.
+8 | description |
+  Create views/scud.rs with placeholder view function. This stub will be replaced with full SCUD management in Phase 5 including task list, status editing, tag management, and PRD import functionality.
+9 | description |
+  Create views/transcripts.rs with placeholder view function. This stub will be replaced with full Transcripts browser in Phase 6 including search, list panel, detail viewer with content display, and replay functionality.
+10 | description |
+  Add all new view modules to views/mod.rs with pub mod declarations. Refactor main.rs to use the extracted view functions, update navigation, and remove inlined view logic while maintaining all functionality.
+10.1 | description |
+  Add pub mod declarations for all new view modules in views/mod.rs to make them accessible.
+10.2 | description |
+  Update main.rs to import and use the extracted view functions, update navigation logic for all 7 views, and remove all inlined view logic while ensuring all functionality is maintained. This is critical for Phase 1 completion.
+
+---
+
+# SCUD Graph v1
 # Phase: migrate
 
 @meta {
   name migrate
   id_format sequential
-  updated 2026-01-13T21:32:47.764106+00:00
+  updated 2026-01-16T00:01:54.210900+00:00
 }
 
 @nodes
