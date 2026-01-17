@@ -8,7 +8,7 @@ use clap::{ArgAction, Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use descartes::{Config, Result};
+use descartes::{Config, Result, views::{agents, scud, settings, skills, transcripts}};
 
 #[derive(Parser)]
 #[command(name = "descartes")]
@@ -78,7 +78,30 @@ enum Commands {
     Waves,
 
     /// Initialize .descartes directory
-    Init,
+    Init {
+        /// Also run interactive wizard for configuration
+        #[arg(long)]
+        wizard: bool,
+
+        /// Also initialize SCUD task management
+        #[arg(long)]
+        with_scud: bool,
+
+        /// Force overwrite existing configuration
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Run interactive configuration wizard (launches Claude Code)
+    Wizard {
+        /// Skip SCUD initialization
+        #[arg(long)]
+        no_scud: bool,
+
+        /// Reconfigure existing setup (don't skip if already initialized)
+        #[arg(long)]
+        reconfigure: bool,
+    },
 
     /// Show current configuration
     Config,
@@ -170,6 +193,58 @@ enum Commands {
         /// Working directory (default: current)
         #[arg(long)]
         working_dir: Option<std::path::PathBuf>,
+
+        /// Use SCUD swarm for execution (default: true)
+        /// This delegates to `scud swarm` for visible terminal windows
+        #[arg(long, default_value = "true")]
+        use_scud: bool,
+
+        /// Disable SCUD delegation and use built-in headless executor
+        #[arg(long)]
+        no_use_scud: bool,
+    },
+
+    /// Spawn SCUD agents for the next available tasks (thin wrapper around scud spawn)
+    ScudSpawn {
+        /// SCUD tag (uses active tag if not provided)
+        #[arg(long)]
+        scud_tag: Option<String>,
+
+        /// Path to implementation plan document for spec context
+        #[arg(long)]
+        plan: Option<std::path::PathBuf>,
+
+        /// Additional spec files to include (can be repeated)
+        #[arg(long = "spec-file", action = ArgAction::Append)]
+        spec_files: Vec<std::path::PathBuf>,
+
+        /// Max tokens for spec section (default: 5000)
+        #[arg(long, default_value = "5000")]
+        max_spec_tokens: usize,
+
+        /// Maximum agents to spawn (default: 5)
+        #[arg(short = 'n', long, default_value = "5")]
+        limit: usize,
+
+        /// Harness to use: claude-code, opencode
+        #[arg(long, env = "DESCARTES_HARNESS", default_value = "claude-code")]
+        harness: String,
+
+        /// Start TUI monitor after spawn (default: true)
+        #[arg(long, default_value = "true")]
+        monitor: bool,
+
+        /// Disable TUI monitor
+        #[arg(long)]
+        no_monitor: bool,
+
+        /// Working directory (default: current)
+        #[arg(long)]
+        working_dir: Option<std::path::PathBuf>,
+
+        /// Show spawn plan without executing
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -251,15 +326,11 @@ async fn main() -> Result<()> {
         }
 
         Commands::Transcripts { today, session } => {
-            let transcripts = descartes::transcript::list_transcripts(&config, today, session)?;
-            for t in transcripts {
-                println!("{}", t);
-            }
+            transcripts::show_transcripts(&config, today, session)?;
         }
 
         Commands::Show { session_id } => {
-            let transcript = descartes::transcript::load(&config, &session_id)?;
-            println!("{}", transcript.to_scg());
+            transcripts::show_transcript(&config, &session_id)?;
         }
 
         Commands::Replay { session_id, speed } => {
@@ -278,84 +349,79 @@ async fn main() -> Result<()> {
         }
 
         Commands::Waves => {
-            use descartes::scud::{Storage, Task};
-
-            let storage = Storage::new(None);
-            let phase = match storage.load_active_group() {
-                Ok(p) => p,
-                Err(_) => {
-                    println!("No active phase found.");
-                    return Ok(());
-                }
-            };
-
-            let waves_ids = descartes::scud::waves(&config)?;
-            if waves_ids.is_empty() {
-                println!("No pending tasks.");
-                return Ok(());
-            }
-
-            const ROUND_SIZE: usize = 5;
-            let total_tasks: usize = waves_ids.iter().map(|w| w.len()).sum();
-            let total_rounds: usize = waves_ids.iter().map(|w| if w.is_empty() { 0 } else { (w.len() + ROUND_SIZE - 1) / ROUND_SIZE }).sum();
-            let total_waves = waves_ids.len();
-            let speedup = if total_rounds == 0 { 1.0f64 } else { total_tasks as f64 / total_rounds as f64 };
-
-            println!("Execution Waves (max {} parallel)", ROUND_SIZE);
-            println!("{}", "═".repeat(50));
-
-            for (wave_idx, wave_ids) in waves_ids.iter().enumerate() {
-                let n_tasks = wave_ids.len();
-                let n_rounds_wave = if n_tasks == 0 { 0 } else { (n_tasks + ROUND_SIZE - 1) / ROUND_SIZE };
-                println!("Wave {}: {} tasks (batched into {} rounds)", wave_idx + 1, n_tasks, n_rounds_wave);
-
-                let rounds: Vec<Vec<&Task>> = wave_ids.chunks(ROUND_SIZE).map(|chunk_ids| {
-                    chunk_ids.iter().filter_map(|id| phase.get_task(id)).collect()
-                }).collect();
-
-                for (round_idx, round_tasks) in rounds.iter().enumerate() {
-                    println!("  Round {}", round_idx + 1);
-                    for task in round_tasks.iter() {
-                        let deps_ids: Vec<_> = task.dependencies.iter()
-                            .filter(|d| phase.get_task(d).is_some())
-                            .cloned()
-                            .collect();
-                        let mut deps_sorted = deps_ids.clone();
-                        deps_sorted.sort_unstable();
-                        let deps_str = deps_sorted.join(", ");
-                        let deps_display = if !deps_ids.is_empty() {
-                            format!(" [{}] <- {}", deps_ids.len(), deps_str)
-                        } else {
-                            String::new()
-                        };
-                        let title_trunc: String = task.title.chars().take(60).collect();
-                        println!("    ○ {} {}{}", task.id, title_trunc, deps_display);
-                    }
-                }
-            }
-
-            println!("\nSummary");
-            println!("{}", "─".repeat(30));
-            println!("  Total tasks:   {}", total_tasks);
-            println!("  Total waves:   {}", total_waves);
-            println!("  Total rounds:  {}", total_rounds);
-            println!("  Speedup:       {:.1}x", speedup);
-            println!("  (from {} sequential to {} parallel rounds)", total_tasks, total_rounds);
+            scud::show_waves(&config)?;
         }
 
-        Commands::Init => {
-            descartes::config::init()?;
+        Commands::Init {
+            wizard,
+            with_scud,
+            force,
+        } => {
+            // Basic init
+            descartes::config::init_with_options(force)?;
             info!("Initialized .descartes directory");
+
+            // Initialize SCUD if requested
+            if with_scud {
+                let status = std::process::Command::new("scud").arg("init").status();
+                match status {
+                    Ok(s) if s.success() => info!("Initialized SCUD"),
+                    Ok(_) => eprintln!("Warning: scud init returned non-zero"),
+                    Err(_) => eprintln!("Warning: scud not found, skipping SCUD init"),
+                }
+            }
+
+            // Launch wizard if requested
+            if wizard {
+                if let Ok(claude_path) = which::which("claude") {
+                    let prompt = include_str!("../skills/wizard.md");
+                    let _ = std::process::Command::new(claude_path)
+                        .args(["-p", prompt, "--dangerously-skip-permissions"])
+                        .status();
+                } else {
+                    eprintln!("Warning: claude CLI not found, skipping wizard");
+                }
+            }
+        }
+
+        Commands::Wizard { no_scud, reconfigure } => {
+            // Check if claude binary exists
+            let claude_path = which::which("claude").map_err(|_| {
+                descartes::Error::Command(
+                    "claude CLI not found. Install from https://claude.ai/code".to_string(),
+                )
+            })?;
+
+            // Build a simple prompt to invoke the wizard
+            let mut prompt =
+                "Help me configure Descartes. Walk me through setting up the project.".to_string();
+
+            if no_scud {
+                prompt.push_str(" Skip SCUD initialization.");
+            }
+            if reconfigure {
+                prompt.push_str(" Reconfigure even if already set up.");
+            }
+
+            // Launch Claude Code
+            let status = std::process::Command::new(claude_path)
+                .arg(&prompt)
+                .current_dir(std::env::current_dir()?)
+                .status()?;
+
+            if !status.success() {
+                return Err(descartes::Error::Command(
+                    "Wizard exited with error".to_string(),
+                ));
+            }
         }
 
         Commands::Config => {
-            let content = toml::to_string_pretty(&config)
-                .map_err(|e| descartes::Error::Config(e.to_string()))?;
-            println!("{}", content);
+            settings::show_config(&config)?;
         }
 
         Commands::Harness => {
-            println!("Active harness: {}", config.harness.kind);
+            settings::show_harness(&config)?;
         }
 
         Commands::Interactive => {
@@ -408,6 +474,8 @@ async fn main() -> Result<()> {
             no_validate,
             dry_run,
             working_dir,
+            use_scud,
+            no_use_scud,
         } => {
             let working_dir =
                 working_dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
@@ -498,23 +566,85 @@ async fn main() -> Result<()> {
                 spec_config.additional_specs.push(spec_file);
             }
 
-            // Create SwarmExecutor and dispatch
-            let executor = descartes::SwarmExecutor::new(
-                final_tag,
-                spec_config,
-                verify,
-                harness,
-                model,
-                round_size,
-                !no_validate,
-                working_dir,
-            )?;
+            // Determine whether to use SCUD delegation
+            // --no-use-scud overrides --use-scud
+            let should_use_scud = use_scud && !no_use_scud;
 
-            if dry_run {
-                executor.dry_run().await?;
+            if should_use_scud {
+                // Write spec to SCUD guidance
+                descartes::spec::write_spec_to_guidance(&spec_config, &working_dir)?;
+
+                // Delegate to scud swarm
+                run_scud_swarm(
+                    &final_tag,
+                    &harness,
+                    round_size,
+                    no_validate,
+                    dry_run,
+                    &working_dir,
+                )?;
             } else {
-                executor.run(&config).await?;
+                // Fallback: use built-in headless executor (deprecated path)
+                info!("Using built-in headless executor (--no-use-scud)");
+
+                let executor = descartes::SwarmExecutor::new(
+                    final_tag,
+                    spec_config,
+                    verify,
+                    harness,
+                    model,
+                    round_size,
+                    !no_validate,
+                    working_dir,
+                )?;
+
+                if dry_run {
+                    executor.dry_run().await?;
+                } else {
+                    executor.run(&config).await?;
+                }
             }
+        }
+
+        Commands::ScudSpawn {
+            scud_tag,
+            plan,
+            spec_files,
+            max_spec_tokens,
+            limit,
+            harness,
+            monitor,
+            no_monitor,
+            working_dir,
+            dry_run,
+        } => {
+            let working_dir =
+                working_dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+            // Build SpecConfig
+            let mut spec_config = descartes::SpecConfig::new();
+            spec_config.max_spec_tokens = Some(max_spec_tokens);
+
+            if let Some(plan_path) = plan {
+                spec_config.plan_path = Some(plan_path);
+            }
+
+            for spec_file in spec_files {
+                spec_config.additional_specs.push(spec_file);
+            }
+
+            // Write spec to SCUD guidance
+            descartes::spec::write_spec_to_guidance(&spec_config, &working_dir)?;
+
+            // Delegate to scud spawn
+            run_scud_spawn(
+                scud_tag.as_deref(),
+                &harness,
+                limit,
+                monitor && !no_monitor,
+                dry_run,
+                &working_dir,
+            )?;
         }
     }
 
@@ -523,88 +653,20 @@ async fn main() -> Result<()> {
 
 /// Handle agents subcommands
 fn handle_agents_command(config: &Config, action: AgentCommands) -> Result<()> {
-    use descartes::agent::AgentDefinitionRegistry;
-
     match action {
         AgentCommands::List => {
-            let mut registry = AgentDefinitionRegistry::new(config.agents.directory.clone())
-                .with_enabled(config.agents.enabled.clone())
-                .with_disabled(config.agents.disabled.clone());
-
-            if let Err(e) = registry.load() {
-                eprintln!("Warning: Failed to load agents: {}", e);
-            }
-
-            if registry.is_empty() {
-                println!("No agents found in {:?}", config.agents.directory);
-                println!("\nTo create agents, add AGENT.md files to subdirectories:");
-                println!("  .descartes/agents/<name>/AGENT.md");
-                println!("\nOr run 'descartes agents init' to create an example.");
-                return Ok(());
-            }
-
-            println!("Available agents:\n");
-            for agent in registry.list() {
-                let model = agent
-                    .model
-                    .as_ref()
-                    .map(|m| format!(" [{}]", m))
-                    .unwrap_or_default();
-                let skills = if agent.skills.is_empty() {
-                    String::new()
-                } else {
-                    format!(" (skills: {})", agent.skills.join(", "))
-                };
-                println!("  {}{}", agent.name, model);
-                println!("    Category: {}", agent.category);
-                println!("    {}{}", agent.description, skills);
-                println!();
-            }
+            agents::show_agents_list(config)?;
         }
 
         AgentCommands::Show { name } => {
-            let mut registry = AgentDefinitionRegistry::new(config.agents.directory.clone())
-                .with_enabled(config.agents.enabled.clone())
-                .with_disabled(config.agents.disabled.clone());
-
-            if let Err(e) = registry.load() {
-                eprintln!("Warning: Failed to load agents: {}", e);
-            }
-
-            if let Some(agent) = registry.get(&name) {
-                println!("Agent: {}", agent.name);
-                println!("Description: {}", agent.description);
-                println!("Category: {}", agent.category);
-                if let Some(ref model) = agent.model {
-                    println!("Model: {}", model);
-                }
-                if let Some(ref tools) = agent.tools {
-                    println!("Tools: {}", tools.join(", "));
-                }
-                if !agent.skills.is_empty() {
-                    println!("Skills: {}", agent.skills.join(", "));
-                }
-                println!("\n─── Instructions ───");
-                println!("{}", agent.instructions);
-            } else {
-                eprintln!("Unknown agent: {}", name);
-                eprintln!(
-                    "\nAvailable agents: {}",
-                    registry
-                        .names()
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-            }
+            agents::show_agent_detail(config, &name)?;
         }
 
         AgentCommands::Init { force } => {
             let agents_dir = config.agents.directory.clone();
-            let example_dir = agents_dir.join("code-analyzer");
 
-            if example_dir.exists() && !force {
+            // Check if any agent already exists
+            if agents_dir.exists() && agents_dir.read_dir()?.next().is_some() && !force {
                 eprintln!(
                     "Agents directory already exists at {:?}. Use --force to overwrite.",
                     agents_dir
@@ -612,50 +674,46 @@ fn handle_agents_command(config: &Config, action: AgentCommands) -> Result<()> {
                 return Ok(());
             }
 
-            // Create agents directory structure
-            std::fs::create_dir_all(&example_dir)?;
+            // Default agents to create - one or more per category
+            let default_agents = [
+                // Searcher category
+                ("codebase-locator", include_str!("../agents/codebase-locator.md")),
+                ("thoughts-locator", include_str!("../agents/thoughts-locator.md")),
+                ("web-search-researcher", include_str!("../agents/web-search-researcher.md")),
+                // Analyzer category
+                ("codebase-analyzer", include_str!("../agents/codebase-analyzer.md")),
+                ("codebase-pattern-finder", include_str!("../agents/codebase-pattern-finder.md")),
+                ("thoughts-analyzer", include_str!("../agents/thoughts-analyzer.md")),
+                // Builder category
+                ("builder", include_str!("../agents/builder.md")),
+                // Fast-builder category
+                ("fast-builder", include_str!("../agents/fast-builder.md")),
+                // Planner category
+                ("planner", include_str!("../agents/planner.md")),
+                // Validator category
+                ("validator", include_str!("../agents/validator.md")),
+                // Builder-reviewer category
+                ("builder-reviewer", include_str!("../agents/builder-reviewer.md")),
+                // Orchestrator category
+                ("orchestrator", include_str!("../agents/orchestrator.md")),
+            ];
 
-            // Write example AGENT.md
-            let example_agent = r#"---
-name: code-analyzer
-description: Expert code analysis agent. Use for deep architectural review, security analysis, and understanding complex codebases.
-category: analyzer
-model: opus
-skills:
-  - research
-  - review
----
+            // Create each agent
+            for (name, content) in default_agents {
+                let agent_dir = agents_dir.join(name);
+                std::fs::create_dir_all(&agent_dir)?;
+                std::fs::write(agent_dir.join("AGENT.md"), content)?;
+                info!("Created agent: {}", name);
+            }
 
-# Code Analyzer
-
-You are an expert code analyst. Your role is to provide deep insights into codebases.
-
-## Focus Areas
-- Architecture patterns and anti-patterns
-- Security vulnerabilities
-- Performance implications
-- Code quality and maintainability
-
-## Available Skills
-You have access to the following skills. Invoke them when appropriate:
-{{skills_frontmatter}}
-
-## Approach
-1. Start by understanding the high-level structure
-2. Identify patterns and conventions
-3. Note areas of concern
-4. Provide actionable recommendations
-"#;
-
-            std::fs::write(example_dir.join("AGENT.md"), example_agent)?;
-            info!(
-                "Created example agent definition in {:?}",
-                example_dir.join("AGENT.md")
-            );
-            println!("Created agents directory with example at {:?}", agents_dir);
+            println!("Created {} default agents in {:?}", default_agents.len(), agents_dir);
+            println!("\nAgents created:");
+            for (name, _) in default_agents {
+                println!("  - {}", name);
+            }
             println!("\nYou can now:");
             println!("  - List agents: descartes agents list");
-            println!("  - Show an agent: descartes agents show code-analyzer");
+            println!("  - Show an agent: descartes agents show <name>");
             println!("  - Create more agents by adding AGENT.md files to subdirectories");
         }
     }
@@ -667,21 +725,7 @@ You have access to the following skills. Invoke them when appropriate:
 fn handle_skills_command(action: SkillCommands) -> Result<()> {
     match action {
         SkillCommands::List => {
-            let registry = descartes::interactive::SkillRegistry::new();
-            println!("Available skills:\n");
-            for (name, skill) in registry.list() {
-                let aliases = if skill.aliases.is_empty() {
-                    String::new()
-                } else {
-                    format!(" ({})", skill.aliases.join(", "))
-                };
-                println!("  /{}{}", name, aliases);
-                println!("    {}", skill.description);
-                if let Some(ref cat) = skill.category {
-                    println!("    Category: {}", cat);
-                }
-                println!();
-            }
+            skills::show_skills_list()?;
         }
 
         SkillCommands::Init { force } => {
@@ -697,46 +741,140 @@ fn handle_skills_command(action: SkillCommands) -> Result<()> {
         }
 
         SkillCommands::Show { name } => {
-            let registry = descartes::interactive::SkillRegistry::new();
-            if let Some(skill) = registry.get(&name) {
-                println!("Skill: {}", skill.name);
-                println!("Description: {}", skill.description);
-                println!("Prompt file: {}", skill.prompt_file.display());
-                if let Some(ref cat) = skill.category {
-                    println!("Category: {}", cat);
-                }
-                if !skill.aliases.is_empty() {
-                    println!("Aliases: {}", skill.aliases.join(", "));
-                }
-                if !skill.variables.is_empty() {
-                    println!("\nVariables:");
-                    for var in &skill.variables {
-                        let required = if var.required { " (required)" } else { "" };
-                        let default = var
-                            .default
-                            .as_ref()
-                            .map(|d| format!(" [default: {}]", d))
-                            .unwrap_or_default();
-                        println!("  {}{}{}", var.name, required, default);
-                        if let Some(ref desc) = var.description {
-                            println!("    {}", desc);
-                        }
-                    }
-                }
-
-                // Try to show the prompt content
-                if skill.prompt_file.exists() {
-                    println!("\n─── Prompt Content ───");
-                    if let Ok(content) = std::fs::read_to_string(&skill.prompt_file) {
-                        println!("{}", content);
-                    }
-                } else {
-                    println!("\nNote: Prompt file does not exist yet. Run 'descartes skills init' to create it.");
-                }
-            } else {
-                eprintln!("Unknown skill: {}", name);
-            }
+            skills::show_skill_detail(&name)?;
         }
+    }
+
+    Ok(())
+}
+
+/// Map Descartes harness name to SCUD harness name
+fn map_harness_name(descartes_harness: &str) -> &str {
+    match descartes_harness {
+        "claude-code" => "claude",
+        "opencode" => "opencode",
+        "codex" => "opencode", // Codex uses OpenCode harness in SCUD
+        other => other,
+    }
+}
+
+/// Run SCUD swarm as a subprocess
+///
+/// Delegates execution to `scud swarm` which provides:
+/// - Visible terminal windows
+/// - Wave-based orchestration
+/// - TUI monitoring
+/// - Backpressure validation
+fn run_scud_swarm(
+    tag: &str,
+    harness: &str,
+    round_size: usize,
+    no_validate: bool,
+    dry_run: bool,
+    working_dir: &std::path::Path,
+) -> Result<()> {
+    // Check if scud is in PATH
+    if which::which("scud").is_err() {
+        return Err(descartes::Error::Command(
+            "scud CLI not found in PATH. Install SCUD or use --no-use-scud for headless execution."
+                .to_string(),
+        ));
+    }
+
+    let scud_harness = map_harness_name(harness);
+
+    let mut args = vec![
+        "swarm".to_string(),
+        "--tag".to_string(),
+        tag.to_string(),
+        "--harness".to_string(),
+        scud_harness.to_string(),
+        "--round-size".to_string(),
+        round_size.to_string(),
+    ];
+
+    if no_validate {
+        args.push("--no-validate".to_string());
+    }
+
+    if dry_run {
+        args.push("--dry-run".to_string());
+    }
+
+    info!("Delegating to: scud {}", args.join(" "));
+
+    let status = std::process::Command::new("scud")
+        .args(&args)
+        .current_dir(working_dir)
+        .status()?;
+
+    if !status.success() {
+        return Err(descartes::Error::Command(format!(
+            "scud swarm exited with status: {}",
+            status
+        )));
+    }
+
+    Ok(())
+}
+
+/// Run SCUD spawn as a subprocess
+///
+/// Delegates execution to `scud spawn` which provides:
+/// - Visible terminal windows for each agent
+/// - Task claiming
+/// - Optional TUI monitoring
+fn run_scud_spawn(
+    tag: Option<&str>,
+    harness: &str,
+    limit: usize,
+    monitor: bool,
+    dry_run: bool,
+    working_dir: &std::path::Path,
+) -> Result<()> {
+    // Check if scud is in PATH
+    if which::which("scud").is_err() {
+        return Err(descartes::Error::Command(
+            "scud CLI not found in PATH. Install SCUD to use scud-spawn.".to_string(),
+        ));
+    }
+
+    let scud_harness = map_harness_name(harness);
+
+    let mut args = vec![
+        "spawn".to_string(),
+        "--harness".to_string(),
+        scud_harness.to_string(),
+        "--limit".to_string(),
+        limit.to_string(),
+        "--claim".to_string(), // Always claim tasks
+    ];
+
+    if let Some(t) = tag {
+        args.push("--tag".to_string());
+        args.push(t.to_string());
+    }
+
+    if monitor {
+        args.push("--monitor".to_string());
+    }
+
+    if dry_run {
+        args.push("--dry-run".to_string());
+    }
+
+    info!("Delegating to: scud {}", args.join(" "));
+
+    let status = std::process::Command::new("scud")
+        .args(&args)
+        .current_dir(working_dir)
+        .status()?;
+
+    if !status.success() {
+        return Err(descartes::Error::Command(format!(
+            "scud spawn exited with status: {}",
+            status
+        )));
     }
 
     Ok(())

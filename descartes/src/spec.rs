@@ -383,6 +383,115 @@ Begin implementation."#,
     )
 }
 
+/// Build a general spec for guidance (without task-specific content)
+///
+/// This combines:
+/// - Plan document content (if `plan_path` is set)
+/// - Additional spec files
+///
+/// Used by SCUD delegation to write context to `.scud/guidance/descartes-spec.md`
+pub fn build_general_spec(config: &SpecConfig) -> Result<String> {
+    let mut sections = Vec::new();
+
+    // Add plan content if configured
+    if let Some(plan_path) = &config.plan_path {
+        match fs::read_to_string(plan_path) {
+            Ok(plan_content) => {
+                let filename = plan_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "Plan".to_string());
+                sections.push(format!("## {}\n\n{}", filename, plan_content.trim()));
+            }
+            Err(e) => {
+                warn!("Failed to read plan file {:?}: {}", plan_path, e);
+            }
+        }
+    }
+
+    // Add additional spec files
+    for spec_path in &config.additional_specs {
+        match fs::read_to_string(spec_path) {
+            Ok(content) => {
+                let filename = spec_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "Spec".to_string());
+                sections.push(format!("## {}\n\n{}", filename, content.trim()));
+            }
+            Err(e) => {
+                warn!("Failed to read spec file {:?}: {}", spec_path, e);
+            }
+        }
+    }
+
+    if sections.is_empty() {
+        return Ok(String::new());
+    }
+
+    let spec = format!(
+        "# Descartes Task Context\n\n{}\n",
+        sections.join("\n\n---\n\n")
+    );
+
+    // Check token budget
+    if let Some(max_tokens) = config.max_spec_tokens {
+        let estimated_tokens = estimate_tokens(&spec);
+        if estimated_tokens > max_tokens {
+            warn!(
+                "General spec exceeds token budget: ~{} tokens (max: {})",
+                estimated_tokens, max_tokens
+            );
+        }
+    }
+
+    Ok(spec)
+}
+
+/// Write spec content to SCUD guidance directory
+///
+/// Creates `.scud/guidance/descartes-spec.md` with the combined spec content
+/// from plan files and additional spec files.
+///
+/// # Arguments
+///
+/// * `config` - The spec configuration with plan_path and additional_specs
+/// * `working_dir` - The working directory containing `.scud/`
+///
+/// # Returns
+///
+/// The path to the written guidance file
+pub fn write_spec_to_guidance(config: &SpecConfig, working_dir: &std::path::Path) -> Result<PathBuf> {
+    let spec_content = build_general_spec(config)?;
+
+    // If no content, skip writing
+    if spec_content.is_empty() {
+        return Ok(working_dir.join(".scud/guidance/descartes-spec.md"));
+    }
+
+    // Ensure guidance directory exists
+    let guidance_dir = working_dir.join(".scud/guidance");
+    fs::create_dir_all(&guidance_dir).map_err(|e| {
+        crate::Error::Config(format!(
+            "Failed to create guidance directory {:?}: {}",
+            guidance_dir, e
+        ))
+    })?;
+
+    // Write spec to guidance file
+    let guidance_path = guidance_dir.join("descartes-spec.md");
+    fs::write(&guidance_path, &spec_content).map_err(|e| {
+        crate::Error::Config(format!(
+            "Failed to write guidance file {:?}: {}",
+            guidance_path, e
+        ))
+    })?;
+
+    tracing::info!("Wrote spec to {:?} ({} bytes)", guidance_path, spec_content.len());
+
+    Ok(guidance_path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -661,5 +770,108 @@ Build instructions.
         assert!(prompt.contains("Prefer composition over inheritance"));
         // Should still contain normal prompt elements
         assert!(prompt.contains("Swarm technique"));
+    }
+
+    // ============ build_general_spec tests ============
+
+    #[test]
+    fn test_build_general_spec_empty() {
+        let config = SpecConfig::default();
+        let spec = build_general_spec(&config).unwrap();
+        assert!(spec.is_empty(), "Empty config should produce empty spec");
+    }
+
+    #[test]
+    fn test_build_general_spec_with_plan() {
+        // Create a temp file for the plan
+        let temp_dir = std::env::temp_dir();
+        let plan_path = temp_dir.join("test-plan.md");
+        std::fs::write(&plan_path, "# Test Plan\n\nThis is the plan content.").unwrap();
+
+        let config = SpecConfig::new().with_plan(plan_path.clone());
+        let spec = build_general_spec(&config).unwrap();
+
+        assert!(spec.contains("# Descartes Task Context"));
+        assert!(spec.contains("## test-plan.md"));
+        assert!(spec.contains("This is the plan content"));
+
+        // Cleanup
+        let _ = std::fs::remove_file(&plan_path);
+    }
+
+    #[test]
+    fn test_build_general_spec_with_multiple_files() {
+        let temp_dir = std::env::temp_dir();
+        let plan_path = temp_dir.join("test-plan2.md");
+        let spec_path = temp_dir.join("test-spec.md");
+
+        std::fs::write(&plan_path, "# Plan\n\nPlan content.").unwrap();
+        std::fs::write(&spec_path, "# Spec\n\nSpec content.").unwrap();
+
+        let config = SpecConfig::new()
+            .with_plan(plan_path.clone())
+            .with_spec_file(spec_path.clone());
+        let spec = build_general_spec(&config).unwrap();
+
+        assert!(spec.contains("Plan content"));
+        assert!(spec.contains("Spec content"));
+        assert!(spec.contains("---"), "Should have separator between sections");
+
+        // Cleanup
+        let _ = std::fs::remove_file(&plan_path);
+        let _ = std::fs::remove_file(&spec_path);
+    }
+
+    // ============ write_spec_to_guidance tests ============
+
+    #[test]
+    fn test_write_spec_to_guidance_creates_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let working_dir = temp_dir.path();
+
+        // Create a plan file
+        let plan_path = temp_dir.path().join("plan.md");
+        std::fs::write(&plan_path, "# Test Plan\n\nContent here.").unwrap();
+
+        let config = SpecConfig::new().with_plan(plan_path);
+        let result = write_spec_to_guidance(&config, working_dir).unwrap();
+
+        assert!(result.exists(), "Guidance file should exist");
+        assert!(result.ends_with("descartes-spec.md"));
+
+        let content = std::fs::read_to_string(&result).unwrap();
+        assert!(content.contains("# Descartes Task Context"));
+        assert!(content.contains("Content here"));
+    }
+
+    #[test]
+    fn test_write_spec_to_guidance_creates_directory() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let working_dir = temp_dir.path();
+
+        // Create a plan file
+        let plan_path = temp_dir.path().join("plan.md");
+        std::fs::write(&plan_path, "# Plan").unwrap();
+
+        // .scud/guidance/ doesn't exist yet
+        let guidance_dir = working_dir.join(".scud/guidance");
+        assert!(!guidance_dir.exists());
+
+        let config = SpecConfig::new().with_plan(plan_path);
+        write_spec_to_guidance(&config, working_dir).unwrap();
+
+        assert!(guidance_dir.exists(), "Should create guidance directory");
+    }
+
+    #[test]
+    fn test_write_spec_to_guidance_empty_config() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config = SpecConfig::default();
+
+        let result = write_spec_to_guidance(&config, temp_dir.path()).unwrap();
+
+        // Should return path but not create file when empty
+        assert!(result.ends_with("descartes-spec.md"));
+        // File might or might not exist, but if it doesn't, that's fine for empty config
     }
 }
