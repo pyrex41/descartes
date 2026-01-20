@@ -1,0 +1,8 @@
+[workspace]
+members = ["descartes", "descartes-gui"]
+resolver = "2"
+
+# Workspace-level patch required for iced_tester 0.14 which requires rfd 0.16
+# (jumped from 0.15.4 to 0.17.2 on crates.io). Remove when publishing.
+[patch.crates-io]
+rfd = { git = "https://github.com/PolyMeilex/rfd", tag = "0.16.0" }
