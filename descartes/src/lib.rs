@@ -31,32 +31,25 @@
 
 pub mod agent;
 pub mod config;
-pub mod context_handoff;
-pub mod handoff;
 pub mod harness;
 pub mod interactive;
-pub mod swarm_executor;
-pub mod swarm_tui;
 pub mod scud;
 pub mod spec;
 pub mod transcript;
+pub mod views;
 
 // Re-exports for convenience
 pub use agent::{
     AgentCategory, AgentHandle, AgentRegistry, RegistryStatus, SubagentResult, TerminalType,
 };
 pub use config::Config;
-pub use context_handoff::{
-    estimate_tokens, summarize_agent_progress, ContextMonitor, HandoffContext,
-};
-pub use handoff::Handoff;
 pub use harness::{Harness, HarnessKind};
 pub use interactive::{Session, SessionState, SkillRegistry};
-pub use swarm_executor::{SwarmExecutor, TaskResult};
-pub use swarm_tui::{SwarmTui, TuiAction, WaveProgress};
 pub use spec::{
-    apply_spec_template, build_prompt, build_task_spec, extract_plan_section, format_task_spec,
-    SpecConfig,
+    apply_spec_template, apply_template_with_context, build_prompt, build_task_spec,
+    create_codebase_context_for_task, enrich_spec_config, extract_plan_section, format_task_spec,
+    CodebaseContext, DependencyContext, DependencySummary, SpecConfig, SpecTemplate,
+    TemplateContext, TemplateRegistry, VerificationConfig,
 };
 pub use transcript::{Transcript, TranscriptEntry};
 

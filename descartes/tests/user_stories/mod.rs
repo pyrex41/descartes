@@ -12,11 +12,8 @@
 //! - US-45 to US-50: Combined Workflows
 
 pub mod single_agent;
-pub mod swarm;
-pub mod context;
 pub mod harnesses;
 pub mod validation;
 pub mod transcript;
 pub mod git;
 pub mod config;
-pub mod combined;

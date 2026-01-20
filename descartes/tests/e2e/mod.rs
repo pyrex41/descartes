@@ -5,4 +5,3 @@
 
 pub mod fixtures;
 pub mod mock_harness;
-mod swarm_e2e;

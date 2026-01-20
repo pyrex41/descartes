@@ -2,15 +2,564 @@
 //!
 //! Implements Geoff's "fixed spec allocation" pattern:
 //! ~5k tokens of persistent context at the start of each prompt.
+//!
+//! # Features
+//!
+//! - **Codebase Context Injection**: Auto-include relevant file snippets based on task description
+//! - **Dependency Context**: Include outputs/summaries from completed dependency tasks
+//! - **Verification Commands**: Configurable verification commands for each spec
+//! - **Template System**: Per-project customizable prompt templates
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use regex::Regex;
-use tracing::warn;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, warn};
 
 use crate::scud::Task;
 use crate::Result;
+
+// ============================================================================
+// Codebase Context Injection
+// ============================================================================
+
+/// Configuration for codebase context injection
+///
+/// Allows automatic inclusion of relevant file snippets in task specs
+/// based on file patterns, keywords, or explicit paths.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodebaseContext {
+    /// Glob patterns for files to include (e.g., "src/**/*.rs")
+    #[serde(default)]
+    pub include_patterns: Vec<String>,
+
+    /// Keywords to search for in the codebase
+    #[serde(default)]
+    pub keywords: Vec<String>,
+
+    /// Explicit file paths to include
+    #[serde(default)]
+    pub explicit_files: Vec<PathBuf>,
+
+    /// Maximum number of files to include
+    #[serde(default = "default_max_files")]
+    pub max_files: usize,
+
+    /// Maximum lines per file
+    #[serde(default = "default_max_lines_per_file")]
+    pub max_lines_per_file: usize,
+
+    /// Working directory for resolving relative paths
+    #[serde(skip)]
+    pub working_dir: Option<PathBuf>,
+}
+
+fn default_max_files() -> usize {
+    5
+}
+
+fn default_max_lines_per_file() -> usize {
+    100
+}
+
+impl Default for CodebaseContext {
+    fn default() -> Self {
+        Self {
+            include_patterns: Vec::new(),
+            keywords: Vec::new(),
+            explicit_files: Vec::new(),
+            max_files: default_max_files(),
+            max_lines_per_file: default_max_lines_per_file(),
+            working_dir: None,
+        }
+    }
+}
+
+impl CodebaseContext {
+    /// Create a new CodebaseContext with defaults
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a glob pattern for files to include
+    pub fn with_pattern(mut self, pattern: impl Into<String>) -> Self {
+        self.include_patterns.push(pattern.into());
+        self
+    }
+
+    /// Add a keyword to search for
+    pub fn with_keyword(mut self, keyword: impl Into<String>) -> Self {
+        self.keywords.push(keyword.into());
+        self
+    }
+
+    /// Add an explicit file path
+    pub fn with_file(mut self, path: impl Into<PathBuf>) -> Self {
+        self.explicit_files.push(path.into());
+        self
+    }
+
+    /// Set the working directory
+    pub fn with_working_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.working_dir = Some(dir.into());
+        self
+    }
+
+    /// Set maximum files to include
+    pub fn with_max_files(mut self, max: usize) -> Self {
+        self.max_files = max;
+        self
+    }
+
+    /// Check if any context is configured
+    pub fn is_empty(&self) -> bool {
+        self.include_patterns.is_empty()
+            && self.keywords.is_empty()
+            && self.explicit_files.is_empty()
+    }
+
+    /// Load file contents based on configuration
+    ///
+    /// Returns a formatted string with file contents suitable for inclusion in a spec.
+    pub fn load_context(&self) -> Result<Option<String>> {
+        if self.is_empty() {
+            return Ok(None);
+        }
+
+        let mut files_content = Vec::new();
+        let working_dir = self
+            .working_dir
+            .clone()
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+        // Load explicit files first
+        for file_path in &self.explicit_files {
+            let full_path = if file_path.is_absolute() {
+                file_path.clone()
+            } else {
+                working_dir.join(file_path)
+            };
+
+            if let Ok(content) = self.read_file_truncated(&full_path) {
+                files_content.push(format!(
+                    "### {}\n\n```\n{}\n```",
+                    file_path.display(),
+                    content
+                ));
+            }
+        }
+
+        // Process glob patterns
+        for pattern in &self.include_patterns {
+            let full_pattern = working_dir.join(pattern);
+            if let Ok(entries) = glob::glob(full_pattern.to_string_lossy().as_ref()) {
+                for entry in entries.flatten() {
+                    if files_content.len() >= self.max_files {
+                        break;
+                    }
+                    if let Ok(content) = self.read_file_truncated(&entry) {
+                        let rel_path = entry
+                            .strip_prefix(&working_dir)
+                            .unwrap_or(&entry);
+                        files_content.push(format!(
+                            "### {}\n\n```\n{}\n```",
+                            rel_path.display(),
+                            content
+                        ));
+                    }
+                }
+            }
+        }
+
+        if files_content.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(format!(
+            "## Codebase Context\n\n{}",
+            files_content.join("\n\n")
+        )))
+    }
+
+    /// Read a file with truncation
+    fn read_file_truncated(&self, path: &Path) -> Result<String> {
+        let content = fs::read_to_string(path)?;
+        let lines: Vec<&str> = content.lines().take(self.max_lines_per_file).collect();
+        let truncated = lines.join("\n");
+
+        if content.lines().count() > self.max_lines_per_file {
+            Ok(format!("{}\n... (truncated)", truncated))
+        } else {
+            Ok(truncated)
+        }
+    }
+}
+
+// ============================================================================
+// Dependency Context
+// ============================================================================
+
+/// Context from completed dependency tasks
+///
+/// Allows including outputs or summaries from tasks that this task depends on.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DependencyContext {
+    /// Summaries from completed dependency tasks
+    #[serde(default)]
+    pub summaries: Vec<DependencySummary>,
+
+    /// Whether to auto-load dependency transcripts
+    #[serde(default)]
+    pub auto_load_transcripts: bool,
+
+    /// Path to transcripts directory
+    #[serde(skip)]
+    pub transcripts_dir: Option<PathBuf>,
+}
+
+/// Summary of a completed dependency task
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DependencySummary {
+    /// Task ID of the dependency
+    pub task_id: String,
+
+    /// Task title
+    pub title: String,
+
+    /// Summary of what was accomplished
+    pub summary: String,
+
+    /// Key outputs or artifacts produced
+    #[serde(default)]
+    pub outputs: Vec<String>,
+}
+
+impl DependencyContext {
+    /// Create a new DependencyContext
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a dependency summary
+    pub fn with_summary(mut self, summary: DependencySummary) -> Self {
+        self.summaries.push(summary);
+        self
+    }
+
+    /// Enable auto-loading of transcripts
+    pub fn with_auto_load_transcripts(mut self, dir: PathBuf) -> Self {
+        self.auto_load_transcripts = true;
+        self.transcripts_dir = Some(dir);
+        self
+    }
+
+    /// Check if any context is available
+    pub fn is_empty(&self) -> bool {
+        self.summaries.is_empty()
+    }
+
+    /// Format dependency context for inclusion in spec
+    pub fn format(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let summaries: Vec<String> = self
+            .summaries
+            .iter()
+            .map(|s| {
+                let outputs_str = if s.outputs.is_empty() {
+                    String::new()
+                } else {
+                    format!("\n  - Outputs: {}", s.outputs.join(", "))
+                };
+                format!(
+                    "- **Task {}** ({}): {}{}",
+                    s.task_id, s.title, s.summary, outputs_str
+                )
+            })
+            .collect();
+
+        Some(format!(
+            "## Dependency Context\n\nCompleted dependencies:\n\n{}",
+            summaries.join("\n")
+        ))
+    }
+}
+
+// ============================================================================
+// Verification Commands
+// ============================================================================
+
+/// Configuration for verification commands
+///
+/// Specifies commands to run after implementation to verify correctness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationConfig {
+    /// Primary verification command (e.g., "cargo test")
+    #[serde(default)]
+    pub primary: Option<String>,
+
+    /// Additional validation commands
+    #[serde(default)]
+    pub additional: Vec<String>,
+
+    /// Whether all commands must pass
+    #[serde(default = "default_require_all")]
+    pub require_all: bool,
+
+    /// Custom success criteria description
+    #[serde(default)]
+    pub success_criteria: Option<String>,
+}
+
+fn default_require_all() -> bool {
+    true
+}
+
+impl Default for VerificationConfig {
+    fn default() -> Self {
+        Self {
+            primary: None,
+            additional: Vec::new(),
+            require_all: default_require_all(),
+            success_criteria: None,
+        }
+    }
+}
+
+impl VerificationConfig {
+    /// Create a new VerificationConfig
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the primary verification command
+    pub fn with_primary(mut self, command: impl Into<String>) -> Self {
+        self.primary = Some(command.into());
+        self
+    }
+
+    /// Add an additional verification command
+    pub fn with_additional(mut self, command: impl Into<String>) -> Self {
+        self.additional.push(command.into());
+        self
+    }
+
+    /// Set custom success criteria
+    pub fn with_success_criteria(mut self, criteria: impl Into<String>) -> Self {
+        self.success_criteria = Some(criteria.into());
+        self
+    }
+
+    /// Get all verification commands as a slice
+    pub fn all_commands(&self) -> Vec<&str> {
+        let mut commands = Vec::new();
+        if let Some(ref primary) = self.primary {
+            commands.push(primary.as_str());
+        }
+        commands.extend(self.additional.iter().map(|s| s.as_str()));
+        commands
+    }
+
+    /// Check if any verification is configured
+    pub fn is_empty(&self) -> bool {
+        self.primary.is_none() && self.additional.is_empty()
+    }
+
+    /// Format verification commands for inclusion in spec
+    pub fn format(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let commands = self.all_commands();
+        let commands_formatted: Vec<String> = commands
+            .iter()
+            .map(|cmd| format!("{}  # required", cmd))
+            .collect();
+
+        let criteria_section = self
+            .success_criteria
+            .as_ref()
+            .map(|c| format!("\n\n**Success Criteria**: {}", c))
+            .unwrap_or_default();
+
+        let require_note = if self.require_all && commands.len() > 1 {
+            "\n\nAll commands must pass for the task to be complete."
+        } else {
+            ""
+        };
+
+        Some(format!(
+            "## Verification Commands\n\n```bash\n{}\n```{}{}",
+            commands_formatted.join("\n"),
+            require_note,
+            criteria_section
+        ))
+    }
+}
+
+// ============================================================================
+// Template System
+// ============================================================================
+
+/// Per-project spec template configuration
+///
+/// Allows projects to customize the structure of generated specs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpecTemplate {
+    /// Template name
+    pub name: String,
+
+    /// Template content with placeholders
+    /// Available: {task}, {plan}, {codebase}, {dependencies}, {verification}, {custom}
+    pub content: String,
+
+    /// Description of when to use this template
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Task types this template applies to (e.g., ["builder", "planner"])
+    #[serde(default)]
+    pub applies_to: Vec<String>,
+}
+
+impl Default for SpecTemplate {
+    fn default() -> Self {
+        Self {
+            name: "default".to_string(),
+            content: DEFAULT_SPEC_TEMPLATE.to_string(),
+            description: Some("Default spec template".to_string()),
+            applies_to: Vec::new(),
+        }
+    }
+}
+
+impl SpecTemplate {
+    /// Create a new template with the given name and content
+    pub fn new(name: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            content: content.into(),
+            description: None,
+            applies_to: Vec::new(),
+        }
+    }
+
+    /// Set description
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    /// Add an applicable task type
+    pub fn applies_to(mut self, task_type: impl Into<String>) -> Self {
+        self.applies_to.push(task_type.into());
+        self
+    }
+}
+
+/// Registry of project-specific templates
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TemplateRegistry {
+    /// Available templates by name
+    #[serde(default)]
+    pub templates: std::collections::HashMap<String, SpecTemplate>,
+
+    /// Default template name to use
+    #[serde(default = "default_template_name")]
+    pub default_template: String,
+}
+
+fn default_template_name() -> String {
+    "default".to_string()
+}
+
+impl TemplateRegistry {
+    /// Create a new registry with the built-in default template
+    pub fn new() -> Self {
+        let mut templates = std::collections::HashMap::new();
+        templates.insert("default".to_string(), SpecTemplate::default());
+        Self {
+            templates,
+            default_template: "default".to_string(),
+        }
+    }
+
+    /// Add a template to the registry
+    pub fn add_template(&mut self, template: SpecTemplate) {
+        self.templates.insert(template.name.clone(), template);
+    }
+
+    /// Get a template by name, falling back to default
+    pub fn get(&self, name: &str) -> &SpecTemplate {
+        self.templates
+            .get(name)
+            .or_else(|| self.templates.get(&self.default_template))
+            .unwrap_or_else(|| {
+                static DEFAULT: once_cell::sync::Lazy<SpecTemplate> =
+                    once_cell::sync::Lazy::new(SpecTemplate::default);
+                &DEFAULT
+            })
+    }
+
+    /// Get template for a specific task type
+    pub fn get_for_type(&self, task_type: &str) -> &SpecTemplate {
+        // Find a template that applies to this task type
+        for template in self.templates.values() {
+            if template.applies_to.iter().any(|t| t == task_type) {
+                return template;
+            }
+        }
+        // Fall back to default
+        self.get(&self.default_template)
+    }
+
+    /// Load templates from a directory
+    ///
+    /// Looks for `.toml` files in the specified directory and loads them as templates.
+    pub fn load_from_directory(&mut self, dir: &Path) -> Result<usize> {
+        let mut loaded = 0;
+
+        if !dir.exists() {
+            debug!("Templates directory does not exist: {:?}", dir);
+            return Ok(0);
+        }
+
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.extension().map(|e| e == "toml").unwrap_or(false) {
+                match fs::read_to_string(&path) {
+                    Ok(content) => {
+                        match toml::from_str::<SpecTemplate>(&content) {
+                            Ok(template) => {
+                                debug!("Loaded template: {} from {:?}", template.name, path);
+                                self.add_template(template);
+                                loaded += 1;
+                            }
+                            Err(e) => {
+                                warn!("Failed to parse template {:?}: {}", path, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to read template file {:?}: {}", path, e);
+                    }
+                }
+            }
+        }
+
+        Ok(loaded)
+    }
+}
+
+// ============================================================================
+// Enhanced SpecConfig
+// ============================================================================
 
 /// Configuration for spec/context loading
 #[derive(Debug, Clone)]
@@ -28,8 +577,23 @@ pub struct SpecConfig {
     pub max_spec_tokens: Option<usize>,
 
     /// Custom template for combining specs
-    /// Placeholders: {task}, {plan}, {custom}, {verification}
+    /// Placeholders: {task}, {plan}, {custom}, {verification}, {codebase}, {dependencies}
     pub spec_template: Option<String>,
+
+    /// Codebase context injection configuration
+    pub codebase_context: Option<CodebaseContext>,
+
+    /// Dependency context configuration
+    pub dependency_context: Option<DependencyContext>,
+
+    /// Verification commands configuration
+    pub verification: Option<VerificationConfig>,
+
+    /// Path to templates directory
+    pub templates_dir: Option<PathBuf>,
+
+    /// Template registry (loaded from templates_dir)
+    pub template_registry: Option<TemplateRegistry>,
 }
 
 impl Default for SpecConfig {
@@ -40,6 +604,11 @@ impl Default for SpecConfig {
             additional_specs: Vec::new(),
             max_spec_tokens: Some(5000),
             spec_template: None,
+            codebase_context: None,
+            dependency_context: None,
+            verification: None,
+            templates_dir: None,
+            template_registry: None,
         }
     }
 }
@@ -61,14 +630,79 @@ impl SpecConfig {
         self.additional_specs.push(path);
         self
     }
+
+    /// Set codebase context configuration
+    pub fn with_codebase_context(mut self, context: CodebaseContext) -> Self {
+        self.codebase_context = Some(context);
+        self
+    }
+
+    /// Set dependency context
+    pub fn with_dependency_context(mut self, context: DependencyContext) -> Self {
+        self.dependency_context = Some(context);
+        self
+    }
+
+    /// Set verification configuration
+    pub fn with_verification(mut self, verification: VerificationConfig) -> Self {
+        self.verification = Some(verification);
+        self
+    }
+
+    /// Set templates directory and load templates
+    pub fn with_templates_dir(mut self, dir: PathBuf) -> Self {
+        self.templates_dir = Some(dir.clone());
+        let mut registry = TemplateRegistry::new();
+        if let Err(e) = registry.load_from_directory(&dir) {
+            warn!("Failed to load templates from {:?}: {}", dir, e);
+        }
+        self.template_registry = Some(registry);
+        self
+    }
+
+    /// Set a custom spec template
+    pub fn with_template(mut self, template: String) -> Self {
+        self.spec_template = Some(template);
+        self
+    }
+
+    /// Get the template to use, considering registry and custom template
+    pub fn get_template(&self, task_type: Option<&str>) -> &str {
+        // Custom template takes precedence
+        if let Some(ref template) = self.spec_template {
+            return template;
+        }
+
+        // Try registry
+        if let Some(ref registry) = self.template_registry {
+            if let Some(task_type) = task_type {
+                return &registry.get_for_type(task_type).content;
+            }
+            return &registry.get(&registry.default_template).content;
+        }
+
+        DEFAULT_SPEC_TEMPLATE
+    }
 }
 
 /// Default template for combining spec sections
+///
+/// Placeholders:
+/// - `{task}`: Task details (ID, title, description, status, dependencies)
+/// - `{plan}`: Plan section extracted from plan document
+/// - `{codebase}`: Codebase context (relevant file snippets)
+/// - `{dependencies}`: Dependency context (completed task summaries)
+/// - `{verification}`: Verification commands
+/// - `{custom}`: Additional spec files content
 const DEFAULT_SPEC_TEMPLATE: &str = r#"# Task Specification
 
 {task}
 
 {plan}
+
+{codebase}
+
+{dependencies}
 
 {custom}
 
@@ -145,9 +779,69 @@ pub fn extract_plan_section(plan_content: &str, task_id: &str) -> Option<String>
     }
 }
 
+/// Template context for spec generation
+#[derive(Debug, Default)]
+pub struct TemplateContext<'a> {
+    /// Task details section
+    pub task: Option<&'a str>,
+    /// Plan section
+    pub plan: Option<&'a str>,
+    /// Codebase context section
+    pub codebase: Option<&'a str>,
+    /// Dependency context section
+    pub dependencies: Option<&'a str>,
+    /// Verification commands section
+    pub verification: Option<&'a str>,
+    /// Custom/additional content section
+    pub custom: Option<&'a str>,
+}
+
+impl<'a> TemplateContext<'a> {
+    /// Create a new template context
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set task section
+    pub fn with_task(mut self, task: &'a str) -> Self {
+        self.task = Some(task);
+        self
+    }
+
+    /// Set plan section
+    pub fn with_plan(mut self, plan: &'a str) -> Self {
+        self.plan = Some(plan);
+        self
+    }
+
+    /// Set codebase context section
+    pub fn with_codebase(mut self, codebase: &'a str) -> Self {
+        self.codebase = Some(codebase);
+        self
+    }
+
+    /// Set dependencies section
+    pub fn with_dependencies(mut self, deps: &'a str) -> Self {
+        self.dependencies = Some(deps);
+        self
+    }
+
+    /// Set verification section
+    pub fn with_verification(mut self, verification: &'a str) -> Self {
+        self.verification = Some(verification);
+        self
+    }
+
+    /// Set custom section
+    pub fn with_custom(mut self, custom: &'a str) -> Self {
+        self.custom = Some(custom);
+        self
+    }
+}
+
 /// Apply a template with placeholder substitution
 ///
-/// Placeholders: {task}, {plan}, {custom}, {verification}
+/// Placeholders: {task}, {plan}, {codebase}, {dependencies}, {verification}, {custom}
 pub fn apply_spec_template(
     template: &str,
     task: Option<&str>,
@@ -155,11 +849,28 @@ pub fn apply_spec_template(
     custom: Option<&str>,
     verification: Option<&str>,
 ) -> String {
+    apply_template_with_context(
+        template,
+        &TemplateContext {
+            task,
+            plan,
+            custom,
+            verification,
+            codebase: None,
+            dependencies: None,
+        },
+    )
+}
+
+/// Apply a template with full context
+pub fn apply_template_with_context(template: &str, ctx: &TemplateContext) -> String {
     template
-        .replace("{task}", task.unwrap_or(""))
-        .replace("{plan}", plan.unwrap_or(""))
-        .replace("{custom}", custom.unwrap_or(""))
-        .replace("{verification}", verification.unwrap_or(""))
+        .replace("{task}", ctx.task.unwrap_or(""))
+        .replace("{plan}", ctx.plan.unwrap_or(""))
+        .replace("{codebase}", ctx.codebase.unwrap_or(""))
+        .replace("{dependencies}", ctx.dependencies.unwrap_or(""))
+        .replace("{verification}", ctx.verification.unwrap_or(""))
+        .replace("{custom}", ctx.custom.unwrap_or(""))
         // Clean up multiple blank lines
         .lines()
         .fold((String::new(), false), |(mut acc, was_blank), line| {
@@ -180,6 +891,9 @@ pub fn apply_spec_template(
 /// Combines:
 /// - Task details (if `include_task` is true)
 /// - Plan section for the task (if `plan_path` is set)
+/// - Codebase context (if `codebase_context` is configured)
+/// - Dependency context (if `dependency_context` has summaries)
+/// - Verification commands (if `verification` is configured)
 /// - Additional spec files
 ///
 /// Logs a warning if the combined spec exceeds `max_spec_tokens`.
@@ -203,6 +917,28 @@ pub fn build_task_spec(config: &SpecConfig, task: &Task) -> Result<String> {
     } else {
         None
     };
+
+    // Load codebase context
+    let codebase_section = if let Some(ref ctx) = config.codebase_context {
+        match ctx.load_context() {
+            Ok(content) => content,
+            Err(e) => {
+                warn!("Failed to load codebase context: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Format dependency context
+    let dependency_section = config
+        .dependency_context
+        .as_ref()
+        .and_then(|ctx| ctx.format());
+
+    // Format verification commands
+    let verification_section = config.verification.as_ref().and_then(|v| v.format());
 
     // Load and combine additional spec files
     let custom_section = if config.additional_specs.is_empty() {
@@ -230,19 +966,19 @@ pub fn build_task_spec(config: &SpecConfig, task: &Task) -> Result<String> {
         }
     };
 
-    // Apply template
-    let template = config
-        .spec_template
-        .as_deref()
-        .unwrap_or(DEFAULT_SPEC_TEMPLATE);
+    // Get template (considering task type if using registry)
+    let template = config.get_template(task.agent_type.as_deref());
 
-    let spec = apply_spec_template(
-        template,
-        task_section.as_deref(),
-        plan_section.as_deref(),
-        custom_section.as_deref(),
-        None, // verification placeholder reserved for future use
-    );
+    // Apply template with full context
+    let ctx = TemplateContext {
+        task: task_section.as_deref(),
+        plan: plan_section.as_deref(),
+        codebase: codebase_section.as_deref(),
+        dependencies: dependency_section.as_deref(),
+        verification: verification_section.as_deref(),
+        custom: custom_section.as_deref(),
+    };
+    let spec = apply_template_with_context(template, &ctx);
 
     // Check token budget
     if let Some(max_tokens) = config.max_spec_tokens {
@@ -446,6 +1182,214 @@ pub fn build_general_spec(config: &SpecConfig) -> Result<String> {
     }
 
     Ok(spec)
+}
+
+// ============================================================================
+// Enriched Spec Generation (Task 9.2)
+// ============================================================================
+
+/// Build an enriched SpecConfig by integrating with SCUD and backpressure
+///
+/// This function enhances a basic SpecConfig with:
+/// - Verification commands from backpressure config
+/// - Dependency summaries from completed SCUD tasks
+/// - Templates from the templates directory
+/// - Optional codebase context patterns
+///
+/// # Arguments
+///
+/// * `base_config` - The basic SpecConfig with plan_path and additional_specs
+/// * `working_dir` - The working directory containing `.scud/` and `.descartes/`
+/// * `scud_tag` - The SCUD tag being executed (for loading dependency context)
+///
+/// # Returns
+///
+/// An enriched SpecConfig with all integrated features
+pub fn enrich_spec_config(
+    mut base_config: SpecConfig,
+    working_dir: &Path,
+    scud_tag: Option<&str>,
+) -> Result<SpecConfig> {
+    // 1. Load verification commands from backpressure config
+    base_config.verification = load_verification_from_backpressure(working_dir)?;
+
+    // 2. Load dependency context from SCUD (if tag provided)
+    if let Some(tag) = scud_tag {
+        base_config.dependency_context = load_dependency_context(working_dir, tag)?;
+    }
+
+    // 3. Load templates from .descartes/templates/ if it exists
+    let templates_dir = working_dir.join(".descartes/templates");
+    if templates_dir.exists() {
+        base_config = base_config.with_templates_dir(templates_dir);
+    }
+
+    // 4. Set working directory for codebase context (if configured)
+    if let Some(ref mut ctx) = base_config.codebase_context {
+        ctx.working_dir = Some(working_dir.to_path_buf());
+    }
+
+    debug!(
+        "Enriched spec config: verification={}, deps={}, templates={}",
+        base_config.verification.is_some(),
+        base_config.dependency_context.as_ref().map(|d| !d.is_empty()).unwrap_or(false),
+        base_config.template_registry.is_some()
+    );
+
+    Ok(base_config)
+}
+
+/// Load verification config from backpressure.toml
+fn load_verification_from_backpressure(working_dir: &Path) -> Result<Option<VerificationConfig>> {
+    use scud::backpressure::BackpressureConfig;
+
+    match BackpressureConfig::load(Some(&working_dir.to_path_buf())) {
+        Ok(bp_config) if !bp_config.commands.is_empty() => {
+            let mut verification = VerificationConfig::new();
+
+            // First command is primary, rest are additional
+            let mut commands = bp_config.commands.into_iter();
+            if let Some(primary) = commands.next() {
+                verification.primary = Some(primary);
+            }
+            verification.additional = commands.collect();
+            verification.require_all = bp_config.stop_on_failure;
+
+            debug!(
+                "Loaded {} verification commands from backpressure config",
+                1 + verification.additional.len()
+            );
+
+            Ok(Some(verification))
+        }
+        Ok(_) => {
+            debug!("No verification commands in backpressure config");
+            Ok(None)
+        }
+        Err(e) => {
+            warn!("Failed to load backpressure config: {}", e);
+            Ok(None)
+        }
+    }
+}
+
+/// Load dependency context from completed SCUD tasks
+fn load_dependency_context(working_dir: &Path, scud_tag: &str) -> Result<Option<DependencyContext>> {
+    use scud::models::TaskStatus;
+    use scud::storage::Storage;
+
+    let storage = Storage::new(Some(working_dir.to_path_buf()));
+
+    // Load tasks for the tag
+    let phases = match storage.load_tasks() {
+        Ok(p) => p,
+        Err(e) => {
+            debug!("Failed to load SCUD tasks: {}", e);
+            return Ok(None);
+        }
+    };
+
+    let phase = match phases.get(scud_tag) {
+        Some(p) => p,
+        None => {
+            debug!("SCUD tag '{}' not found", scud_tag);
+            return Ok(None);
+        }
+    };
+
+    // Find completed tasks to use as dependency summaries
+    let completed_tasks: Vec<&Task> = phase
+        .tasks
+        .iter()
+        .filter(|t| t.status == TaskStatus::Done)
+        .collect();
+
+    if completed_tasks.is_empty() {
+        return Ok(None);
+    }
+
+    let mut dep_context = DependencyContext::new();
+
+    for task in completed_tasks {
+        let summary = DependencySummary {
+            task_id: task.id.clone(),
+            title: task.title.clone(),
+            summary: truncate_description(&task.description, 200),
+            outputs: Vec::new(), // Could be enhanced to track file outputs
+        };
+        dep_context.summaries.push(summary);
+    }
+
+    debug!(
+        "Loaded {} completed task summaries for dependency context",
+        dep_context.summaries.len()
+    );
+
+    Ok(Some(dep_context))
+}
+
+/// Truncate a description to a maximum length, preserving word boundaries
+fn truncate_description(desc: &str, max_len: usize) -> String {
+    if desc.len() <= max_len {
+        return desc.to_string();
+    }
+
+    // Find the last space before max_len
+    let truncated = &desc[..max_len];
+    match truncated.rfind(' ') {
+        Some(pos) if pos > max_len / 2 => format!("{}...", &desc[..pos]),
+        _ => format!("{}...", truncated),
+    }
+}
+
+/// Create a SpecConfig with codebase context for a specific task
+///
+/// Analyzes the task description to extract keywords and configure
+/// relevant file patterns for codebase context injection.
+///
+/// # Arguments
+///
+/// * `task` - The task to analyze for codebase context
+/// * `working_dir` - The working directory
+///
+/// # Returns
+///
+/// A CodebaseContext configured based on task analysis
+pub fn create_codebase_context_for_task(task: &Task, working_dir: &Path) -> CodebaseContext {
+    let mut ctx = CodebaseContext::new()
+        .with_working_dir(working_dir.to_path_buf());
+
+    // Extract potential keywords from task title and description
+    let text = format!("{} {}", task.title, task.description);
+
+    // Look for common code-related terms to build patterns
+    let keywords: Vec<&str> = vec![
+        "test", "config", "spec", "module", "component", "service",
+        "handler", "controller", "model", "view", "api", "endpoint",
+    ];
+
+    for keyword in keywords {
+        if text.to_lowercase().contains(keyword) {
+            ctx.keywords.push(keyword.to_string());
+        }
+    }
+
+    // Add common patterns based on file extension mentions
+    if text.contains(".rs") || text.contains("rust") || text.contains("Cargo") {
+        ctx.include_patterns.push("src/**/*.rs".to_string());
+    }
+    if text.contains(".ts") || text.contains("typescript") {
+        ctx.include_patterns.push("src/**/*.ts".to_string());
+    }
+    if text.contains(".py") || text.contains("python") {
+        ctx.include_patterns.push("**/*.py".to_string());
+    }
+
+    // Limit to reasonable defaults
+    ctx.max_files = 3;
+    ctx.max_lines_per_file = 50;
+
+    ctx
 }
 
 /// Write spec content to SCUD guidance directory
@@ -873,5 +1817,434 @@ Build instructions.
         // Should return path but not create file when empty
         assert!(result.ends_with("descartes-spec.md"));
         // File might or might not exist, but if it doesn't, that's fine for empty config
+    }
+
+    // ============ CodebaseContext tests ============
+
+    #[test]
+    fn test_codebase_context_empty() {
+        let ctx = CodebaseContext::new();
+        assert!(ctx.is_empty());
+
+        let content = ctx.load_context().unwrap();
+        assert!(content.is_none());
+    }
+
+    #[test]
+    fn test_codebase_context_with_explicit_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.rs");
+        std::fs::write(&file_path, "fn main() {\n    println!(\"Hello\");\n}").unwrap();
+
+        let ctx = CodebaseContext::new()
+            .with_file(file_path.clone())
+            .with_working_dir(temp_dir.path().to_path_buf());
+
+        assert!(!ctx.is_empty());
+
+        let content = ctx.load_context().unwrap();
+        assert!(content.is_some());
+        let content = content.unwrap();
+        assert!(content.contains("## Codebase Context"));
+        assert!(content.contains("fn main()"));
+    }
+
+    #[test]
+    fn test_codebase_context_truncation() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("long.txt");
+
+        // Create a file with many lines
+        let lines: Vec<String> = (0..200).map(|i| format!("Line {}", i)).collect();
+        std::fs::write(&file_path, lines.join("\n")).unwrap();
+
+        let ctx = CodebaseContext::new()
+            .with_file(file_path)
+            .with_working_dir(temp_dir.path().to_path_buf())
+            .with_max_files(5); // default max_lines_per_file is 100
+
+        let content = ctx.load_context().unwrap().unwrap();
+        assert!(content.contains("... (truncated)"));
+        assert!(content.contains("Line 99")); // Should have line 99
+        assert!(!content.contains("Line 150")); // Should not have line 150
+    }
+
+    // ============ DependencyContext tests ============
+
+    #[test]
+    fn test_dependency_context_empty() {
+        let ctx = DependencyContext::new();
+        assert!(ctx.is_empty());
+        assert!(ctx.format().is_none());
+    }
+
+    #[test]
+    fn test_dependency_context_with_summary() {
+        let summary = DependencySummary {
+            task_id: "1.1".to_string(),
+            title: "Setup project".to_string(),
+            summary: "Created initial project structure".to_string(),
+            outputs: vec!["Cargo.toml".to_string(), "src/main.rs".to_string()],
+        };
+
+        let ctx = DependencyContext::new().with_summary(summary);
+
+        assert!(!ctx.is_empty());
+        let formatted = ctx.format().unwrap();
+        assert!(formatted.contains("## Dependency Context"));
+        assert!(formatted.contains("Task 1.1"));
+        assert!(formatted.contains("Setup project"));
+        assert!(formatted.contains("Created initial project structure"));
+        assert!(formatted.contains("Cargo.toml"));
+    }
+
+    #[test]
+    fn test_dependency_context_multiple_summaries() {
+        let ctx = DependencyContext::new()
+            .with_summary(DependencySummary {
+                task_id: "1.1".to_string(),
+                title: "First task".to_string(),
+                summary: "Done first".to_string(),
+                outputs: vec![],
+            })
+            .with_summary(DependencySummary {
+                task_id: "1.2".to_string(),
+                title: "Second task".to_string(),
+                summary: "Done second".to_string(),
+                outputs: vec!["output.txt".to_string()],
+            });
+
+        let formatted = ctx.format().unwrap();
+        assert!(formatted.contains("Task 1.1"));
+        assert!(formatted.contains("Task 1.2"));
+        assert!(formatted.contains("Done first"));
+        assert!(formatted.contains("Done second"));
+    }
+
+    // ============ VerificationConfig tests ============
+
+    #[test]
+    fn test_verification_config_empty() {
+        let config = VerificationConfig::new();
+        assert!(config.is_empty());
+        assert!(config.format().is_none());
+    }
+
+    #[test]
+    fn test_verification_config_primary_only() {
+        let config = VerificationConfig::new().with_primary("cargo test");
+
+        assert!(!config.is_empty());
+        assert_eq!(config.all_commands(), vec!["cargo test"]);
+
+        let formatted = config.format().unwrap();
+        assert!(formatted.contains("## Verification Commands"));
+        assert!(formatted.contains("cargo test"));
+    }
+
+    #[test]
+    fn test_verification_config_multiple_commands() {
+        let config = VerificationConfig::new()
+            .with_primary("cargo build")
+            .with_additional("cargo test")
+            .with_additional("cargo clippy");
+
+        assert_eq!(config.all_commands().len(), 3);
+
+        let formatted = config.format().unwrap();
+        assert!(formatted.contains("cargo build"));
+        assert!(formatted.contains("cargo test"));
+        assert!(formatted.contains("cargo clippy"));
+        assert!(formatted.contains("All commands must pass"));
+    }
+
+    #[test]
+    fn test_verification_config_with_success_criteria() {
+        let config = VerificationConfig::new()
+            .with_primary("cargo test")
+            .with_success_criteria("All tests pass with no warnings");
+
+        let formatted = config.format().unwrap();
+        assert!(formatted.contains("**Success Criteria**: All tests pass with no warnings"));
+    }
+
+    // ============ TemplateContext tests ============
+
+    #[test]
+    fn test_template_context_all_fields() {
+        let ctx = TemplateContext::new()
+            .with_task("Task content")
+            .with_plan("Plan content")
+            .with_codebase("Codebase content")
+            .with_dependencies("Dependencies content")
+            .with_verification("Verification content")
+            .with_custom("Custom content");
+
+        let template = "{task}\n{plan}\n{codebase}\n{dependencies}\n{verification}\n{custom}";
+        let result = apply_template_with_context(template, &ctx);
+
+        assert!(result.contains("Task content"));
+        assert!(result.contains("Plan content"));
+        assert!(result.contains("Codebase content"));
+        assert!(result.contains("Dependencies content"));
+        assert!(result.contains("Verification content"));
+        assert!(result.contains("Custom content"));
+    }
+
+    // ============ SpecTemplate tests ============
+
+    #[test]
+    fn test_spec_template_default() {
+        let template = SpecTemplate::default();
+        assert_eq!(template.name, "default");
+        assert!(template.content.contains("{task}"));
+        assert!(template.content.contains("{codebase}"));
+        assert!(template.content.contains("{dependencies}"));
+    }
+
+    #[test]
+    fn test_spec_template_custom() {
+        let template = SpecTemplate::new("builder", "# Builder Task\n\n{task}\n\n{verification}")
+            .with_description("Template for builder tasks")
+            .applies_to("builder")
+            .applies_to("fast-builder");
+
+        assert_eq!(template.name, "builder");
+        assert!(template.applies_to.contains(&"builder".to_string()));
+        assert!(template.applies_to.contains(&"fast-builder".to_string()));
+    }
+
+    // ============ TemplateRegistry tests ============
+
+    #[test]
+    fn test_template_registry_default() {
+        let registry = TemplateRegistry::new();
+        assert_eq!(registry.default_template, "default");
+
+        let template = registry.get("default");
+        assert_eq!(template.name, "default");
+    }
+
+    #[test]
+    fn test_template_registry_add_and_get() {
+        let mut registry = TemplateRegistry::new();
+        registry.add_template(
+            SpecTemplate::new("builder", "Builder template")
+                .applies_to("builder"),
+        );
+
+        let template = registry.get("builder");
+        assert_eq!(template.name, "builder");
+
+        // Should return default for unknown template
+        let unknown = registry.get("unknown");
+        assert_eq!(unknown.name, "default");
+    }
+
+    #[test]
+    fn test_template_registry_get_for_type() {
+        let mut registry = TemplateRegistry::new();
+        registry.add_template(
+            SpecTemplate::new("builder-template", "Builder content")
+                .applies_to("builder")
+                .applies_to("fast-builder"),
+        );
+
+        let template = registry.get_for_type("builder");
+        assert_eq!(template.name, "builder-template");
+
+        let template = registry.get_for_type("fast-builder");
+        assert_eq!(template.name, "builder-template");
+
+        // Unknown type should return default
+        let template = registry.get_for_type("unknown");
+        assert_eq!(template.name, "default");
+    }
+
+    // ============ Integration tests for build_task_spec with new features ============
+
+    #[test]
+    fn test_build_task_spec_with_verification() {
+        let task = sample_task();
+        let verification = VerificationConfig::new()
+            .with_primary("cargo test")
+            .with_additional("cargo clippy");
+
+        let config = SpecConfig::default().with_verification(verification);
+        let spec = build_task_spec(&config, &task).unwrap();
+
+        assert!(spec.contains("## Verification Commands"));
+        assert!(spec.contains("cargo test"));
+        assert!(spec.contains("cargo clippy"));
+    }
+
+    #[test]
+    fn test_build_task_spec_with_dependency_context() {
+        let task = sample_task();
+        let dep_ctx = DependencyContext::new().with_summary(DependencySummary {
+            task_id: "1.1".to_string(),
+            title: "Prerequisites".to_string(),
+            summary: "Set up the project foundation".to_string(),
+            outputs: vec![],
+        });
+
+        let config = SpecConfig::default().with_dependency_context(dep_ctx);
+        let spec = build_task_spec(&config, &task).unwrap();
+
+        assert!(spec.contains("## Dependency Context"));
+        assert!(spec.contains("Task 1.1"));
+        assert!(spec.contains("Prerequisites"));
+    }
+
+    #[test]
+    fn test_build_task_spec_with_all_features() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let plan_path = temp_dir.path().join("plan.md");
+        std::fs::write(
+            &plan_path,
+            "# Plan\n\n## 1.2: Feature X\n\nImplement the feature.\n\n## 1.3\n\nNext task.",
+        )
+        .unwrap();
+
+        let task = sample_task();
+        let config = SpecConfig::default()
+            .with_plan(plan_path)
+            .with_verification(
+                VerificationConfig::new()
+                    .with_primary("cargo test"),
+            )
+            .with_dependency_context(
+                DependencyContext::new().with_summary(DependencySummary {
+                    task_id: "1.1".to_string(),
+                    title: "Setup".to_string(),
+                    summary: "Initial setup done".to_string(),
+                    outputs: vec![],
+                }),
+            );
+
+        let spec = build_task_spec(&config, &task).unwrap();
+
+        // Check all sections are present
+        assert!(spec.contains("## Task: Implement feature X")); // Task section
+        assert!(spec.contains("## 1.2: Feature X")); // Plan section
+        assert!(spec.contains("## Dependency Context")); // Dependency section
+        assert!(spec.contains("## Verification Commands")); // Verification section
+    }
+
+    // ============ Task 9.2: Enrichment function tests ============
+
+    #[test]
+    fn test_truncate_description_short() {
+        let desc = "Short description";
+        assert_eq!(truncate_description(desc, 100), desc);
+    }
+
+    #[test]
+    fn test_truncate_description_long() {
+        let desc = "This is a very long description that needs to be truncated at word boundaries";
+        let truncated = truncate_description(desc, 30);
+        assert!(truncated.ends_with("..."));
+        assert!(truncated.len() <= 35); // 30 + "..."
+    }
+
+    #[test]
+    fn test_truncate_description_no_space() {
+        let desc = "NoSpacesInThisVeryLongString";
+        let truncated = truncate_description(desc, 10);
+        assert_eq!(truncated, "NoSpacesIn...");
+    }
+
+    #[test]
+    fn test_create_codebase_context_for_task_rust() {
+        let task = Task::new(
+            "1".to_string(),
+            "Implement Rust module".to_string(),
+            "Add new .rs file for the feature".to_string(),
+        );
+        let ctx = create_codebase_context_for_task(&task, std::path::Path::new("."));
+
+        assert!(ctx.include_patterns.iter().any(|p| p.contains(".rs")));
+        assert_eq!(ctx.max_files, 3);
+        assert_eq!(ctx.max_lines_per_file, 50);
+    }
+
+    #[test]
+    fn test_create_codebase_context_for_task_typescript() {
+        let task = Task::new(
+            "1".to_string(),
+            "Add TypeScript component".to_string(),
+            "Create new .ts component".to_string(),
+        );
+        let ctx = create_codebase_context_for_task(&task, std::path::Path::new("."));
+
+        assert!(ctx.include_patterns.iter().any(|p| p.contains(".ts")));
+    }
+
+    #[test]
+    fn test_create_codebase_context_for_task_keywords() {
+        let task = Task::new(
+            "1".to_string(),
+            "Add API endpoint".to_string(),
+            "Create new endpoint handler for the service".to_string(),
+        );
+        let ctx = create_codebase_context_for_task(&task, std::path::Path::new("."));
+
+        assert!(ctx.keywords.contains(&"api".to_string()));
+        assert!(ctx.keywords.contains(&"endpoint".to_string()));
+        assert!(ctx.keywords.contains(&"handler".to_string()));
+        assert!(ctx.keywords.contains(&"service".to_string()));
+    }
+
+    #[test]
+    fn test_enrich_spec_config_basic() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let base_config = SpecConfig::new();
+
+        // Should not fail even without backpressure config
+        let enriched = enrich_spec_config(
+            base_config,
+            temp_dir.path(),
+            None,
+        ).unwrap();
+
+        // Templates dir doesn't exist, so registry should be None
+        assert!(enriched.template_registry.is_none());
+    }
+
+    #[test]
+    fn test_enrich_spec_config_with_templates_dir() {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Create templates directory
+        let templates_dir = temp_dir.path().join(".descartes/templates");
+        std::fs::create_dir_all(&templates_dir).unwrap();
+
+        // Write a template file
+        std::fs::write(
+            templates_dir.join("builder.toml"),
+            r#"name = "builder"
+content = """
+# Builder Task
+
+{task}
+
+{verification}
+"""
+description = "Template for builder tasks"
+applies_to = ["builder"]
+"#,
+        ).unwrap();
+
+        let base_config = SpecConfig::new();
+        let enriched = enrich_spec_config(
+            base_config,
+            temp_dir.path(),
+            None,
+        ).unwrap();
+
+        // Templates should be loaded
+        assert!(enriched.template_registry.is_some());
+        let registry = enriched.template_registry.unwrap();
+        assert!(registry.templates.contains_key("builder"));
     }
 }

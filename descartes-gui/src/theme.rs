@@ -2,6 +2,8 @@
 //!
 //! Dark theme with accent colors for Descartes.
 
+#![allow(dead_code)]
+
 use iced::Color;
 
 /// Primary accent color (blue)

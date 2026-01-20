@@ -77,19 +77,15 @@ impl ClaudeCodeHarness {
         resume: bool,
         append_system_prompt: Option<&str>,
     ) -> Vec<String> {
-        let mut args = vec![];
-
-        // Print mode for streaming JSON output
-        args.push("-p".to_string());
-        args.push(message.to_string());
-
-        // Output format
-        args.push("--output-format".to_string());
-        args.push("stream-json".to_string());
-
-        // Model
-        args.push("--model".to_string());
-        args.push(session.model.clone());
+        // Initialize with base arguments: print mode, output format, and model
+        let mut args = vec![
+            "-p".to_string(),
+            message.to_string(),
+            "--output-format".to_string(),
+            "stream-json".to_string(),
+            "--model".to_string(),
+            session.model.clone(),
+        ];
 
         // Permissions
         if self.skip_permissions {

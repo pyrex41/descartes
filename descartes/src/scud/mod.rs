@@ -61,6 +61,18 @@ pub fn complete(config: &Config, task_id: &str) -> Result<()> {
     }
 }
 
+/// List all tasks from the active group
+pub fn list_tasks(config: &Config) -> Result<Vec<Task>> {
+    let storage = create_storage(config)?;
+
+    let phase = match storage.load_active_group() {
+        Ok(p) => p,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    Ok(phase.tasks.clone())
+}
+
 /// Get task waves (parallel execution potential)
 /// Returns groups of task IDs that can be executed in parallel
 pub fn waves(config: &Config) -> Result<Vec<Vec<String>>> {

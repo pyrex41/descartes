@@ -22,6 +22,10 @@ pub struct TaskInfo {
 pub struct AppState {
     /// Task waves (parallel execution groups)
     pub waves: Vec<Vec<TaskInfo>>,
+    /// All loaded tasks (flat list for reference)
+    pub tasks: Vec<TaskInfo>,
+    /// Currently active tag filter
+    pub active_tag: Option<String>,
     /// Current agent status
     pub agent_status: AgentStatus,
     /// Currently executing task

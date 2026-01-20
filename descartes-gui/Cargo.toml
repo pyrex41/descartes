@@ -25,6 +25,7 @@ descartes = { version = "0.3", path = "../descartes", package = "descartes-cli" 
 
 # Async
 tokio = { version = "1", features = ["full", "sync"] }
+async-stream = "0.3"
 
 # Serialization (for SCUD bridge JSON parsing)
 serde = { version = "1", features = ["derive"] }

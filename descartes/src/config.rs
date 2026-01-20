@@ -640,6 +640,48 @@ impl GuidanceConfig {
     }
 }
 
+/// Initialize .descartes directory with options
+pub fn init_with_options(force: bool) -> Result<()> {
+    let descartes_dir = PathBuf::from(".descartes");
+
+    if !descartes_dir.exists() {
+        std::fs::create_dir_all(&descartes_dir)?;
+    }
+
+    // Create transcripts directory
+    let transcripts_dir = descartes_dir.join("transcripts");
+    if !transcripts_dir.exists() {
+        std::fs::create_dir_all(&transcripts_dir)?;
+    }
+
+    // Create default config if it doesn't exist or force is true
+    let config_path = descartes_dir.join("config.toml");
+    if !config_path.exists() || force {
+        let default_config = Config::default();
+        let config_str =
+            toml::to_string_pretty(&default_config).map_err(|e| Error::Config(e.to_string()))?;
+        std::fs::write(&config_path, config_str)?;
+    }
+
+    // Create prompts directory
+    let prompts_dir = PathBuf::from("prompts");
+    if !prompts_dir.exists() {
+        std::fs::create_dir_all(&prompts_dir)?;
+
+        // Write default prompts
+        std::fs::write(
+            prompts_dir.join("plan.md"),
+            include_str!("../prompts/plan.md"),
+        )?;
+        std::fs::write(
+            prompts_dir.join("build.md"),
+            include_str!("../prompts/build.md"),
+        )?;
+    }
+
+    Ok(())
+}
+
 /// Initialize .descartes directory
 pub fn init() -> Result<()> {
     let descartes_dir = PathBuf::from(".descartes");

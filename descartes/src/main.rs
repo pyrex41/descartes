@@ -75,7 +75,15 @@ enum Commands {
     },
 
     /// Show task waves (parallel execution potential)
-    Waves,
+    Waves {
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+
+        /// Output as streaming JSON events (one per wave)
+        #[arg(long)]
+        json_events: bool,
+    },
 
     /// Initialize .descartes directory
     Init {
@@ -194,14 +202,6 @@ enum Commands {
         #[arg(long)]
         working_dir: Option<std::path::PathBuf>,
 
-        /// Use SCUD swarm for execution (default: true)
-        /// This delegates to `scud swarm` for visible terminal windows
-        #[arg(long, default_value = "true")]
-        use_scud: bool,
-
-        /// Disable SCUD delegation and use built-in headless executor
-        #[arg(long)]
-        no_use_scud: bool,
     },
 
     /// Spawn SCUD agents for the next available tasks (thin wrapper around scud spawn)
@@ -348,8 +348,15 @@ async fn main() -> Result<()> {
             info!("Marked task {} complete", task_id);
         }
 
-        Commands::Waves => {
-            scud::show_waves(&config)?;
+        Commands::Waves { json, json_events } => {
+            let format = if json_events {
+                scud::WavesOutputFormat::JsonEvents
+            } else if json {
+                scud::WavesOutputFormat::Json
+            } else {
+                scud::WavesOutputFormat::Human
+            };
+            scud::show_waves_with_format(&config, format)?;
         }
 
         Commands::Init {
@@ -467,15 +474,13 @@ async fn main() -> Result<()> {
             plan,
             spec_files,
             max_spec_tokens,
-            verify,
+            verify: _,
             harness,
-            model,
+            model: _,
             round_size,
             no_validate,
             dry_run,
             working_dir,
-            use_scud,
-            no_use_scud,
         } => {
             let working_dir =
                 working_dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
@@ -566,44 +571,25 @@ async fn main() -> Result<()> {
                 spec_config.additional_specs.push(spec_file);
             }
 
-            // Determine whether to use SCUD delegation
-            // --no-use-scud overrides --use-scud
-            let should_use_scud = use_scud && !no_use_scud;
+            // Task 9.2: Enrich spec config with SCUD/backpressure integration
+            let spec_config = descartes::spec::enrich_spec_config(
+                spec_config,
+                &working_dir,
+                Some(&final_tag),
+            )?;
 
-            if should_use_scud {
-                // Write spec to SCUD guidance
-                descartes::spec::write_spec_to_guidance(&spec_config, &working_dir)?;
+            // Write spec to SCUD guidance
+            descartes::spec::write_spec_to_guidance(&spec_config, &working_dir)?;
 
-                // Delegate to scud swarm
-                run_scud_swarm(
-                    &final_tag,
-                    &harness,
-                    round_size,
-                    no_validate,
-                    dry_run,
-                    &working_dir,
-                )?;
-            } else {
-                // Fallback: use built-in headless executor (deprecated path)
-                info!("Using built-in headless executor (--no-use-scud)");
-
-                let executor = descartes::SwarmExecutor::new(
-                    final_tag,
-                    spec_config,
-                    verify,
-                    harness,
-                    model,
-                    round_size,
-                    !no_validate,
-                    working_dir,
-                )?;
-
-                if dry_run {
-                    executor.dry_run().await?;
-                } else {
-                    executor.run(&config).await?;
-                }
-            }
+            // Delegate to scud swarm
+            run_scud_swarm(
+                &final_tag,
+                &harness,
+                round_size,
+                no_validate,
+                dry_run,
+                &working_dir,
+            )?;
         }
 
         Commands::ScudSpawn {
@@ -632,6 +618,13 @@ async fn main() -> Result<()> {
             for spec_file in spec_files {
                 spec_config.additional_specs.push(spec_file);
             }
+
+            // Task 9.2: Enrich spec config with SCUD/backpressure integration
+            let spec_config = descartes::spec::enrich_spec_config(
+                spec_config,
+                &working_dir,
+                scud_tag.as_deref(),
+            )?;
 
             // Write spec to SCUD guidance
             descartes::spec::write_spec_to_guidance(&spec_config, &working_dir)?;
@@ -776,8 +769,7 @@ fn run_scud_swarm(
     // Check if scud is in PATH
     if which::which("scud").is_err() {
         return Err(descartes::Error::Command(
-            "scud CLI not found in PATH. Install SCUD or use --no-use-scud for headless execution."
-                .to_string(),
+            "scud CLI not found in PATH. Install SCUD for swarm execution.".to_string(),
         ));
     }
 
